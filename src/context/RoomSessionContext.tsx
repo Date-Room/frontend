@@ -34,6 +34,7 @@ export type RoomSession = RoomIdentity & {
 
 const Ctx = createContext<RoomSession | null>(null);
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook co-located with its provider; extracting it would ripple imports for a dev-only Fast Refresh hint
 export function useRoomSession(): RoomSession {
   const s = useContext(Ctx);
   if (!s) throw new Error("useRoomSession must be used within a RoomSessionProvider");
