@@ -68,7 +68,12 @@ export default function Landing() {
             <li><a href="#friends" className="transition hover:text-lpcream">For friends</a></li>
             <li><a href="#pricing" className="transition hover:text-lpcream">Pricing</a></li>
           </ul>
-          <Link to={START} className="lp-btn !px-5 !py-2.5 text-sm">Create a room</Link>
+          <div className="flex items-center gap-3 sm:gap-5">
+            <Link to="/join" className="hidden text-sm text-lpmuted transition-colors hover:text-lpcream sm:inline">
+              Join a room
+            </Link>
+            <Link to={START} className="lp-btn !px-5 !py-2.5 text-sm">Create a room</Link>
+          </div>
         </nav>
       </header>
 
@@ -89,6 +94,10 @@ export default function Landing() {
               <Link to={START} className="lp-btn">Create your room</Link>
               <a href="#how" className="lp-link">See how it works</a>
             </div>
+            <p className="mt-6 text-[15px] text-lpmuted">
+              Got a code from your match?{" "}
+              <Link to="/join" className="lp-link">Join a room</Link>
+            </p>
           </div>
         </div>
       </section>
@@ -339,6 +348,7 @@ export default function Landing() {
           <p className="mt-8 text-lg text-lpcream/85">Two minutes to make a room. The next move is theirs.</p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-6">
             <Link to={START} className="lp-btn">Create an account</Link>
+            <Link to="/join" className="lp-link">Join a room</Link>
             <a href="#pricing" className="lp-link">View pricing plans</a>
           </div>
         </div>
