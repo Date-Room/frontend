@@ -49,8 +49,10 @@ function RoomShell({ expiresAt }: { expiresAt: string | null }) {
       orbs={false}
       vignette={false}
       grain={false}
-      className="min-h-0 h-screen flex flex-col overflow-hidden bg-[#0a0508]"
+      className="h-screen flex overflow-hidden bg-[#0a0508]"
     >
+      {/* Left column: video + chrome (full width on mobile, flex-1 beside the panel on desktop) */}
+      <div className="flex-1 min-w-0 flex flex-col relative">
       {/* Header chrome over the video */}
       <header className="relative z-20 flex items-center justify-between gap-2 px-4 sm:px-6 py-3 shrink-0">
         <div className="flex items-center gap-2 rounded-full bg-black/45 backdrop-blur px-3 py-1.5 min-w-0">
@@ -73,8 +75,8 @@ function RoomShell({ expiresAt }: { expiresAt: string | null }) {
         <RoomVideo />
       </main>
 
-      {/* Activities launcher (mobile's "Apps") */}
-      <div className="relative z-20 flex justify-center py-3 shrink-0">
+      {/* Activities launcher — mobile only; desktop shows the docked panel */}
+      <div className="lg:hidden relative z-20 flex justify-center py-3 shrink-0">
         <button
           type="button"
           onClick={() => setTrayOpen(true)}
@@ -82,6 +84,7 @@ function RoomShell({ expiresAt }: { expiresAt: string | null }) {
         >
           <LayoutGrid className="w-4 h-4" /> Activities
         </button>
+      </div>
       </div>
 
       <ActivityTray

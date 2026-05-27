@@ -69,25 +69,46 @@ function sendReaction(emoji: string) {
   window.dispatchEvent(new CustomEvent("dr-react", { detail: emoji }));
 }
 
-/** Composite the two on-screen videos into a framed square and download it. */
-function capturePhoto(partnerEl: HTMLVideoElement | null, selfEl: HTMLVideoElement | null) {
+/** Composite the two on-screen videos into a framed keepsake (mobile parity). */
+function capturePhoto(
+  partnerEl: HTMLVideoElement | null,
+  selfEl: HTMLVideoElement | null,
+  partnerName: string,
+  selfName: string,
+) {
   const S = 1080;
   const canvas = document.createElement("canvas");
   canvas.width = S;
   canvas.height = S;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  // Warm backdrop.
-  const g = ctx.createLinearGradient(0, 0, S, S);
-  g.addColorStop(0, "#1A1410");
-  g.addColorStop(1, "#24160C");
-  ctx.fillStyle = g;
+
+  // Warm dark backdrop.
+  const bg = ctx.createLinearGradient(0, 0, S, S);
+  bg.addColorStop(0, "#1A1410");
+  bg.addColorStop(1, "#24160C");
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, S, S);
 
+  // Faint deterministic hearts.
+  ctx.save();
+  ctx.globalAlpha = 0.05;
+  ctx.fillStyle = "#D4826A";
+  ctx.font = "28px serif";
+  for (let r = 0; r < 9; r++) {
+    for (let c = 0; c < 9; c++) {
+      if ((r + c) % 2 === 0) ctx.fillText("♥", 40 + c * 120, 70 + r * 120);
+    }
+  }
+  ctx.restore();
+
+  const pad = 28;
+  const gap = 16;
+  const w = (S - pad * 2 - gap) / 2;
+  const h = S - pad * 2 - 110; // leave a footer band
+  const y = pad;
+
   const drawTile = (el: HTMLVideoElement | null, x: number, mirror: boolean) => {
-    const w = (S - 60) / 2;
-    const h = S - 120;
-    const y = 30;
     ctx.save();
     ctx.beginPath();
     ctx.roundRect(x, y, w, h, 28);
@@ -96,28 +117,44 @@ function capturePhoto(partnerEl: HTMLVideoElement | null, selfEl: HTMLVideoEleme
       const scale = Math.max(w / el.videoWidth, h / el.videoHeight);
       const dw = el.videoWidth * scale;
       const dh = el.videoHeight * scale;
+      const dx = x + (w - dw) / 2;
+      const dy = y + (h - dh) / 2;
       if (mirror) {
-        ctx.translate(x + w, 0);
+        // Flip around the tile's centre so the self-view reads as the user sees it.
+        ctx.translate(x + w / 2, 0);
         ctx.scale(-1, 1);
-        ctx.drawImage(el, w - (dw - w) / 2 - dw + w, y - (dh - h) / 2, dw, dh);
-      } else {
-        ctx.drawImage(el, x - (dw - w) / 2, y - (dh - h) / 2, dw, dh);
+        ctx.translate(-(x + w / 2), 0);
       }
+      ctx.drawImage(el, dx, dy, dw, dh);
     } else {
       ctx.fillStyle = "#2a2018";
       ctx.fillRect(x, y, w, h);
     }
     ctx.restore();
+    // Amber rim.
+    const rim = ctx.createLinearGradient(x, y, x, y + h);
+    rim.addColorStop(0, "rgba(212,130,106,0.7)");
+    rim.addColorStop(1, "rgba(212,130,106,0.25)");
+    ctx.strokeStyle = rim;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 28);
+    ctx.stroke();
   };
-  drawTile(partnerEl, 20, false);
-  drawTile(selfEl, S / 2 + 10, true);
 
-  ctx.fillStyle = "rgba(255,236,210,0.85)";
-  ctx.font = "italic 34px Georgia, serif";
+  drawTile(partnerEl, pad, false);
+  drawTile(selfEl, pad + w + gap, true);
+
+  // Footer: names + date.
   ctx.textAlign = "center";
-  ctx.fillText(new Date().toLocaleDateString(), S / 2, S - 50);
+  ctx.fillStyle = "rgba(255,236,210,0.92)";
+  ctx.font = "italic 40px Georgia, serif";
+  ctx.fillText(`${partnerName} & ${selfName}  ♥`, S / 2, S - 56);
+  ctx.fillStyle = "rgba(255,236,210,0.5)";
+  ctx.font = "22px Georgia, serif";
+  ctx.fillText(new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }), S / 2, S - 24);
 
-  const url = canvas.toDataURL("image/jpeg", 0.92);
+  const url = canvas.toDataURL("image/jpeg", 0.94);
   const a = document.createElement("a");
   a.href = url;
   a.download = `dateroom-${Date.now()}.jpg`;
@@ -146,9 +183,17 @@ function Stage() {
         window.setTimeout(tick, 250);
       } else {
         setCountdown(null);
+        const partnerName =
+          room.presence
+            .map((p) => ({ id: p.sender_id, name: p.name }))
+            .find((p) => typeof p.id === "string" && p.id !== room.senderId && typeof p.name === "string")?.name as
+            | string
+            | undefined;
         capturePhoto(
           partnerWrapRef.current?.querySelector("video") ?? null,
           selfWrapRef.current?.querySelector("video") ?? null,
+          partnerName || "Them",
+          room.displayName || "You",
         );
       }
     };
@@ -161,6 +206,7 @@ function Stage() {
       const at = typeof e.payload.capture_at === "number" ? e.payload.capture_at : Date.now() + 3000;
       scheduleCapture(at);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room.channel]);
 
   function startCapture() {
