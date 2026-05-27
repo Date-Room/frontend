@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, LogOut, MessageSquare, ChevronRight, History, Heart, User, Settings as SettingsIcon, Globe } from "lucide-react";
+import { Plus, LogOut, MessageSquare, ChevronRight, History, Heart, User, Settings as SettingsIcon, Globe, KeyRound } from "lucide-react";
 import { BRAND_NAME } from "@/lib/constants";
 import { supabase } from "@/lib/supabaseClient";
 import { getMe } from "@/lib/users";
@@ -13,6 +13,12 @@ const ALIVE_STATES = new Set<RoomStateName>(["created", "waiting", "live", "acti
 const ENDED_STATES = new Set<RoomStateName>(["ended", "grace", "sub_lapsed"]);
 
 type Tab = "history" | "rooms" | "profile";
+
+const TABS: { id: Tab; label: string; icon: typeof Heart }[] = [
+  { id: "rooms", label: "Rooms", icon: Heart },
+  { id: "history", label: "History", icon: History },
+  { id: "profile", label: "Profile", icon: User },
+];
 
 export default function Home() {
   const navigate = useNavigate();
@@ -35,38 +41,87 @@ export default function Home() {
     navigate("/auth");
   }
 
+  const initial = (me?.display_name || me?.email || "?")[0]?.toUpperCase();
+
   return (
     <PageShell>
+      {/* Header — logo always; on desktop it also carries the tab nav + account. */}
       <header className="fixed top-0 left-0 right-0 z-40 glass-subtle backdrop-blur-xl border-b border-white/[0.04]">
-        <div className="max-w-2xl mx-auto px-6 h-16 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full overflow-hidden ring-1 ring-white/10">
-            <img src="/logo.png" alt={`${BRAND_NAME} logo`} className="w-full h-full object-cover scale-[1.05]" />
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-6">
+          <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl ring-1 ring-white/10">
+            <img src="/dateroom-logo.png" alt={`${BRAND_NAME} logo`} className="h-full w-full object-cover" />
           </div>
-          <span className="font-serif italic text-xl text-cream font-semibold">{BRAND_NAME}</span>
+          <span className="font-serif text-xl font-semibold italic text-cream">{BRAND_NAME}</span>
+
+          {/* Desktop tab nav */}
+          <nav className="ml-8 hidden items-center gap-1 lg:flex">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  "rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                  tab === t.id ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-cream",
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+
+          {/* Desktop account cluster */}
+          <div className="ml-auto hidden items-center gap-3 lg:flex">
+            <button
+              type="button"
+              onClick={() => setTab("profile")}
+              className="flex items-center gap-2.5 rounded-full border border-white/[0.08] bg-white/[0.03] py-1 pl-1 pr-3.5 transition-colors hover:border-primary/25"
+            >
+              {me?.photo_url ? (
+                <img src={me.photo_url} alt="" className="h-7 w-7 rounded-full object-cover" />
+              ) : (
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-rosegold/40 to-romantic/30 font-serif text-sm text-cream">
+                  {initial}
+                </span>
+              )}
+              <span className="max-w-[10rem] truncate text-sm text-cream">{me?.display_name || me?.email?.split("@")[0]}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              aria-label="Sign out"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-white/[0.06] hover:text-cream"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-6 pt-24 pb-28 relative z-10 min-h-screen">
+      <main className="relative z-10 mx-auto min-h-screen max-w-6xl px-6 pt-24 pb-28 lg:pb-16">
         {tab === "rooms" && (
-          <div className="space-y-6 animate-fade-in">
-            <button
-              type="button"
-              onClick={() => navigate("/create")}
-              className="w-full btn-primary py-5 flex items-center justify-center gap-3 rounded-[1.35rem] shadow-[0_12px_48px_rgba(212,130,106,0.28)]"
-            >
-              <Plus className="w-5 h-5" strokeWidth={2.25} />
-              <span className="font-medium tracking-wide">Create a new room</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/join")}
-              className="w-full -mt-3 flex items-center justify-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-cream transition py-2"
-            >
-              Join with code
-            </button>
+          <div className="animate-fade-in space-y-8">
+            {/* Action bar — full-width stacked on mobile, contained row on desktop. */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={() => navigate("/create")}
+                className="btn-primary flex items-center justify-center gap-3 rounded-[1.35rem] py-5 shadow-[0_12px_48px_rgba(212,130,106,0.28)] sm:flex-1 sm:py-4 lg:max-w-xs"
+              >
+                <Plus className="h-5 w-5" strokeWidth={2.25} />
+                <span className="font-medium tracking-wide">Create a new room</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/join")}
+                className="flex items-center justify-center gap-2 rounded-[1.35rem] border border-white/[0.08] py-4 text-xs uppercase tracking-[0.2em] text-muted-foreground transition hover:border-primary/25 hover:text-cream sm:px-8"
+              >
+                <KeyRound className="h-4 w-4" /> Join with code
+              </button>
+            </div>
 
             {aliveRooms.length > 0 ? (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {aliveRooms.map((r) => {
                   const isHost = me ? r.host_id === me.id : false;
                   return (
@@ -74,16 +129,16 @@ export default function Home() {
                       key={r.id}
                       type="button"
                       onClick={() => (isHost ? navigate(`/rooms/${r.id}/pre`) : enterRoom(r))}
-                      className="w-full text-left glass-strong grain rounded-[1.75rem] p-5 flex items-center justify-between border border-white/[0.06] hover:border-primary/25 hover:bg-white/[0.04] transition-all group"
+                      className="group flex items-center justify-between rounded-[1.75rem] border border-white/[0.06] glass-strong grain p-5 text-left transition-all hover:border-primary/25 hover:bg-white/[0.04]"
                     >
-                      <div className="flex items-center gap-4 min-w-0">
-                        <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/15 flex items-center justify-center text-xl shrink-0">
+                      <div className="flex min-w-0 items-center gap-4">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-primary/15 bg-primary/10 text-xl">
                           {r.persistence === "persistent" ? "🏠" : "🕯️"}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-serif italic text-lg text-cream truncate">
+                          <p className="truncate font-serif text-lg italic text-cream">
                             {r.persistence === "persistent" ? "Our Room" : "Tonight"}
-                            <span className="text-muted-foreground/70 not-italic text-sm"> · {isHost ? "host" : "guest"}</span>
+                            <span className="text-sm not-italic text-muted-foreground/70"> · {isHost ? "host" : "guest"}</span>
                           </p>
                           <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                             Code {r.code}
@@ -91,19 +146,19 @@ export default function Home() {
                           </p>
                         </div>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                      <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition-all group-hover:translate-x-1 group-hover:text-primary" />
                     </button>
                   );
                 })}
               </div>
             ) : (
-              <div className="rounded-[2.5rem] border border-dashed border-white/[0.1] py-20 px-8 flex flex-col items-center justify-center text-center space-y-5">
-                <div className="flex h-[5rem] w-[5rem] items-center justify-center rounded-full bg-gradient-to-br from-primary/25 via-primary/10 to-transparent ring-1 ring-primary/25">
-                  <MessageSquare className="w-9 h-9 text-primary/75" strokeWidth={1.25} />
+              <div className="flex flex-col items-center justify-center space-y-5 rounded-[2.5rem] border border-dashed border-white/[0.1] px-8 py-20 text-center">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/25 via-primary/10 to-transparent ring-1 ring-primary/25">
+                  <MessageSquare className="h-9 w-9 text-primary/75" strokeWidth={1.25} />
                 </div>
-                <div className="space-y-2 max-w-xs">
-                  <p className="text-cream font-serif italic text-xl">No rooms yet.</p>
-                  <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Tap + to create one and share the invite</p>
+                <div className="max-w-xs space-y-2">
+                  <p className="font-serif text-xl italic text-cream">No rooms yet.</p>
+                  <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Create one and share the invite</p>
                 </div>
               </div>
             )}
@@ -111,86 +166,84 @@ export default function Home() {
         )}
 
         {tab === "history" && (
-          <div className="space-y-3 animate-fade-in">
-            <h2 className="text-[11px] uppercase tracking-[0.35em] text-muted-foreground px-1 mb-2">History</h2>
+          <div className="animate-fade-in space-y-4">
+            <h2 className="mb-2 px-1 text-[11px] uppercase tracking-[0.35em] text-muted-foreground">History</h2>
             {endedRooms.length === 0 ? (
-              <div className="rounded-[2rem] border border-dashed border-white/[0.1] py-20 px-8 text-center space-y-2">
-                <p className="text-cream font-serif italic text-lg">No past sessions yet.</p>
+              <div className="space-y-2 rounded-[2rem] border border-dashed border-white/[0.1] px-8 py-20 text-center">
+                <p className="font-serif text-lg italic text-cream">No past sessions yet.</p>
                 <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Rooms move here once their session ends</p>
               </div>
             ) : (
-              endedRooms.map((r) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => navigate(`/room/${r.id}/recap`)}
-                  className="w-full text-left glass grain rounded-[1.5rem] p-4 flex items-center justify-between border border-white/[0.06] hover:border-primary/25 transition group"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-full bg-secondary/60 flex items-center justify-center text-lg shrink-0">🕯️</div>
-                    <div className="min-w-0">
-                      <p className="text-cream truncate">{r.persistence === "persistent" ? "Our Room" : "Tonight"}</p>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Code {r.code} · recap</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {endedRooms.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => navigate(`/room/${r.id}/recap`)}
+                    className="group flex items-center justify-between rounded-[1.5rem] border border-white/[0.06] glass grain p-4 text-left transition hover:border-primary/25"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary/60 text-lg">🕯️</div>
+                      <div className="min-w-0">
+                        <p className="truncate text-cream">{r.persistence === "persistent" ? "Our Room" : "Tonight"}</p>
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Code {r.code} · recap</p>
+                      </div>
                     </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition" />
-                </button>
-              ))
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition group-hover:text-primary" />
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         )}
 
         {tab === "profile" && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="rounded-3xl p-6 glass-strong grain flex items-center gap-4">
+          <div className="mx-auto max-w-xl animate-fade-in space-y-6">
+            <div className="flex items-center gap-4 rounded-3xl p-6 glass-strong grain">
               {me?.photo_url ? (
-                <img src={me.photo_url} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-rosegold/20" />
+                <img src={me.photo_url} alt="" className="h-16 w-16 rounded-full border-2 border-rosegold/20 object-cover" />
               ) : (
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-rosegold/30 to-romantic/30 border-2 border-rosegold/20 flex items-center justify-center text-2xl font-serif text-cream">
-                  {(me?.display_name || me?.email || "?")[0]?.toUpperCase()}
+                <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-rosegold/20 bg-gradient-to-br from-rosegold/30 to-romantic/30 font-serif text-2xl text-cream">
+                  {initial}
                 </div>
               )}
               <div className="min-w-0">
-                <p className="text-lg font-medium text-cream truncate">{me?.display_name || me?.email?.split("@")[0]}</p>
-                <p className="text-xs text-muted-foreground truncate">{me?.email}</p>
+                <p className="truncate text-lg font-medium text-cream">{me?.display_name || me?.email?.split("@")[0]}</p>
+                <p className="truncate text-xs text-muted-foreground">{me?.email}</p>
                 {me?.country && (
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mt-1 flex items-center gap-1">
-                    <Globe className="w-3 h-3" /> {me.country}
+                  <p className="mt-1 flex items-center gap-1 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                    <Globe className="h-3 w-3" /> {me.country}
                   </p>
                 )}
               </div>
             </div>
-            <button type="button" onClick={() => navigate("/settings")} className="w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 glass grain hover:bg-secondary/40 transition">
-              <SettingsIcon className="w-4 h-4 text-muted-foreground" />
+            <button type="button" onClick={() => navigate("/settings")} className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 glass grain transition hover:bg-secondary/40">
+              <SettingsIcon className="h-4 w-4 text-muted-foreground" />
               <span className="flex-1 text-left text-sm text-cream">Manage profile</span>
-              <ChevronRight className="w-4 h-4 text-muted-foreground/50" />
+              <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
             </button>
-            <button type="button" onClick={handleSignOut} className="w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 glass grain hover:bg-secondary/40 transition">
-              <LogOut className="w-4 h-4 text-muted-foreground" />
+            <button type="button" onClick={handleSignOut} className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 glass grain transition hover:bg-secondary/40">
+              <LogOut className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-cream">Sign out</span>
             </button>
           </div>
         )}
       </main>
 
-      {/* Bottom nav — mobile parity: History / Rooms / Profile */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 glass-subtle backdrop-blur-xl border-t border-white/[0.06]">
-        <div className="max-w-2xl mx-auto px-6 h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] flex">
-          {([
-            { id: "history" as const, label: "History", icon: History },
-            { id: "rooms" as const, label: "Rooms", icon: Heart },
-            { id: "profile" as const, label: "Profile", icon: User },
-          ]).map((t) => (
+      {/* Bottom nav — mobile only; desktop uses the header tabs. */}
+      <nav className="fixed bottom-0 left-0 right-0 z-40 glass-subtle backdrop-blur-xl border-t border-white/[0.06] lg:hidden">
+        <div className="mx-auto flex h-[calc(4rem+env(safe-area-inset-bottom))] max-w-2xl px-6 pb-[env(safe-area-inset-bottom)]">
+          {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
               className={cn(
-                "flex-1 flex flex-col items-center justify-center gap-1 transition-colors",
+                "flex flex-1 flex-col items-center justify-center gap-1 transition-colors",
                 tab === t.id ? "text-primary" : "text-muted-foreground hover:text-cream",
               )}
             >
-              <t.icon className="w-5 h-5" fill={tab === t.id && t.id !== "history" ? "currentColor" : "none"} />
+              <t.icon className="h-5 w-5" fill={tab === t.id && t.id !== "history" ? "currentColor" : "none"} />
               <span className="text-[10px] uppercase tracking-[0.18em]">{t.label}</span>
             </button>
           ))}
