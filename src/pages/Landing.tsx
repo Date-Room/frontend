@@ -1,291 +1,403 @@
 import { Link } from "react-router-dom";
-import { 
-  ArrowRight, 
-  MessageSquare, 
-  Music, 
-  Video, 
-  Camera, 
-  Heart, 
-  ShieldCheck, 
+import { type ReactNode, type ComponentType } from "react";
+import {
+  ArrowRight,
   Sparkles,
-  ChevronRight,
+  Play,
+  Music2,
+  Zap,
+  Camera,
+  Flame,
+  HelpCircle,
+  MoreHorizontal,
+  MessageCircleQuestion,
+  ShieldCheck,
+  Lock,
+  PhoneOff,
+  KeyRound,
+  Mic,
+  Video,
+  PhoneOff as Hangup,
+  Twitter,
+  Instagram,
+  Mail,
 } from "lucide-react";
-import { BRAND_NAME, BRAND_TAGLINE } from "@/lib/constants";
-import { PageShell } from "@/components/PageShell";
 
-export default function Landing() {
+/**
+ * Marketing landing — a faithful port of date-room-escape.lovable.app.
+ * Structure/copy mirror the Lovable source; styling uses lp-prefixed helpers
+ * (.lp-display / .lp-eyebrow / .lp-btn / .lp-link / .lp-glow / .lp-vignette in
+ * index.css) and the warm `lp*` palette (tailwind.config). Action CTAs route
+ * to /auth; in-page links use section anchors.
+ */
+
+const START = "/auth"; // sign-in funnels every room/purchase action
+
+function Wordmark({ size = "text-xl" }: { size?: string }) {
   return (
-    <PageShell orbs={false} vignette={false} grain={false} className="bg-transparent">
-      {/* Fixed full-bleed hero art — focal point sits slightly right of center (tablet / video call) */}
-      <div className="fixed inset-0 z-[-20] overflow-hidden">
-        <img
-          src="/hero-virtual-date-rose-petals.png"
-          alt=""
-          className="h-full w-full min-h-[100dvh] object-cover animate-fade-in-slow object-[54%_44%] sm:object-[56%_46%] md:object-[58%_48%] xl:object-[60%_48%]"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/85 via-background/35 to-background/90" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,hsl(var(--background)_/_0.5)_120%)]" />
-      </div>
-
-      {/* Dynamic Ambient Background */}
-      <div className="fixed top-[-10%] left-[-10%] w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] bg-primary/10 rounded-full blur-[120px] -z-10 animate-breathe" />
-      <div className="fixed bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] max-w-[600px] max-h-[600px] bg-rosegold/10 rounded-full blur-[120px] -z-10 animate-pulse-glow" />
-      <div className="fixed top-[40%] left-[20%] w-[40vw] h-[40vw] max-w-[500px] max-h-[500px] bg-champagne/5 rounded-full blur-[100px] -z-10 animate-[breathe_7s_ease-in-out_infinite]" />
-
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-[60] px-6 py-6 flex items-center justify-between glass-subtle backdrop-blur-xl border-b border-white/[0.06]">
-        <div className="flex items-center gap-3.5 group cursor-pointer select-none">
-          <BrandLogoImage />
-          <span className="font-serif italic text-2xl tracking-wide text-cream font-semibold transition-colors duration-300 group-hover:text-rosegold">{BRAND_NAME}</span>
-        </div>
-        <div className="hidden md:flex items-center gap-10">
-          <a href="#features" className="text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-cream transition-colors">Features</a>
-          <a href="#about" className="text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-cream transition-colors">How it works</a>
-          <Link to="/pricing" className="text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-cream transition-colors">Pricing</Link>
-        </div>
-        <Link to="/auth?mode=signin" className="btn-secondary py-2.5 px-6 text-sm">
-          Log in
-        </Link>
-      </nav>
-
-      <div className="relative z-[1] flex min-h-[100dvh] w-full flex-col">
-        {/* Hero Section */}
-        <main className="flex flex-1 flex-col">
-      <section className="relative min-h-screen flex items-center justify-center pt-20 px-6">
-        {/* Hero-only accents (photo is fixed behind whole page — avoids stacking two copies) */}
-        <div className="pointer-events-none absolute inset-0 z-0">
-          <div
-            className="absolute inset-0 opacity-90"
-            style={{
-              maskImage: "linear-gradient(to bottom, black 55%, transparent 100%)",
-              WebkitMaskImage: "linear-gradient(to bottom, black 55%, transparent 100%)",
-            }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background" />
-          </div>
-          <div className="absolute top-[10%] left-[15%] w-[45vw] h-[45vw] bg-rosegold/18 rounded-full blur-[140px] mix-blend-screen animate-pulse-glow" />
-          <div className="absolute bottom-[20%] right-[15%] w-[40vw] h-[40vw] bg-champagne/14 rounded-full blur-[120px] mix-blend-color-dodge animate-breathe" />
-          <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/35" />
-        </div>
-
-        <div className="relative z-10 max-w-4xl text-center space-y-8 animate-fade-in">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-subtle text-[10px] uppercase tracking-[0.3em] text-rosegold mb-4">
-            <Sparkles className="w-3 h-3" />
-            A new way to connect
-          </div>
-          <h1 className="text-5xl md:text-8xl font-serif italic gradient-text leading-[1.1]">
-            {BRAND_TAGLINE}
-          </h1>
-          <p className="text-lg md:text-xl text-cream/70 max-w-2xl mx-auto font-light leading-relaxed">
-            Structured virtual dates that spark real conversation. After the match, before you meet. Keep long-distance partners connected between visits.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
-            <Link to="/auth" className="btn-primary flex items-center gap-2">
-              Start your first date <ArrowRight className="w-4 h-4" />
-            </Link>
-            <a href="#features" className="btn-secondary">
-              See the activities
-            </a>
-          </div>
-        </div>
-
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 opacity-40 animate-bounce">
-          <div className="w-px h-12 bg-gradient-to-b from-transparent to-cream/50" />
-          <span className="text-[10px] uppercase tracking-[0.4em] rotate-90 mb-4">Scroll</span>
-        </div>
-      </section>
-
-      {/* Narrative Section */}
-      <section id="about" className="py-32 px-6 relative z-10">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-          <div className="space-y-10 animate-fade-in">
-            <div className="space-y-4">
-              <h2 className="text-4xl md:text-6xl font-serif italic text-cream leading-tight">
-                The space between <br /> matching and meeting.
-              </h2>
-              <div className="w-20 h-px bg-rosegold" />
-            </div>
-            <p className="text-lg text-muted-foreground leading-relaxed">
-              Dating apps are great for discovery, but the transition to real life is often clumsy. {BRAND_NAME} provides a structured environment to truly get to know someone beyond the text bubble.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-              <div className="space-y-3">
-                <Heart className="text-rosegold w-6 h-6" />
-                <h3 className="text-cream font-serif italic text-xl">Deep Connection</h3>
-                <p className="text-sm text-muted-foreground">Move past small talk with 250+ curated conversation prompts.</p>
-              </div>
-              <div className="space-y-3">
-                <ShieldCheck className="text-rosegold w-6 h-6" />
-                <h3 className="text-cream font-serif italic text-xl">Privacy First</h3>
-                <p className="text-sm text-muted-foreground">End-to-end encrypted rooms that expire 24h after your session.</p>
-              </div>
-            </div>
-          </div>
-          <div className="relative group">
-            <div className="absolute -inset-4 rounded-3xl bg-primary/20 blur-3xl opacity-20 group-hover:opacity-30 transition-opacity" />
-            <div className="relative glass-strong rounded-[2.5rem] p-4 card-shadow overflow-hidden aspect-video">
-              <video 
-                src="/date-laughing.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
-                className="rounded-[2rem] w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none rounded-[2.5rem]" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Showcase */}
-      <section id="features" className="py-32 px-6 relative bg-black/10 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto text-center space-y-6 mb-20">
-          <h2 className="text-4xl md:text-6xl font-serif italic text-cream">Everything for a perfect evening.</h2>
-          <p className="text-muted-foreground max-w-xl mx-auto font-light">Five curated activities seamlessly synced between you and your partner. No awkward pauses, just flow.</p>
-        </div>
-
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <FeatureCard 
-            icon={<MessageSquare className="w-6 h-6" />}
-            title="The Deck"
-            description="250+ prompts across four levels of intimacy. Skip the small talk and dive deep."
-            image="/card-deck.png"
-          />
-          <FeatureCard 
-            icon={<Music className="w-6 h-6" />}
-            title="Synced DJ"
-            description="Take turns choosing the soundtrack. Shared music, synchronized playback."
-            image="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=800"
-          />
-          <FeatureCard 
-            icon={<Video className="w-6 h-6" />}
-            title="Watch Together"
-            description="Bring your favorite YouTube clips and enjoy them in real-time together."
-            image="https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&q=80&w=800"
-          />
-          <FeatureCard 
-            icon={<Sparkles className="w-6 h-6" />}
-            title="This or That"
-            description="Fast-paced prompts to reveal your core similarities and quirky differences."
-            image="/hero-date.png"
-          />
-          <FeatureCard 
-            icon={<Camera className="w-6 h-6" />}
-            title="Capture"
-            description="A shared polaroid moment. Take a selfie together to remember the night."
-            image="/lobby-hero.png"
-          />
-          <FeatureCard 
-            icon={<Sparkles className="w-6 h-6" />}
-            title="More coming soon."
-            description="We're constantly crafting new ways to share a little space."
-            image="/premium-bg.png"
-          />
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-40 px-6 relative overflow-hidden">
-        <div className="absolute inset-0 z-0">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px] opacity-30" />
-        </div>
-        <div className="relative z-10 max-w-4xl mx-auto text-center space-y-10">
-          <h2 className="text-5xl md:text-7xl font-serif italic text-cream leading-tight">
-            Ready to open the door?
-          </h2>
-          <p className="text-xl text-muted-foreground font-light max-w-2xl mx-auto leading-relaxed">
-            Invite your match or your partner to a space that belongs only to the two of you. 
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <Link to="/auth" className="btn-primary flex items-center gap-3 text-lg px-10">
-              Create an account <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link to="/pricing" className="text-cream hover:text-rosegold transition-colors flex items-center gap-2 group tracking-widest text-xs uppercase">
-              View Pricing Plans <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Link>
-          </div>
-        </div>
-      </section>
-        </main>
-
-      {/* Footer — mt-auto pins to viewport bottom when content is short; solid scrim separates from hero art */}
-      <footer className="relative z-20 mt-auto border-t border-white/10 bg-background/88 py-16 px-6 shadow-[0_-24px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-        <div className="mx-auto grid max-w-7xl grid-cols-1 gap-12 md:grid-cols-4">
-          <div className="col-span-2 space-y-6">
-            <div className="flex items-center gap-3.5">
-              <BrandLogoImage />
-              <span className="font-serif italic text-2xl font-semibold tracking-wide text-cream">{BRAND_NAME}</span>
-            </div>
-            <p className="text-muted-foreground max-w-sm font-light">
-              We're on a mission to bring intentionality and intimacy back to the digital dating experience.
-            </p>
-          </div>
-          <div className="space-y-6">
-            <h4 className="text-[10px] uppercase tracking-[0.3em] text-rosegold">Product</h4>
-            <ul className="space-y-4 text-sm text-muted-foreground">
-              <li><a href="#features" className="hover:text-cream transition-colors">Features</a></li>
-              <li><Link to="/pricing" className="hover:text-cream transition-colors">Pricing</Link></li>
-              <li><a href="#" className="hover:text-cream transition-colors">Security</a></li>
-            </ul>
-          </div>
-          <div className="space-y-6">
-            <h4 className="text-[10px] uppercase tracking-[0.3em] text-rosegold">Company</h4>
-            <ul className="space-y-4 text-sm text-muted-foreground">
-              <li><a href="#" className="hover:text-cream transition-colors">About Us</a></li>
-              <li><a href="#" className="hover:text-cream transition-colors">Privacy</a></li>
-              <li><a href="#" className="hover:text-cream transition-colors">Terms</a></li>
-            </ul>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto pt-20 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <p className="text-xs text-muted-foreground/50">
-            © {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.
-          </p>
-          <div className="flex items-center gap-6 text-muted-foreground/50 text-xs">
-            <span>Made with love for the digital-first generation.</span>
-          </div>
-        </div>
-      </footer>
-      </div>
-    </PageShell>
+    <a href="#top" className="group flex items-center gap-2.5">
+      <img src="/dateroom-logo.png" alt="DateRoom" width={32} height={32} className="h-8 w-8 rounded-md object-contain" />
+      <span className={`lp-serif italic ${size} tracking-tight text-lpcream`}>DateRoom</span>
+    </a>
   );
 }
 
-function BrandLogoImage() {
+function Eyebrow({ children }: { children: ReactNode }) {
+  return <p className="lp-eyebrow">{children}</p>;
+}
+
+export default function Landing() {
   return (
-    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-transparent p-0">
-      <img
-        src="/logo.png"
-        alt=""
-        className="h-full w-full scale-[1.05] object-cover drop-shadow-[0_0_8px_rgba(212,130,106,0.35)]"
-      />
+    <div id="top" className="lp min-h-screen bg-lpbg text-lpcream">
+      {/* Banner */}
+      <a href="#couples" className="block w-full border-b border-lpborder/40 bg-[oklch(0.13_0.01_40)]">
+        <div className="mx-auto max-w-7xl px-6 py-2.5 text-center text-[13px] text-lpmuted">
+          Already have your people? Meet the room that stays open{" "}
+          <ArrowRight className="ml-1 -mt-0.5 inline h-3.5 w-3.5 text-lppeach" />
+        </div>
+      </a>
+
+      {/* Nav */}
+      <header className="sticky top-0 z-40 border-b border-lpborder/40 bg-lpbg/75 backdrop-blur-md">
+        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-8 px-6">
+          <Wordmark />
+          <ul className="hidden items-center gap-8 text-sm text-lpmuted md:flex">
+            <li><a href="#how" className="transition hover:text-lpcream">How it works</a></li>
+            <li><a href="#inside" className="transition hover:text-lpcream">Inside the room</a></li>
+            <li><a href="#couples" className="transition hover:text-lpcream">For couples</a></li>
+            <li><a href="#friends" className="transition hover:text-lpcream">For friends</a></li>
+            <li><a href="#pricing" className="transition hover:text-lpcream">Pricing</a></li>
+          </ul>
+          <Link to={START} className="lp-btn !px-5 !py-2.5 text-sm">Create a room</Link>
+        </nav>
+      </header>
+
+      {/* Section 1 — Hero */}
+      <section className="lp-vignette relative overflow-hidden">
+        <img src="/lov/hero-candlelit.jpg" alt="Candlelit dinner table with a tablet showing a video date" width={1920} height={1280} className="absolute inset-0 h-full w-full object-cover" />
+        <div className="relative z-10 mx-auto max-w-7xl px-6 pb-32 pt-28 md:pb-48 md:pt-40">
+          <div className="max-w-2xl">
+            <Eyebrow>Before the phone number</Eyebrow>
+            <h1 className="lp-display mt-6 text-5xl text-lpcream md:text-7xl lg:text-8xl">
+              Date them before<br />you date them.
+            </h1>
+            <p className="mt-8 max-w-xl text-lg leading-relaxed text-lpcream/85 md:text-xl">
+              A private room you share with a six-digit code. No phone numbers. No awkward exchange. Just enough to know if it's worth meeting in real life.
+            </p>
+            <p className="lp-serif mt-5 text-xl italic text-lppeachsoft md:text-2xl">Not a video call. A date.</p>
+            <div className="mt-10 flex flex-wrap items-center gap-6">
+              <Link to={START} className="lp-btn">Create your room</Link>
+              <a href="#how" className="lp-link">See how it works</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 2 — Why this exists */}
+      <section className="mx-auto grid max-w-7xl items-center gap-16 px-6 py-28 md:grid-cols-2 md:py-40">
+        <div>
+          <Eyebrow>Why this exists</Eyebrow>
+          <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">
+            Dating got expensive.<br />In every sense.
+          </h2>
+          <p className="mt-8 text-lg leading-relaxed text-lpmuted">
+            First dates now cost a hundred bucks before the second drink. And the price of being wrong is higher: a number you can't take back, texts that won't stop, a stranger who knows where to find you.
+          </p>
+          <p className="mt-5 text-lg leading-relaxed text-lpmuted">
+            There should be a step between matching and meeting. A safer one. There wasn't. Now there is.
+          </p>
+        </div>
+        <div className="relative">
+          <img src="/lov/why-laptop.jpg" alt="A laptop glowing beside a single candle on dark wood" width={1280} height={1280} loading="lazy" className="lp-glow aspect-square w-full rounded-2xl object-cover" />
+        </div>
+      </section>
+
+      {/* Section 3 — How it works */}
+      <section id="how" className="border-t border-lpborder/40 bg-[oklch(0.14_0.012_40)]">
+        <div className="mx-auto max-w-7xl px-6 py-28 md:py-36">
+          <div className="mx-auto max-w-3xl text-center">
+            <Eyebrow>How it works</Eyebrow>
+            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">Three steps. Nothing to download.</h2>
+          </div>
+
+          {/* Room mockup */}
+          <div className="lp-glow mx-auto mt-16 max-w-4xl rounded-3xl border border-lpborder bg-[oklch(0.12_0.01_40)] p-5 md:p-7">
+            <div className="flex items-center justify-between text-xs text-lpmuted">
+              <div className="flex gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.55_0.18_25)]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.78_0.14_75)]" />
+                <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.70_0.14_140)]" />
+              </div>
+              <div className="font-mono tracking-[0.3em] text-lpcream/80">ROOM · 668 890</div>
+              <div className="text-[11px] uppercase tracking-widest text-lppeach">live</div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-4">
+              {["She", "He"].map((label, i) => (
+                <div key={label} className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-lpborder bg-gradient-to-br from-[oklch(0.22_0.02_40)] to-[oklch(0.10_0.01_40)]">
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div
+                      className="h-24 w-24 rounded-full opacity-70"
+                      style={{
+                        background:
+                          i === 0
+                            ? "radial-gradient(circle at 35% 30%, oklch(0.85 0.08 55), oklch(0.45 0.05 40))"
+                            : "radial-gradient(circle at 60% 35%, oklch(0.75 0.06 50), oklch(0.30 0.04 40))",
+                      }}
+                    />
+                  </div>
+                  <div className="lp-serif absolute bottom-3 left-3 text-xs italic text-lpcream/80">{label}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-center gap-4">
+              {[Mic, Video, Hangup].map((Icon, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`flex h-12 w-12 items-center justify-center rounded-full ${i === 2 ? "bg-[oklch(0.55_0.18_25)] text-lpcream" : "bg-lppeach text-lpbg"}`}
+                >
+                  <Icon className="h-5 w-5" />
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-20 grid gap-10 md:grid-cols-3">
+            {[
+              { n: "01", t: "Create the room.", d: "A six-digit code lands in your hand. Add an optional PIN if you want extra cover." },
+              { n: "02", t: "Share the code.", d: "Drop it in any DM. The other side opens it on the app or in any browser." },
+              { n: "03", t: "Open the door.", d: "Twenty minutes, an hour, whatever you booked. The room dissolves when you're done." },
+            ].map((s) => (
+              <div key={s.n}>
+                <div className="lp-serif text-3xl italic text-lppeach">{s.n}</div>
+                <h3 className="lp-display mt-3 text-2xl text-lpcream">{s.t}</h3>
+                <p className="mt-3 leading-relaxed text-lpmuted">{s.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Section 4 — Inside the room */}
+      <section id="inside" className="mx-auto max-w-7xl px-6 py-28 md:py-36">
+        <div className="max-w-3xl">
+          <Eyebrow>Why this beats FaceTime</Eyebrow>
+          <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">
+            Built for the part of dating that's actually hard: the first hour.
+          </h2>
+          <p className="mt-6 text-lg text-lpmuted">Awkward silences kill chemistry. The room comes with things to do.</p>
+        </div>
+
+        <div className="mt-16 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { Icon: MessageCircleQuestion, t: "The Deck", d: "Real questions, not small talk. Two hundred and fifty prompts that get past the weather." },
+            { Icon: Play, t: "Watch Together", d: "A YouTube clip, a stand-up set, a trailer. Synced down to the second." },
+            { Icon: Music2, t: "Synced DJ", d: "Play her the song. Play him the song back. Watch each other react." },
+            { Icon: Zap, t: "This or That", d: "Rapid-fire choices. The fastest way to find out you both hate camping." },
+            { Icon: Camera, t: "Capture", d: "A photo of the two of you, taken at the same moment from two cities. The only thing you keep." },
+            { Icon: Flame, t: "Truth or Dare", d: "Couple-safe by default. Tiered, so you choose how brave the room gets." },
+            { Icon: HelpCircle, t: "Two Truths and a Lie", d: "The classic. Now with a partner who can't quite read your face through the candlelight." },
+            { Icon: MoreHorizontal, t: "More coming", d: "Karaoke, the 36 Questions, Couple's Trivia, Draw and Guess. The next wave." },
+          ].map(({ Icon, t, d }) => (
+            <article key={t} className="group relative overflow-hidden rounded-2xl border border-lpborder bg-lpcard p-6 transition hover:border-lppeach/40">
+              <div
+                className="absolute inset-0 opacity-25 transition group-hover:opacity-40"
+                style={{ background: "radial-gradient(circle at 80% 0%, oklch(0.62 0.14 50 / 0.55), transparent 60%)" }}
+              />
+              <div className="relative">
+                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-lppeach/30 bg-lppeach/15">
+                  <Icon className="h-5 w-5 text-lppeach" />
+                </div>
+                <h3 className="lp-display mt-8 text-2xl text-lpcream">{t}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-lpmuted">{d}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* Section 5 — One room. Every app. */}
+      <section className="lp-vignette relative overflow-hidden border-y border-lpborder/40">
+        <img src="/lov/phone-code.jpg" alt="A phone showing a 6-digit code by candlelight" width={1280} height={1280} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="relative z-10 mx-auto max-w-7xl px-6 py-28 md:py-40">
+          <div className="max-w-2xl">
+            <Eyebrow>Why this works</Eyebrow>
+            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">One room. Every app.</h2>
+            <p className="mt-8 text-lg leading-relaxed text-lpcream/85">
+              Most daters keep three or four apps open at once. Tinder, Bumble, Hinge, all running at the same time. None of them will ever build a room that works across the others. DateRoom does.
+            </p>
+            <p className="mt-5 text-lg leading-relaxed text-lpcream/85">
+              The room is yours. Drop the code in whichever DM matters tonight. The next match opens the same room. You bring the room. Matches come to it.
+            </p>
+            <div className="mt-10 flex gap-3 text-xs uppercase tracking-[0.25em] text-lpmuted">
+              <span className="rounded-full border border-lpborder/60 px-3 py-1.5">Tinder</span>
+              <span className="rounded-full border border-lpborder/60 px-3 py-1.5">Bumble</span>
+              <span className="rounded-full border border-lpborder/60 px-3 py-1.5">Hinge</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 6 — For couples */}
+      <section id="couples" className="relative overflow-hidden">
+        <img src="/lov/couples-morning.jpg" alt="Warm morning light through curtains onto a rumpled bed" width={1920} height={1080} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, oklch(0.18 0.02 50 / 0.92) 0%, oklch(0.18 0.02 50 / 0.55) 60%, transparent 100%)" }} />
+        <div className="relative z-10 mx-auto max-w-7xl px-6 py-28 md:py-40">
+          <div className="max-w-xl">
+            <Eyebrow>Already yours?</Eyebrow>
+            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">A room that stays open.</h2>
+            <p className="mt-8 text-lg leading-relaxed text-lpcream/85">
+              When you live in different cities. When one of you is on the road. When you live in the same house but the kids are everywhere. Keep a room. Pin a vision board. Leave each other notes. Watch a movie at the same time from two time zones. Make the walls yours. It stays open as long as you want it to.
+            </p>
+            <Link to={START} className="lp-btn mt-10">Open a Together room</Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 7 — For friends */}
+      <section id="friends" className="relative overflow-hidden">
+        <img src="/lov/friends-evening.jpg" alt="Cozy living room with a laptop showing a group video call" width={1920} height={1080} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(270deg, oklch(0.18 0.02 50 / 0.92) 0%, oklch(0.18 0.02 50 / 0.55) 60%, transparent 100%)" }} />
+        <div className="relative z-10 mx-auto flex max-w-7xl justify-end px-6 py-28 md:py-40">
+          <div className="max-w-xl">
+            <Eyebrow>Or bring the group</Eyebrow>
+            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">Closer than the group chat.</h2>
+            <p className="mt-8 text-lg leading-relaxed text-lpcream/85">
+              Best friends in three different cities. Sisters in different countries. The book club that lives across time zones. Up to five of you in one room. Watch a movie at the same time. Play the deck. Argue about whose turn it is on the DJ. The group chat, but you can actually see each other.
+            </p>
+            <Link to={START} className="lp-btn mt-10">Open a room with friends</Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 8 — Pricing */}
+      <section id="pricing" className="mx-auto max-w-7xl px-6 py-28 md:py-36">
+        <div className="mx-auto max-w-3xl text-center">
+          <Eyebrow>Pricing</Eyebrow>
+          <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">Pick the room that fits.</h2>
+        </div>
+
+        <div className="mt-16 grid gap-5 md:grid-cols-3">
+          {[
+            { name: "Try", price: "Free", unit: "one date · 20 min", desc: "Ad-supported.", cta: "Start free" },
+            { name: "Date Pack", price: "$5", unit: "three dates · 1 hour each", desc: "For the early matches.", cta: "Get the pack" },
+            { name: "Long Pack", price: "$10", unit: "five dates · 2 hours each", desc: "For the ones with potential.", cta: "Get the pack" },
+          ].map((p) => (
+            <PricingCard key={p.name} {...p} />
+          ))}
+        </div>
+
+        <div className="mt-5 grid gap-5 md:grid-cols-2">
+          <PricingCard name="Together" price="$20" unit="/ month · for two" desc="A room that stays open. Custom walls. Unlimited everything." cta="Open Together" featured />
+          <PricingCard name="Crew" price="$25" unit="/ month · up to five" desc="Movie nights, game nights, book clubs, group hangs. Room for more chairs." cta="Open Crew" featured />
+        </div>
+      </section>
+
+      {/* Section 9 — App badges */}
+      <section className="mx-auto max-w-7xl px-6 pb-20 text-center">
+        <p className="lp-serif text-2xl italic text-lpcream">Coming soon to your pocket.</p>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+          {[
+            { top: "Coming soon on", bot: "App Store" },
+            { top: "Coming soon on", bot: "Google Play" },
+          ].map((b) => (
+            <div key={b.bot} className="flex cursor-not-allowed items-center gap-3 rounded-xl border border-lpborder bg-lpcard/60 px-6 py-3 text-left opacity-70">
+              <Sparkles className="h-6 w-6 text-lpmuted" />
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-lpmuted">{b.top}</div>
+                <div className="lp-serif text-lg italic text-lpcream">{b.bot}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Section 10 — Trust strip */}
+      <section className="border-y border-lpborder/40 bg-[oklch(0.14_0.012_40)]">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-10 gap-y-4 px-6 py-8 text-sm text-lpcream/85">
+          {[
+            { Icon: ShieldCheck, t: "Date safer." },
+            { Icon: PhoneOff, t: "No phone numbers exchanged." },
+            { Icon: KeyRound, t: "Code plus optional PIN." },
+            { Icon: Lock, t: "End-to-end encrypted." },
+          ].map(({ Icon, t }) => (
+            <div key={t} className="flex items-center gap-2.5">
+              <Icon className="h-4 w-4 text-lppeach" />
+              <span>{t}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Section 11 — Final CTA */}
+      <section id="cta" className="lp-vignette relative overflow-hidden">
+        <img src="/lov/final-door.jpg" alt="An open door with warm light spilling into a dark room" width={1920} height={1080} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="relative z-10 mx-auto max-w-3xl px-6 py-36 text-center md:py-48">
+          <h2 className="lp-display text-5xl text-lpcream md:text-7xl">Open the door.</h2>
+          <p className="mt-8 text-lg text-lpcream/85">Two minutes to make a room. The next move is theirs.</p>
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-6">
+            <Link to={START} className="lp-btn">Create an account</Link>
+            <a href="#pricing" className="lp-link">View pricing plans</a>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-lpborder/40 bg-[oklch(0.13_0.01_40)]">
+        <div className="mx-auto grid max-w-7xl gap-12 px-6 py-16 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+          <div>
+            <Wordmark size="text-2xl" />
+            <p className="mt-5 max-w-sm text-sm leading-relaxed text-lpmuted">
+              We're on a mission to bring intentionality and safety to the part of dating no one designed: the space between a match and a meeting.
+            </p>
+            <p className="lp-serif mt-5 italic text-lppeachsoft">The room before the phone number.</p>
+          </div>
+
+          <FooterCol title="Product" links={["Features", "Pricing", "How it works"]} />
+          <FooterCol title="Company" links={["About us", "Privacy", "Terms"]} />
+          <FooterCol title="Connect" links={["Twitter", "Instagram", "Contact"]} icons={[Twitter, Instagram, Mail]} />
+        </div>
+        <div className="border-t border-lpborder/40">
+          <div className="mx-auto max-w-7xl px-6 py-6 text-xs text-lpmuted">© DateRoom, {new Date().getFullYear()}.</div>
+        </div>
+      </footer>
     </div>
   );
 }
 
-function FeatureCard({ icon, title, description, image }: { icon: React.ReactNode, title: string, description: string, image: string }) {
+function PricingCard({ name, price, unit, desc, cta, featured }: { name: string; price: string; unit: string; desc: string; cta: string; featured?: boolean }) {
   return (
-    <div className="group relative overflow-hidden rounded-[2.5rem] glass card-shadow border-white/5 hover:border-white/20 transition-all duration-500">
-      <div className="aspect-[4/5] overflow-hidden">
-        <img 
-          src={image} 
-          alt={title} 
-          className="w-full h-full object-cover grayscale opacity-40 group-hover:grayscale-0 group-hover:opacity-100 group-hover:scale-110 transition-all duration-1000"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+    <div className={`relative flex flex-col rounded-2xl border p-7 ${featured ? "border-lppeach/40 bg-gradient-to-b from-[oklch(0.22_0.03_50)] to-lpcard" : "border-lpborder bg-lpcard"}`}>
+      <div className="text-sm uppercase tracking-widest text-lppeach">{name}</div>
+      <div className="mt-5 flex items-baseline gap-2">
+        <span className="lp-display text-5xl text-lpcream">{price}</span>
+        <span className="text-sm text-lpmuted">{unit}</span>
       </div>
-      <div className="absolute inset-0 p-8 flex flex-col justify-end space-y-4">
-        <div className="w-12 h-12 rounded-2xl glass-strong flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
-          {icon}
-        </div>
-        <div className="space-y-2 translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
-          <h3 className="text-2xl font-serif italic text-cream">{title}</h3>
-          <p className="text-sm text-muted-foreground leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity duration-700">
-            {description}
-          </p>
-        </div>
-      </div>
+      <p className="mt-4 flex-1 text-sm leading-relaxed text-lpmuted">{desc}</p>
+      <Link to={START} className="lp-btn mt-8 self-start text-sm">{cta}</Link>
+    </div>
+  );
+}
+
+function FooterCol({ title, links, icons }: { title: string; links: string[]; icons?: Array<ComponentType<{ className?: string }>> }) {
+  return (
+    <div>
+      <div className="lp-eyebrow !text-lpmuted">{title}</div>
+      <ul className="mt-5 space-y-3 text-sm text-lpcream/85">
+        {links.map((l, i) => {
+          const Icon = icons?.[i];
+          return (
+            <li key={l}>
+              <a href="#" className="inline-flex items-center gap-2 transition hover:text-lppeach">
+                {Icon ? <Icon className="h-4 w-4" /> : null}
+                {l}
+              </a>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

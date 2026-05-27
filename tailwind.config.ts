@@ -68,6 +68,15 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // Lovable-parity landing palette (warm candlelit; collision-free names)
+        lpbg: "#120c09",
+        lpcream: "#f3eadd",
+        lpmuted: "#a1968d",
+        lpcard: "#1c1411",
+        lppeach: "#f0ad7f",
+        lppeachsoft: "#efc8aa",
+        lpember: "#c7692c",
+        lpborder: "#342c28",
         // Brand colors
         cream: "hsl(var(--cream))",
         rosegold: "hsl(var(--rosegold))",

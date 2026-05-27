@@ -198,6 +198,77 @@
 .text-amber { color: #F5A623; }
 .bg-rosegold { background-color: #D4826A; }
 
+/* ── Lovable-parity landing page (ported from date-room-escape.lovable.app) ──
+   Cormorant Garamond display + Inter body over the warm candlelit palette.
+   Helper classes are lp-prefixed to avoid colliding with app utilities. */
+.lp {
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  background: #120c09;
+  color: #f3eadd;
+}
+.lp-serif {
+  font-family: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+}
+.lp-eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #f0ad7f;
+  font-weight: 500;
+}
+.lp-display {
+  font-family: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
+}
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background-color: #f0ad7f;
+  color: #120c09;
+  padding: 0.85rem 1.6rem;
+  border-radius: 999px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: all 0.25s ease;
+  box-shadow: 0 10px 40px -10px oklch(0.8 0.1 55 / 0.45);
+}
+.lp-btn:hover {
+  background-color: #efc8aa;
+  transform: translateY(-1px);
+}
+.lp-link {
+  color: #f0ad7f;
+  font-size: 0.95rem;
+  border-bottom: 1px solid color-mix(in oklch, #f0ad7f 40%, transparent);
+  padding-bottom: 2px;
+  transition: border-color 0.2s ease;
+}
+.lp-link:hover {
+  border-color: #f0ad7f;
+}
+.lp-glow {
+  box-shadow:
+    0 0 0 1px oklch(0.8 0.1 55 / 0.15),
+    0 30px 80px -20px oklch(0.62 0.14 50 / 0.35);
+}
+.lp-vignette {
+  position: relative;
+}
+.lp-vignette::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 30%, oklch(0.1 0.01 40 / 0.55) 90%),
+    linear-gradient(180deg, oklch(0.16 0.012 40 / 0.55) 0%, oklch(0.16 0.012 40 / 0.25) 35%, oklch(0.16 0.012 40 / 0.85) 100%);
+}
+
 @keyframes ken-burns {
   0% { transform: scale(1.02) translate(0, 0); }
   50% { transform: scale(1.09) translate(-1.5%, -0.8%); }

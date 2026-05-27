@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="DateRoom">
+  <title>DateRoom</title>
+  <rect width="64" height="64" fill="#1A140E"/>
+
+  <!-- Abstracted doorway: a bold warm rectangle (the lit room) with a clearly
+       visible dark vertical bar on its left edge (the door, ajar). Reads as
+       "open door" at 16px because the silhouette stays simple. -->
+
+  <!-- Light spill on floor — just two trapezoidal shapes, no fine detail -->
+  <path d="M 24 52 L 40 52 L 52 60 L 12 60 Z" fill="#A0691F"/>
+  <path d="M 26 50 L 38 50 L 44 56 L 20 56 Z" fill="#E8A653"/>
+
+  <!-- Doorway interior — bold amber -->
+  <rect x="22" y="12" width="20" height="40" fill="#E8A653"/>
+  <rect x="25" y="15" width="14" height="37" fill="#FFE3B8"/>
+
+  <!-- Door panel — single dark bar overlapping the doorway's left edge,
+       tilted slightly for the "ajar" cue. Kept simple, no panels or handle. -->
+  <g transform="rotate(-15 22 12)">
+    <rect x="14" y="12" width="8" height="40" fill="#0F0B07"/>
+  </g>
+</svg>
