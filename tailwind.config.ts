@@ -84,6 +84,12 @@ export default {
         romantic: "hsl(var(--romantic))",
         ember: "hsl(var(--ember))",
         sage: "hsl(var(--sage))",
+        // Accents used widely as bg-amber / bg-rose (+ opacity variants).
+        // Single values (matching the .text-amber/.text-rose utilities) so
+        // bg-/text-/border- and /opacity modifiers all generate. Nothing uses
+        // the numeric amber-500/rose-500 scales, so overriding them is safe.
+        amber: "#F5A623",
+        rose: "#D4826A",
       },
       borderRadius: {
         lg: "var(--radius)",
