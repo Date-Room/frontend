@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Copy, Share2, Loader2, Trash2 } from "lucide-react";
-import { PageShell, PageStickyHeader } from "@/components/PageShell";
+import { Copy, Share2, Loader2, Trash2 } from "lucide-react";
+import { PageShell } from "@/components/PageShell";
+import { CardPage } from "@/components/CardPage";
 import { listMyRooms, startRoom, deleteRoom, type Room } from "@/lib/rooms";
 
 /**
@@ -96,24 +97,19 @@ export default function PreRoom() {
   }
 
   return (
-    <PageShell>
-      <PageStickyHeader>
-        <div className="max-w-xl mx-auto px-6 h-14 flex items-center justify-between">
-          <button type="button" onClick={() => navigate("/home")} className="text-muted-foreground hover:text-cream transition" aria-label="Back to home">
-            <ArrowLeft className="w-5 h-5" />
+    <CardPage
+      title={room.greeting_headline || "Your room"}
+      onBack={() => navigate("/home")}
+      maxWidth="sm:max-w-xl"
+      bodyClassName="space-y-8"
+      headerRight={
+        room.persistence === "persistent" ? (
+          <button type="button" onClick={destroy} className="text-destructive/70 hover:text-destructive transition" aria-label="Destroy room">
+            <Trash2 className="w-4 h-4" />
           </button>
-          <h1 className="font-serif text-cream text-lg truncate">{room.greeting_headline || "Your room"}</h1>
-          {room.persistence === "persistent" ? (
-            <button type="button" onClick={destroy} className="text-destructive/70 hover:text-destructive transition" aria-label="Destroy room">
-              <Trash2 className="w-4 h-4" />
-            </button>
-          ) : (
-            <div className="w-5" />
-          )}
-        </div>
-      </PageStickyHeader>
-
-      <main className="max-w-xl mx-auto px-6 pt-8 pb-28 relative z-10 space-y-8 animate-fade-in">
+        ) : undefined
+      }
+    >
         <section className="space-y-3">
           <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Invite</p>
           <div className="rounded-[1.5rem] border border-primary/25 bg-primary/[0.06] p-5 space-y-4">
@@ -152,7 +148,6 @@ export default function PreRoom() {
           {starting ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : null}
           {live ? "Rejoin" : "Start session"}
         </button>
-      </main>
-    </PageShell>
+    </CardPage>
   );
 }

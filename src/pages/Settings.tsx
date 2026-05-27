@@ -1,4 +1,4 @@
-import { ArrowLeft, Camera, ChevronRight, Globe, LogOut, Shield, User, Loader2 } from "lucide-react";
+import { Camera, ChevronRight, Globe, LogOut, Shield, User, Loader2 } from "lucide-react";
 import { BRAND_NAME } from "@/lib/constants";
 import { supabase } from "@/lib/supabaseClient";
 import { getMe, updateMe, type UserMe } from "@/lib/users";
@@ -15,7 +15,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { PageShell, PageStickyHeader } from "@/components/PageShell";
+import { PageShell } from "@/components/PageShell";
+import { CardPage } from "@/components/CardPage";
 
 const MAX_PHOTO_BYTES = 750 * 1024;
 
@@ -171,7 +172,7 @@ export default function Settings() {
   const initial = displayName[0]?.toUpperCase() || "?";
 
   return (
-    <PageShell>
+    <CardPage title="Profile" onBack={() => navigate("/home")} maxWidth="sm:max-w-2xl">
       <input ref={photoInputRef} type="file" accept="image/*" className="hidden" aria-label="Upload profile photo" onChange={onPhotoFileChange} />
 
       <Dialog open={photoDialogOpen} onOpenChange={setPhotoDialogOpen}>
@@ -221,17 +222,7 @@ export default function Settings() {
         </DialogContent>
       </Dialog>
 
-      <PageStickyHeader>
-        <div className="max-w-2xl mx-auto px-6 h-14 flex items-center">
-          <button type="button" onClick={() => navigate("/home")} className="text-muted-foreground hover:text-cream transition mr-4" aria-label="Back to home">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="font-serif text-cream text-lg">Profile</h1>
-        </div>
-      </PageStickyHeader>
-
-      <main className="max-w-2xl mx-auto px-6 pt-6 pb-24 relative z-10">
-        <div className="rounded-3xl p-6 glass-strong grain mb-8 flex items-center gap-4 animate-fade-in">
+      <div className="rounded-3xl p-6 glass-strong grain mb-8 flex items-center gap-4 animate-fade-in">
           {avatarUrl ? (
             <img src={avatarUrl} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-rosegold/20 shrink-0" />
           ) : (
@@ -293,7 +284,6 @@ export default function Settings() {
         </div>
 
         <p className="text-center text-[10px] text-muted-foreground mt-10">{BRAND_NAME} · Made with ❤️</p>
-      </main>
-    </PageShell>
+    </CardPage>
   );
 }

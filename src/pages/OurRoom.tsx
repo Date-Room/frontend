@@ -1,7 +1,8 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Play, Calendar, ChevronRight, Loader2 } from "lucide-react";
-import { PageShell, PageStickyHeader } from "@/components/PageShell";
+import { Play, Calendar, ChevronRight, Loader2 } from "lucide-react";
+import { PageShell } from "@/components/PageShell";
+import { CardPage } from "@/components/CardPage";
 import { listMyRooms } from "@/lib/rooms";
 
 /**
@@ -30,18 +31,7 @@ export default function OurRoom() {
   }
 
   return (
-    <PageShell>
-      <PageStickyHeader>
-        <div className="max-w-3xl mx-auto px-6 h-14 flex items-center justify-between">
-          <button type="button" onClick={() => navigate("/home")} className="text-muted-foreground hover:text-cream transition">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="font-serif text-cream text-base">Our Room</h1>
-          <div className="w-5" />
-        </div>
-      </PageStickyHeader>
-
-      <main className="max-w-3xl mx-auto px-6 pt-8 pb-24 relative z-10 space-y-4">
+    <CardPage title="Our Room" onBack={() => navigate("/home")} maxWidth="sm:max-w-xl" bodyClassName="space-y-4">
         {!room ? (
           <div className="rounded-2xl p-8 glass grain text-center text-muted-foreground">
             This room isn&apos;t in your list anymore.
@@ -80,7 +70,6 @@ export default function OurRoom() {
             </button>
           </>
         )}
-      </main>
-    </PageShell>
+    </CardPage>
   );
 }

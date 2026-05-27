@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2 } from "lucide-react";
-import { PageShell, PageStickyHeader } from "@/components/PageShell";
+import { Loader2 } from "lucide-react";
+import { CardPage } from "@/components/CardPage";
 import { createRoom, type RoomPersistence } from "@/lib/rooms";
 import { cn } from "@/lib/utils";
 
@@ -54,23 +54,8 @@ export default function CreateRoom() {
   ];
 
   return (
-    <PageShell>
-      <PageStickyHeader>
-        <div className="max-w-xl mx-auto px-6 h-14 flex items-center">
-          <button
-            type="button"
-            onClick={() => navigate("/home")}
-            className="text-muted-foreground hover:text-cream transition mr-4"
-            aria-label="Back to home"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="font-serif text-cream text-lg">New room</h1>
-        </div>
-      </PageStickyHeader>
-
-      <main className="max-w-xl mx-auto px-6 pt-8 pb-28 relative z-10 space-y-8 animate-fade-in">
-        <section className="space-y-3">
+    <CardPage title="New room" onBack={() => navigate("/home")} bodyClassName="space-y-8">
+      <section className="space-y-3">
           <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Keep this room?</p>
           <div className="space-y-3">
             {options.map((opt) => (
@@ -151,7 +136,6 @@ export default function CreateRoom() {
             "Create room"
           )}
         </button>
-      </main>
-    </PageShell>
+    </CardPage>
   );
 }

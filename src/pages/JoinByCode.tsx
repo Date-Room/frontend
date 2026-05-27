@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-import { PageShell, PageStickyHeader } from "@/components/PageShell";
+import { CardPage } from "@/components/CardPage";
 
 /**
  * Manual "Join with code" entry — mirrors mobile's `join_by_code_screen.dart`.
@@ -21,18 +20,8 @@ export default function JoinByCode() {
   }
 
   return (
-    <PageShell>
-      <PageStickyHeader>
-        <div className="max-w-md mx-auto px-6 h-14 flex items-center">
-          <button type="button" onClick={() => navigate(-1)} className="text-muted-foreground hover:text-cream transition mr-4" aria-label="Back">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="font-serif text-cream text-lg">Join with code</h1>
-        </div>
-      </PageStickyHeader>
-
-      <main className="max-w-md mx-auto px-6 pt-10 pb-24 relative z-10">
-        <p className="text-sm text-muted-foreground mb-6">Type the Room ID and PIN your host shared.</p>
+    <CardPage title="Join with code" onBack={() => navigate(-1)} maxWidth="sm:max-w-md">
+      <p className="text-sm text-muted-foreground mb-6">Type the Room ID and PIN your host shared.</p>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-1.5">
             <label htmlFor="jbc-code" className="block text-[11px] uppercase tracking-[0.28em] text-muted-foreground">
@@ -70,7 +59,6 @@ export default function JoinByCode() {
             Join
           </button>
         </form>
-      </main>
-    </PageShell>
+    </CardPage>
   );
 }

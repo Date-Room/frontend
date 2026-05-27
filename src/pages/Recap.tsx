@@ -1,7 +1,7 @@
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Calendar, ChevronRight, Loader2, Sparkles } from "lucide-react";
-import { PageShell, PageStickyHeader } from "@/components/PageShell";
+import { CardPage } from "@/components/CardPage";
 import { getRoomRecap, type ActivityStateResponse } from "@/lib/activities/activityState";
 
 const ACTIVITY_LABELS: Record<string, string> = {
@@ -53,17 +53,14 @@ export default function Recap() {
   const activities = (data?.activities ?? []).filter((a) => ACTIVITY_LABELS[a.activity_id]);
 
   return (
-    <PageShell>
-      <PageStickyHeader>
-        <div className="max-w-2xl mx-auto px-6 h-14 flex items-center justify-between">
-          <span className="font-serif italic text-cream">Tonight</span>
-          <button type="button" onClick={() => navigate("/home")} className="btn-ghost text-sm">
-            Done
-          </button>
-        </div>
-      </PageStickyHeader>
-
-      <main className="max-w-2xl mx-auto px-6 pt-6 pb-24 relative z-10">
+    <CardPage
+      maxWidth="sm:max-w-2xl"
+      headerRight={
+        <button type="button" onClick={() => navigate("/home")} className="btn-ghost text-sm">
+          Done
+        </button>
+      }
+    >
         <div className="text-center mb-10 animate-fade-in">
           <div className="w-2 h-2 rounded-full bg-rosegold mx-auto mb-4 animate-pulse-glow" />
           <h1 className="font-serif text-4xl text-cream italic mb-2">Tonight</h1>
@@ -108,7 +105,6 @@ export default function Recap() {
           </div>
           <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
         </button>
-      </main>
-    </PageShell>
+    </CardPage>
   );
 }
