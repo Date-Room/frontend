@@ -24,33 +24,54 @@ export default function AuthCallback() {
   useEffect(() => {
     let cancelled = false;
     const token = params.get("token");
+    const hash = window.location.hash;
+    const looksLikeOauthFragment = hash.includes("at=") && hash.includes("rt=");
+
+    function go() {
+      let dest = "/home";
+      try {
+        const stashed = sessionStorage.getItem(REDIRECT_KEY);
+        if (stashed && stashed.startsWith("/") && !stashed.startsWith("//")) dest = stashed;
+        sessionStorage.removeItem(REDIRECT_KEY);
+      } catch {
+        /* ignore */
+      }
+      // Clear the fragment so a refresh doesn't try to re-ingest.
+      window.history.replaceState(null, "", window.location.pathname);
+      navigate(dest, { replace: true });
+    }
 
     void (async () => {
-      if (!token) {
-        // No token in the URL — landed here directly. If already signed
-        // in (e.g. stale tab) route home; otherwise nudge to /auth.
-        if (cancelled) return;
-        if (authClient.getSession()) navigate("/home", { replace: true });
-        else navigate("/auth", { replace: true });
+      // 1) Magic-link path: `?token=…`.
+      if (token) {
+        try {
+          await authClient.verifyLink(token);
+          if (cancelled) return;
+          go();
+        } catch (err) {
+          if (cancelled) return;
+          setFailed(err instanceof Error ? err.message : "Sign-in link is invalid.");
+        }
         return;
       }
 
-      try {
-        await authClient.verifyLink(token);
-        if (cancelled) return;
-        let dest = "/home";
+      // 2) OAuth path: `#at=…&rt=…&expires_in=…`.
+      if (looksLikeOauthFragment) {
         try {
-          const stashed = sessionStorage.getItem(REDIRECT_KEY);
-          if (stashed && stashed.startsWith("/") && !stashed.startsWith("//")) dest = stashed;
-          sessionStorage.removeItem(REDIRECT_KEY);
-        } catch {
-          /* ignore */
+          await authClient.ingestFragment(hash);
+          if (cancelled) return;
+          go();
+        } catch (err) {
+          if (cancelled) return;
+          setFailed(err instanceof Error ? err.message : "Sign-in didn't complete.");
         }
-        navigate(dest, { replace: true });
-      } catch (err) {
-        if (cancelled) return;
-        setFailed(err instanceof Error ? err.message : "Sign-in link is invalid.");
+        return;
       }
+
+      // 3) Bare landing — if signed in, home; else /auth.
+      if (cancelled) return;
+      if (authClient.getSession()) navigate("/home", { replace: true });
+      else navigate("/auth", { replace: true });
     })();
 
     return () => {

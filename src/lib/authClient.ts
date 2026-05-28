@@ -120,6 +120,67 @@ class AuthClient {
     return this.finalizeSignIn(await response.json());
   }
 
+  /** Kick off Google sign-in. Full-page redirect; the backend redirects
+   * to Google, Google back to the backend, and the backend lands the
+   * user at `/auth/callback#at=…&rt=…` — handled by ingestFragment. */
+  signInWithGoogle(): void {
+    window.location.href = `${API_BASE}/v1/auth/google/start`;
+  }
+
+  /** Kick off Apple sign-in. Same redirect shape as Google. */
+  signInWithApple(): void {
+    window.location.href = `${API_BASE}/v1/auth/apple/start`;
+  }
+
+  /** Consume tokens that landed in the URL hash from an OAuth callback.
+   * The OAuth endpoints don't return the user inline (would force a
+   * giant URL); we set the tokens, then call /v1/auth/session to fetch
+   * the user, then re-broadcast SIGNED_IN with the real user. */
+  async ingestFragment(rawHash: string): Promise<Session | null> {
+    const params = new URLSearchParams(rawHash.startsWith("#") ? rawHash.slice(1) : rawHash);
+    const access = params.get("at");
+    const refresh = params.get("rt");
+    const expiresInRaw = params.get("expires_in");
+    if (!access || !refresh || !expiresInRaw) return null;
+    const expiresIn = Number(expiresInRaw);
+    if (!Number.isFinite(expiresIn)) return null;
+
+    // Temporary stub user so subsequent calls authenticate; replaced
+    // once /session returns the real row.
+    const stub: AuthUser = {
+      id: "",
+      email: "",
+      display_name: "",
+      photo_url: null,
+      country: null,
+      profile_complete: false,
+      email_verified_at: null,
+      provider: null,
+    };
+    this.set({
+      access_token: access,
+      refresh_token: refresh,
+      expires_at: Date.now() + expiresIn * 1000,
+      user: stub,
+    });
+
+    try {
+      const response = await fetch(`${API_BASE}/v1/auth/session`, {
+        headers: { Authorization: `Bearer ${access}` },
+      });
+      if (!response.ok) throw new Error("Could not load session.");
+      const data = (await response.json()) as { user: AuthUser };
+      const current = this.session;
+      if (!current) return null;
+      const next: Session = { ...current, user: data.user };
+      this.set(next);
+      return next;
+    } catch (err) {
+      this.set(null);
+      throw err;
+    }
+  }
+
   async signOut(): Promise<void> {
     const refresh = this.session?.refresh_token;
     this.set(null);

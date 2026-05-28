@@ -167,8 +167,31 @@ export default function Auth() {
                   Welcome to {BRAND_NAME}
                 </h1>
                 <p className="mx-auto max-w-md text-sm font-light leading-relaxed text-muted-foreground">
-                  Virtual date rooms for two. Enter your email and we'll send a 6-digit code.
+                  Virtual date rooms for two.
                 </p>
+              </div>
+
+              <div className="space-y-3 mb-5">
+                <button
+                  type="button"
+                  onClick={() => authClient.signInWithGoogle()}
+                  className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] py-3.5 text-sm font-medium text-cream transition-colors hover:bg-white/[0.06] sm:rounded-[1.15rem]"
+                >
+                  <span aria-hidden className="text-base">G</span>
+                  Continue with Google
+                </button>
+                <button
+                  type="button"
+                  onClick={() => authClient.signInWithApple()}
+                  className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] py-3.5 text-sm font-medium text-cream transition-colors hover:bg-white/[0.06] sm:rounded-[1.15rem]"
+                >
+                  <span aria-hidden className="text-base"></span>
+                  Continue with Apple
+                </button>
+              </div>
+
+              <div className="my-5 flex items-center gap-3 text-[10px] uppercase tracking-[0.3em] text-muted-foreground/60">
+                <span className="h-px flex-1 bg-white/10" /> or <span className="h-px flex-1 bg-white/10" />
               </div>
 
               <form onSubmit={handleRequestOtp} className="space-y-4">
