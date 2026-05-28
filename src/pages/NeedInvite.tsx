@@ -2,16 +2,14 @@ import { Link } from "react-router-dom";
 import { Shield, Lock, ArrowRight, MessageSquare } from "lucide-react";
 import { BRAND_NAME } from "@/lib/constants";
 import { PageShell } from "@/components/PageShell";
-import { supabase } from "@/lib/supabaseClient";
+import { authClient } from "@/lib/authClient";
 import { useEffect, useState } from "react";
 
 export default function NeedInvite() {
-  const [hasSession, setHasSession] = useState(false);
+  const [hasSession, setHasSession] = useState(authClient.getSession() != null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setHasSession(!!session);
-    });
+    return authClient.onAuthStateChange((s) => setHasSession(s != null));
   }, []);
 
   return (

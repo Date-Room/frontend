@@ -1,72 +1,78 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { authClient } from "@/lib/authClient";
 import { PageShell } from "@/components/PageShell";
 
 const REDIRECT_KEY = "post_auth_redirect";
 
 /**
- * Landing page for Supabase magic-link / OAuth redirects. supabase-js
- * (detectSessionInUrl + PKCE) exchanges the code in the URL automatically on
- * client init; we wait for the resulting session, then route the user onward.
+ * Landing page for the magic-link click. The email's link points here
+ * with `?token=<opaque>`; we hand the token to authClient.verifyLink and
+ * route the user onward.
+ *
+ * Same-device enforcement: /v1/auth/request-otp sets an HttpOnly cookie
+ * scoped to /v1/auth on the requesting browser. authClient.verifyLink
+ * sends the cookie via `credentials: "include"`; the backend checks it
+ * against the OTP row. If the link is opened on a different browser/
+ * device the cookie is missing → the user gets nudged to use the code.
  */
 export default function AuthCallback() {
   const navigate = useNavigate();
-  const [failed, setFailed] = useState(false);
+  const [params] = useSearchParams();
+  const [failed, setFailed] = useState<string | null>(null);
 
   useEffect(() => {
-    let done = false;
+    let cancelled = false;
+    const token = params.get("token");
 
-    function go() {
-      if (done) return;
-      done = true;
-      let dest = "/home";
-      try {
-        const stashed = sessionStorage.getItem(REDIRECT_KEY);
-        if (stashed && stashed.startsWith("/") && !stashed.startsWith("//")) dest = stashed;
-        sessionStorage.removeItem(REDIRECT_KEY);
-      } catch {
-        /* ignore */
+    void (async () => {
+      if (!token) {
+        // No token in the URL — landed here directly. If already signed
+        // in (e.g. stale tab) route home; otherwise nudge to /auth.
+        if (cancelled) return;
+        if (authClient.getSession()) navigate("/home", { replace: true });
+        else navigate("/auth", { replace: true });
+        return;
       }
-      navigate(dest, { replace: true });
-    }
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) go();
-    });
-
-    // Cover the case where the session is already present by the time we mount.
-    void supabase.auth.getSession().then(({ data }) => {
-      if (data.session) go();
-    });
-
-    // If nothing resolves, surface a retry path rather than hanging forever.
-    const timer = window.setTimeout(() => {
-      if (!done) setFailed(true);
-    }, 8000);
+      try {
+        await authClient.verifyLink(token);
+        if (cancelled) return;
+        let dest = "/home";
+        try {
+          const stashed = sessionStorage.getItem(REDIRECT_KEY);
+          if (stashed && stashed.startsWith("/") && !stashed.startsWith("//")) dest = stashed;
+          sessionStorage.removeItem(REDIRECT_KEY);
+        } catch {
+          /* ignore */
+        }
+        navigate(dest, { replace: true });
+      } catch (err) {
+        if (cancelled) return;
+        setFailed(err instanceof Error ? err.message : "Sign-in link is invalid.");
+      }
+    })();
 
     return () => {
-      subscription.unsubscribe();
-      window.clearTimeout(timer);
+      cancelled = true;
     };
-  }, [navigate]);
+  }, [navigate, params]);
 
   return (
     <PageShell className="flex items-center justify-center">
       <div className="text-center relative z-10 animate-fade-in px-6">
         <div className="w-2 h-2 rounded-full bg-rosegold mx-auto mb-4 animate-pulse-glow" />
         {failed ? (
-          <>
-            <p className="font-serif italic text-cream text-xl mb-2">This link didn't sign you in</p>
-            <p className="text-sm text-muted-foreground mb-4">
-              It may have expired or already been used.
-            </p>
-            <button type="button" className="auth-mode-switch" onClick={() => navigate("/auth")}>
-              Back to sign in
-            </button>
-          </>
+          <div className="space-y-3 max-w-md">
+            <h1 className="font-serif italic text-cream text-2xl">Sign-in didn't complete</h1>
+            <p className="text-muted-foreground text-sm">{failed}</p>
+            <Link
+              to="/auth"
+              className="inline-flex items-center justify-center mt-4 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:scale-[1.03] transition-transform"
+            >
+              Try again
+            </Link>
+          </div>
         ) : (
           <p className="font-serif italic text-cream text-xl">Signing you in…</p>
         )}

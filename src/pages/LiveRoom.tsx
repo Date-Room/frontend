@@ -5,7 +5,7 @@ import { PageShell } from "@/components/PageShell";
 import { RoomSessionProvider, type RoomIdentity } from "@/context/RoomSessionContext";
 import { RoomVideo } from "@/components/RoomVideo";
 import { ActivityTray } from "@/components/ActivityTray";
-import { supabase } from "@/lib/supabaseClient";
+import { authClient } from "@/lib/authClient";
 import { DATE_NAME } from "@/lib/room";
 
 function Loading({ label }: { label: string }) {
@@ -131,21 +131,16 @@ export default function LiveRoom() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const { data } = await supabase.auth.getSession();
+      const session = authClient.getSession();
       if (cancelled) return;
-      const session = data.session;
 
       if (session) {
-        const meta = (session.user.user_metadata ?? {}) as Record<string, unknown>;
-        const name =
-          urlName ||
-          (typeof meta.full_name === "string" ? meta.full_name : "") ||
-          session.user.email?.split("@")[0] ||
-          "You";
+        const u = session.user;
+        const name = urlName || u.display_name || u.email?.split("@")[0] || "You";
         // Signed-in users authorise LiveKit + durable writes via their token,
         // so no participant_id is needed; the host is slot "a".
         setIdentity({
-          senderId: session.user.id,
+          senderId: u.id,
           slot,
           participantId: undefined,
           isHost: !participantId,

@@ -4,10 +4,11 @@
  * - Base URL comes from VITE_API_BASE_URL (the Railway origin, no trailing slash).
  *   Callers pass the full path including `/v1`, e.g. `api.post("/v1/rooms", …)`.
  *   Non-`/v1` routes (`/i/{code}`, `/auth/callback`) also live under this origin.
- * - Attaches the Supabase access token as `Authorization: Bearer …` by default.
- * - A 401 means the token was rejected/expired → we sign out so the app re-auths.
+ * - Attaches the backend-issued access token as `Authorization: Bearer …`.
+ * - On a 401 we transparently refresh once and retry; a second 401 propagates
+ *   so the caller (and AuthGuard) can land the user back on /auth.
  */
-import { supabase } from "@/lib/supabaseClient";
+import { authClient } from "@/lib/authClient";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
@@ -26,9 +27,8 @@ export function apiConfigured(): boolean {
   return Boolean(API_BASE);
 }
 
-async function authHeader(): Promise<Record<string, string>> {
-  const { data } = await supabase.auth.getSession();
-  const token = data.session?.access_token;
+function authHeader(): Record<string, string> {
+  const token = authClient.getAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -61,20 +61,31 @@ function safeJson(text: string): unknown {
 
 export async function apiFetch<T>(path: string, opts: Options = {}): Promise<T> {
   const { body, auth = true, headers, ...rest } = opts;
-  const h: Record<string, string> = { ...(headers as Record<string, string> | undefined) };
   const isForm = typeof FormData !== "undefined" && body instanceof FormData;
-  if (body !== undefined && !isForm) h["Content-Type"] = "application/json";
-  if (auth) Object.assign(h, await authHeader());
+  const bodyToSend =
+    body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body);
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...rest,
-    headers: h,
-    body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
-  });
+  function buildHeaders(): Record<string, string> {
+    const h: Record<string, string> = { ...(headers as Record<string, string> | undefined) };
+    if (body !== undefined && !isForm) h["Content-Type"] = "application/json";
+    if (auth) Object.assign(h, authHeader());
+    return h;
+  }
 
-  // A 401 means this request's token was rejected — surface it to the caller.
-  // We deliberately do NOT sign the user out here: a transient backend 401
-  // (e.g. a JWKS hiccup) must not nuke a valid session and bounce the app.
+  async function send(): Promise<Response> {
+    return fetch(`${API_BASE}${path}`, { ...rest, headers: buildHeaders(), body: bodyToSend });
+  }
+
+  let res = await send();
+
+  // A 401 most often means the access token just expired. Refresh once
+  // (single-flight inside authClient) and retry. A second 401 propagates
+  // so the caller / AuthGuard land the user back on /auth.
+  if (res.status === 401 && auth) {
+    const refreshed = await authClient.refresh();
+    if (refreshed) res = await send();
+  }
+
   if (res.status === 401) {
     throw new ApiError(401, "Not authenticated", null);
   }

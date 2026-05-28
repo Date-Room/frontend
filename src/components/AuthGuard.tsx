@@ -1,59 +1,46 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
+import { authClient, type Session } from "@/lib/authClient";
 
-export const AuthGuard = ({ children, requireAuth = true }: { children: React.ReactNode; requireAuth?: boolean }) => {
+/**
+ * Sentinel that drives the public-vs-protected redirect dance.
+ *
+ * Reads the current session synchronously from authClient (which has
+ * already hydrated from localStorage on construction), so there's no
+ * loading flash. Listens for changes (sign-in, sign-out, failed
+ * refresh) so a token that goes stale mid-session sends the user back
+ * to /auth.
+ */
+export const AuthGuard = ({
+  children,
+  requireAuth = true,
+}: {
+  children: React.ReactNode;
+  requireAuth?: boolean;
+}) => {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState<unknown>(null);
+  const [, setSession] = useState<Session | null>(authClient.getSession());
 
   useEffect(() => {
-    let cancelled = false;
-
-    void (async () => {
-      const { data: { session: local } } = await supabase.auth.getSession();
-      if (cancelled) return;
-      setSession(local);
-      setLoading(false);
-      redirectForSession(local);
-    })();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      redirectForSession(nextSession);
+    redirectForSession(authClient.getSession());
+    const unsubscribe = authClient.onAuthStateChange((next) => {
+      setSession(next);
+      redirectForSession(next);
     });
 
-    function redirectForSession(currentSession: unknown) {
+    function redirectForSession(current: Session | null) {
       const path = window.location.pathname;
       const isAuthPath = path === "/auth" || path === "/" || path === "/invite";
 
-      if (currentSession) {
+      if (current) {
         if (isAuthPath) navigate("/home", { replace: true });
       } else if (requireAuth && path !== "/auth") {
         navigate("/auth", { replace: true });
       }
     }
 
-    return () => {
-      cancelled = true;
-      subscription.unsubscribe();
-    };
+    return unsubscribe;
   }, [navigate, requireAuth]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center relative">
-        <div className="vignette" aria-hidden />
-        <div className="page-grain" aria-hidden />
-        <div className="text-center relative z-10 animate-fade-in">
-          <div className="w-2 h-2 rounded-full bg-rosegold mx-auto mb-4 animate-pulse-glow" />
-          <p className="font-serif italic text-cream text-xl">Entering the space…</p>
-        </div>
-      </div>
-    );
-  }
 
   return <>{children}</>;
 };

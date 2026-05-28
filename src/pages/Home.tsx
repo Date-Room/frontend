@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, LogOut, MessageSquare, ChevronRight, History, Heart, User, Settings as SettingsIcon, Globe, KeyRound } from "lucide-react";
 import { BRAND_NAME } from "@/lib/constants";
-import { supabase } from "@/lib/supabaseClient";
+import { authClient } from "@/lib/authClient";
 import { getMe } from "@/lib/users";
 import { listMyRooms, type Room, type RoomStateName } from "@/lib/rooms";
 import { PageShell } from "@/components/PageShell";
@@ -37,7 +37,7 @@ export default function Home() {
   }
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
+    await authClient.signOut();
     navigate("/auth");
   }
 

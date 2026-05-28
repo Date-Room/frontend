@@ -4,7 +4,6 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { supabase } from "@/lib/supabaseClient";
 import { applyThemePreference, detachThemePreferenceListener } from "@/lib/theme";
 
 // Pages
@@ -27,26 +26,14 @@ import { AuthGuard } from "./components/AuthGuard";
 
 const queryClient = new QueryClient();
 
-function sessionThemePreference(session: unknown): string | undefined {
-  const s = session as { user?: { user_metadata?: Record<string, unknown> } } | null | undefined;
-  const pref = s?.user?.user_metadata?.theme_preference;
-  return typeof pref === "string" ? pref : undefined;
-}
-
 const App = () => {
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      applyThemePreference(sessionThemePreference(session));
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      applyThemePreference(sessionThemePreference(session));
-    });
-
+    // Per-user theme preference used to ride on Supabase's user_metadata.
+    // Backend auth has no equivalent yet (Phase 1 is "fresh start"), so we
+    // apply the default and revisit once a /v1/users/me preference field
+    // exists.
+    applyThemePreference(undefined);
     return () => {
-      subscription.unsubscribe();
       detachThemePreferenceListener();
     };
   }, []);

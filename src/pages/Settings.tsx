@@ -1,6 +1,6 @@
 import { Camera, ChevronRight, Globe, LogOut, Shield, User, Loader2 } from "lucide-react";
 import { BRAND_NAME } from "@/lib/constants";
-import { supabase } from "@/lib/supabaseClient";
+import { authClient } from "@/lib/authClient";
 import { getMe, updateMe, type UserMe } from "@/lib/users";
 import { applyThemePreference } from "@/lib/theme";
 import { useEffect, useRef, useState } from "react";
@@ -78,7 +78,7 @@ export default function Settings() {
   async function handleSignOut() {
     setSignOutBusy(true);
     try {
-      await supabase.auth.signOut();
+      await authClient.signOut();
       applyThemePreference("dark");
       navigate("/");
     } finally {

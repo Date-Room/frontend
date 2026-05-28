@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { getRoomByCode, joinRoom, type InviteCard } from "@/lib/rooms";
 import { getMe, updateMe } from "@/lib/users";
-import { supabase } from "@/lib/supabaseClient";
+import { authClient } from "@/lib/authClient";
 import { resolveAmbiancePreset, ambianceMeta } from "@/lib/ambiance";
 import type { AmbiancePresetId } from "@/lib/ambiance";
 import { PageShell } from "@/components/PageShell";
@@ -74,8 +74,7 @@ export default function Lobby() {
       /* ignore */
     }
     void (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) return;
+      if (!authClient.getSession()) return;
       setSignedIn(true);
       try {
         const me = await getMe();
