@@ -3,7 +3,7 @@
  * room and how do I talk to it." Replaces the old monolithic `RoomScopeContext`
  * + `useRoomState`/`usePlayerSlot` model.
  *
- * Owns one {@link RoomChannel} (Supabase Realtime) for the room and exposes the
+ * Owns one {@link RoomChannel} (backend WebSocket) for the room and exposes the
  * caller's identity: signed-in member vs. anonymous guest, slot from the join
  * response, and whether they may persist durable state.
  */
@@ -55,7 +55,9 @@ export function RoomSessionProvider({
   const [status, setStatus] = useState("connecting");
 
   // One channel per room id. Identity changes don't recreate the socket.
-  if (!channelRef.current) channelRef.current = new RoomChannel(roomId);
+  if (!channelRef.current) {
+    channelRef.current = new RoomChannel(roomId, { participantId });
+  }
   const channel = channelRef.current;
 
   useEffect(() => {

@@ -1,21 +1,23 @@
 /**
- * One Supabase Realtime channel per room, named `room:<roomId>` — the exact
- * topic and wire format the mobile app uses (see
- * `mobile/packages/realtime/lib/src/supabase_realtime_client.dart`), so web and
- * mobile clients in the same room interoperate.
+ * Room channel — backed by the FastAPI WebSocket realtime layer
+ * (`/v1/rooms/{roomId}/ws`). Public API is unchanged from the previous
+ * Supabase-backed implementation so every activity using it keeps
+ * working without per-activity changes.
  *
- * Carries three things:
- *  - broadcast: a single envelope event `"event"` with payload `{ kind, data }`.
- *    Supabase overwrites the top-level `type`, so the app-level tag rides in
- *    `kind` and the caller's payload in `data`.
- *  - presence: who's connected (via `track`).
- *  - postgres_changes: durable activity state on `public.room_activity_states`
- *    filtered by `room_id`, re-emitted per `activity_id`.
+ * The wire format (defined in `backend/app/realtime/protocol.py`):
+ * - inbound  → `broadcast` / `presence.update` / `ping`
+ * - outbound → `ready` / `broadcast` / `presence.{sync,join,leave}` /
+ *              `durable.update` / `pong` / `error`
+ *
+ * Reconnect: on socket close we re-open with exponential backoff
+ * capped at ~30s. Pending broadcasts queued while disconnected are
+ * flushed in order after `ready`. Presence is re-tracked from the
+ * last `track(state)` call so peers re-see us after a flap.
  */
-import type { RealtimeChannel } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabaseClient";
+import { authClient } from "@/lib/authClient";
 
-const BROADCAST_ENVELOPE = "event";
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+const WS_BASE = API_BASE.replace(/^http/, "ws");
 
 export type BroadcastEvent = {
   /** Application-level tag, e.g. "activity" or "reaction". */
@@ -37,49 +39,61 @@ type BroadcastListener = (e: BroadcastEvent) => void;
 type DurableListener = (u: DurableUpdate) => void;
 type PresenceListener = (states: PresenceState[]) => void;
 
+type Outbound =
+  | { type: "broadcast"; event: string; payload: Record<string, unknown> }
+  | { type: "presence.update"; state: PresenceState }
+  | { type: "ping" };
+
+type Inbound =
+  | { type: "ready"; self: string; presence: Record<string, PresenceState> }
+  | { type: "broadcast"; event: string; payload: Record<string, unknown>; from: string }
+  | { type: "presence.sync"; state: Record<string, PresenceState> }
+  | { type: "presence.join"; id: string; state: PresenceState }
+  | { type: "presence.leave"; id: string }
+  | { type: "durable.update"; activity_id: string; row: Record<string, unknown> }
+  | { type: "pong" }
+  | { type: "error"; code: string; message: string };
+
+const MAX_BACKOFF_MS = 30_000;
+const PING_INTERVAL_MS = 25_000;
+
 export class RoomChannel {
   readonly roomId: string;
-  private channel: RealtimeChannel;
-  private readonly broadcastListeners = new Set<BroadcastListener>();
-  private readonly durableListeners = new Set<DurableListener>();
-  private readonly presenceListeners = new Set<PresenceListener>();
+  private readonly participantId: string | undefined;
+
+  private socket: WebSocket | null = null;
   private subscribed = false;
   status = "idle";
 
-  constructor(roomId: string) {
+  private readonly broadcastListeners = new Set<BroadcastListener>();
+  private readonly durableListeners = new Set<DurableListener>();
+  private readonly presenceListeners = new Set<PresenceListener>();
+
+  /** Subscriber-id → state. Rebuilt from presence.sync/join/leave. */
+  private presence: Record<string, PresenceState> = {};
+  /** Last `track(...)` value — re-applied on reconnect. */
+  private lastPresence: PresenceState | null = null;
+  /** Queued sends while we're not OPEN; drained after `ready`. */
+  private outbox: Outbound[] = [];
+  private backoff = 500;
+  private reconnectTimer: number | null = null;
+  private pingTimer: number | null = null;
+  private disposed = false;
+  private openResolver: (() => void) | null = null;
+  private openRejecter: ((err: Error) => void) | null = null;
+
+  constructor(roomId: string, options?: { participantId?: string }) {
     this.roomId = roomId;
-    this.channel = supabase.channel(`room:${roomId}`, {
-      // self:true so the sender also receives its own broadcast — lets the
-      // local client render its own reaction/event through the same path.
-      config: { broadcast: { self: true } },
-    });
+    this.participantId = options?.participantId;
   }
 
-  /** Subscribe; resolves once the channel reaches SUBSCRIBED. */
+  /** Connect; resolves once the server's `ready` lands. */
   open(): Promise<void> {
-    this.channel
-      .on("broadcast", { event: BROADCAST_ENVELOPE }, (msg) =>
-        this.handleBroadcast(msg.payload as Record<string, unknown>),
-      )
-      .on("presence", { event: "sync" }, () => this.emitPresence())
-      .on("presence", { event: "join" }, () => this.emitPresence())
-      .on("presence", { event: "leave" }, () => this.emitPresence())
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "room_activity_states", filter: `room_id=eq.${this.roomId}` },
-        (payload) => this.handleDurable(payload),
-      );
-
-    return new Promise((resolve, reject) => {
-      this.channel.subscribe((s, err) => {
-        this.status = err ? `${s}:${err.message}` : s;
-        if (s === "SUBSCRIBED") {
-          this.subscribed = true;
-          resolve();
-        } else if (s === "CHANNEL_ERROR" || s === "TIMED_OUT") {
-          reject(new Error(this.status));
-        }
-      });
+    if (this.subscribed) return Promise.resolve();
+    return new Promise<void>((resolve, reject) => {
+      this.openResolver = resolve;
+      this.openRejecter = reject;
+      this.connect();
     });
   }
 
@@ -89,75 +103,210 @@ export class RoomChannel {
 
   // ── broadcast ──────────────────────────────────────────────────────────
   broadcast(kind: string, data: Record<string, unknown>): Promise<unknown> {
-    return this.channel.send({
-      type: "broadcast",
-      event: BROADCAST_ENVELOPE,
-      payload: { kind, data },
-    });
+    return Promise.resolve(this.send({ type: "broadcast", event: kind, payload: data }));
   }
 
   onBroadcast(fn: BroadcastListener): () => void {
     this.broadcastListeners.add(fn);
-    return () => this.broadcastListeners.delete(fn);
+    return () => {
+      this.broadcastListeners.delete(fn);
+    };
   }
 
-  private handleBroadcast(raw: Record<string, unknown>) {
-    const kind = typeof raw?.kind === "string" ? raw.kind : "unknown";
-    const data = (raw?.data && typeof raw.data === "object" ? raw.data : {}) as Record<string, unknown>;
-    const event: BroadcastEvent = { kind, payload: data, receivedAt: Date.now() };
-    for (const fn of this.broadcastListeners) fn(event);
-  }
-
-  // ── durable (postgres_changes) ─────────────────────────────────────────
+  // ── durable updates ────────────────────────────────────────────────────
   onDurable(fn: DurableListener): () => void {
     this.durableListeners.add(fn);
-    return () => this.durableListeners.delete(fn);
-  }
-
-  private handleDurable(payload: {
-    new?: Record<string, unknown>;
-    old?: Record<string, unknown>;
-  }) {
-    const newRow = payload.new;
-    const activityId = typeof newRow?.activity_id === "string" ? newRow.activity_id : undefined;
-    if (!newRow || !activityId) return;
-    const update: DurableUpdate = {
-      activityId,
-      newRow,
-      oldRow: payload.old && Object.keys(payload.old).length > 0 ? payload.old : null,
-      receivedAt: Date.now(),
+    return () => {
+      this.durableListeners.delete(fn);
     };
-    for (const fn of this.durableListeners) fn(update);
   }
 
   // ── presence ───────────────────────────────────────────────────────────
   track(state: PresenceState): Promise<unknown> {
-    return Promise.resolve(this.channel.track(state));
+    this.lastPresence = state;
+    return Promise.resolve(this.send({ type: "presence.update", state }));
   }
 
   onPresence(fn: PresenceListener): () => void {
     this.presenceListeners.add(fn);
-    return () => this.presenceListeners.delete(fn);
-  }
-
-  private emitPresence() {
-    const list: PresenceState[] = [];
-    const state = this.channel.presenceState<PresenceState>();
-    for (const key of Object.keys(state)) {
-      for (const p of state[key]) list.push(p);
-    }
-    for (const fn of this.presenceListeners) fn(list);
+    return () => {
+      this.presenceListeners.delete(fn);
+    };
   }
 
   async dispose(): Promise<void> {
+    this.disposed = true;
     this.broadcastListeners.clear();
     this.durableListeners.clear();
     this.presenceListeners.clear();
     this.subscribed = false;
-    await supabase.removeChannel(this.channel);
-    // Brief settle: re-creating a channel with the same topic immediately after
-    // removeChannel can return a zombie that never reaches SUBSCRIBED. Matches
-    // the mobile client's teardown delay.
-    await new Promise((r) => setTimeout(r, 250));
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    if (this.pingTimer !== null) {
+      window.clearInterval(this.pingTimer);
+      this.pingTimer = null;
+    }
+    const sock = this.socket;
+    if (sock) {
+      try {
+        sock.close(1000);
+      } catch {
+        /* ignore */
+      }
+      this.socket = null;
+    }
+  }
+
+  // ── internals ──────────────────────────────────────────────────────────
+
+  private buildUrl(): string {
+    const params = new URLSearchParams();
+    const token = authClient.getAccessToken();
+    if (token) params.set("token", token);
+    if (this.participantId) params.set("participant_id", this.participantId);
+    return `${WS_BASE}/v1/rooms/${encodeURIComponent(this.roomId)}/ws?${params}`;
+  }
+
+  private connect() {
+    if (this.disposed) return;
+    if (this.socket && this.socket.readyState <= WebSocket.OPEN) return;
+
+    const url = this.buildUrl();
+    this.status = "connecting";
+    const sock = new WebSocket(url);
+    this.socket = sock;
+
+    sock.onopen = () => {
+      this.status = "open";
+      // `ready` from server confirms we're truly joined — wait for it
+      // before resolving open() and flushing the outbox.
+    };
+
+    sock.onmessage = (ev) => this.handle(JSON.parse(ev.data as string) as Inbound);
+
+    sock.onerror = () => {
+      this.status = "error";
+    };
+
+    sock.onclose = (ev) => {
+      this.subscribed = false;
+      this.status = `closed:${ev.code}`;
+      this.socket = null;
+      this.presence = {};
+      // 4401 = bad token (server-side close), don't retry on it.
+      if (this.disposed || ev.code === 4401) {
+        if (this.openRejecter) {
+          this.openRejecter(new Error(`WS closed ${ev.code}`));
+          this.openRejecter = null;
+          this.openResolver = null;
+        }
+        return;
+      }
+      this.scheduleReconnect();
+    };
+
+    if (this.pingTimer === null) {
+      this.pingTimer = window.setInterval(() => {
+        // Cheap keepalive so intermediaries don't reap the socket on idle.
+        this.send({ type: "ping" });
+      }, PING_INTERVAL_MS);
+    }
+  }
+
+  private scheduleReconnect() {
+    if (this.disposed) return;
+    const delay = Math.min(this.backoff, MAX_BACKOFF_MS);
+    this.backoff = Math.min(this.backoff * 2, MAX_BACKOFF_MS);
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect();
+    }, delay);
+  }
+
+  private send(message: Outbound): boolean {
+    const sock = this.socket;
+    if (this.subscribed && sock && sock.readyState === WebSocket.OPEN) {
+      sock.send(JSON.stringify(message));
+      return true;
+    }
+    // Not ready yet — queue. Bounded so a buggy caller can't OOM us.
+    if (this.outbox.length < 256) this.outbox.push(message);
+    return false;
+  }
+
+  private flushOutbox() {
+    const queued = this.outbox;
+    this.outbox = [];
+    for (const message of queued) this.send(message);
+  }
+
+  private handle(message: Inbound) {
+    switch (message.type) {
+      case "ready": {
+        this.subscribed = true;
+        this.status = "subscribed";
+        this.backoff = 500;
+        this.presence = { ...message.presence };
+        this.emitPresence();
+        // Re-track presence on reconnect so peers see us again.
+        if (this.lastPresence) {
+          this.send({ type: "presence.update", state: this.lastPresence });
+        }
+        this.flushOutbox();
+        if (this.openResolver) {
+          this.openResolver();
+          this.openResolver = null;
+          this.openRejecter = null;
+        }
+        return;
+      }
+      case "broadcast": {
+        const event: BroadcastEvent = {
+          kind: message.event,
+          payload: message.payload ?? {},
+          receivedAt: Date.now(),
+        };
+        for (const fn of this.broadcastListeners) fn(event);
+        return;
+      }
+      case "presence.sync": {
+        this.presence = { ...message.state };
+        this.emitPresence();
+        return;
+      }
+      case "presence.join": {
+        this.presence[message.id] = message.state;
+        this.emitPresence();
+        return;
+      }
+      case "presence.leave": {
+        delete this.presence[message.id];
+        this.emitPresence();
+        return;
+      }
+      case "durable.update": {
+        const update: DurableUpdate = {
+          activityId: message.activity_id,
+          newRow: message.row,
+          oldRow: null, // backend hook fires post-write; old row not carried
+          receivedAt: Date.now(),
+        };
+        for (const fn of this.durableListeners) fn(update);
+        return;
+      }
+      case "pong":
+        return;
+      case "error":
+        // Surface for debug; don't tear down the socket on a single error frame.
+        console.warn("[realtime] server error", message.code, message.message);
+        return;
+    }
+  }
+
+  private emitPresence() {
+    const list = Object.values(this.presence);
+    for (const fn of this.presenceListeners) fn(list);
   }
 }
