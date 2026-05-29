@@ -60,11 +60,18 @@ export default function Home() {
                 key={t.id}
                 type="button"
                 onClick={() => setTab(t.id)}
+                aria-pressed={tab === t.id}
                 className={cn(
-                  "rounded-full px-4 py-2 text-sm font-medium transition-colors",
-                  tab === t.id ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-cream",
+                  "focus-ring relative rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                  tab === t.id ? "text-primary" : "text-muted-foreground hover:text-cream",
                 )}
               >
+                {tab === t.id && (
+                  <span
+                    className="absolute inset-0 -z-10 rounded-full bg-primary/15 shadow-[inset_0_0_0_1px_rgba(212,130,106,0.18)]"
+                    aria-hidden
+                  />
+                )}
                 {t.label}
               </button>
             ))}
@@ -265,12 +272,24 @@ export default function Home() {
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
+              aria-pressed={tab === t.id}
+              aria-label={t.label}
               className={cn(
-                "flex flex-1 flex-col items-center justify-center gap-1 transition-colors",
+                "focus-ring relative flex flex-1 flex-col items-center justify-center gap-1 transition-colors",
                 tab === t.id ? "text-primary" : "text-muted-foreground hover:text-cream",
               )}
             >
-              <t.icon className="h-5 w-5" fill={tab === t.id && t.id !== "history" ? "currentColor" : "none"} />
+              {tab === t.id && (
+                <span
+                  className="absolute top-2 h-0.5 w-6 rounded-full bg-primary/80"
+                  aria-hidden
+                />
+              )}
+              <t.icon
+                className="h-5 w-5 transition-transform duration-200"
+                fill={tab === t.id && t.id !== "history" ? "currentColor" : "none"}
+                style={{ transform: tab === t.id ? "scale(1.06)" : "scale(1)" }}
+              />
               <span className="text-[10px] uppercase tracking-[0.18em]">{t.label}</span>
             </button>
           ))}
