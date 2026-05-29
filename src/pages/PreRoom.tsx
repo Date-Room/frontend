@@ -2,10 +2,52 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Copy, Share2, Loader2, Trash2 } from "lucide-react";
+import { Check, Copy, Share2, Loader2, Trash2 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { CardPage } from "@/components/CardPage";
+import { cn } from "@/lib/utils";
 import { listMyRooms, startRoom, deleteRoom, type Room } from "@/lib/rooms";
+
+type CopiedKey = "room-id" | "pin" | "link" | null;
+
+/** Tap-to-copy chip for a single value (Room ID or PIN). Shows a
+ * checkmark for 2s after a successful copy. */
+function CodeCopyTile({
+  label,
+  value,
+  copied,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      aria-label={`Copy ${label}`}
+      className={cn(
+        "group rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 text-left transition",
+        "hover:bg-white/[0.06] hover:border-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        copied && "border-emerald-400/40 bg-emerald-400/5",
+      )}
+    >
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">{label}</p>
+        {copied ? (
+          <Check className="w-3.5 h-3.5 text-emerald-300" aria-hidden />
+        ) : (
+          <Copy className="w-3.5 h-3.5 text-muted-foreground opacity-60 group-hover:opacity-100 transition" aria-hidden />
+        )}
+      </div>
+      <p className="mt-1 font-serif text-2xl tracking-[0.3em] text-primary tabular-nums select-all">
+        {value}
+      </p>
+    </button>
+  );
+}
 
 /**
  * Host pre-room — mirrors mobile's `pre_room_screen.dart`: shows ROOM ID + PIN,
@@ -16,6 +58,9 @@ export default function PreRoom() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [starting, setStarting] = useState(false);
+  // Tracks which chip/button just flashed "Copied" — replaces the
+  // toast spam we had when every copy fired sonner. Auto-clears 2s.
+  const [copiedKey, setCopiedKey] = useState<CopiedKey>(null);
 
   const { data: rooms, isLoading } = useQuery({
     queryKey: ["my-rooms"],
@@ -25,14 +70,16 @@ export default function PreRoom() {
   const room: Room | undefined = rooms?.find((r) => r.id === id);
 
   const inviteUrl = room ? `${window.location.origin}/i/${room.code}/${room.pin}` : "";
+  const inviteUrlDisplay = inviteUrl.replace(/^https?:\/\//, "");
   const live = room ? room.state === "live" || room.state === "active" : false;
 
-  async function copyLink() {
+  async function copyValue(value: string, key: Exclude<CopiedKey, null>) {
     try {
-      await navigator.clipboard.writeText(inviteUrl);
-      toast.success("Invite link copied.");
+      await navigator.clipboard.writeText(value);
+      setCopiedKey(key);
+      window.setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 2000);
     } catch {
-      toast.error("Couldn't copy — long-press the link to copy.");
+      toast.error("Couldn't copy — long-press to select.");
     }
   }
 
@@ -112,25 +159,62 @@ export default function PreRoom() {
     >
         <section className="space-y-3">
           <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Invite</p>
-          <div className="rounded-[1.5rem] border border-primary/25 bg-primary/[0.06] p-5 space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Room ID</p>
-                <p className="font-serif text-2xl tracking-[0.3em] text-primary tabular-nums">{room.code}</p>
-              </div>
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">PIN</p>
-                <p className="font-serif text-2xl tracking-[0.3em] text-primary tabular-nums">{room.pin}</p>
-              </div>
+          <div className="rounded-[1.5rem] border border-primary/25 bg-primary/[0.06] p-5 space-y-5">
+            {/* Method A — Room ID + PIN. Tap either to copy. */}
+            <div className="grid grid-cols-2 gap-3">
+              <CodeCopyTile
+                label="Room ID"
+                value={room.code}
+                copied={copiedKey === "room-id"}
+                onCopy={() => void copyValue(room.code, "room-id")}
+              />
+              <CodeCopyTile
+                label="PIN"
+                value={room.pin}
+                copied={copiedKey === "pin"}
+                onCopy={() => void copyValue(room.pin, "pin")}
+              />
             </div>
-            <p className="text-xs text-primary/80 break-all">{inviteUrl}</p>
-            <div className="flex gap-2">
-              <button type="button" onClick={copyLink} className="flex-1 flex items-center justify-center gap-2 rounded-full border border-white/15 py-2.5 text-sm text-cream hover:bg-white/5 transition">
-                <Copy className="w-4 h-4" /> Copy
-              </button>
-              <button type="button" onClick={share} className="flex-1 flex items-center justify-center gap-2 rounded-full bg-amber text-primary-foreground py-2.5 text-sm font-medium hover:bg-amber/90 transition">
-                <Share2 className="w-4 h-4" /> Share
-              </button>
+
+            {/* "or" rule — separates the two sharing methods. */}
+            <div className="flex items-center gap-3" aria-hidden>
+              <span className="flex-1 h-px bg-white/10" />
+              <span className="text-[10px] uppercase tracking-[0.32em] text-muted-foreground">or</span>
+              <span className="flex-1 h-px bg-white/10" />
+            </div>
+
+            {/* Method B — invite link. Single tap to copy; URL shown below. */}
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void copyValue(inviteUrl, "link")}
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-2 rounded-full border border-white/15 py-2.5 text-sm text-cream hover:bg-white/5 transition",
+                    copiedKey === "link" && "border-emerald-400/40 text-emerald-200",
+                  )}
+                >
+                  {copiedKey === "link" ? (
+                    <>
+                      <Check className="w-4 h-4" aria-hidden /> Link copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4" aria-hidden /> Copy link
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={share}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-full bg-amber text-primary-foreground py-2.5 text-sm font-medium hover:bg-amber/90 transition"
+                >
+                  <Share2 className="w-4 h-4" aria-hidden /> Share…
+                </button>
+              </div>
+              <p className="text-[11px] text-primary/70 break-all font-mono leading-relaxed">
+                {inviteUrlDisplay}
+              </p>
             </div>
           </div>
         </section>

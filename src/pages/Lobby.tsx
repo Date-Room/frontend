@@ -108,17 +108,16 @@ export default function Lobby() {
   const ended = invite ? ENDED_STATES.has(invite.state) : false;
   const open = invite ? !ended && openByTime : false;
 
-  // Profile name when signed in; otherwise the typed name.
-  const effectiveName = (signedIn && profileName ? profileName : name).trim();
+  // Profile name when signed in; otherwise the typed name. Anonymous
+  // guests can skip the name field — we default to "Guest" so the join
+  // form needs only the PIN.
+  const typedName = name.trim();
+  const effectiveName = (signedIn && profileName ? profileName : typedName) || "Guest";
   const needsName = !(signedIn && profileName);
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
     if (!invite) return;
-    if (!effectiveName) {
-      toast.error(signedIn ? "Set a display name in your profile first." : "Add your name.");
-      return;
-    }
     if (!/^\d{4,}$/.test(pin.trim())) {
       toast.error("Enter the PIN the host shared.");
       return;
@@ -294,27 +293,9 @@ export default function Lobby() {
                   </div>
 
                   <form onSubmit={handleJoin} className="space-y-4">
-                  {needsName ? (
-                    <div className="space-y-1.5 text-left">
-                      <label htmlFor="lobby-name" className="block text-[11px] uppercase tracking-[0.28em] text-cream/70">
-                        Your name
-                      </label>
-                      <input
-                        id="lobby-name"
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder={`Hi, I'm…`}
-                        autoComplete="given-name"
-                        className="auth-input"
-                        required
-                      />
-                    </div>
-                  ) : (
-                    <p className="text-left text-sm text-cream/70">
-                      Joining as <span className="text-cream">{effectiveName}</span>.
-                    </p>
-                  )}
+                  {/* PIN first — it's the only required field. Name (when
+                      asked) is optional and floats below; anonymous guests
+                      who skip it join as "Guest". */}
                   <div className="space-y-1.5 text-left">
                     <label htmlFor="lobby-pin" className="block text-[11px] uppercase tracking-[0.28em] text-cream/70">
                       Room PIN
@@ -329,8 +310,30 @@ export default function Lobby() {
                       className="auth-input tracking-[0.5em] text-center"
                       maxLength={8}
                       required
+                      autoFocus
                     />
                   </div>
+                  {needsName ? (
+                    <div className="space-y-1.5 text-left">
+                      <label htmlFor="lobby-name" className="flex items-center justify-between text-[11px] uppercase tracking-[0.28em] text-cream/70">
+                        <span>Your name</span>
+                        <span className="normal-case tracking-normal text-cream/40">optional</span>
+                      </label>
+                      <input
+                        id="lobby-name"
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Guest"
+                        autoComplete="given-name"
+                        className="auth-input"
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-left text-sm text-cream/70">
+                      Joining as <span className="text-cream">{effectiveName}</span>.
+                    </p>
+                  )}
                   <button
                     type="submit"
                     disabled={joining}
@@ -341,7 +344,7 @@ export default function Lobby() {
                         <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Joining…
                       </>
                     ) : (
-                      "Enter"
+                      "Enter room"
                     )}
                   </button>
                   </form>
