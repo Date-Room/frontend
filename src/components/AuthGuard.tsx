@@ -14,9 +14,14 @@ import { authClient, type Session } from "@/lib/authClient";
 export const AuthGuard = ({
   children,
   requireAuth = true,
+  /** Allow unauthenticated access when this query param is present —
+   * used by /room/:id so anonymous guests with a participant_id from
+   * /join can render the room. */
+  guestParam,
 }: {
   children: React.ReactNode;
   requireAuth?: boolean;
+  guestParam?: string;
 }) => {
   const navigate = useNavigate();
   const [, setSession] = useState<Session | null>(authClient.getSession());
@@ -31,16 +36,19 @@ export const AuthGuard = ({
     function redirectForSession(current: Session | null) {
       const path = window.location.pathname;
       const isAuthPath = path === "/auth" || path === "/" || path === "/invite";
+      const hasGuestPass = guestParam
+        ? new URLSearchParams(window.location.search).has(guestParam)
+        : false;
 
       if (current) {
         if (isAuthPath) navigate("/home", { replace: true });
-      } else if (requireAuth && path !== "/auth") {
+      } else if (requireAuth && path !== "/auth" && !hasGuestPass) {
         navigate("/auth", { replace: true });
       }
     }
 
     return unsubscribe;
-  }, [navigate, requireAuth]);
+  }, [navigate, requireAuth, guestParam]);
 
   return <>{children}</>;
 };

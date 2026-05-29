@@ -62,7 +62,7 @@ const App = () => {
             <Route path="/home" element={<AuthGuard><Home /></AuthGuard>} />
             <Route path="/create" element={<AuthGuard><CreateRoom /></AuthGuard>} />
             <Route path="/rooms/:id/pre" element={<AuthGuard><PreRoom /></AuthGuard>} />
-            <Route path="/room/:id" element={<AuthGuard><LiveRoom /></AuthGuard>} />
+            <Route path="/room/:id" element={<AuthGuard guestParam="participant_id"><LiveRoom /></AuthGuard>} />
             <Route path="/room/:id/recap" element={<AuthGuard><Recap /></AuthGuard>} />
             <Route path="/our-room/:id" element={<AuthGuard><OurRoom /></AuthGuard>} />
             <Route path="/settings" element={<AuthGuard><Settings /></AuthGuard>} />
