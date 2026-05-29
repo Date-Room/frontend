@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { CardPage } from "@/components/CardPage";
 import { createRoom, type RoomPersistence } from "@/lib/rooms";
+import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 /**
@@ -32,6 +33,13 @@ export default function CreateRoom() {
       await queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
       navigate(`/rooms/${room.id}/pre`);
     } catch (e) {
+      // Backend 402 = paywall gate. Send them to the pitch instead of
+      // surfacing a generic error.
+      if (e instanceof ApiError && e.status === 402) {
+        toast.message("Persistent rooms need a subscription.");
+        navigate("/paywall");
+        return;
+      }
       toast.error(e instanceof Error ? e.message : "Could not create room.");
     } finally {
       setCreating(false);
