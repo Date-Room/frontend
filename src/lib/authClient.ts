@@ -34,6 +34,16 @@ export type Session = {
 const STORAGE_KEY = "dr_auth_v1";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
+/** Build a same-origin `next` path to round-trip through OAuth so the
+ * user lands back where they started. Defaults to `/` if we're already
+ * on /auth/callback (no useful return target then). */
+function currentNext(): string {
+  if (typeof window === "undefined") return "/";
+  const { pathname, search, hash } = window.location;
+  if (pathname === "/auth/callback") return "/";
+  return `${pathname}${search}${hash}` || "/";
+}
+
 type Listener = (s: Session | null) => void;
 
 class AuthClient {
@@ -122,14 +132,20 @@ class AuthClient {
 
   /** Kick off Google sign-in. Full-page redirect; the backend redirects
    * to Google, Google back to the backend, and the backend lands the
-   * user at `/auth/callback#at=…&rt=…` — handled by ingestFragment. */
+   * user at `/auth/callback?next=…#at=…&rt=…` — handled by ingestFragment.
+   * `next` carries the path the user was on so we can return them there
+   * after the round-trip. */
   signInWithGoogle(): void {
-    window.location.href = `${API_BASE}/v1/auth/google/start`;
+    window.location.href = `${API_BASE}/v1/auth/google/start?next=${encodeURIComponent(
+      currentNext(),
+    )}`;
   }
 
   /** Kick off Apple sign-in. Same redirect shape as Google. */
   signInWithApple(): void {
-    window.location.href = `${API_BASE}/v1/auth/apple/start`;
+    window.location.href = `${API_BASE}/v1/auth/apple/start?next=${encodeURIComponent(
+      currentNext(),
+    )}`;
   }
 
   /** Consume tokens that landed in the URL hash from an OAuth callback.

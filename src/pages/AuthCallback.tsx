@@ -29,12 +29,20 @@ export default function AuthCallback() {
 
     function go() {
       let dest = "/home";
-      try {
-        const stashed = sessionStorage.getItem(REDIRECT_KEY);
-        if (stashed && stashed.startsWith("/") && !stashed.startsWith("//")) dest = stashed;
-        sessionStorage.removeItem(REDIRECT_KEY);
-      } catch {
-        /* ignore */
+      // OAuth path carries the return target as `?next=`; magic-link path
+      // historically stashed it in sessionStorage. Honour both, with the
+      // URL param winning when present.
+      const nextParam = params.get("next");
+      if (nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")) {
+        dest = nextParam;
+      } else {
+        try {
+          const stashed = sessionStorage.getItem(REDIRECT_KEY);
+          if (stashed && stashed.startsWith("/") && !stashed.startsWith("//")) dest = stashed;
+          sessionStorage.removeItem(REDIRECT_KEY);
+        } catch {
+          /* ignore */
+        }
       }
       // Clear the fragment so a refresh doesn't try to re-ingest.
       window.history.replaceState(null, "", window.location.pathname);
