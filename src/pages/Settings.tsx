@@ -222,66 +222,66 @@ export default function Settings() {
         </DialogContent>
       </Dialog>
 
-      <div className="rounded-3xl p-6 glass-strong grain mb-8 flex items-center gap-4 animate-fade-in">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-rosegold/20 shrink-0" />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-rosegold/30 to-romantic/30 border-2 border-rosegold/20 flex items-center justify-center text-2xl font-serif text-cream shrink-0">
-              {initial}
-            </div>
-          )}
-          <div className="min-w-0">
-            <h2 className="text-lg font-medium text-cream truncate">{displayName}</h2>
-            <p className="text-xs text-muted-foreground truncate">{me?.email}</p>
+      <div className="editorial-card grain mb-8 flex items-center gap-4 p-5 sm:p-6 animate-float-up">
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-rosegold/20 shrink-0" />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-rosegold/30 to-romantic/30 border-2 border-rosegold/20 flex items-center justify-center text-2xl font-serif text-cream shrink-0">
+            {initial}
           </div>
+        )}
+        <div className="min-w-0">
+          <h2 className="text-lg font-medium text-cream truncate">{displayName}</h2>
+          <p className="text-xs text-muted-foreground truncate">{me?.email}</p>
         </div>
+      </div>
 
-        <div className="mb-6 animate-fade-in stagger-1">
-          <h3 className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2 px-1">Profile</h3>
-          <div className="rounded-2xl glass grain overflow-hidden divide-y divide-border/30">
-            <button type="button" onClick={() => void editDisplayName()} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/40 transition text-left">
-              <User className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="flex-1 text-sm text-cream">Display name</span>
-              <span className="text-xs text-muted-foreground truncate max-w-[40%]">{displayName}</span>
-              <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
-            </button>
-            <button type="button" onClick={() => setPhotoDialogOpen(true)} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/40 transition text-left">
-              <Camera className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="flex-1 text-sm text-cream">Profile photo</span>
-              <span className="text-xs text-muted-foreground">{avatarUrl ? "Change or remove" : "Add photo"}</span>
-              <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
-            </button>
-            <button type="button" onClick={() => setCountryDialogOpen(true)} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/40 transition text-left">
-              <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="flex-1 text-sm text-cream">Country</span>
-              <span className="text-xs text-muted-foreground">{country}</span>
-              <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
-            </button>
-          </div>
-        </div>
-
-        <div className="mb-6 animate-fade-in stagger-2">
-          <h3 className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2 px-1">Account</h3>
-          <div className="rounded-2xl glass grain overflow-hidden divide-y divide-border/30">
-            <button type="button" onClick={() => navigate("/privacy")} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-secondary/40 transition text-left">
-              <Shield className="w-4 h-4 text-muted-foreground shrink-0" />
-              <span className="flex-1 text-sm text-cream">Privacy &amp; safety</span>
-              <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
-            </button>
-          </div>
-        </div>
-
-        <div className="mt-10">
-          <button
-            type="button"
-            disabled={signOutBusy}
-            onClick={() => void handleSignOut()}
-            className="w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 glass grain text-left hover:bg-secondary/40 transition disabled:opacity-60"
-          >
-            {signOutBusy ? <Loader2 className="w-4 h-4 text-muted-foreground animate-spin shrink-0" /> : <LogOut className="w-4 h-4 text-muted-foreground shrink-0" />}
-            <span className="text-sm text-cream">{signOutBusy ? "Signing out…" : "Sign out"}</span>
+      <div className="mb-6 animate-float-up">
+        <h3 className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2 px-1">Profile</h3>
+        <div className="editorial-card overflow-hidden divide-y divide-white/[0.06]">
+          <button type="button" onClick={() => void editDisplayName()} className="focus-ring w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.04] transition text-left">
+            <User className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span className="flex-1 text-sm text-cream">Display name</span>
+            <span className="text-xs text-muted-foreground truncate max-w-[40%]">{displayName}</span>
+            <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+          </button>
+          <button type="button" onClick={() => setPhotoDialogOpen(true)} className="focus-ring w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.04] transition text-left">
+            <Camera className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span className="flex-1 text-sm text-cream">Profile photo</span>
+            <span className="text-xs text-muted-foreground">{avatarUrl ? "Change or remove" : "Add photo"}</span>
+            <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+          </button>
+          <button type="button" onClick={() => setCountryDialogOpen(true)} className="focus-ring w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.04] transition text-left">
+            <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span className="flex-1 text-sm text-cream">Country</span>
+            <span className="text-xs text-muted-foreground">{country}</span>
+            <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
           </button>
         </div>
+      </div>
+
+      <div className="mb-6 animate-float-up">
+        <h3 className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2 px-1">Account</h3>
+        <div className="editorial-card overflow-hidden divide-y divide-white/[0.06]">
+          <button type="button" onClick={() => navigate("/privacy")} className="focus-ring w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.04] transition text-left">
+            <Shield className="w-4 h-4 text-muted-foreground shrink-0" />
+            <span className="flex-1 text-sm text-cream">Privacy &amp; safety</span>
+            <ChevronRight className="w-4 h-4 text-muted-foreground/50 shrink-0" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-10">
+        <button
+          type="button"
+          disabled={signOutBusy}
+          onClick={() => void handleSignOut()}
+          className="editorial-card hover-lift focus-ring w-full flex items-center gap-3 px-4 py-3.5 text-left disabled:opacity-60"
+        >
+          {signOutBusy ? <Loader2 className="w-4 h-4 text-muted-foreground animate-spin shrink-0" /> : <LogOut className="w-4 h-4 text-muted-foreground shrink-0" />}
+          <span className="text-sm text-cream">{signOutBusy ? "Signing out…" : "Sign out"}</span>
+        </button>
+      </div>
 
         <p className="text-center text-[10px] text-muted-foreground mt-10">{BRAND_NAME} · Made with ❤️</p>
     </CardPage>

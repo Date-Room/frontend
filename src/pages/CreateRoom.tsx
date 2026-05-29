@@ -53,89 +53,115 @@ export default function CreateRoom() {
     },
   ];
 
+  const charsLeft = 240 - note.length;
   return (
-    <CardPage title="New room" onBack={() => navigate("/home")} bodyClassName="space-y-8">
+    <CardPage
+      title="New room"
+      onBack={() => navigate("/home")}
+      maxWidth="sm:max-w-xl lg:max-w-2xl"
+      bodyClassName="space-y-8 animate-float-up"
+    >
       <section className="space-y-3">
-          <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Keep this room?</p>
-          <div className="space-y-3">
-            {options.map((opt) => (
+        <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Keep this room?</p>
+        <div className="stagger-children space-y-3">
+          {options.map((opt) => {
+            const active = persistence === opt.id;
+            return (
               <button
                 key={opt.id}
                 type="button"
                 onClick={() => setPersistence(opt.id)}
+                aria-pressed={active}
                 className={cn(
-                  "w-full text-left rounded-[1.5rem] p-5 border transition-all flex items-start gap-4",
-                  persistence === opt.id
-                    ? "border-primary/55 bg-primary/10 ring-1 ring-primary/25"
-                    : "border-white/[0.08] bg-card/40 hover:border-primary/25",
+                  "focus-ring group w-full text-left rounded-[1.5rem] p-5 border transition-all flex items-start gap-4",
+                  active
+                    ? "border-primary/55 bg-primary/[0.10] ring-1 ring-primary/25 shadow-[0_18px_60px_-22px_rgba(212,130,106,0.45)]"
+                    : "editorial-card hover:border-primary/25 hover:-translate-y-0.5 duration-200",
                 )}
               >
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/12 ring-1 ring-primary/25 text-2xl">
+                <div className={cn(
+                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl ring-1 transition-colors",
+                  active ? "bg-primary/15 ring-primary/35" : "bg-primary/[0.08] ring-primary/15",
+                )}>
                   {opt.icon}
                 </div>
                 <div className="min-w-0 pt-0.5">
                   <p className="text-cream font-medium">{opt.title}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                  <span className={cn("mt-2 inline-block", active ? (opt.id === "persistent" ? "pill-rose" : "pill-amber") : "pill-muted")}>
+                    {opt.id === "persistent" ? "Perm" : "Temp"}
+                  </span>
                 </div>
                 <span
                   className={cn(
-                    "ml-auto mt-1 h-5 w-5 shrink-0 rounded-full border-2 transition-colors",
-                    persistence === opt.id ? "border-primary bg-primary" : "border-muted-foreground/40",
+                    "ml-auto mt-1 h-5 w-5 shrink-0 rounded-full border-2 transition-all",
+                    active
+                      ? "border-primary bg-primary shadow-[0_0_0_4px_rgba(212,130,106,0.18)]"
+                      : "border-muted-foreground/40 group-hover:border-primary/40",
                   )}
                 />
               </button>
-            ))}
-          </div>
-        </section>
+            );
+          })}
+        </div>
+      </section>
 
-        <section className="space-y-3">
-          <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Greeting (optional)</p>
-          <div className="space-y-3 rounded-[1.5rem] border border-white/[0.08] bg-card/40 p-5">
-            <div className="space-y-1.5">
-              <label htmlFor="cr-headline" className="block text-xs text-muted-foreground">
-                Headline
-              </label>
-              <input
-                id="cr-headline"
-                type="text"
-                value={headline}
-                onChange={(e) => setHeadline(e.target.value)}
-                placeholder="Tonight's the night"
-                maxLength={60}
-                className="auth-input"
-              />
-            </div>
-            <div className="space-y-1.5">
+      <section className="space-y-3">
+        <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Greeting (optional)</p>
+        <div className="editorial-card p-5 space-y-4">
+          <div className="space-y-1.5">
+            <label htmlFor="cr-headline" className="block text-xs text-muted-foreground">
+              Headline
+            </label>
+            <input
+              id="cr-headline"
+              type="text"
+              value={headline}
+              onChange={(e) => setHeadline(e.target.value)}
+              placeholder="Tonight's the night"
+              maxLength={60}
+              className="auth-input focus-ring"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex items-baseline justify-between">
               <label htmlFor="cr-note" className="block text-xs text-muted-foreground">
                 Note
               </label>
-              <textarea
-                id="cr-note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="A short note for them — what are we doing, what to expect, anything that sets the tone."
-                maxLength={240}
-                rows={3}
-                className="auth-input resize-y"
-              />
+              <span className={cn(
+                "text-[10px] tabular-nums",
+                charsLeft < 20 ? "text-amber" : "text-muted-foreground/60",
+              )}>
+                {charsLeft}
+              </span>
             </div>
+            <textarea
+              id="cr-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="A short note for them — what are we doing, what to expect, anything that sets the tone."
+              maxLength={240}
+              rows={3}
+              className="auth-input focus-ring resize-y"
+            />
           </div>
-        </section>
+        </div>
+      </section>
 
-        <button
-          type="button"
-          onClick={handleCreate}
-          disabled={creating}
-          className="btn-primary w-full flex items-center justify-center gap-2 py-4 rounded-[1.15rem] font-semibold disabled:opacity-50"
-        >
-          {creating ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Creating room…
-            </>
-          ) : (
-            "Create room"
-          )}
-        </button>
+      <button
+        type="button"
+        onClick={handleCreate}
+        disabled={creating}
+        className="btn-primary focus-ring w-full flex items-center justify-center gap-2 py-4 rounded-[1.15rem] font-semibold disabled:opacity-50"
+      >
+        {creating ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Creating room…
+          </>
+        ) : (
+          "Create room"
+        )}
+      </button>
     </CardPage>
   );
 }
