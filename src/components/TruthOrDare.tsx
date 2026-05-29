@@ -82,7 +82,18 @@ export function TruthOrDare() {
         ) : (
           <button
             type="button"
-            onClick={() => emit("draw")}
+            onClick={() =>
+              emit(
+                "draw",
+                {},
+                card
+                  ? {
+                      event_type: card.kind === "dare" ? "dare" : "truth",
+                      payload: { text: card.text },
+                    }
+                  : undefined,
+              )
+            }
             className="w-full max-w-sm aspect-[3/4] rounded-3xl border-2 border-dashed border-white/15 bg-card/40 flex flex-col items-center justify-center gap-3 hover:border-amber/40 transition"
           >
             <span className="text-4xl">🂠</span>
@@ -113,10 +124,30 @@ export function TruthOrDare() {
 
       {revealed && (
         <div className="flex flex-wrap gap-2 justify-center">
-          <Button onClick={() => emit("done")} className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90">
+          <Button
+            onClick={() =>
+              emit(
+                "done",
+                {},
+                card ? { event_type: "done", payload: { text: card.text } } : undefined,
+              )
+            }
+            className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90"
+          >
             <Check className="w-4 h-4 mr-1.5" /> Done — next card
           </Button>
-          <Button variant="outline" onClick={() => emit("skip")} disabled={skipsLeft <= 0} className="rounded-full border-border">
+          <Button
+            variant="outline"
+            onClick={() =>
+              emit(
+                "skip",
+                {},
+                card ? { event_type: "skipped", payload: { text: card.text } } : undefined,
+              )
+            }
+            disabled={skipsLeft <= 0}
+            className="rounded-full border-border"
+          >
             <SkipForward className="w-4 h-4 mr-1.5" /> Skip ({skipsLeft})
           </Button>
           {!trade && (

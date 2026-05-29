@@ -32,6 +32,13 @@ export function QuestionDeck() {
   stateRef.current = state;
   const seeded = useRef(false);
   const [customText, setCustomText] = useState("");
+  // One-shot recap event the next emit-driven persist consumes. Set by
+  // emit() and cleared inside the reducer effect after the persist call
+  // for the matching local event. Self-events only.
+  const nextRecap = useRef<{
+    event_type: string;
+    payload?: Record<string, unknown>;
+  } | null>(null);
 
   // Seed once from the persisted snapshot (initial hydrate / late join).
   useEffect(() => {
@@ -54,11 +61,22 @@ export function QuestionDeck() {
       if (next === stateRef.current) return;
       stateRef.current = next;
       setState(next);
-      if (room.canPersist) void session.persist(next as unknown as Record<string, unknown>);
+      if (room.canPersist) {
+        // Only attach the recap event when this is OUR move — partner
+        // moves echo through here too and we don't want to double-log.
+        const recap = e.userId === me ? nextRecap.current ?? undefined : undefined;
+        if (recap) nextRecap.current = null;
+        void session.persist(next as unknown as Record<string, unknown>, recap);
+      }
     });
-  }, [session, room.canPersist]);
+  }, [session, room.canPersist, me]);
 
-  function emit(type: string, payload: Record<string, unknown> = {}) {
+  function emit(
+    type: string,
+    payload: Record<string, unknown> = {},
+    recap?: { event_type: string; payload?: Record<string, unknown> },
+  ) {
+    nextRecap.current = recap ?? null;
     void session?.sendEvent(type, payload);
   }
 
@@ -213,7 +231,13 @@ export function QuestionDeck() {
 
       <div className="flex flex-wrap gap-2 justify-center">
         {myTurn && (
-          <Button type="button" onClick={() => emit("answered")} className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90">
+          <Button
+            type="button"
+            onClick={() =>
+              emit("answered", {}, { event_type: "answered", payload: { text: cardText } })
+            }
+            className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90"
+          >
             <Check className="w-4 h-4 mr-1.5" /> Answered — next
           </Button>
         )}
@@ -221,7 +245,9 @@ export function QuestionDeck() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => emit("skip")}
+            onClick={() =>
+              emit("skip", {}, { event_type: "skipped", payload: { text: cardText } })
+            }
             disabled={state.skips_left <= 0}
             className="rounded-full border-border"
           >

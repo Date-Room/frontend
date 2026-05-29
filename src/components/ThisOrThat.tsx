@@ -98,7 +98,17 @@ export function ThisOrThat() {
     const next = { ...picks, [me]: c };
     setPicks(next);
     void session?.sendEvent("pick", { pick: c });
-    void session?.persist({ prompt_index: idx, picks: next });
+    // Recap-worthy: each pick reads as "Sasha · picked — Mountains · vs · Beaches".
+    void session?.persist(
+      { prompt_index: idx, picks: next },
+      {
+        event_type: "picked",
+        payload: {
+          text: `${pair.a.label}  ·  vs  ·  ${pair.b.label}`,
+          choice: c,
+        },
+      },
+    );
   };
 
   const nextRound = () => {

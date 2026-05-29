@@ -43,7 +43,13 @@ export function The36() {
 
       <button
         type="button"
-        onClick={() => emit("advance", { from_set: state.set_index, from_q: state.question_index })}
+        onClick={() =>
+          emit(
+            "advance",
+            { from_set: state.set_index, from_q: state.question_index },
+            { event_type: "answered", payload: { text: prompt } },
+          )
+        }
         className="btn-primary w-full py-3.5 rounded-full font-semibold"
       >
         Next question

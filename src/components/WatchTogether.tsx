@@ -74,8 +74,11 @@ export function WatchTogether() {
   const [videoId, setVideoId] = useState<string | null>(dVideo);
   const [playing, setPlaying] = useState<boolean>(dPlaying);
 
-  function persistWatch(next: { video_id: string | null; playing: boolean; timestamp_seconds: number }) {
-    void session?.persist({ ...next, last_controller: userId });
+  function persistWatch(
+    next: { video_id: string | null; playing: boolean; timestamp_seconds: number },
+    recapEvent?: { event_type: string; payload?: Record<string, unknown> },
+  ) {
+    void session?.persist({ ...next, last_controller: userId }, recapEvent);
   }
 
   // Mirror durable state for late-joiners / refreshes (source of truth when the
@@ -235,7 +238,10 @@ export function WatchTogether() {
     setVideoId(id);
     setPlaying(true);
     void session?.sendEvent("load", { video_id: id, timestamp_seconds: 0 });
-    persistWatch({ video_id: id, playing: true, timestamp_seconds: 0 });
+    persistWatch(
+      { video_id: id, playing: true, timestamp_seconds: 0 },
+      { event_type: "queued_video", payload: { text: `youtu.be/${id}` } },
+    );
     setUrl("");
   };
 

@@ -85,7 +85,12 @@ export function TwoTruths() {
         <Button
           onClick={() => {
             if (lie === null) return;
-            emit("submit_statements", { statements: drafts.map((d) => d.trim()), lie_index: lie });
+            const trimmed = drafts.map((d) => d.trim());
+            emit(
+              "submit_statements",
+              { statements: trimmed, lie_index: lie },
+              { event_type: "submitted", payload: { text: trimmed.join("  ·  ") } },
+            );
           }}
           disabled={!canSubmit}
           className="rounded-full bg-amber text-primary-foreground disabled:opacity-50 mt-1"
@@ -116,7 +121,13 @@ export function TwoTruths() {
             <button
               key={i}
               type="button"
-              onClick={() => emit("guess", { guess: i })}
+              onClick={() =>
+                emit(
+                  "guess",
+                  { guess: i },
+                  { event_type: "guessed", payload: { text: s } },
+                )
+              }
               className="rounded-2xl border border-border bg-card/60 p-4 text-left text-cream hover:border-rose/50 transition"
             >
               {s}

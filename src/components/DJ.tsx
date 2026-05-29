@@ -127,16 +127,22 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
   }, [room.presence]);
   const djName = currentDj ? names[currentDj] || (currentDj === userId ? "You" : "Your partner") : "Nobody yet";
 
-  function persistDj(patch: Record<string, unknown>) {
-    void session?.persist({
-      turn,
-      now_playing: nowPlaying,
-      playing,
-      timestamp_seconds: dTsRef.current,
-      last_controller: userId,
-      silence,
-      ...patch,
-    });
+  function persistDj(
+    patch: Record<string, unknown>,
+    recapEvent?: { event_type: string; payload?: Record<string, unknown> },
+  ) {
+    void session?.persist(
+      {
+        turn,
+        now_playing: nowPlaying,
+        playing,
+        timestamp_seconds: dTsRef.current,
+        last_controller: userId,
+        silence,
+        ...patch,
+      },
+      recapEvent,
+    );
   }
 
   useEffect(() => {
@@ -307,7 +313,10 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
         : { current_dj: userId, turn_started_at: new Date().toISOString() };
       void session?.sendEvent("enqueue", { track });
       void session?.sendEvent("play", { timestamp_seconds: 0 });
-      persistDj({ turn: nextTurn, now_playing: track, playing: true, timestamp_seconds: 0, silence: false });
+      persistDj(
+        { turn: nextTurn, now_playing: track, playing: true, timestamp_seconds: 0, silence: false },
+        { event_type: "queued_track", payload: { text: `youtu.be/${id}` } },
+      );
       const p = playerRef.current;
       if (p?.loadVideoById) {
         suppress(5000);

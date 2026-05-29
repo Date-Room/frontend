@@ -4,6 +4,10 @@
  * through the activity's reducer; members persist the result for late-join;
  * initial state seeds from the durable snapshot.
  *
+ * Recap events: callers can pass a `recap` field to `emit()` and it travels
+ * on the next persist call — only for OUR moves (not partner echoes), so
+ * the timeline doesn't double-log.
+ *
  * `initial`, `fromJson`, and `reduce` must be stable (module-level) functions.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,18 +16,30 @@ import { useActivitySession } from "@/hooks/useActivitySession";
 
 type ReducerEvent = { type: string; payload: Record<string, unknown>; userId: string };
 
+export type EmitRecap = {
+  event_type: string;
+  payload?: Record<string, unknown>;
+};
+
 export function useReducedActivity<S>(
   activityId: string,
   initial: () => S,
   fromJson: (j: Record<string, unknown>) => S,
   reduce: (state: S, event: ReducerEvent) => S,
-): { state: S; emit: (type: string, payload?: Record<string, unknown>) => void; senderId: string } {
+): {
+  state: S;
+  emit: (type: string, payload?: Record<string, unknown>, recap?: EmitRecap) => void;
+  senderId: string;
+} {
   const room = useRoomSession();
   const { session, state: durable } = useActivitySession(activityId);
   const [state, setState] = useState<S>(initial);
   const stateRef = useRef(state);
   stateRef.current = state;
   const seeded = useRef(false);
+  // One-shot stash for the next emit's recap event. Cleared inside the
+  // reducer effect once consumed by a self-event's persist call.
+  const nextRecap = useRef<EmitRecap | null>(null);
 
   // Seed once from the persisted snapshot (initial hydrate / late join).
   useEffect(() => {
@@ -42,12 +58,17 @@ export function useReducedActivity<S>(
       if (next === stateRef.current) return;
       stateRef.current = next;
       setState(next);
-      if (room.canPersist) void session.persist(next as unknown as Record<string, unknown>);
+      if (room.canPersist) {
+        const recap = e.userId === room.senderId ? nextRecap.current ?? undefined : undefined;
+        if (recap) nextRecap.current = null;
+        void session.persist(next as unknown as Record<string, unknown>, recap);
+      }
     });
-  }, [session, room.canPersist, reduce]);
+  }, [session, room.canPersist, reduce, room.senderId]);
 
   const emit = useCallback(
-    (type: string, payload: Record<string, unknown> = {}) => {
+    (type: string, payload: Record<string, unknown> = {}, recap?: EmitRecap) => {
+      nextRecap.current = recap ?? null;
       void session?.sendEvent(type, payload);
     },
     [session],
