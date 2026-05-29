@@ -118,7 +118,9 @@ class AuthClient {
     const response = await fetch(`${API_BASE}/v1/auth/verify-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, code }),
+      // `device_label: "web"` keeps the refresh token on the rolling
+      // TTL — shared browsers shouldn't keep their session forever.
+      body: JSON.stringify({ email, code, device_label: "web" }),
     });
     if (!response.ok) throw await asError(response, "Could not verify the code.");
     return this.finalizeSignIn(await response.json());
