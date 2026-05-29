@@ -17,9 +17,26 @@ export type ActivityStateResponse = {
   updated_at: string;
 };
 
+/** One row of the room's chronological activity timeline. Matches
+ *  the backend's ActivityEventResponse. */
+export type ActivityEventResponse = {
+  id: string;
+  activity_id: string;
+  sequence_number: number;
+  event_type: string;
+  actor_participant_id: string | null;
+  actor_display_name: string | null;
+  payload: Record<string, unknown>;
+  created_at: string;
+};
+
 export type RoomRecapResponse = {
   room_id: string;
+  /** Converged per-activity state snapshots (legacy + summary cards). */
   activities: ActivityStateResponse[];
+  /** Chronological move-by-move timeline. Empty for rooms predating
+   *  the events log (commit 46cfedd). */
+  events: ActivityEventResponse[];
 };
 
 function statePath(roomId: string, activityId: string, participantId?: string): string {
@@ -44,7 +61,15 @@ export async function getActivityState(
 export function putActivityState(
   roomId: string,
   activityId: string,
-  body: { state: Record<string, unknown>; schema_version?: number; if_match_version?: number | null },
+  body: {
+    state: Record<string, unknown>;
+    schema_version?: number;
+    if_match_version?: number | null;
+    /** Optional semantic move logged transactionally with the state
+     *  change so Recap's timeline stays consistent. Skip for
+     *  activities whose state alone tells the whole story. */
+    event?: { event_type: string; payload?: Record<string, unknown> };
+  },
 ): Promise<ActivityStateResponse> {
   return api.put<ActivityStateResponse>(
     `/v1/rooms/${roomId}/activities/${encodeURIComponent(activityId)}/state`,
@@ -52,6 +77,29 @@ export function putActivityState(
       state: body.state,
       schema_version: body.schema_version ?? 1,
       if_match_version: body.if_match_version ?? null,
+      event: body.event ?? null,
+    },
+  );
+}
+
+/** Append a single move to the activity timeline without touching
+ *  persisted state. Use for reactions, "started the round", etc. */
+export function postActivityEvent(
+  roomId: string,
+  activityId: string,
+  body: {
+    event_type: string;
+    payload?: Record<string, unknown>;
+    /** Guests pass their participant_id; signed-in members omit. */
+    participant_id?: string;
+  },
+): Promise<ActivityEventResponse> {
+  return api.post<ActivityEventResponse>(
+    `/v1/rooms/${roomId}/activities/${encodeURIComponent(activityId)}/events`,
+    {
+      event_type: body.event_type,
+      payload: body.payload ?? null,
+      participant_id: body.participant_id ?? null,
     },
   );
 }
