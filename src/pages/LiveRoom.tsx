@@ -54,8 +54,8 @@ function RoomShell({ expiresAt, isHost }: { expiresAt: string | null; isHost: bo
       {/* Left column: video + chrome (full width on mobile, flex-1 beside the panel on desktop) */}
       <div className="flex-1 min-w-0 flex flex-col relative">
       {/* Header chrome over the video */}
-      <header className="relative z-20 flex items-center justify-between gap-2 px-4 sm:px-6 py-3 shrink-0">
-        <div className="flex items-center gap-2 rounded-full bg-black/45 backdrop-blur px-3 py-1.5 min-w-0">
+      <header className="relative z-20 flex items-center justify-between gap-2 px-3 sm:px-6 py-3 shrink-0">
+        <div className="flex items-center gap-2 rounded-full bg-black/45 backdrop-blur px-3 py-1.5 min-w-0 ring-1 ring-white/[0.08]">
           <span className="w-1.5 h-1.5 rounded-full bg-rosegold animate-pulse-glow shrink-0" />
           <h1 className="font-serif italic text-cream text-sm tracking-wide truncate">
             {DATE_NAME || "Our Room"}
@@ -66,9 +66,11 @@ function RoomShell({ expiresAt, isHost }: { expiresAt: string | null; isHost: bo
         {expiresAt && isHost && <Countdown expiresAt={expiresAt} />}
         <button
           onClick={() => setShowLeaveConfirm(true)}
-          className="flex items-center gap-1.5 rounded-full bg-black/45 backdrop-blur px-3 py-1.5 text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-cream transition shrink-0"
+          aria-label="Leave the room"
+          className="focus-ring flex items-center gap-1.5 rounded-full bg-black/45 backdrop-blur px-2.5 sm:px-3 py-1.5 text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-cream transition shrink-0 ring-1 ring-white/[0.08]"
         >
-          <LogOut className="w-3.5 h-3.5" /> Leave
+          <LogOut className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Leave</span>
         </button>
       </header>
 

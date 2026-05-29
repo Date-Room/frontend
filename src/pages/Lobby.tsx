@@ -275,9 +275,9 @@ export default function Lobby() {
         </div>
 
         <div className="flex-1 w-full flex items-center justify-center">
-          <div className="w-full max-w-xl">
+          <div className="w-full max-w-md sm:max-w-xl">
             <div
-              className="rounded-3xl p-6 sm:p-10 text-center flex flex-col items-center gap-6 glass-strong grain animate-fade-in-slow"
+              className="editorial-card grain animate-scale-in flex flex-col items-center gap-6 p-6 text-center sm:p-10"
               style={{ boxShadow: "0 30px 80px -20px rgba(0,0,0,0.6), inset 0 0 60px rgba(212,130,106,0.04)" }}
             >
               {invite.greeting_headline && (

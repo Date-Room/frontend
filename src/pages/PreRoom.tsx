@@ -147,19 +147,24 @@ export default function PreRoom() {
     <CardPage
       title={room.greeting_headline || "Your room"}
       onBack={() => navigate("/home")}
-      maxWidth="sm:max-w-xl"
-      bodyClassName="space-y-8"
+      maxWidth="sm:max-w-xl lg:max-w-2xl"
+      bodyClassName="space-y-8 animate-float-up"
       headerRight={
         room.persistence === "persistent" ? (
-          <button type="button" onClick={destroy} className="text-destructive/70 hover:text-destructive transition" aria-label="Destroy room">
+          <button type="button" onClick={destroy} className="focus-ring text-destructive/70 hover:text-destructive transition" aria-label="Destroy room">
             <Trash2 className="w-4 h-4" />
           </button>
         ) : undefined
       }
     >
         <section className="space-y-3">
-          <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Invite</p>
-          <div className="rounded-[1.5rem] border border-primary/25 bg-primary/[0.06] p-5 space-y-5">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Invite</p>
+            <span className={room.persistence === "persistent" ? "pill-rose" : "pill-amber"}>
+              {room.persistence === "persistent" ? "Perm" : "Temp"}
+            </span>
+          </div>
+          <div className="rounded-[1.5rem] border border-primary/25 bg-primary/[0.06] p-5 space-y-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
             {/* Method A — Room ID + PIN. Tap either to copy. */}
             <div className="grid grid-cols-2 gap-3">
               <CodeCopyTile

@@ -98,8 +98,8 @@ export default function Auth() {
         <span className="tracking-wide">Back to site</span>
       </Link>
 
-      <div className="relative z-10 w-full max-w-lg animate-fade-in sm:max-w-xl">
-        <div className="grain card-shadow rounded-[2rem] px-8 py-7 glass-strong sm:rounded-[2.25rem] sm:px-10 sm:py-8">
+      <div className="relative z-10 w-full max-w-md animate-scale-in sm:max-w-lg lg:max-w-xl">
+        <div className="grain editorial-card grain rounded-[1.75rem] px-6 py-7 sm:rounded-[2.25rem] sm:px-10 sm:py-9 lg:px-12 lg:py-10">
           <div className="mb-4 flex justify-center sm:mb-5">
             <div className="h-2 w-2 animate-pulse-glow rounded-full bg-rosegold" />
           </div>
@@ -177,7 +177,7 @@ export default function Auth() {
                 <button
                   type="button"
                   onClick={() => authClient.signInWithGoogle()}
-                  className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] py-3.5 text-sm font-medium text-cream transition-colors hover:bg-white/[0.06] sm:rounded-[1.15rem]"
+                  className="focus-ring flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.10] bg-white/[0.04] py-3.5 text-sm font-medium text-cream transition-all duration-200 hover:bg-white/[0.08] hover:border-white/[0.18] hover:-translate-y-px sm:rounded-[1.15rem]"
                 >
                   <span aria-hidden className="text-base">G</span>
                   Continue with Google
@@ -185,7 +185,7 @@ export default function Auth() {
                 <button
                   type="button"
                   onClick={() => authClient.signInWithApple()}
-                  className="flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] py-3.5 text-sm font-medium text-cream transition-colors hover:bg-white/[0.06] sm:rounded-[1.15rem]"
+                  className="focus-ring flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.10] bg-white/[0.04] py-3.5 text-sm font-medium text-cream transition-all duration-200 hover:bg-white/[0.08] hover:border-white/[0.18] hover:-translate-y-px sm:rounded-[1.15rem]"
                 >
                   <span aria-hidden className="text-base"></span>
                   Continue with Apple
