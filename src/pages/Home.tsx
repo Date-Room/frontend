@@ -225,8 +225,8 @@ export default function Home() {
         )}
 
         {tab === "profile" && (
-          <div className="mx-auto max-w-xl animate-fade-in space-y-6">
-            <div className="flex items-center gap-4 rounded-3xl p-6 glass-strong grain">
+          <div className="mx-auto max-w-xl animate-float-up space-y-4 stagger-children">
+            <div className="editorial-card grain flex items-center gap-4 p-6">
               {me?.photo_url ? (
                 <img src={me.photo_url} alt="" className="h-16 w-16 rounded-full border-2 border-rosegold/20 object-cover" />
               ) : (
@@ -244,12 +244,12 @@ export default function Home() {
                 )}
               </div>
             </div>
-            <button type="button" onClick={() => navigate("/settings")} className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 glass grain transition hover:bg-secondary/40">
+            <button type="button" onClick={() => navigate("/settings")} className="editorial-card hover-lift focus-ring flex w-full items-center gap-3 px-4 py-3.5">
               <SettingsIcon className="h-4 w-4 text-muted-foreground" />
               <span className="flex-1 text-left text-sm text-cream">Manage profile</span>
               <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
             </button>
-            <button type="button" onClick={handleSignOut} className="flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 glass grain transition hover:bg-secondary/40">
+            <button type="button" onClick={handleSignOut} className="editorial-card hover-lift focus-ring flex w-full items-center gap-3 px-4 py-3.5">
               <LogOut className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-cream">Sign out</span>
             </button>
