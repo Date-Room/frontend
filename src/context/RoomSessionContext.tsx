@@ -73,6 +73,9 @@ export function RoomSessionProvider({
           slot: identity.slot,
           name: identity.displayName,
           is_host: identity.isHost,
+          // Surfaces a stable handle to kick by; only guests have one
+          // (signed-in partners don't need it for DELETE /participants).
+          participant_id: identity.participantId ?? null,
         });
       })
       .catch(() => {

@@ -39,7 +39,7 @@ function Countdown({ expiresAt }: { expiresAt: string }) {
   );
 }
 
-function RoomShell({ expiresAt }: { expiresAt: string | null }) {
+function RoomShell({ expiresAt, isHost }: { expiresAt: string | null; isHost: boolean }) {
   const navigate = useNavigate();
   const [trayOpen, setTrayOpen] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -61,7 +61,9 @@ function RoomShell({ expiresAt }: { expiresAt: string | null }) {
             {DATE_NAME || "Our Room"}
           </h1>
         </div>
-        {expiresAt && <Countdown expiresAt={expiresAt} />}
+        {/* Timer is a host-side tool — the guest doesn't get to plan
+            around the room's lifespan. Hide it from non-hosts. */}
+        {expiresAt && isHost && <Countdown expiresAt={expiresAt} />}
         <button
           onClick={() => setShowLeaveConfirm(true)}
           className="flex items-center gap-1.5 rounded-full bg-black/45 backdrop-blur px-3 py-1.5 text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-cream transition shrink-0"
@@ -173,7 +175,7 @@ export default function LiveRoom() {
 
   return (
     <RoomSessionProvider roomId={roomId} identity={identity}>
-      <RoomShell expiresAt={expiresAt} />
+      <RoomShell expiresAt={expiresAt} isHost={identity.isHost} />
     </RoomSessionProvider>
   );
 }

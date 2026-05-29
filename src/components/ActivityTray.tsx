@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, X, LogOut, Gamepad2, Play, Headphones, MessageCircle, DoorOpen, type LucideIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, X, LogOut, Gamepad2, Play, Headphones, MessageCircle, DoorOpen, Copy, Check, KeyRound, UserMinus, Loader2, type LucideIcon } from "lucide-react";
+import { toast } from "sonner";
 import { Chat } from "@/components/Chat";
 import { WatchTogether } from "@/components/WatchTogether";
 import { ThisOrThat } from "@/components/ThisOrThat";
@@ -10,6 +11,7 @@ import { TwoTruths } from "@/components/TwoTruths";
 import { TruthOrDare } from "@/components/TruthOrDare";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { cn } from "@/lib/utils";
+import { kickParticipant, listMyRooms, rotateRoomPin, type Room } from "@/lib/rooms";
 
 /**
  * Activity tray — mobile's category model (Games/Watch/Music/Chat/Room), made
@@ -40,18 +42,172 @@ const CATEGORIES: Category[] = [
   { id: "room", label: "Room", Icon: DoorOpen, activities: [{ id: "room_details", label: "Room Details", tagline: "", ready: true }] },
 ];
 
+/** Host-only "Manage room" panel — code + PIN copy tiles, presence
+ * list with kick, rotate-PIN action. Not rendered for guests (the
+ * Room tray category itself is hidden from non-hosts). */
 function RoomDetails({ onLeave }: { onLeave: () => void }) {
-  const room = useRoomSession();
+  const session = useRoomSession();
+  const [room, setRoom] = useState<Room | null>(null);
+  const [copiedKey, setCopiedKey] = useState<"room-id" | "pin" | "link" | null>(null);
+  const [rotating, setRotating] = useState(false);
+  const [kicking, setKicking] = useState<string | null>(null);
+
+  // Pull the room row so we have code + pin (the in-room channel
+  // doesn't carry them). Listing my rooms is cheap and uses cached
+  // data from PreRoom in most cases.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const all = await listMyRooms();
+        if (cancelled) return;
+        setRoom(all.find((r) => r.id === session.roomId) ?? null);
+      } catch {
+        /* leave room null — the rest of the panel still works */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session.roomId]);
+
+  async function copy(value: string, key: "room-id" | "pin" | "link") {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedKey(key);
+      window.setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 2000);
+    } catch {
+      toast.error("Couldn't copy.");
+    }
+  }
+
+  async function onRotate() {
+    if (!room || rotating) return;
+    if (!window.confirm("Rotate the PIN? The current invite link will stop working.")) return;
+    setRotating(true);
+    try {
+      const updated = await rotateRoomPin(room.id);
+      setRoom(updated);
+      toast.success("PIN rotated. Re-share the new link.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't rotate the PIN.");
+    } finally {
+      setRotating(false);
+    }
+  }
+
+  async function onKick(participantId: string, name: string) {
+    if (kicking) return;
+    if (!window.confirm(`Remove ${name} from the room?`)) return;
+    setKicking(participantId);
+    try {
+      await kickParticipant(session.roomId, participantId);
+      toast.success(`${name} removed.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't remove that participant.");
+    } finally {
+      setKicking(null);
+    }
+  }
+
+  const inviteUrl = room ? `${window.location.origin}/i/${room.code}/${room.pin}` : "";
+  // Presence list minus the host themselves (you can't kick yourself).
+  const others = session.presence.filter((p) => p.sender_id !== session.senderId);
+
   return (
-    <div className="flex flex-col gap-4 p-6">
-      <div className="rounded-2xl border border-border bg-card/60 p-4 space-y-2">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">You are</p>
-        <p className="font-serif italic text-cream text-lg">{room.isHost ? "Host" : "Guest"} · seat {room.slot.toUpperCase()}</p>
-      </div>
-      <div className="rounded-2xl border border-border bg-card/60 p-4">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-1">In the room</p>
-        <p className="text-sm text-cream">{room.presence.length} connected</p>
-      </div>
+    <div className="flex flex-col gap-5 p-5">
+      {/* Share — Room ID + PIN tiles, then the link beneath. */}
+      <section className="space-y-3">
+        <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Share</p>
+        {room ? (
+          <div className="rounded-2xl border border-primary/25 bg-primary/[0.06] p-4 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <CopyTile label="Room ID" value={room.code} copied={copiedKey === "room-id"} onCopy={() => void copy(room.code, "room-id")} />
+              <CopyTile label="PIN" value={room.pin} copied={copiedKey === "pin"} onCopy={() => void copy(room.pin, "pin")} />
+            </div>
+            <div className="flex items-center gap-3" aria-hidden>
+              <span className="flex-1 h-px bg-white/10" />
+              <span className="text-[10px] uppercase tracking-[0.32em] text-muted-foreground">or</span>
+              <span className="flex-1 h-px bg-white/10" />
+            </div>
+            <button
+              type="button"
+              onClick={() => void copy(inviteUrl, "link")}
+              className={cn(
+                "w-full flex items-center justify-center gap-2 rounded-full border border-white/15 py-2.5 text-sm text-cream hover:bg-white/5 transition",
+                copiedKey === "link" && "border-emerald-400/40 text-emerald-200",
+              )}
+            >
+              {copiedKey === "link" ? (
+                <>
+                  <Check className="w-4 h-4" aria-hidden /> Link copied
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4" aria-hidden /> Copy invite link
+                </>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={onRotate}
+              disabled={rotating}
+              className="w-full flex items-center justify-center gap-2 rounded-full border border-amber/40 text-amber py-2.5 text-sm hover:bg-amber/10 transition disabled:opacity-50"
+            >
+              {rotating ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <KeyRound className="w-4 h-4" aria-hidden />}
+              Rotate PIN
+            </button>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-white/10 bg-card/40 p-4 text-sm text-muted-foreground">Loading…</div>
+        )}
+      </section>
+
+      {/* People — live presence list with kick. */}
+      <section className="space-y-3">
+        <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">In the room ({session.presence.length})</p>
+        <div className="rounded-2xl border border-border bg-card/60 divide-y divide-white/[0.06]">
+          {session.presence.length === 0 ? (
+            <p className="px-4 py-3 text-sm text-muted-foreground">Just you — waiting on your guest.</p>
+          ) : (
+            session.presence.map((p) => {
+              const isSelf = p.sender_id === session.senderId;
+              // Only guests have participant_id from /join. Signed-in
+              // partners join via session and don't expose one to the
+              // wire — they aren't kickable from this UI.
+              const kickable = !isSelf && typeof p.participant_id === "string";
+              return (
+                <div key={`${p.sender_id}-${p.slot}`} className="flex items-center gap-3 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-cream truncate">
+                      {p.name || (isSelf ? "You" : "Guest")} {isSelf && <span className="text-muted-foreground text-xs">· you</span>}
+                    </p>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                      Seat {String(p.slot || "?").toUpperCase()} {p.is_host ? "· host" : ""}
+                    </p>
+                  </div>
+                  {kickable && (
+                    <button
+                      type="button"
+                      onClick={() => void onKick(String(p.participant_id), p.name ?? "Guest")}
+                      disabled={kicking === p.participant_id}
+                      className="flex items-center gap-1.5 rounded-full border border-destructive/30 text-destructive/80 hover:text-destructive hover:bg-destructive/10 px-3 py-1.5 text-[11px] uppercase tracking-[0.2em] transition disabled:opacity-50"
+                    >
+                      {kicking === p.participant_id ? (
+                        <Loader2 className="w-3 h-3 animate-spin" aria-hidden />
+                      ) : (
+                        <UserMinus className="w-3 h-3" aria-hidden />
+                      )}
+                      Remove
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+
       <button
         type="button"
         onClick={onLeave}
@@ -60,6 +216,37 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
         <LogOut className="w-4 h-4" /> Leave the room
       </button>
     </div>
+  );
+}
+
+function CopyTile({
+  label,
+  value,
+  copied,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      aria-label={`Copy ${label}`}
+      className={cn(
+        "group rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 text-left transition",
+        "hover:bg-white/[0.06] hover:border-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        copied && "border-emerald-400/40 bg-emerald-400/5",
+      )}
+    >
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">{label}</p>
+        {copied ? <Check className="w-3.5 h-3.5 text-emerald-300" aria-hidden /> : <Copy className="w-3.5 h-3.5 text-muted-foreground opacity-60 group-hover:opacity-100 transition" aria-hidden />}
+      </div>
+      <p className="mt-1 font-serif text-2xl tracking-[0.3em] text-primary tabular-nums select-all">{value}</p>
+    </button>
   );
 }
 
@@ -97,9 +284,14 @@ export function ActivityTray({ open, onClose, onLeave }: { open: boolean; onClos
   // Chat) whose ids match their activity can't collide and break "back".
   const [catId, setCatId] = useState<string | null>(null);
   const [actId, setActId] = useState<string | null>(null);
+  const { isHost } = useRoomSession();
 
-  const category = CATEGORIES.find((c) => c.id === catId);
-  const activity = CATEGORIES.flatMap((c) => c.activities).find((a) => a.id === actId);
+  // The Room/Manage category is host-only — guests don't need to see
+  // (or accidentally tap into) the host's PIN-rotation + kick controls.
+  const visibleCategories = isHost ? CATEGORIES : CATEGORIES.filter((c) => c.id !== "room");
+
+  const category = visibleCategories.find((c) => c.id === catId);
+  const activity = visibleCategories.flatMap((c) => c.activities).find((a) => a.id === actId);
   const wide = !!activity?.wide;
   const isMenu = !catId && !actId;
 
@@ -168,7 +360,7 @@ export function ActivityTray({ open, onClose, onLeave }: { open: boolean; onClos
         <div className="flex-1 min-h-0 overflow-auto">
           {isMenu ? (
             <div className="flex flex-col gap-2 p-4">
-              {CATEGORIES.map((c) => (
+              {visibleCategories.map((c) => (
                 <button
                   key={c.id}
                   type="button"

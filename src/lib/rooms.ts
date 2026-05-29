@@ -132,6 +132,17 @@ export function deleteRoom(roomId: string): Promise<void> {
   return api.delete<void>(`/v1/rooms/${roomId}`);
 }
 
+/** Host-only — rotate the room PIN. Returns the updated room (so the
+ * caller's share UI immediately reflects the new value). */
+export function rotateRoomPin(roomId: string): Promise<Room> {
+  return api.post<Room>(`/v1/rooms/${roomId}/rotate-pin`);
+}
+
+/** Host-only — eject a participant. */
+export function kickParticipant(roomId: string, participantId: string): Promise<void> {
+  return api.delete<void>(`/v1/rooms/${roomId}/participants/${participantId}`);
+}
+
 export function updateRoom(
   roomId: string,
   patch: { theme_color?: string | null; background_id?: string | null },
