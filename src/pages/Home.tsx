@@ -102,11 +102,11 @@ export default function Home() {
         {tab === "rooms" && (
           <div className="animate-fade-in space-y-8">
             {/* Action bar — full-width stacked on mobile, contained row on desktop. */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
               <button
                 type="button"
                 onClick={() => navigate("/create")}
-                className="btn-primary flex items-center justify-center gap-3 rounded-[1.35rem] py-5 shadow-[0_12px_48px_rgba(212,130,106,0.28)] sm:flex-1 sm:py-4 lg:max-w-xs"
+                className="btn-primary focus-ring flex items-center justify-center gap-3 rounded-[1.35rem] py-5 shadow-[0_12px_48px_rgba(212,130,106,0.28)] sm:flex-1 sm:py-4 lg:max-w-xs"
               >
                 <Plus className="h-5 w-5" strokeWidth={2.25} />
                 <span className="font-medium tracking-wide">Create a new room</span>
@@ -114,39 +114,60 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => navigate("/join")}
-                className="flex items-center justify-center gap-2 rounded-[1.35rem] border border-white/[0.08] py-4 text-xs uppercase tracking-[0.2em] text-muted-foreground transition hover:border-primary/25 hover:text-cream sm:px-8"
+                className="focus-ring flex items-center justify-center gap-2 rounded-[1.35rem] border border-white/[0.08] py-4 text-xs uppercase tracking-[0.2em] text-muted-foreground transition hover:border-primary/25 hover:text-cream sm:px-8 hover:-translate-y-0.5 duration-200"
               >
                 <KeyRound className="h-4 w-4" /> Join with code
               </button>
             </div>
 
             {aliveRooms.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="stagger-children grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {aliveRooms.map((r) => {
                   const isHost = me ? r.host_id === me.id : false;
+                  const isLive = r.state === "live" || r.state === "active";
+                  const isWaiting = r.state === "waiting" || r.state === "created";
+                  const isPersistent = r.persistence === "persistent";
                   return (
                     <button
                       key={r.id}
                       type="button"
                       onClick={() => (isHost ? navigate(`/rooms/${r.id}/pre`) : enterRoom(r))}
-                      className="group flex items-center justify-between rounded-[1.75rem] border border-white/[0.06] glass-strong grain p-5 text-left transition-all hover:border-primary/25 hover:bg-white/[0.04]"
+                      className="group editorial-card hover-lift focus-ring flex items-stretch text-left"
                     >
-                      <div className="flex min-w-0 items-center gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-primary/15 bg-primary/10 text-xl">
-                          {r.persistence === "persistent" ? "🏠" : "🕯️"}
+                      <div className="flex flex-1 min-w-0 flex-col gap-4 p-5">
+                        {/* Top row — icon + title + chevron */}
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/15 to-primary/[0.04] text-lg shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+                            {isPersistent ? "🏠" : "🕯️"}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-serif text-[1.05rem] italic leading-snug text-cream">
+                              {isPersistent ? "Our Room" : "Tonight"}
+                              <span className="text-sm not-italic text-muted-foreground/65"> · {isHost ? "host" : "guest"}</span>
+                            </p>
+                            <p className="mt-0.5 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+                              Code {r.code}{isHost ? ` · PIN ${r.pin}` : ""}
+                            </p>
+                          </div>
+                          <ChevronRight className="mt-1 h-4 w-4 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
                         </div>
-                        <div className="min-w-0">
-                          <p className="truncate font-serif text-lg italic text-cream">
-                            {r.persistence === "persistent" ? "Our Room" : "Tonight"}
-                            <span className="text-sm not-italic text-muted-foreground/70"> · {isHost ? "host" : "guest"}</span>
-                          </p>
-                          <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                            Code {r.code}
-                            {isHost ? ` · PIN ${r.pin}` : ""}
-                          </p>
+
+                        {/* Bottom row — status pills */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className={isPersistent ? "pill-rose" : "pill-amber"} title={isPersistent ? "Persistent — Our Room" : "Session — Tonight"}>
+                            {isPersistent ? "Perm" : "Temp"}
+                          </span>
+                          {isLive && (
+                            <span className="pill-live">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" aria-hidden />
+                              Live
+                            </span>
+                          )}
+                          {isWaiting && !isLive && (
+                            <span className="pill-muted">Waiting</span>
+                          )}
                         </div>
                       </div>
-                      <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition-all group-hover:translate-x-1 group-hover:text-primary" />
                     </button>
                   );
                 })}
@@ -174,24 +195,30 @@ export default function Home() {
                 <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Rooms move here once their session ends</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {endedRooms.map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => navigate(`/room/${r.id}/recap`)}
-                    className="group flex items-center justify-between rounded-[1.5rem] border border-white/[0.06] glass grain p-4 text-left transition hover:border-primary/25"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary/60 text-lg">🕯️</div>
-                      <div className="min-w-0">
-                        <p className="truncate text-cream">{r.persistence === "persistent" ? "Our Room" : "Tonight"}</p>
-                        <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Code {r.code} · recap</p>
+              <div className="stagger-children grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {endedRooms.map((r) => {
+                  const isPersistent = r.persistence === "persistent";
+                  return (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onClick={() => navigate(`/room/${r.id}/recap`)}
+                      className="group editorial-card hover-lift focus-ring flex items-center gap-3 p-4 text-left"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-secondary/60 text-lg ring-1 ring-white/[0.06]">
+                        {isPersistent ? "🏠" : "🕯️"}
                       </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition group-hover:text-primary" />
-                  </button>
-                ))}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-cream">{isPersistent ? "Our Room" : "Tonight"}</p>
+                        <div className="mt-0.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                          <span className={isPersistent ? "pill-rose" : "pill-amber"}>{isPersistent ? "Perm" : "Temp"}</span>
+                          <span className="truncate">Code {r.code} · recap</span>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

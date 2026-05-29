@@ -6,25 +6,29 @@
 
 @layer base {
   :root {
-    --background: 250 20% 6%;
-    --foreground: 40 10% 96%;
-    --card: 250 20% 8%;
-    --card-foreground: 40 10% 96%;
-    --popover: 250 20% 6%;
-    --popover-foreground: 40 10% 96%;
-    --primary: 16 52% 62%;
-    --primary-foreground: 250 20% 6%;
-    --secondary: 250 15% 12%;
-    --secondary-foreground: 40 10% 96%;
-    --muted: 250 15% 15%;
-    --muted-foreground: 250 10% 65%;
-    --accent: 38 92% 55%;
-    --accent-foreground: 250 20% 6%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 250 15% 18%;
-    --input: 250 15% 18%;
-    --ring: 16 52% 62%;
+    /* Warm dim — lifted from the original near-black so surfaces breathe
+       without losing the candlelit feel. Hue shifted from blue-leaning
+       (~250) to warm taupe (~22) so cream tones harmonise instead of
+       fighting the base. Keep contrast headroom on text + primary. */
+    --background: 22 20% 9%;
+    --foreground: 40 14% 96%;
+    --card: 22 18% 13%;
+    --card-foreground: 40 14% 96%;
+    --popover: 22 20% 11%;
+    --popover-foreground: 40 14% 96%;
+    --primary: 16 56% 64%;
+    --primary-foreground: 22 22% 9%;
+    --secondary: 22 16% 16%;
+    --secondary-foreground: 40 14% 96%;
+    --muted: 22 14% 20%;
+    --muted-foreground: 30 12% 72%;
+    --accent: 38 88% 60%;
+    --accent-foreground: 22 22% 9%;
+    --destructive: 0 76% 60%;
+    --destructive-foreground: 35 35% 98%;
+    --border: 30 10% 24%;
+    --input: 30 10% 22%;
+    --ring: 16 56% 64%;
     --radius: 1.5rem;
   }
 }
@@ -69,15 +73,24 @@
 
 @layer components {
   .glass {
-    @apply bg-white/5 backdrop-blur-xl border border-white/10;
+    @apply bg-white/[0.06] backdrop-blur-xl border border-white/[0.12];
   }
-  
+
   .glass-strong {
-    @apply bg-black/40 backdrop-blur-2xl border border-white/10;
+    @apply bg-black/35 backdrop-blur-2xl border border-white/[0.14];
   }
 
   .glass-subtle {
-    @apply bg-white/5 backdrop-blur-md border border-white/5;
+    @apply bg-white/[0.04] backdrop-blur-md border border-white/[0.08];
+  }
+
+  /* Editorial card — warm dim surface with a faint top-edge highlight
+     that mimics light catching the bezel. Used for room tiles, recap
+     blocks, anything that should feel like a physical object. */
+  .editorial-card {
+    @apply rounded-[1.75rem] border border-white/[0.10] bg-card/65
+           shadow-[0_18px_60px_-20px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]
+           backdrop-blur-xl;
   }
 
   .vignette {
@@ -111,7 +124,39 @@
 
   /* Gentle lift on hover for tappable cards. */
   .hover-lift {
-    @apply transition-transform duration-300 hover:-translate-y-0.5;
+    @apply transition-all duration-300 ease-out
+           hover:-translate-y-0.5 hover:shadow-[0_22px_60px_-22px_rgba(212,130,106,0.28)];
+  }
+
+  /* Stronger lift for hero CTAs / paywall tiles — same easing as
+     hover-lift so motion stays consistent across surfaces. */
+  .hover-lift-strong {
+    @apply transition-all duration-300 ease-out
+           hover:-translate-y-1 hover:shadow-[0_28px_72px_-22px_rgba(212,130,106,0.38)];
+  }
+
+  /* Reusable focus ring — consistent across inputs, buttons, links. */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/55
+           focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  /* Pill — for persistence / state badges on room tiles, etc. */
+  .pill {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5
+           text-[10px] font-medium uppercase tracking-[0.18em];
+  }
+  .pill-amber {
+    @apply pill bg-amber/15 text-amber border border-amber/25;
+  }
+  .pill-rose {
+    @apply pill bg-rosegold/15 text-rose border border-rosegold/30;
+  }
+  .pill-muted {
+    @apply pill bg-white/[0.05] text-muted-foreground border border-white/[0.08];
+  }
+  .pill-live {
+    @apply pill bg-emerald-400/15 text-emerald-300 border border-emerald-400/25;
   }
 
   /* Primary-tinted "gradient" border for highlighted cards. */
@@ -191,6 +236,30 @@
   75% { transform: scale(1.1) translateX(-1px); opacity: 0.8; }
 }
 
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Honour reduced-motion — skip animations, keep functionality. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
 .animate-fade-in {
   animation: fade-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
@@ -206,6 +275,28 @@
 .animate-candle-flicker {
   animation: candle-flicker 4s ease-in-out infinite;
 }
+
+.animate-scale-in {
+  animation: scale-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-float-up {
+  animation: float-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Stagger helpers — wrap a parent in .stagger-children and the kids
+   fade-up in order. Tap them with motion-delay-{1..6} for control. */
+.stagger-children > * {
+  opacity: 0;
+  animation: float-up 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0.04s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.10s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.16s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.22s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.28s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.34s; }
+.stagger-children > *:nth-child(n+7) { animation-delay: 0.40s; }
 
 /* Custom Utilities */
 .text-cream { color: #F8F7F3; }
