@@ -83,7 +83,12 @@ export function Chat() {
     const next = mergeMessages(messages, [msg]);
     setMessages(next);
     void session.sendEvent("send", msg as unknown as Record<string, unknown>);
-    void session.persist({ messages: next });
+    // Piggyback the recap event on the durable PUT — every sent
+    // message lands on the timeline with its text in payload.text.
+    void session.persist(
+      { messages: next },
+      { event_type: "message", payload: { text: trimmed } },
+    );
     setText("");
   }
 

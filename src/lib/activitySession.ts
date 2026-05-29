@@ -138,12 +138,20 @@ export class RoomActivitySession {
     });
   }
 
-  /** Persist a durable snapshot (members only). Updates the tracked version. */
-  async persist(state: Record<string, unknown>): Promise<void> {
+  /** Persist a durable snapshot (members only). Updates the tracked
+   * version. The optional `recapEvent` rides along — backend writes
+   * it transactionally with the state row, surfacing on the Recap
+   * timeline. Skip it for transient state convergence (typing
+   * indicators, etc.) and pass it for moves the recap should show. */
+  async persist(
+    state: Record<string, unknown>,
+    recapEvent?: { event_type: string; payload?: Record<string, unknown> },
+  ): Promise<void> {
     if (!this.opts.canPersist) return;
     const row = await putActivityState(this.opts.roomId, this.activityId, {
       state,
       if_match_version: null, // last-write-wins; events already converged it
+      event: recapEvent,
     });
     this.serverVersion = row.version;
   }
