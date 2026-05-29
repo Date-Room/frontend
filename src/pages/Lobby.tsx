@@ -110,8 +110,16 @@ export default function Lobby() {
   const effectiveName = (signedIn && profileName ? profileName : typedName) || "Guest";
   const needsName = !(signedIn && profileName);
 
-  async function handleJoin(e: React.FormEvent) {
-    e.preventDefault();
+  // Bounce signed-out guests trying to enter a persistent room into
+  // the auth flow, carrying the deep link so they return here after
+  // signing up / in. The Lobby then auto-joins them (see effect below).
+  function bounceToAuthForPersistent(): void {
+    const deepLink = code && pin ? `/i/${encodeURIComponent(code)}/${encodeURIComponent(pin)}` : "/";
+    toast.message("This room is account-only — quick sign-in then you're in.");
+    navigate(`/auth?next=${encodeURIComponent(deepLink)}`, { replace: true });
+  }
+
+  async function attemptJoin(displayName: string): Promise<void> {
     if (!invite) return;
     if (!/^\d{4,}$/.test(pin)) {
       // No PIN in the URL — the user probably opened just `/i/<code>`.
@@ -122,30 +130,54 @@ export default function Lobby() {
     }
     setJoining(true);
     try {
-      const res = await joinRoom(invite.id, { display_name: effectiveName, pin });
-      // Remember the name so we stop asking: persist to the profile for
-      // signed-in users (who had none), and locally for everyone.
+      const res = await joinRoom(invite.id, { display_name: displayName, pin });
       try {
-        localStorage.setItem("dateroom_guest_name", effectiveName);
+        localStorage.setItem("dateroom_guest_name", displayName);
       } catch {
         /* ignore */
       }
       if (signedIn && !profileName) {
-        void updateMe({ display_name: effectiveName }).catch(() => {});
+        void updateMe({ display_name: displayName }).catch(() => {});
       }
       const params = new URLSearchParams({
         participant_id: res.participant_id,
         slot: res.slot,
-        name: effectiveName,
+        name: displayName,
       });
       if (res.expires_at) params.set("expires_at", res.expires_at);
       navigate(`/room/${res.room_id}?${params.toString()}`, { replace: true });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not join. Check the PIN and try again.");
+      // Backend 403 "Persistent rooms require an account" → divert
+      // anonymous guests to the auth flow with the deep link in tow.
+      const msg = err instanceof Error ? err.message : "Could not join.";
+      if (!signedIn && /account|persistent/i.test(msg)) {
+        bounceToAuthForPersistent();
+        return;
+      }
+      toast.error(msg + " Check the PIN and try again.");
     } finally {
       setJoining(false);
     }
   }
+
+  async function handleJoin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!invite) return;
+    await attemptJoin(effectiveName);
+  }
+
+  // Returners from a successful sign-in / sign-up via the
+  // persistent-room nudge land here authenticated, with the PIN
+  // already in the URL. Auto-join — no extra click needed.
+  useEffect(() => {
+    if (!invite || joining) return;
+    if (!signedIn || !profileName) return;
+    if (!/^\d{4,}$/.test(pin)) return;
+    if (!open) return;
+    void attemptJoin(profileName);
+    // We only ever want to fire once per (invite, identity) pair.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invite, signedIn, profileName, pin, open]);
 
   // ── Date finished — recap only ──
   if (ended && invite) {

@@ -35,12 +35,17 @@ const STORAGE_KEY = "dr_auth_v1";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
 /** Build a same-origin `next` path to round-trip through OAuth so the
- * user lands back where they started. Defaults to `/` if we're already
- * on /auth/callback (no useful return target then). */
+ * user lands back where they started.
+ * - /auth and /auth/callback aren't useful return targets — prefer
+ *   their own `?next=` param if present, otherwise `/`.
+ * - Anywhere else: round-trip the current path (incl. search + hash). */
 function currentNext(): string {
   if (typeof window === "undefined") return "/";
   const { pathname, search, hash } = window.location;
-  if (pathname === "/auth/callback") return "/";
+  if (pathname === "/auth" || pathname === "/auth/callback") {
+    const inner = new URLSearchParams(search).get("next");
+    return inner && inner.startsWith("/") && !inner.startsWith("//") ? inner : "/";
+  }
   return `${pathname}${search}${hash}` || "/";
 }
 

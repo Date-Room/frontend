@@ -8,10 +8,12 @@ import { PageShell } from "@/components/PageShell";
 
 const REDIRECT_KEY = "post_auth_redirect";
 
-/** Where to land after auth completes. Validated to be a same-origin path. */
+/** Where to land after auth completes. Validated to be a same-origin path.
+ * Accepts both `?next=` (the canonical param used everywhere else) and
+ * `?redirect=` (legacy, kept for any old in-app links). */
 function intendedRedirect(params: URLSearchParams): string {
-  const next = params.get("redirect");
-  return next && next.startsWith("/") && !next.startsWith("//") ? next : "/home";
+  const raw = params.get("next") ?? params.get("redirect");
+  return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/home";
 }
 
 /**
