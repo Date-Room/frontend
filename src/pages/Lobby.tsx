@@ -233,8 +233,8 @@ export default function Lobby() {
       />
       <div className="page-grain" aria-hidden />
 
-      <div className="relative z-10 min-h-screen flex flex-col">
-        <div className="flex justify-center pt-8">
+      <div className="relative z-10 min-h-screen flex flex-col items-center px-6 py-10 sm:py-14">
+        <div className="flex justify-center pb-6">
           <span
             className="w-2 h-2 rounded-full bg-rosegold animate-candle-flicker"
             style={{ boxShadow: "0 0 20px hsl(16 52% 62% / 0.6), 0 0 60px hsl(16 52% 62% / 0.2)" }}
@@ -242,9 +242,7 @@ export default function Lobby() {
           />
         </div>
 
-        <div className="flex-1" />
-
-        <div className="px-6 pb-12 sm:pb-16 flex justify-center">
+        <div className="flex-1 w-full flex items-center justify-center">
           <div className="w-full max-w-xl">
             <div
               className="rounded-3xl p-6 sm:p-10 text-center flex flex-col items-center gap-6 glass-strong grain animate-fade-in-slow"
