@@ -56,7 +56,7 @@ export function RoomSessionProvider({
 
   // One channel per room id. Identity changes don't recreate the socket.
   if (!channelRef.current) {
-    channelRef.current = new RoomChannel(roomId, { participantId });
+    channelRef.current = new RoomChannel(roomId, { participantId: identity.participantId });
   }
   const channel = channelRef.current;
 
