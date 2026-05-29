@@ -34,8 +34,10 @@ export default function Lobby() {
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [name, setName] = useState("");
-  const [pin, setPin] = useState(pinParam ?? "");
   const [joining, setJoining] = useState(false);
+  // PIN now travels in the deep-link path (`/i/<code>/<pin>`) — share UIs
+  // always include it, so the lobby no longer asks for it.
+  const pin = (pinParam ?? "").trim();
   // Signed-in users join with their profile display name (mobile parity) and
   // are never asked. Only anonymous guests type a name.
   const [signedIn, setSignedIn] = useState(false);
@@ -90,13 +92,6 @@ export default function Lobby() {
     [invite],
   );
 
-  // Deep-link landing on the backend bounces into the iOS app (code-only;
-  // the guest enters the PIN in-app). Used by the "Open in the app" option.
-  const appInviteUrl = useMemo(() => {
-    const base = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
-    return code ? `${base}/i/${encodeURIComponent(code)}` : base;
-  }, [code]);
-
   const expired = useMemo(() => {
     if (!invite?.expires_at) return false;
     return now >= new Date(invite.expires_at).getTime();
@@ -118,13 +113,16 @@ export default function Lobby() {
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
     if (!invite) return;
-    if (!/^\d{4,}$/.test(pin.trim())) {
-      toast.error("Enter the PIN the host shared.");
+    if (!/^\d{4,}$/.test(pin)) {
+      // No PIN in the URL — the user probably opened just `/i/<code>`.
+      // Bounce to the manual-entry page with the code prefilled.
+      toast.error("This invite link is missing the PIN — ask the host to resend.");
+      navigate(`/join?code=${encodeURIComponent(code ?? "")}`);
       return;
     }
     setJoining(true);
     try {
-      const res = await joinRoom(invite.id, { display_name: effectiveName, pin: pin.trim() });
+      const res = await joinRoom(invite.id, { display_name: effectiveName, pin });
       // Remember the name so we stop asking: persist to the profile for
       // signed-in users (who had none), and locally for everyone.
       try {
@@ -276,43 +274,9 @@ export default function Lobby() {
 
               {open ? (
                 <div className="w-full max-w-sm space-y-5">
-                  <a
-                    href={appInviteUrl}
-                    className="btn-primary flex w-full items-center justify-center gap-2 rounded-full py-3.5 font-semibold"
-                  >
-                    Open in the Date Room app
-                  </a>
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-white/[0.08]" />
-                    </div>
-                    <div className="relative flex justify-center text-[10px] uppercase tracking-[0.28em] text-cream/45">
-                      <span className="bg-background/60 px-3 backdrop-blur-sm">or continue on this device</span>
-                    </div>
-                  </div>
-
                   <form onSubmit={handleJoin} className="space-y-4">
-                  {/* PIN first — it's the only required field. Name (when
-                      asked) is optional and floats below; anonymous guests
-                      who skip it join as "Guest". */}
-                  <div className="space-y-1.5 text-left">
-                    <label htmlFor="lobby-pin" className="block text-[11px] uppercase tracking-[0.28em] text-cream/70">
-                      Room PIN
-                    </label>
-                    <input
-                      id="lobby-pin"
-                      type="text"
-                      inputMode="numeric"
-                      value={pin}
-                      onChange={(e) => setPin(e.target.value.replace(/[^\d]/g, ""))}
-                      placeholder="••••"
-                      className="auth-input tracking-[0.5em] text-center"
-                      maxLength={8}
-                      required
-                      autoFocus
-                    />
-                  </div>
+                  {/* Name only (PIN already in the deep link). Anonymous
+                      guests who skip the name join as "Guest". */}
                   {needsName ? (
                     <div className="space-y-1.5 text-left">
                       <label htmlFor="lobby-name" className="flex items-center justify-between text-[11px] uppercase tracking-[0.28em] text-cream/70">
@@ -327,6 +291,7 @@ export default function Lobby() {
                         placeholder="Guest"
                         autoComplete="given-name"
                         className="auth-input"
+                        autoFocus
                       />
                     </div>
                   ) : (
