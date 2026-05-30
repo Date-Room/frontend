@@ -55,6 +55,9 @@ export function ThisOrThat() {
   // persist, write the converged state to durable — so the round /
   // pick survives a reload even if only one side is signed in
   // (matches mobile's "persist on partner's behalf" semantics).
+  // `promptIndex` is referenced inline rather than `idx` because
+  // `idx` is declared below this effect — closing over it would
+  // hit a TDZ on first render.
   useEffect(() => {
     if (!session) return;
     return session.onEvent((e) => {
@@ -65,7 +68,7 @@ export function ThisOrThat() {
         setPicks((prev) => {
           const next = { ...prev, [e.userId]: c };
           if (isPartner && room.canPersist) {
-            void session.persist({ prompt_index: idx, picks: next });
+            void session.persist({ prompt_index: promptIndex, picks: next });
           }
           return next;
         });
@@ -78,7 +81,7 @@ export function ThisOrThat() {
         }
       }
     });
-  }, [session, me, idx, room.canPersist]);
+  }, [session, me, promptIndex, room.canPersist]);
 
   const idx = promptIndex;
   const pair = pairs[idx % Math.max(1, pairs.length)];
