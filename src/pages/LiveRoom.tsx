@@ -39,10 +39,18 @@ function Countdown({ expiresAt }: { expiresAt: string }) {
   );
 }
 
-function RoomShell({ expiresAt, isHost }: { expiresAt: string | null; isHost: boolean }) {
+function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; isHost: boolean; roomId: string }) {
   const navigate = useNavigate();
   const [trayOpen, setTrayOpen] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  const expired = expiresAt
+    ? now >= new Date(expiresAt).getTime()
+    : false;
 
   return (
     <PageShell
@@ -116,6 +124,36 @@ function RoomShell({ expiresAt, isHost }: { expiresAt: string | null; isHost: bo
           </div>
         </div>
       )}
+
+      {expired && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/90 backdrop-blur-md animate-fade-in">
+          <div className="w-full max-w-md mx-4 editorial-card grain p-8 text-center animate-scale-in">
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-rosegold/15 ring-1 ring-rosegold/35">
+              <Clock className="h-6 w-6 text-rosegold" aria-hidden />
+            </div>
+            <h2 className="font-serif italic text-cream text-2xl mb-2">The evening's over</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+              The room has ended. Your recap stays viewable for the next 24 hours — after that it's gone.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => navigate(`/room/${roomId}/recap`)}
+                className="btn-primary focus-ring w-full py-3.5 rounded-full font-semibold"
+              >
+                View recap
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/home")}
+                className="focus-ring text-muted-foreground hover:text-cream py-2 text-sm transition"
+              >
+                Back to your rooms
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </PageShell>
   );
 }
@@ -177,7 +215,7 @@ export default function LiveRoom() {
 
   return (
     <RoomSessionProvider roomId={roomId} identity={identity}>
-      <RoomShell expiresAt={expiresAt} isHost={identity.isHost} />
+      <RoomShell expiresAt={expiresAt} isHost={identity.isHost} roomId={roomId} />
     </RoomSessionProvider>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Plus, LogOut, MessageSquare, ChevronRight, History, Heart, User, Settings as SettingsIcon, Globe, KeyRound } from "lucide-react";
@@ -14,11 +14,25 @@ const ENDED_STATES = new Set<RoomStateName>(["ended", "grace", "sub_lapsed"]);
 
 type Tab = "history" | "rooms" | "profile";
 
+// `history` id kept for routing stability; the user-facing label is now
+// "Recap" since this is where you re-watch what happened, not where
+// you find archived rooms (those vanish after 24h anyway).
 const TABS: { id: Tab; label: string; icon: typeof Heart }[] = [
   { id: "rooms", label: "Rooms", icon: Heart },
-  { id: "history", label: "History", icon: History },
+  { id: "history", label: "Recap", icon: History },
   { id: "profile", label: "Profile", icon: User },
 ];
+
+/** Format "Xh Ym left" / "Ym left" / "ended" from a future timestamp. */
+function formatGraceCountdown(graceEndsAt: string | null, now: number): string {
+  if (!graceEndsAt) return "";
+  const ms = new Date(graceEndsAt).getTime() - now;
+  if (ms <= 0) return "deleted soon";
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  if (h > 0) return `${h}h ${m}m left`;
+  return `${m}m left`;
+}
 
 export default function Home() {
   const navigate = useNavigate();
@@ -29,6 +43,14 @@ export default function Home() {
 
   const aliveRooms = rooms.filter((r) => ALIVE_STATES.has(r.state));
   const endedRooms = rooms.filter((r) => ENDED_STATES.has(r.state));
+
+  // Tick once per minute so the 24h countdown stays current without
+  // burning a 1s interval. Reads aren't refreshed; only the display.
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(t);
+  }, []);
 
   function enterRoom(r: Room) {
     const slot = me && r.host_id === me.id ? "a" : "b";
@@ -195,7 +217,10 @@ export default function Home() {
 
         {tab === "history" && (
           <div className="animate-fade-in space-y-4">
-            <h2 className="mb-2 px-1 text-[11px] uppercase tracking-[0.35em] text-muted-foreground">History</h2>
+            <h2 className="mb-2 px-1 text-[11px] uppercase tracking-[0.35em] text-muted-foreground">Recap</h2>
+            <div className="rounded-2xl border border-amber/25 bg-amber/[0.05] px-4 py-3 text-xs text-amber/90 leading-relaxed">
+              Recaps live for 24 hours after the room ends. After that the room and its contents are deleted permanently.
+            </div>
             {endedRooms.length === 0 ? (
               <div className="space-y-2 rounded-[2rem] border border-dashed border-white/[0.1] px-8 py-20 text-center">
                 <p className="font-serif text-lg italic text-cream">No past sessions yet.</p>
@@ -205,6 +230,10 @@ export default function Home() {
               <div className="stagger-children grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {endedRooms.map((r) => {
                   const isPersistent = r.persistence === "persistent";
+                  const remaining = formatGraceCountdown(r.grace_expires_at, now);
+                  const urgent = r.grace_expires_at
+                    ? new Date(r.grace_expires_at).getTime() - now < 60 * 60 * 1000
+                    : false;
                   return (
                     <button
                       key={r.id}
@@ -219,8 +248,16 @@ export default function Home() {
                         <p className="truncate text-cream">{isPersistent ? "Our Room" : "Tonight"}</p>
                         <div className="mt-0.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                           <span className={isPersistent ? "pill-rose" : "pill-amber"}>{isPersistent ? "Perm" : "Temp"}</span>
-                          <span className="truncate">Code {r.code} · recap</span>
+                          <span className="truncate">Code {r.code}</span>
                         </div>
+                        {remaining && (
+                          <p className={cn(
+                            "mt-0.5 text-[10px] uppercase tracking-[0.18em] tabular-nums",
+                            urgent ? "text-rose" : "text-muted-foreground/60",
+                          )}>
+                            {remaining}
+                          </p>
+                        )}
                       </div>
                       <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition group-hover:translate-x-0.5 group-hover:text-primary" />
                     </button>
