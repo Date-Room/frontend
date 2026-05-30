@@ -33,7 +33,10 @@ export function The36() {
         <span className="tabular-nums">{overall} / {SETS_COUNT * PER_SET}</span>
       </div>
 
-      <div className="flex-1 min-h-0 flex items-center justify-center rounded-3xl border-2 border-rosegold/30 bg-rosegold/5 p-6 text-center">
+      <div
+        key={`${state.set_index}-${state.question_index}`}
+        className="flex-1 min-h-0 flex items-center justify-center rounded-3xl border-2 border-rosegold/30 bg-rosegold/5 p-6 text-center animate-scale-in shadow-[0_28px_72px_-22px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]"
+      >
         <p className="font-serif italic text-cream text-2xl leading-snug">{prompt}</p>
       </div>
 
@@ -50,7 +53,7 @@ export function The36() {
             { event_type: "answered", payload: { text: prompt } },
           )
         }
-        className="btn-primary w-full py-3.5 rounded-full font-semibold"
+        className="btn-primary focus-ring w-full py-3.5 rounded-full font-semibold"
       >
         Next question
       </button>

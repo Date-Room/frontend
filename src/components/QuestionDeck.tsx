@@ -205,7 +205,10 @@ export function QuestionDeck() {
         <span className="tabular-nums">{cardsLeft} left</span>
       </div>
 
-      <div className="flex-1 min-h-0 flex items-center justify-center rounded-3xl border-2 border-amber/30 bg-amber/5 p-6 text-center">
+      <div
+        key={cardText}
+        className="flex-1 min-h-0 flex items-center justify-center rounded-3xl border-2 border-amber/30 bg-amber/5 p-6 text-center animate-scale-in shadow-[0_28px_72px_-22px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.05)]"
+      >
         <p className="font-serif italic text-cream text-2xl leading-snug">{cardText}</p>
       </div>
 

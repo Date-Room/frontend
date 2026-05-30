@@ -70,8 +70,8 @@ export function TruthOrDare() {
       <div className="flex-1 min-h-0 flex items-center justify-center">
         {revealed ? (
           <div
-            className={`w-full max-w-sm rounded-3xl border-2 p-6 text-center ${
-              card.kind === "dare" ? "border-rose/40 bg-rose/5" : "border-amber/40 bg-amber/5"
+            className={`w-full max-w-sm rounded-3xl border-2 p-6 text-center animate-scale-in shadow-[0_28px_72px_-22px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)] ${
+              card.kind === "dare" ? "border-rose/40 bg-rose/[0.06]" : "border-amber/40 bg-amber/[0.06]"
             }`}
           >
             <p className={`text-[10px] uppercase tracking-[0.3em] mb-3 ${card.kind === "dare" ? "text-rose" : "text-amber"}`}>
@@ -94,7 +94,7 @@ export function TruthOrDare() {
                   : undefined,
               )
             }
-            className="w-full max-w-sm aspect-[3/4] rounded-3xl border-2 border-dashed border-white/15 bg-card/40 flex flex-col items-center justify-center gap-3 hover:border-amber/40 transition"
+            className="focus-ring w-full max-w-sm aspect-[3/4] rounded-3xl border-2 border-dashed border-white/15 bg-card/40 flex flex-col items-center justify-center gap-3 hover:border-amber/40 hover:bg-card/60 hover:-translate-y-1 transition-all duration-300"
           >
             <span className="text-4xl">🂠</span>
             <span className="font-serif italic text-cream/70">Tap to flip your card</span>
@@ -103,7 +103,7 @@ export function TruthOrDare() {
       </div>
 
       {trade && (
-        <div className="rounded-2xl border border-rosegold/30 bg-rosegold/10 p-4 text-center space-y-3">
+        <div className="rounded-2xl border border-rosegold/30 bg-rosegold/10 p-4 text-center space-y-3 animate-float-up">
           {iAmProposer ? (
             <p className="text-sm text-cream">Trade proposed — waiting for your partner…</p>
           ) : (

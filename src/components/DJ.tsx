@@ -422,7 +422,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
         </div>
       )}
 
-      <div className="rounded-2xl bg-secondary border border-border p-4 flex flex-col gap-2">
+      <div className="rounded-2xl bg-secondary/60 border border-white/[0.08] p-4 flex flex-col gap-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="font-serif italic text-cream text-lg">
             🎧 {djName} is DJ{" "}
@@ -434,7 +434,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
             </div>
           )}
         </div>
-        <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
+        <div className="h-1 w-full rounded-full bg-black/30 overflow-hidden">
           <div className="h-full bg-amber transition-all duration-500" style={{ width: `${currentDj ? pct : 0}%` }} />
         </div>
       </div>
@@ -444,10 +444,10 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
           <Input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="Paste a YouTube link to start as DJ..."
-            className="bg-secondary border-border"
+            placeholder="Paste a YouTube link to start as DJ…"
+            className="focus-ring bg-secondary/60 border-white/[0.10] focus-visible:border-primary/40"
           />
-          <Button type="submit" className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90">
+          <Button type="submit" className="focus-ring rounded-full bg-amber text-primary-foreground hover:bg-amber/90 hover:-translate-y-px transition-all">
             Play
           </Button>
         </form>
@@ -457,18 +457,18 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
             <Input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="Paste a YouTube link to play..."
-              className="bg-secondary border-border"
+              placeholder="Paste a YouTube link to play…"
+              className="focus-ring bg-secondary/60 border-white/[0.10] focus-visible:border-primary/40"
             />
-            <Button type="submit" className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90">
+            <Button type="submit" className="focus-ring rounded-full bg-amber text-primary-foreground hover:bg-amber/90 hover:-translate-y-px transition-all">
               Play
             </Button>
           </form>
           <div className="flex flex-col sm:flex-row gap-2">
-            <Button type="button" onClick={chooseSilence} variant="outline" className="rounded-full border-border bg-secondary hover:bg-muted flex-1">
+            <Button type="button" onClick={chooseSilence} variant="outline" className="focus-ring rounded-full border-white/[0.10] bg-secondary/40 hover:bg-secondary/60 flex-1">
               🤫 Choose silence
             </Button>
-            <Button type="button" onClick={passAux} variant="outline" className="rounded-full border-amber/40 text-amber hover:bg-amber/10 flex-1">
+            <Button type="button" onClick={passAux} variant="outline" className="focus-ring rounded-full border-amber/40 text-amber hover:bg-amber/10 flex-1">
               <SkipForward className="w-4 h-4" /> Pass the aux 🎵
             </Button>
           </div>
@@ -497,7 +497,12 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
           )}
           <div className="flex gap-2 justify-center flex-wrap">
             {["❤️", "🔥", "🤔", "😂"].map((e) => (
-              <button key={e} onClick={() => sendReaction(e)} className="h-11 w-11 rounded-full bg-secondary hover:bg-muted border border-border text-xl transition active:scale-90">
+              <button
+                key={e}
+                onClick={() => sendReaction(e)}
+                aria-label={`Send ${e} reaction`}
+                className="focus-ring h-11 w-11 rounded-full bg-secondary/60 hover:bg-secondary/80 border border-white/[0.10] text-xl transition-all active:scale-90 hover:-translate-y-0.5 hover:border-amber/30"
+              >
                 {e}
               </button>
             ))}
@@ -505,7 +510,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
         </>
       )}
 
-      <div className="rounded-2xl border border-border bg-card/80 overflow-hidden card-shadow">
+      <div className="rounded-2xl border border-white/[0.08] bg-card/70 overflow-hidden shadow-[0_22px_60px_-22px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.04)]">
         {silence ? (
           <div className="p-8 text-center">
             <div className="text-4xl mb-2">🤫</div>

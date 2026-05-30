@@ -68,8 +68,10 @@ export function TwoTruths() {
               type="button"
               onClick={() => setLie(i)}
               aria-label={`Mark statement ${i + 1} as the lie`}
-              className={`h-7 w-7 shrink-0 rounded-full border text-[10px] uppercase transition ${
-                lie === i ? "bg-rose border-rose text-cream" : "border-muted-foreground/40 text-muted-foreground"
+              className={`focus-ring h-7 w-7 shrink-0 rounded-full border text-[10px] uppercase transition-all ${
+                lie === i
+                  ? "bg-rose border-rose text-cream shadow-[0_0_0_4px_rgba(212,130,106,0.18)]"
+                  : "border-muted-foreground/40 text-muted-foreground hover:border-rose/40"
               }`}
             >
               lie
@@ -78,7 +80,7 @@ export function TwoTruths() {
               value={d}
               onChange={(e) => setDrafts((arr) => arr.map((x, j) => (j === i ? e.target.value : x)))}
               placeholder={`Statement ${i + 1}`}
-              className="bg-secondary border-border"
+              className="focus-ring bg-secondary/60 border-white/[0.10] focus-visible:border-primary/40"
             />
           </div>
         ))}
@@ -128,7 +130,8 @@ export function TwoTruths() {
                   { event_type: "guessed", payload: { text: s } },
                 )
               }
-              className="rounded-2xl border border-border bg-card/60 p-4 text-left text-cream hover:border-rose/50 transition"
+              className="focus-ring animate-float-up rounded-2xl border border-white/[0.08] bg-card/60 p-4 text-left text-cream hover:border-rose/50 hover:bg-card/80 hover:-translate-y-0.5 transition-all duration-200 shadow-[0_4px_18px_-8px_rgba(0,0,0,0.4)]"
+              style={{ animationDelay: `${i * 60}ms` }}
             >
               {s}
             </button>
