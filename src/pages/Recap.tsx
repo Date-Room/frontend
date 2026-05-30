@@ -81,18 +81,45 @@ export default function Recap() {
   const activities = (data?.activities ?? []).filter((a) => ACTIVITY_LABELS[a.activity_id]);
   const events = data?.events ?? [];
 
+  // Personalisation: pull distinct actor names off the events log so
+  // the header reads 'Tonight with Sasha' instead of just 'Tonight'.
+  // Falls back to generic when no events (the user hasn't played
+  // anything) or when only one name appears (solo session).
+  const actorNames = Array.from(
+    new Set(
+      events
+        .map((e) => e.actor_display_name?.trim())
+        .filter((n): n is string => !!n && n.length > 0),
+    ),
+  );
+  const partnerName = actorNames.length >= 2 ? actorNames[actorNames.length - 1] : null;
+
   return (
     <CardPage
       maxWidth="sm:max-w-2xl lg:max-w-3xl"
       headerRight={
-        <button type="button" onClick={() => navigate("/home")} className="btn-ghost focus-ring text-sm">
+        <button
+          type="button"
+          onClick={() => {
+            // Close the recap and go back where the user was —
+            // matters when they reached this from the Recap tab,
+            // Home, or a partner's deep link. Falls back to /home
+            // only when there's no history to pop (e.g. cold-loaded
+            // the recap URL directly).
+            if (window.history.length > 1) navigate(-1);
+            else navigate("/home");
+          }}
+          className="btn-ghost focus-ring text-sm"
+        >
           Done
         </button>
       }
     >
       <div className="text-center mb-10 animate-float-up">
         <div className="w-2 h-2 rounded-full bg-rosegold mx-auto mb-4 animate-pulse-glow" />
-        <h1 className="font-serif text-3xl sm:text-4xl text-cream italic mb-2">Tonight</h1>
+        <h1 className="font-serif text-3xl sm:text-4xl text-cream italic mb-2">
+          {partnerName ? `Tonight with ${partnerName}` : "Tonight"}
+        </h1>
         <p className="text-muted-foreground text-sm">A look back at what you did together</p>
       </div>
 

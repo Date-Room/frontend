@@ -62,7 +62,17 @@ export const AuthGuard = ({
         }
         if (isAuthPath) navigate("/home", { replace: true });
       } else if (requireAuth && path !== "/auth" && !hasGuestPass) {
-        navigate("/auth", { replace: true });
+        // Preserve the original deep link as ?next= so post-auth lands
+        // back here. Big one: a guest tapping a recap link to an
+        // ended room signs in and gets routed to that exact recap —
+        // doubling as a sign-up funnel since the room shows up on
+        // their Recap tab going forward.
+        const after = `${path}${window.location.search}${window.location.hash}`;
+        const safe = after.startsWith("/") && !after.startsWith("//");
+        navigate(
+          safe ? `/auth?next=${encodeURIComponent(after)}` : "/auth",
+          { replace: true },
+        );
       }
     }
 

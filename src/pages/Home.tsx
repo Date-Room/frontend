@@ -156,6 +156,11 @@ export default function Home() {
                   const isLive = r.state === "live" || r.state === "active";
                   const isWaiting = r.state === "waiting" || r.state === "created";
                   const isPersistent = r.persistence === "persistent";
+                  // Title preference: host-set greeting wins; falls
+                  // back to the room-type label. Once the backend
+                  // returns partner names on /v1/rooms we'll add a
+                  // 'with {name}' subtitle here too.
+                  const title = r.greeting_headline?.trim() || (isPersistent ? "Our Room" : "Tonight");
                   return (
                     <button
                       key={r.id}
@@ -171,7 +176,7 @@ export default function Home() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="truncate font-serif text-[1.05rem] italic leading-snug text-cream">
-                              {isPersistent ? "Our Room" : "Tonight"}
+                              {title}
                               <span className="text-sm not-italic text-muted-foreground/65"> · {isHost ? "host" : "guest"}</span>
                             </p>
                             <p className="mt-0.5 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
@@ -234,6 +239,7 @@ export default function Home() {
                   const urgent = r.grace_expires_at
                     ? new Date(r.grace_expires_at).getTime() - now < 60 * 60 * 1000
                     : false;
+                  const title = r.greeting_headline?.trim() || (isPersistent ? "Our Room" : "Tonight");
                   return (
                     <button
                       key={r.id}
@@ -245,7 +251,7 @@ export default function Home() {
                         {isPersistent ? "🏠" : "🕯️"}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-cream">{isPersistent ? "Our Room" : "Tonight"}</p>
+                        <p className="truncate text-cream">{title}</p>
                         <div className="mt-0.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                           <span className={isPersistent ? "pill-rose" : "pill-amber"}>{isPersistent ? "Perm" : "Temp"}</span>
                           <span className="truncate">Code {r.code}</span>
