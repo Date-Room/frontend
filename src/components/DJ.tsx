@@ -224,6 +224,35 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       if (e.userId === userId) return;
       const p = playerRef.current;
       const ts = typeof e.payload.timestamp_seconds === "number" ? e.payload.timestamp_seconds : undefined;
+      if (e.type === "enqueue") {
+        // Partner took the aux — persist their track on their
+        // behalf so the durable state catches up even when the
+        // partner is a guest (canPersist=false). Matches mobile's
+        // _onBroadcast partner-write semantics.
+        const track = e.payload.track as Record<string, unknown> | undefined;
+        if (track && room.canPersist) {
+          const turnPatch = {
+            current_dj: e.userId,
+            turn_started_at: new Date().toISOString(),
+          };
+          persistDj(
+            {
+              turn: turnPatch,
+              now_playing: track,
+              playing: true,
+              timestamp_seconds: 0,
+              silence: false,
+            },
+            typeof track.video_id === "string"
+              ? {
+                  event_type: "queued_track",
+                  payload: { text: `youtu.be/${track.video_id}` },
+                }
+              : undefined,
+          );
+        }
+        return;
+      }
       if (e.type === "play" && p?.playVideo) {
         suppress(5000);
         try {
@@ -253,7 +282,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
         }
       }
     });
-  }, [session, userId]);
+  }, [session, userId, room.canPersist]);
 
   // DJ heartbeat for drift correction.
   useEffect(() => {
