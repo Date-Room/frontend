@@ -143,7 +143,7 @@ export function ThisOrThat() {
         onClick={() => choose(side)}
         disabled={!!myPick}
         className={[
-          "focus-ring group relative flex-1 rounded-3xl border-2 p-6 sm:p-8 min-h-[200px] flex flex-col items-center justify-center gap-3 text-center grain transition-all duration-500 shadow-[0_22px_60px_-22px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.05)]",
+          "focus-ring group relative flex-1 rounded-3xl border-2 p-6 sm:p-8 min-h-[180px] md:min-h-[280px] flex flex-col items-center justify-center gap-4 text-center grain transition-all duration-500 shadow-[0_22px_60px_-22px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.05)]",
           chosenByMe && chosenByOther
             ? "border-amber bg-amber/15 scale-[1.02] shadow-[0_30px_80px_-22px_rgba(245,166,35,0.45)]"
             : chosenByMe
@@ -185,7 +185,7 @@ export function ThisOrThat() {
       <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground text-center">
         Round {idx + 1} · pick one
       </div>
-      <div className="flex-1 flex flex-col sm:flex-row items-stretch gap-3">
+      <div className="flex-1 flex flex-col md:flex-row items-stretch gap-3 max-w-3xl mx-auto w-full">
         <Card side="a" opt={pair.a} />
         <div className="flex items-center justify-center font-serif italic text-muted-foreground/70">
           <span className="px-2 text-[10px] uppercase tracking-[0.32em]">or</span>

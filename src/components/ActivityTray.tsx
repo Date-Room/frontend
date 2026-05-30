@@ -30,7 +30,7 @@ const CATEGORIES: Category[] = [
     Icon: Gamepad2,
     activities: [
       { id: "questions", label: "21 Questions", tagline: "Pick 24, swap decks, take turns.", ready: true },
-      { id: "this_or_that", label: "This or That", tagline: "Pick blind, reveal together.", ready: true },
+      { id: "this_or_that", label: "This or That", tagline: "Pick blind, reveal together.", ready: true, wide: true },
       { id: "the_36", label: "The 36", tagline: "Three sets of twelve. Get closer.", ready: true },
       { id: "2_truths", label: "2 Truths and a Lie", tagline: "Spot the lie. Swap roles.", ready: true },
       { id: "truth_or_dare", label: "Truth or Dare", tagline: "Three cards each. Two skips. Trades welcome.", ready: true },
