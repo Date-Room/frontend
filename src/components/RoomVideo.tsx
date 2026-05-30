@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
   VideoTrack,
   useTracks,
   useLocalParticipant,
+  useIsSpeaking,
 } from "@livekit/components-react";
-import { Track } from "livekit-client";
+import { Track, type Participant } from "livekit-client";
 import "@livekit/components-styles";
 import { Mic, MicOff, Video, VideoOff, Camera } from "lucide-react";
 import { livekitToken } from "@/lib/rooms";
@@ -161,6 +162,75 @@ function capturePhoto(
   a.click();
 }
 
+/** When the partner's camera is off, show their avatar centered with
+ * a pulse-on-speech halo so you can tell they're talking even when
+ * audio is muted on your side. Reads `isSpeaking` from the remote
+ * Participant via the LiveKit context. */
+function CameraOffAvatar({
+  participant,
+  name,
+  photoUrl,
+}: {
+  participant: Participant;
+  name: string;
+  photoUrl: string | null;
+}) {
+  const isSpeaking = useIsSpeaking(participant);
+  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-background/40 via-background/30 to-background/60">
+      <div className="relative">
+        {/* Halo — pulses when the partner's mic picks them up. Two
+            concentric rings so the wave reads even at a glance. */}
+        <span
+          aria-hidden
+          className={[
+            "absolute inset-0 -m-6 rounded-full bg-rosegold/25 blur-xl transition-all duration-300",
+            isSpeaking ? "scale-125 opacity-100" : "scale-100 opacity-0",
+          ].join(" ")}
+        />
+        <span
+          aria-hidden
+          className={[
+            "absolute inset-0 -m-3 rounded-full border-2 border-rosegold/50 transition-all duration-200",
+            isSpeaking
+              ? "scale-110 opacity-100 animate-pulse"
+              : "scale-100 opacity-0",
+          ].join(" ")}
+        />
+        <div
+          className={[
+            "relative h-28 w-28 sm:h-32 sm:w-32 rounded-full overflow-hidden flex items-center justify-center",
+            "border-2 transition-all duration-300",
+            isSpeaking
+              ? "border-rosegold/80 shadow-[0_0_60px_rgba(212,130,106,0.45)]"
+              : "border-white/15 shadow-[0_18px_50px_-15px_rgba(0,0,0,0.7)]",
+            "bg-gradient-to-br from-rosegold/25 via-rosegold/10 to-transparent",
+          ].join(" ")}
+        >
+          {photoUrl ? (
+            <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="font-serif text-5xl sm:text-6xl text-cream">{initial}</span>
+          )}
+        </div>
+      </div>
+      <div className="text-center">
+        <p className="font-serif italic text-cream text-base">{name || "Them"}</p>
+        <p
+          className={[
+            "mt-1 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.28em] transition-colors",
+            isSpeaking ? "text-rosegold" : "text-muted-foreground/60",
+          ].join(" ")}
+        >
+          <VideoOff className="h-3 w-3" aria-hidden />
+          {isSpeaking ? "speaking" : "camera off"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 /** Partner full-bleed, self as a draggable picture-in-picture. */
 function Stage() {
   const room = useRoomSession();
@@ -233,12 +303,35 @@ function Stage() {
     dragRef.current = null;
   }
 
+  // Pull the partner's display name + photo from presence so the
+  // camera-off avatar matches what shows in chat/recap. Falls back
+  // to the LiveKit participant identity if presence hasn't arrived.
+  const partnerDisplay = useMemo(() => {
+    const me = room.senderId;
+    const entry = room.presence.find((p) => {
+      const sid = p.sender_id;
+      return typeof sid === "string" && sid !== me;
+    });
+    const name = typeof entry?.name === "string" ? entry.name : "Them";
+    const photoUrl =
+      typeof entry?.photo_url === "string" ? entry.photo_url : null;
+    return { name, photoUrl };
+  }, [room.presence, room.senderId]);
+
   return (
     <div className="absolute inset-0" onDoubleClick={() => sendReaction("❤️")}>
       {/* Partner */}
       <div ref={partnerWrapRef} className="absolute inset-0">
         {remote ? (
-          <VideoTrack trackRef={remote} className="w-full h-full object-cover" />
+          remote.publication?.isMuted ? (
+            <CameraOffAvatar
+              participant={remote.participant}
+              name={partnerDisplay.name}
+              photoUrl={partnerDisplay.photoUrl}
+            />
+          ) : (
+            <VideoTrack trackRef={remote} className="w-full h-full object-cover" />
+          )
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <p className="font-serif italic text-cream/70 text-lg">Waiting for them…</p>

@@ -22,6 +22,9 @@ export type RoomIdentity = {
   /** Only signed-in members may PUT durable activity state. */
   canPersist: boolean;
   displayName: string;
+  /** Broadcast on presence so the partner can render an avatar when
+   *  cameras are off (matches mobile's PresenceState.photoUrl). */
+  photoUrl?: string | null;
 };
 
 export type RoomSession = RoomIdentity & {
@@ -76,6 +79,9 @@ export function RoomSessionProvider({
           // Surfaces a stable handle to kick by; only guests have one
           // (signed-in partners don't need it for DELETE /participants).
           participant_id: identity.participantId ?? null,
+          // Photo url so the partner's camera-off avatar can render
+          // the actual picture instead of just an initial.
+          photo_url: identity.photoUrl ?? null,
         });
       })
       .catch(() => {

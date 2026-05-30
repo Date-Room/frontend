@@ -188,6 +188,7 @@ export default function LiveRoom() {
           isHost: !participantId,
           canPersist: true,
           displayName: name,
+          photoUrl: u.photo_url ?? null,
         });
       } else if (participantId) {
         // Anonymous guest from the lobby join.
@@ -198,6 +199,7 @@ export default function LiveRoom() {
           isHost: false,
           canPersist: false,
           displayName: urlName || "Guest",
+          photoUrl: null,
         });
       } else {
         navigate(`/auth?redirect=${encodeURIComponent(`/room/${roomId ?? ""}`)}`, { replace: true });
