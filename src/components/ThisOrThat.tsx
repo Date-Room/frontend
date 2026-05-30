@@ -129,16 +129,16 @@ export function ThisOrThat() {
         onClick={() => choose(side)}
         disabled={!!myPick}
         className={[
-          "group relative flex-1 rounded-3xl border-2 p-6 sm:p-8 min-h-[200px] flex flex-col items-center justify-center gap-3 text-center card-shadow grain transition-all duration-500",
+          "focus-ring group relative flex-1 rounded-3xl border-2 p-6 sm:p-8 min-h-[200px] flex flex-col items-center justify-center gap-3 text-center grain transition-all duration-500 shadow-[0_22px_60px_-22px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.05)]",
           chosenByMe && chosenByOther
-            ? "border-amber bg-amber/15 candle-glow scale-[1.02]"
+            ? "border-amber bg-amber/15 scale-[1.02] shadow-[0_30px_80px_-22px_rgba(245,166,35,0.45)]"
             : chosenByMe
-              ? "border-amber bg-amber/10 candle-glow"
+              ? "border-amber bg-amber/10 shadow-[0_22px_60px_-22px_rgba(245,166,35,0.35)]"
               : chosenByOther
                 ? "border-rose bg-rose/10"
                 : reveal
-                  ? "border-border bg-card"
-                  : "border-border bg-card hover:border-amber/50",
+                  ? "border-white/[0.08] bg-card"
+                  : "border-white/[0.10] bg-card hover:border-amber/50 hover:-translate-y-0.5",
           dimmed ? "opacity-30 grayscale" : "",
           myPick && !chosenByMe && !reveal ? "opacity-50" : "",
         ].join(" ")}
@@ -167,13 +167,15 @@ export function ThisOrThat() {
   };
 
   return (
-    <div className="flex flex-col h-full p-6 gap-6">
+    <div className="flex flex-col h-full p-4 sm:p-6 gap-6 animate-fade-in">
       <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground text-center">
         Round {idx + 1} · pick one
       </div>
       <div className="flex-1 flex flex-col sm:flex-row items-stretch gap-3">
         <Card side="a" opt={pair.a} />
-        <div className="flex items-center justify-center font-serif italic text-muted-foreground">or</div>
+        <div className="flex items-center justify-center font-serif italic text-muted-foreground/70">
+          <span className="px-2 text-[10px] uppercase tracking-[0.32em]">or</span>
+        </div>
         <Card side="b" opt={pair.b} />
       </div>
       <div className="min-h-[3.5rem] flex items-center justify-center">

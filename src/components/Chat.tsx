@@ -98,28 +98,33 @@ export function Chat() {
     <div className="flex flex-col h-full p-4 sm:p-6 gap-3 min-h-0">
       <div
         ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto rounded-2xl bg-secondary/60 border border-border p-3 flex flex-col gap-2"
+        className="flex-1 min-h-0 overflow-y-auto rounded-2xl bg-secondary/40 border border-white/[0.08] p-3 flex flex-col gap-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
       >
         {messages.length === 0 ? (
           <div className="m-auto text-muted-foreground font-serif italic text-sm text-center px-4">
             say something sweet, or just check in.
           </div>
         ) : (
-          messages.map((m) => {
+          messages.map((m, idx) => {
             const isMine = mine.has(m.from_user_id);
+            const prev = idx > 0 ? messages[idx - 1] : undefined;
+            const showAttribution = !prev || prev.from_user_id !== m.from_user_id;
             return (
               <div
                 key={m.id}
-                className={`flex flex-col max-w-[80%] ${isMine ? "self-end items-end" : "self-start items-start"}`}
+                className={`flex flex-col max-w-[82%] animate-float-up ${isMine ? "self-end items-end" : "self-start items-start"}`}
+                style={{ animationDelay: `${Math.min(idx * 20, 200)}ms` }}
               >
-                <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground px-1">
-                  {isMine ? "you" : "them"}
-                </span>
+                {showAttribution && (
+                  <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground/80 px-1 mb-0.5">
+                    {isMine ? "you" : "them"}
+                  </span>
+                )}
                 <div
-                  className={`px-3 py-2 rounded-2xl text-sm leading-snug whitespace-pre-wrap break-words ${
+                  className={`px-3 py-2 rounded-2xl text-sm leading-snug whitespace-pre-wrap break-words shadow-[0_4px_18px_-8px_rgba(0,0,0,0.45)] ${
                     isMine
                       ? "bg-amber text-primary-foreground rounded-br-sm"
-                      : "bg-card text-cream border border-border rounded-bl-sm"
+                      : "bg-card text-cream border border-white/[0.08] rounded-bl-sm"
                   }`}
                 >
                   {m.text}
@@ -133,14 +138,14 @@ export function Chat() {
         <Input
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Type a message..."
-          className="bg-secondary border-border"
+          placeholder="Type a message…"
+          className="focus-ring bg-secondary/60 border-white/[0.10] focus-visible:border-primary/40"
           autoComplete="off"
         />
         <Button
           type="submit"
           disabled={!text.trim()}
-          className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90 disabled:opacity-50"
+          className="focus-ring rounded-full bg-amber text-primary-foreground hover:bg-amber/90 disabled:opacity-40 transition-all hover:-translate-y-px"
         >
           <Send className="w-4 h-4" />
         </Button>

@@ -260,32 +260,36 @@ export function WatchTogether() {
   };
 
   return (
-    <div className="flex flex-col h-full p-6 gap-4">
+    <div className="flex flex-col h-full p-4 sm:p-6 gap-4">
       <form onSubmit={submit} className="flex gap-2">
         <Input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="Paste a YouTube URL..."
-          className="bg-secondary border-border"
+          placeholder="Paste a YouTube URL…"
+          className="focus-ring bg-secondary/60 border-white/[0.10] focus-visible:border-primary/40"
         />
-        <Button type="submit" className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90">
+        <Button
+          type="submit"
+          className="focus-ring rounded-full bg-amber text-primary-foreground hover:bg-amber/90 transition-all hover:-translate-y-px"
+        >
           Play
         </Button>
       </form>
 
       <p className="text-xs text-muted-foreground italic px-1">
-        Hover the video to play, pause, or unmute via YouTube's controls. Each of you controls your own volume.
+        Hover the video to play, pause, or unmute. Each of you controls your own volume.
       </p>
 
-      <div className="flex-1 rounded-2xl overflow-hidden bg-black border border-border card-shadow relative">
+      <div className="flex-1 rounded-2xl overflow-hidden bg-black border border-white/[0.08] shadow-[0_22px_60px_-22px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.04)] relative">
         {shouldMount && (
           <div className="w-full h-full min-h-[240px] aspect-video">
             <div ref={containerRef} className="w-full h-full" />
           </div>
         )}
         {!videoId && (
-          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground font-serif italic">
-            paste a link to begin
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+            <div className="text-3xl opacity-40">▶</div>
+            <p className="font-serif italic text-sm">paste a link to begin</p>
           </div>
         )}
       </div>
