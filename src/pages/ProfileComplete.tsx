@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Camera, User as UserIcon, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { CardPage } from "@/components/CardPage";
@@ -43,6 +44,7 @@ export default function ProfileComplete() {
   const [params] = useSearchParams();
   const next = params.get("next") || "/home";
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
 
   const [me, setMe] = useState<UserMe | null>(null);
   const [displayName, setDisplayName] = useState("");
@@ -105,8 +107,14 @@ export default function ProfileComplete() {
         date_of_birth: new Date(dob + "T00:00:00Z").toISOString(),
       });
       // Sync the cached session.user so AuthGuard's profile_complete
-      // check stops routing us back here.
+      // check stops routing us back here AND so the freshly-saved
+      // display name shows up on Home/Settings without waiting for
+      // a window reload.
       await authClient.refreshUser();
+      // Invalidate the react-query 'me' cache so any consumer that
+      // reads from getMe() (Home avatar, Settings, profile menu)
+      // refetches the new display_name + photo_url on next render.
+      queryClient.invalidateQueries({ queryKey: ["me"] });
       navigate(next, { replace: true });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't save your profile.");
