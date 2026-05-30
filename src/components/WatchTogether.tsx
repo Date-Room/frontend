@@ -188,8 +188,19 @@ export function WatchTogether() {
 
       if (e.type === "load") {
         suppress(5000);
-        setVideoId(typeof e.payload.video_id === "string" ? e.payload.video_id : null);
+        const v = typeof e.payload.video_id === "string" ? e.payload.video_id : null;
+        setVideoId(v);
         setPlaying(true);
+        // Persist on partner's behalf — keeps the chosen video alive
+        // through a reload even when only one side is signed in.
+        // Play/pause/seek/tick events are control noise and don't
+        // need durable writes (they fire many times a second).
+        if (room.canPersist) {
+          persistWatch(
+            { video_id: v, playing: true, timestamp_seconds: 0 },
+            v ? { event_type: "queued_video", payload: { text: `youtu.be/${v}` } } : undefined,
+          );
+        }
         return;
       }
       if (e.type === "play") {

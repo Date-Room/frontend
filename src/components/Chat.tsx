@@ -56,15 +56,31 @@ export function Chat() {
   }, [state]);
 
   // Live broadcasts from the partner (and our own echo — deduped by id).
+  // When we receive a partner's message AND we can persist, write the
+  // merged list to durable state so the message survives a reload —
+  // matching mobile's "persist on partner's behalf" semantics. Without
+  // this, every message after the first vanished from durable state
+  // because only the sender persisted; Chat-on-reload pulled an
+  // out-of-date snapshot.
   useEffect(() => {
     if (!session) return;
     return session.onEvent((e) => {
       if (e.type !== "send") return;
       const m = e.payload as unknown as ChatMessage;
       if (!m?.id) return;
-      setMessages((prev) => mergeMessages(prev, [m]));
+      setMessages((prev) => {
+        const next = mergeMessages(prev, [m]);
+        // Persist only when the broadcast came from someone else;
+        // our own sends already persist via send() below. Guards
+        // against the "echo + persist" loop where we'd re-write the
+        // same row twice on every send.
+        if (m.from_user_id !== room.senderId && room.canPersist) {
+          void session.persist({ messages: next });
+        }
+        return next;
+      });
     });
-  }, [session]);
+  }, [session, room.senderId, room.canPersist]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });

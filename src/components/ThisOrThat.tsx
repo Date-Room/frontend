@@ -51,20 +51,34 @@ export function ThisOrThat() {
     });
   }, [durable]);
 
-  // Live partner events.
+  // Live partner events. When a partner event lands AND we can
+  // persist, write the converged state to durable — so the round /
+  // pick survives a reload even if only one side is signed in
+  // (matches mobile's "persist on partner's behalf" semantics).
   useEffect(() => {
     if (!session) return;
     return session.onEvent((e) => {
+      const isPartner = e.userId !== me;
       if (e.type === "pick") {
         const c = e.payload.pick;
-        if (c === "left" || c === "right") setPicks((prev) => ({ ...prev, [e.userId]: c }));
+        if (c !== "left" && c !== "right") return;
+        setPicks((prev) => {
+          const next = { ...prev, [e.userId]: c };
+          if (isPartner && room.canPersist) {
+            void session.persist({ prompt_index: idx, picks: next });
+          }
+          return next;
+        });
       } else if (e.type === "next_prompt") {
         const ni = typeof e.payload.prompt_index === "number" ? e.payload.prompt_index : 0;
         setPromptIndex(ni);
         setPicks({});
+        if (isPartner && room.canPersist) {
+          void session.persist({ prompt_index: ni, picks: {} });
+        }
       }
     });
-  }, [session]);
+  }, [session, me, idx, room.canPersist]);
 
   const idx = promptIndex;
   const pair = pairs[idx % Math.max(1, pairs.length)];
