@@ -1,0 +1,232 @@
+import { useEffect, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Loader2, Camera, User as UserIcon, Calendar } from "lucide-react";
+import { toast } from "sonner";
+import { CardPage } from "@/components/CardPage";
+import { authClient } from "@/lib/authClient";
+import { getMe, updateMe, type UserMe } from "@/lib/users";
+
+const MAX_PHOTO_BYTES = 750 * 1024;
+
+/** Compress a File into a base64 data URL ≤ MAX_PHOTO_BYTES. Mirrors
+ *  Settings's photo upload logic so the profile-row stays small. */
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Could not read file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+/** Today − 18y, ISO date string (yyyy-mm-dd). The DOB input's `max`
+ *  attribute prevents picking anything more recent. */
+function eighteenYearsAgoIso(): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 18);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * First-run profile gate.
+ *
+ * The AuthGuard funnels users here once signed in if their backend
+ * profile_complete flag is false (missing display name OR not
+ * age-verified). Photo is optional — every other field is required.
+ *
+ * After PATCH /users/me, we refresh the cached auth session so the
+ * guard stops routing the user back here, then push them on to
+ * the original target via ?next= (defaults to /home).
+ */
+export default function ProfileComplete() {
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const next = params.get("next") || "/home";
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  const [me, setMe] = useState<UserMe | null>(null);
+  const [displayName, setDisplayName] = useState("");
+  const [dob, setDob] = useState<string>("");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const profile = await getMe();
+        if (cancelled) return;
+        setMe(profile);
+        setDisplayName(
+          profile.display_name?.trim() ||
+            profile.email?.split("@")[0] ||
+            "",
+        );
+        setPhotoUrl(profile.photo_url);
+      } catch {
+        /* surface generic state */
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const initial = (displayName || me?.email || "?")[0]?.toUpperCase();
+
+  async function onPickPhoto(file: File) {
+    if (file.size > MAX_PHOTO_BYTES) {
+      toast.error("Photo's too big — pick one under 750 KB.");
+      return;
+    }
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setPhotoUrl(dataUrl);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't load that photo.");
+    }
+  }
+
+  const canSubmit =
+    !busy &&
+    displayName.trim().length >= 1 &&
+    dob.length === 10 &&
+    new Date(dob) <= new Date(eighteenYearsAgoIso());
+
+  async function handleSave() {
+    setBusy(true);
+    try {
+      await updateMe({
+        display_name: displayName.trim(),
+        photo_url: photoUrl ?? null,
+        date_of_birth: new Date(dob + "T00:00:00Z").toISOString(),
+      });
+      // Sync the cached session.user so AuthGuard's profile_complete
+      // check stops routing us back here.
+      await authClient.refreshUser();
+      navigate(next, { replace: true });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't save your profile.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <CardPage maxWidth="sm:max-w-md">
+        <div className="flex justify-center py-16">
+          <Loader2 className="w-6 h-6 text-rosegold animate-spin" aria-hidden />
+        </div>
+      </CardPage>
+    );
+  }
+
+  return (
+    <CardPage
+      title="A few quick things"
+      maxWidth="sm:max-w-md"
+      bodyClassName="animate-float-up space-y-6"
+    >
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        aria-label="Profile photo"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void onPickPhoto(f);
+        }}
+      />
+
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        Set your display name and confirm you're an adult. A photo is optional
+        — you can always add one later in Settings.
+      </p>
+
+      {/* Photo */}
+      <section className="flex flex-col items-center gap-3">
+        <button
+          type="button"
+          onClick={() => photoInputRef.current?.click()}
+          aria-label="Pick a profile photo"
+          className="focus-ring relative h-24 w-24 rounded-full overflow-hidden border-2 border-rosegold/25 bg-gradient-to-br from-rosegold/30 to-romantic/20 flex items-center justify-center text-3xl font-serif text-cream transition hover:border-rosegold/55"
+        >
+          {photoUrl ? (
+            <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span>{initial}</span>
+          )}
+          <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/55 py-1 text-[10px] uppercase tracking-[0.2em] text-cream">
+            <Camera className="h-3 w-3" /> {photoUrl ? "Change" : "Add"}
+          </span>
+        </button>
+        <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground/70">
+          Optional
+        </p>
+      </section>
+
+      {/* Display name */}
+      <section className="space-y-1.5">
+        <label
+          htmlFor="pc-name"
+          className="flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-muted-foreground"
+        >
+          <UserIcon className="h-3 w-3" /> Display name
+        </label>
+        <input
+          id="pc-name"
+          type="text"
+          value={displayName}
+          onChange={(e) => setDisplayName(e.target.value)}
+          placeholder="What should they call you?"
+          maxLength={30}
+          autoComplete="given-name"
+          className="auth-input focus-ring"
+          required
+        />
+      </section>
+
+      {/* DOB */}
+      <section className="space-y-1.5">
+        <label
+          htmlFor="pc-dob"
+          className="flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-muted-foreground"
+        >
+          <Calendar className="h-3 w-3" /> Date of birth
+        </label>
+        <input
+          id="pc-dob"
+          type="date"
+          value={dob}
+          onChange={(e) => setDob(e.target.value)}
+          max={eighteenYearsAgoIso()}
+          className="auth-input focus-ring tabular-nums"
+          required
+        />
+        <p className="text-[11px] text-muted-foreground/70">
+          You must be 18 or older to use DateRoom.
+        </p>
+      </section>
+
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={!canSubmit}
+        className="btn-primary focus-ring w-full py-4 rounded-[1.15rem] font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
+      >
+        {busy ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" /> Saving…
+          </>
+        ) : (
+          "Continue"
+        )}
+      </button>
+    </CardPage>
+  );
+}

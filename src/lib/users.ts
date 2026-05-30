@@ -1,9 +1,9 @@
 /**
  * Current-user profile via the backend `/v1/users/me`.
  *
- * Canonical profile fields (display name, photo, country) live on the backend.
- * Client-only preferences (theme, notifications) live in Supabase `user_metadata`
- * via `supabase.auth.updateUser({ data })` — the backend has no column for them.
+ * Canonical profile fields (display name, photo, country, age) live
+ * on the backend. Client-only preferences (theme prefs) sit in
+ * localStorage now that Supabase auth has been decommissioned.
  */
 import { api } from "@/lib/api";
 

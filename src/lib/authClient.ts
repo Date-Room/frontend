@@ -104,6 +104,22 @@ class AuthClient {
     };
   }
 
+  /** Refresh the cached `session.user` from /v1/auth/session — call
+   *  after a PATCH /users/me so the in-memory profile_complete flag
+   *  stays accurate without re-signing-in. No-op when signed out. */
+  async refreshUser(): Promise<AuthUser | null> {
+    const current = this.session;
+    if (!current) return null;
+    const response = await fetch(`${API_BASE}/v1/auth/session`, {
+      headers: { Authorization: `Bearer ${current.access_token}` },
+    });
+    if (!response.ok) return null;
+    const body = await response.json();
+    const next: AuthUser = body.user;
+    this.set({ ...current, user: next });
+    return next;
+  }
+
   async requestOtp(email: string): Promise<void> {
     const response = await fetch(`${API_BASE}/v1/auth/request-otp`, {
       method: "POST",

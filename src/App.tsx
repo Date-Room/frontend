@@ -23,6 +23,7 @@ import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
 import NeedInvite from "./pages/NeedInvite";
 import Paywall from "./pages/Paywall";
+import ProfileComplete from "./pages/ProfileComplete";
 import { AuthGuard } from "./components/AuthGuard";
 
 const queryClient = new QueryClient();
@@ -67,6 +68,7 @@ const App = () => {
             <Route path="/room/:id/recap" element={<AuthGuard><Recap /></AuthGuard>} />
             <Route path="/our-room/:id" element={<AuthGuard><OurRoom /></AuthGuard>} />
             <Route path="/paywall" element={<AuthGuard><Paywall /></AuthGuard>} />
+            <Route path="/profile/complete" element={<AuthGuard><ProfileComplete /></AuthGuard>} />
             <Route path="/settings" element={<AuthGuard><Settings /></AuthGuard>} />
 
             {/* Catch-all */}

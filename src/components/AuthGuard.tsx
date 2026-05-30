@@ -41,6 +41,25 @@ export const AuthGuard = ({
         : false;
 
       if (current) {
+        // Soft profile-complete gate. Once signed in, a user with an
+        // incomplete profile (no display name, no DOB on file) gets
+        // funnelled through /profile/complete with the original
+        // target stashed as ?next= for post-completion routing.
+        // Excluded paths: the completion page itself, auth pages,
+        // settings (where they can edit anyway), and the lobby
+        // (perm-room nudge already routes there).
+        const exempt =
+          isAuthPath ||
+          path === "/profile/complete" ||
+          path === "/settings" ||
+          path.startsWith("/i/");
+        if (!current.user.profile_complete && !exempt) {
+          const after = `${path}${window.location.search}${window.location.hash}`;
+          navigate(`/profile/complete?next=${encodeURIComponent(after)}`, {
+            replace: true,
+          });
+          return;
+        }
         if (isAuthPath) navigate("/home", { replace: true });
       } else if (requireAuth && path !== "/auth" && !hasGuestPass) {
         navigate("/auth", { replace: true });
