@@ -37,6 +37,9 @@ export type Room = {
   theme_color: string | null;
   background_id: string | null;
   created_at: string;
+  /** Signed JWT — URL-bearer recap access. Embed in share URLs as
+   *  `#k=<token>`. See backend services/rooms/invites.py. */
+  recap_invite_token: string | null;
 };
 
 export type ParticipantInfo = {
@@ -61,7 +64,20 @@ export type InviteCard = {
   participants: ParticipantInfo[];
   theme_color: string | null;
   background_id: string | null;
+  /** Same URL-bearer recap-invite as Room.recap_invite_token; lets
+   *  the lobby render a recap deep link with the token already
+   *  attached. */
+  recap_invite_token: string | null;
 };
+
+/** POST /v1/rooms/{id}/claim. */
+export function claimRoom(roomId: string, inviteToken: string): Promise<{
+  participant_id: string;
+  slot: string;
+  already_member: boolean;
+}> {
+  return api.post(`/v1/rooms/${roomId}/claim`, { invite_token: inviteToken });
+}
 
 export type CreateRoomRequest = {
   persistence: RoomPersistence;

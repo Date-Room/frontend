@@ -191,7 +191,15 @@ export default function Lobby() {
           <button
             type="button"
             className="btn-primary w-full py-3 rounded-full"
-            onClick={() => navigate(`/room/${encodeURIComponent(invite.id)}/recap`)}
+            onClick={() => {
+              // Carry the recap-invite from the share URL fragment
+              // through to the recap. Both signed-in and anonymous
+              // visitors land — token unlocks read without needing
+              // to be a participant.
+              const tok = invite.recap_invite_token;
+              const target = `/room/${encodeURIComponent(invite.id)}/recap${tok ? `#k=${tok}` : ""}`;
+              navigate(target);
+            }}
           >
             View recap
           </button>

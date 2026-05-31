@@ -1,5 +1,6 @@
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Calendar, ChevronRight, Loader2, Sparkles } from "lucide-react";
 import { CardPage } from "@/components/CardPage";
 import {
@@ -7,6 +8,8 @@ import {
   type ActivityEventResponse,
   type ActivityStateResponse,
 } from "@/lib/activities/activityState";
+import { authClient } from "@/lib/authClient";
+import { claimRoom } from "@/lib/rooms";
 
 const ACTIVITY_LABELS: Record<string, string> = {
   questions: "21 Questions",
@@ -66,17 +69,48 @@ function formatRelativeTime(then: string): string {
   return `${d}d ago`;
 }
 
+/** Pull the recap-invite token out of the URL fragment (`#k=<token>`).
+ * Fragment, not query, so the JWT never lands in server access logs /
+ * Referer headers when the user clicks an outbound link. */
+function readInviteToken(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const raw = window.location.hash;
+  if (!raw) return undefined;
+  const params = new URLSearchParams(raw.startsWith("#") ? raw.slice(1) : raw);
+  const t = params.get("k");
+  return t && t.length > 10 ? t : undefined;
+}
+
 export default function Recap() {
   const { id } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const participantId = params.get("participant_id") ?? undefined;
+  const inviteToken = useMemo(() => readInviteToken(), []);
+  const [claiming, setClaiming] = useState(false);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["recap", id],
+    queryKey: ["recap", id, inviteToken ?? ""],
     enabled: !!id,
-    queryFn: () => getRoomRecap(id as string, participantId),
+    queryFn: () => getRoomRecap(id as string, participantId, inviteToken),
   });
+
+  // Post-auth claim. If we have a token AND we're signed in AND we
+  // haven't already claimed this room (idempotent server-side, so
+  // re-runs are cheap), POST /claim once. After that the room shows
+  // up on the Recap tab without any further hops.
+  useEffect(() => {
+    if (!id || !inviteToken || claiming) return;
+    const session = authClient.getSession();
+    if (!session) return;
+    setClaiming(true);
+    void claimRoom(id, inviteToken)
+      .then(() => queryClient.invalidateQueries({ queryKey: ["my-rooms"] }))
+      .catch(() => null)
+      .finally(() => setClaiming(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, inviteToken]);
 
   const activities = (data?.activities ?? []).filter((a) => ACTIVITY_LABELS[a.activity_id]);
   const events = data?.events ?? [];

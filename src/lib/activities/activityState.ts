@@ -104,8 +104,19 @@ export function postActivityEvent(
   );
 }
 
-export function getRoomRecap(roomId: string, participantId?: string): Promise<RoomRecapResponse> {
+export function getRoomRecap(
+  roomId: string,
+  participantId?: string,
+  inviteToken?: string,
+): Promise<RoomRecapResponse> {
   const base = `/v1/rooms/${roomId}/recap`;
   const path = participantId ? `${base}?participant_id=${encodeURIComponent(participantId)}` : base;
-  return api.get<RoomRecapResponse>(path);
+  // The URL-bearer recap invite ships as a header so it stays out
+  // of access logs / Referer / dev-tools URL bar. Auth header is
+  // included when a session exists; backend OptionalUser accepts
+  // either, and the invite token unlocks read for users without a
+  // participant row.
+  return api.get<RoomRecapResponse>(path, {
+    headers: inviteToken ? { "X-Invite-Token": inviteToken } : undefined,
+  });
 }

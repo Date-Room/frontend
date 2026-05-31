@@ -69,7 +69,15 @@ export default function PreRoom() {
   });
   const room: Room | undefined = rooms?.find((r) => r.id === id);
 
-  const inviteUrl = room ? `${window.location.origin}/i/${room.code}/${room.pin}` : "";
+  // Share URL: `/i/CODE/PIN#k=<recap-invite>` — the fragment carries
+  // an URL-bearer recap-invite that lets the guest read the recap
+  // and, once signed in, claim membership so the room sticks on
+  // their Recap tab.
+  const inviteUrl = room
+    ? `${window.location.origin}/i/${room.code}/${room.pin}${
+        room.recap_invite_token ? `#k=${room.recap_invite_token}` : ""
+      }`
+    : "";
   const inviteUrlDisplay = inviteUrl.replace(/^https?:\/\//, "");
   const live = room ? room.state === "live" || room.state === "active" : false;
 
