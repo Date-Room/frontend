@@ -6,6 +6,7 @@ import { BRAND_NAME } from "@/lib/constants";
 import { authClient } from "@/lib/authClient";
 import { getMe } from "@/lib/users";
 import { listMyRooms, type Room, type RoomStateName } from "@/lib/rooms";
+import { listMyConnections, lastMetLabel, type Connection } from "@/lib/connections";
 import { PageShell } from "@/components/PageShell";
 import { cn } from "@/lib/utils";
 
@@ -40,6 +41,14 @@ export default function Home() {
 
   const { data: me } = useQuery({ queryKey: ["me"], queryFn: getMe, staleTime: 30_000, retry: 1, refetchOnWindowFocus: false });
   const { data: rooms = [] } = useQuery({ queryKey: ["my-rooms"], queryFn: listMyRooms, staleTime: 10_000 });
+  // Our Rooms (persistent pairings). Empty when signed-out or when
+  // the account has no promoted rooms yet. Tiles render above the
+  // session rooms when present; hidden entirely otherwise.
+  const { data: connections = [] } = useQuery({
+    queryKey: ["my-connections"],
+    queryFn: listMyConnections,
+    staleTime: 10_000,
+  });
 
   const aliveRooms = rooms.filter((r) => ALIVE_STATES.has(r.state));
   const endedRooms = rooms.filter((r) => ENDED_STATES.has(r.state));
@@ -148,6 +157,17 @@ export default function Home() {
                 <KeyRound className="h-4 w-4" /> Join with code
               </button>
             </div>
+
+            {connections.length > 0 && (
+              <section className="space-y-3">
+                <p className="px-1 text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Our Rooms</p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {connections.map((c) => (
+                    <OurRoomTile key={c.id} connection={c} onOpen={() => navigate(`/our-room/${c.id}`)} />
+                  ))}
+                </div>
+              </section>
+            )}
 
             {aliveRooms.length > 0 ? (
               <div className="stagger-children grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -339,5 +359,38 @@ export default function Home() {
         </div>
       </nav>
     </PageShell>
+  );
+}
+
+/** Our Room tile — partner-oriented row that opens /our-room/<id>.
+ * Falls back to a primary monogram + 'Our Room' title when the
+ * partner hasn't set a display name yet. */
+function OurRoomTile({ connection, onOpen }: { connection: Connection; onOpen: () => void }) {
+  const name = connection.partner.display_name?.trim() ?? "";
+  const initial = name ? name[0].toUpperCase() : "·";
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group editorial-card hover-lift focus-ring flex items-center gap-4 p-4 text-left"
+    >
+      <div className="h-11 w-11 shrink-0 overflow-hidden rounded-full border border-rosegold/25 bg-rosegold/[0.08] flex items-center justify-center">
+        {connection.partner.photo_url ? (
+          // eslint-disable-next-line jsx-a11y/alt-text
+          <img src={connection.partner.photo_url} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span className="font-serif text-base text-rosegold">{initial}</span>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-serif text-[1.05rem] italic leading-snug text-cream">
+          {name ? `You & ${name}` : "Our Room"}
+        </p>
+        <p className="mt-0.5 text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+          {lastMetLabel(connection)}
+        </p>
+      </div>
+      <ChevronRight className="h-4 w-4 text-muted-foreground/40 transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
+    </button>
   );
 }

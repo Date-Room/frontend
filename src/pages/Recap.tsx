@@ -9,7 +9,7 @@ import {
   type ActivityStateResponse,
 } from "@/lib/activities/activityState";
 import { authClient } from "@/lib/authClient";
-import { claimRoom } from "@/lib/rooms";
+import { claimRoom, promoteRoom } from "@/lib/rooms";
 
 const ACTIVITY_LABELS: Record<string, string> = {
   questions: "21 Questions",
@@ -89,6 +89,8 @@ export default function Recap() {
   const participantId = params.get("participant_id") ?? undefined;
   const inviteToken = useMemo(() => readInviteToken(), []);
   const [claiming, setClaiming] = useState(false);
+  const [promoting, setPromoting] = useState(false);
+  const [promoteError, setPromoteError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["recap", id, inviteToken ?? ""],
@@ -212,6 +214,46 @@ export default function Recap() {
             </section>
           )}
         </>
+      )}
+
+      {/* Promote-to-persistent CTA. Signed-in only; server enforces
+       *  the rest (must be a session room in grace, partner must
+       *  have an account, etc.). On success we dive into the
+       *  freshly-minted Our Room. */}
+      {authClient.getSession() && id && (
+        <button
+          type="button"
+          disabled={promoting}
+          onClick={async () => {
+            setPromoting(true);
+            setPromoteError(null);
+            try {
+              const room = await promoteRoom(id);
+              queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
+              queryClient.invalidateQueries({ queryKey: ["my-connections"] });
+              if (room.connection_id) {
+                navigate(`/our-room/${room.connection_id}`);
+              }
+            } catch (e) {
+              setPromoteError(e instanceof Error ? e.message : "Couldn't save this room.");
+            } finally {
+              setPromoting(false);
+            }
+          }}
+          className="mb-4 w-full rounded-[1.5rem] border border-primary/30 bg-gradient-to-br from-primary/[0.12] to-transparent shadow-[0_22px_60px_-20px_rgba(212,130,106,0.35)] flex items-center gap-4 p-5 focus-ring hover-lift-strong disabled:opacity-60 disabled:cursor-wait"
+        >
+          <div className="w-10 h-10 rounded-xl bg-rosegold/15 border border-rosegold/25 flex items-center justify-center">
+            {promoting ? <Loader2 className="w-5 h-5 text-rosegold animate-spin" /> : <Sparkles className="w-5 h-5 text-rosegold" />}
+          </div>
+          <div className="flex-1 text-left">
+            <p className="text-sm font-medium text-cream">Make this our room</p>
+            <p className="text-xs text-muted-foreground">Keep going as a couple — opens an Our Room.</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
+        </button>
+      )}
+      {promoteError && (
+        <p className="mb-4 text-xs text-rose-300">{promoteError}</p>
       )}
 
       <button
