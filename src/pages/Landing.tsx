@@ -80,8 +80,8 @@ export default function Landing() {
       {/* Section 1 — Hero */}
       <section className="lp-vignette relative overflow-hidden">
         <img src="/lov/hero-candlelit.jpg" alt="Candlelit dinner table with a tablet showing a video date" width={1920} height={1280} className="absolute inset-0 h-full w-full object-cover" />
-        <div className="relative z-10 mx-auto max-w-7xl px-6 pb-32 pt-28 md:pb-48 md:pt-40">
-          <div className="max-w-2xl">
+        <div className="relative z-10 mx-auto max-w-7xl px-6 pb-32 pt-28 md:pb-38 md:pt-30">
+          <div className="max-w-2xl text-left">
             <Eyebrow>Before the phone number</Eyebrow>
             <h1 className="lp-display mt-6 text-5xl text-lpcream md:text-7xl lg:text-8xl">
               Date them before<br />you date them.
@@ -89,21 +89,21 @@ export default function Landing() {
             <p className="mt-8 max-w-xl text-lg leading-relaxed text-lpcream/85 md:text-xl">
               A private room you share with a six-digit code. No phone numbers. No awkward exchange. Just enough to know if it's worth meeting in real life.
             </p>
-            <p className="lp-serif mt-5 text-xl italic text-lppeachsoft md:text-2xl">Not a video call. A date.</p>
+  <p className="lp-serif mt-5 text-xl italic text-lppeachsoft md:text-2xl">Not a video call. A date.</p>
             <div className="mt-10 flex flex-wrap items-center gap-6">
-              <Link to={START} className="lp-btn">Create your room</Link>
-              <a href="#how" className="lp-link">See how it works</a>
-            </div>
-            <p className="mt-6 text-[15px] text-lpmuted">
+    <Link to={START} className="lp-btn">Create your room</Link>
+    <a href="#how" className="lp-link">See how it works</a>
+  </div>
+  <p className="mt-6 text-[15px] text-lpmuted">
               Got a code from your match?{" "}
               <Link to="/join" className="lp-link">Join a room</Link>
-            </p>
+  </p>
           </div>
         </div>
       </section>
 
       {/* Section 2 — Why this exists */}
-      <section className="mx-auto grid max-w-7xl items-center gap-16 px-6 py-28 md:grid-cols-2 md:py-40">
+      <section className="mx-auto grid max-w-7xl items-center gap-10 px-6 py-16 md:grid-cols-2 md:py-7">
         <div>
           <Eyebrow>Why this exists</Eyebrow>
           <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">
@@ -117,7 +117,14 @@ export default function Landing() {
           </p>
         </div>
         <div className="relative">
-          <img src="/lov/why-laptop.jpg" alt="A laptop glowing beside a single candle on dark wood" width={1280} height={1280} loading="lazy" className="lp-glow aspect-square w-full rounded-2xl object-cover" />
+          <img
+            src="/hero-virtual-date-rose-petals.png"
+            alt="Virtual date with rose petals"
+            width={800}
+            height={800}
+            loading="lazy"
+            className="lp-glow aspect-square w-half rounded-2xl object-cover"
+          />
         </div>
       </section>
 
@@ -142,22 +149,8 @@ export default function Landing() {
             </div>
 
             <div className="mt-5 grid grid-cols-2 gap-4">
-              {["She", "He"].map((label, i) => (
-                <div key={label} className="relative aspect-[4/5] overflow-hidden rounded-2xl border border-lpborder bg-gradient-to-br from-[oklch(0.22_0.02_40)] to-[oklch(0.10_0.01_40)]">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div
-                      className="h-24 w-24 rounded-full opacity-70"
-                      style={{
-                        background:
-                          i === 0
-                            ? "radial-gradient(circle at 35% 30%, oklch(0.85 0.08 55), oklch(0.45 0.05 40))"
-                            : "radial-gradient(circle at 60% 35%, oklch(0.75 0.06 50), oklch(0.30 0.04 40))",
-                      }}
-                    />
-                  </div>
-                  <div className="lp-serif absolute bottom-3 left-3 text-xs italic text-lpcream/80">{label}</div>
-                </div>
-              ))}
+              <img src="/image copy.png" alt="Man and woman on a virtual date" width={640} height={426} className="object-cover rounded-2xl max-w-xs md:max-w-sm" />
+              <img src="/image.png" alt="Man and woman on a virtual date" width={640} height={426} className="object-cover rounded-2xl max-w-xs md:max-w-sm" />
             </div>
 
             <div className="mt-6 flex justify-center gap-4">
@@ -209,21 +202,49 @@ export default function Landing() {
             { Icon: Flame, t: "Truth or Dare", d: "Couple-safe by default. Tiered, so you choose how brave the room gets." },
             { Icon: HelpCircle, t: "Two Truths and a Lie", d: "The classic. Now with a partner who can't quite read your face through the candlelight." },
             { Icon: MoreHorizontal, t: "More coming", d: "Karaoke, the 36 Questions, Couple's Trivia, Draw and Guess. The next wave." },
-          ].map(({ Icon, t, d }) => (
-            <article key={t} className="group relative overflow-hidden rounded-2xl border border-lpborder bg-lpcard p-6 transition hover:border-lppeach/40">
-              <div
-                className="absolute inset-0 opacity-25 transition group-hover:opacity-40"
-                style={{ background: "radial-gradient(circle at 80% 0%, oklch(0.62 0.14 50 / 0.55), transparent 60%)" }}
-              />
-              <div className="relative">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full border border-lppeach/30 bg-lppeach/15">
-                  <Icon className="h-5 w-5 text-lppeach" />
+          ].map((card, i) => {
+            const bgImages = [
+              '/hero-virtual-date-rose-petals.png',
+              '/image.png',
+              '/lobby-mood-candlelit.png',
+              '/lov/hero-candlelit.jpg',
+              '/lov/friends-evening.jpg',
+              '/lov/phone-code.jpg',
+              '/premium-bg.png',
+              '/lov/final-door.jpg',
+            ];
+            return (
+              <article
+                key={card.t}
+                className="group relative overflow-hidden rounded-2xl border border-lpborder p-6 transition-all duration-500 ease-in-out hover:scale-[1.03] hover:border-lppeach/40 hover:shadow-lg hover:shadow-lppeach/10"
+                style={{
+                  backgroundImage: `url(${bgImages[i % bgImages.length]})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+              >
+                {/* Dark overlay — hides background image until hover */}
+                <div
+                  className="absolute inset-0 bg-lpcard opacity-[0.95] transition-opacity duration-500 ease-out group-hover:opacity-0"
+                />
+                {/* Gradient accent overlay */}
+                <div
+                  className="absolute inset-0 opacity-0 transition-opacity duration-500 ease-out group-hover:opacity-40"
+                  style={{
+                    background:
+                      'linear-gradient(180deg, transparent 30%, oklch(0.12 0.02 40 / 0.85) 100%)',
+                  }}
+                />
+                <div className="relative z-10">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-full border border-lppeach/30 bg-lppeach/15 transition-colors duration-500 group-hover:border-lppeach/60 group-hover:bg-lppeach/25">
+                    <card.Icon className="h-5 w-5 text-lppeach" />
+                  </div>
+                  <h3 className="lp-display mt-8 text-2xl text-lpcream">{card.t}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-lpmuted transition-colors duration-500 group-hover:text-lpcream/90">{card.d}</p>
                 </div>
-                <h3 className="lp-display mt-8 text-2xl text-lpcream">{t}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-lpmuted">{d}</p>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       </section>
 
@@ -251,7 +272,7 @@ export default function Landing() {
 
       {/* Section 6 — For couples */}
       <section id="couples" className="relative overflow-hidden">
-        <img src="/lov/couples-morning.jpg" alt="Warm morning light through curtains onto a rumpled bed" width={1920} height={1080} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <img src="/premium-bg.png" alt="Warm morning light through curtains onto a rumpled bed" width={1920} height={1080} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, oklch(0.18 0.02 50 / 0.92) 0%, oklch(0.18 0.02 50 / 0.55) 60%, transparent 100%)" }} />
         <div className="relative z-10 mx-auto max-w-7xl px-6 py-28 md:py-40">
           <div className="max-w-xl">
