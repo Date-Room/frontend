@@ -5,6 +5,14 @@ import { PageShell } from "@/components/PageShell";
 
 const REDIRECT_KEY = "post_auth_redirect";
 
+/** Best-effort iOS / Android sniff. We don't gate web functionality
+ *  on this — we only use it to decide whether to *attempt* the
+ *  custom-scheme deep-link bounce into the native app first. */
+function looksLikeMobile(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
+
 /**
  * Landing page for the magic-link click. The email's link points here
  * with `?token=<opaque>`; we hand the token to authClient.verifyLink and
@@ -15,6 +23,16 @@ const REDIRECT_KEY = "post_auth_redirect";
  * sends the cookie via `credentials: "include"`; the backend checks it
  * against the OTP row. If the link is opened on a different browser/
  * device the cookie is missing → the user gets nudged to use the code.
+ *
+ * Mobile-app bounce: when the page loads on a mobile UA with a token,
+ * we try the custom-scheme deep link `io.dateroom.app://login-callback?
+ * token=…` FIRST. If the iOS app is installed it catches the URL via
+ * its deep-link listener and signs the user in there. If nothing
+ * grabs the URL within ~1.5s (no app, or Android), we fall through
+ * to the regular web verifyLink flow. This is the safety net for
+ * the case where Universal Links don't fire — e.g. the user tapped
+ * the email link inside Gmail / Outlook / a webview that doesn't
+ * dispatch UL.
  */
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -26,6 +44,35 @@ export default function AuthCallback() {
     const token = params.get("token");
     const hash = window.location.hash;
     const looksLikeOauthFragment = hash.includes("at=") && hash.includes("rt=");
+
+    /** Try to hand a token off to the native app via custom scheme.
+     *  Resolves true when the page becomes hidden (iOS / Android moved
+     *  us into the app), false on the timeout fallback. */
+    function tryNativeBounce(tok: string): Promise<boolean> {
+      return new Promise((resolve) => {
+        const url = `io.dateroom.app://login-callback?token=${encodeURIComponent(tok)}`;
+        // If we lose page visibility, the OS sent us elsewhere — the
+        // app caught the URL. Bail without falling through to web
+        // verify so we don't burn the one-time token twice.
+        const onHide = () => {
+          if (document.visibilityState === "hidden") {
+            document.removeEventListener("visibilitychange", onHide);
+            window.clearTimeout(timer);
+            resolve(true);
+          }
+        };
+        document.addEventListener("visibilitychange", onHide);
+        // Navigate to the custom scheme. iOS handles via universal-link
+        // or scheme handler; Android via intent matching. Desktops
+        // throw a polite "Cannot open URL" we never see because the
+        // user isn't there.
+        window.location.href = url;
+        const timer = window.setTimeout(() => {
+          document.removeEventListener("visibilitychange", onHide);
+          resolve(false);
+        }, 1500);
+      });
+    }
 
     function go() {
       let dest = "/home";
@@ -52,6 +99,15 @@ export default function AuthCallback() {
     void (async () => {
       // 1) Magic-link path: `?token=…`.
       if (token) {
+        // Mobile bounce first. The custom-scheme URL is the path most
+        // resilient to in-app browsers (Gmail / Outlook / etc.) that
+        // strip Universal Links. If a native handler takes it, the
+        // page goes hidden and we exit; otherwise we proceed with
+        // the web verify.
+        if (looksLikeMobile()) {
+          const caught = await tryNativeBounce(token);
+          if (cancelled || caught) return;
+        }
         try {
           await authClient.verifyLink(token);
           if (cancelled) return;
