@@ -87,6 +87,31 @@ export async function apiFetch<T>(path: string, opts: Options = {}): Promise<T> 
   }
 
   if (res.status === 401) {
+    // Hard force-logout: token expired AND refresh failed (or was
+    // never possible because there was no auth on this call). Clear
+    // the session client-side so React Query / AuthGuard see the
+    // signed-out state, then hard-redirect to /auth from wherever
+    // the user is. Mobile auth never reaches this branch (10y
+    // tokens + permanent refresh); web policy is rotation-driven
+    // and we *want* to nudge the user back through sign-in cleanly.
+    if (auth) {
+      try {
+        await authClient.signOut();
+      } catch {
+        /* swallow — local clear-out already happened in refresh() */
+      }
+      // Stash the post-auth destination so the user lands back where
+      // they were after re-signing-in. Same key AuthCallback reads.
+      try {
+        const here = window.location.pathname + window.location.search;
+        if (here && here !== "/auth") {
+          sessionStorage.setItem("post_auth_redirect", here);
+        }
+      } catch {
+        /* sessionStorage can be unavailable in private modes */
+      }
+      window.location.assign("/auth");
+    }
     throw new ApiError(401, "Not authenticated", null);
   }
 
