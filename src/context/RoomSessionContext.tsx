@@ -72,16 +72,30 @@ export function RoomSessionProvider({
         if (disposed) return;
         setStatus("connected");
         void channel.track({
+          // Web-legacy fields — kept for web code that still reads
+          // sender_id / name / is_host.
           sender_id: identity.senderId,
           slot: identity.slot,
           name: identity.displayName,
           is_host: identity.isHost,
+          // Canonical PresenceState fields — what the mobile client
+          // reads off the wire. Without these, mobile's
+          // PresenceState.fromJson failed on web-sent presence and
+          // mobile saw no partner (capture footer rendered just the
+          // self name). Sending both lets either client find the
+          // other regardless of which schema it knows.
+          user_id: identity.senderId,
+          display_name: identity.displayName,
+          photo_url: identity.photoUrl ?? null,
+          // Mirror the mobile flags so cross-platform code paths
+          // (typing dots, in-call halo) see consistent state.
+          is_ready: true,
+          is_typing: false,
+          is_in_call: false,
+          last_seen: new Date().toISOString(),
           // Surfaces a stable handle to kick by; only guests have one
           // (signed-in partners don't need it for DELETE /participants).
           participant_id: identity.participantId ?? null,
-          // Photo url so the partner's camera-off avatar can render
-          // the actual picture instead of just an initial.
-          photo_url: identity.photoUrl ?? null,
         });
       })
       .catch(() => {

@@ -216,7 +216,7 @@ function CameraOffAvatar({
         </div>
       </div>
       <div className="text-center">
-        <p className="font-serif italic text-cream text-base">{name || "Them"}</p>
+        <p className="font-serif italic text-cream text-base">{name || "Partner"}</p>
         <p
           className={[
             "mt-1 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.28em] transition-colors",
@@ -253,16 +253,27 @@ function Stage() {
         window.setTimeout(tick, 250);
       } else {
         setCountdown(null);
-        const partnerName =
-          room.presence
-            .map((p) => ({ id: p.sender_id, name: p.name }))
-            .find((p) => typeof p.id === "string" && p.id !== room.senderId && typeof p.name === "string")?.name as
-            | string
-            | undefined;
+        // Look the partner up by EITHER schema. The web legacy
+        // wire shape carries sender_id + name; the canonical
+        // mobile-sourced shape carries user_id + display_name.
+        // Read both so cross-platform rooms produce the same
+        // footer 'Partner & Self ♥' on both sides.
+        const partnerName = room.presence
+          .map((p) => ({
+            id:
+              (typeof p.sender_id === "string" && p.sender_id) ||
+              (typeof p.user_id === "string" && p.user_id) ||
+              "",
+            name:
+              (typeof p.name === "string" && p.name) ||
+              (typeof p.display_name === "string" && p.display_name) ||
+              "",
+          }))
+          .find((p) => p.id && p.id !== room.senderId && p.name)?.name;
         capturePhoto(
           partnerWrapRef.current?.querySelector("video") ?? null,
           selfWrapRef.current?.querySelector("video") ?? null,
-          partnerName || "Them",
+          partnerName || "Partner",
           room.displayName || "You",
         );
       }
@@ -304,17 +315,25 @@ function Stage() {
   }
 
   // Pull the partner's display name + photo from presence so the
-  // camera-off avatar matches what shows in chat/recap. Falls back
-  // to the LiveKit participant identity if presence hasn't arrived.
+  // camera-off avatar matches what shows in chat/recap. Reads
+  // either schema (web's sender_id+name OR the canonical
+  // user_id+display_name that mobile clients publish) so
+  // cross-platform rooms show the real partner name, not "Them".
   const partnerDisplay = useMemo(() => {
     const me = room.senderId;
     const entry = room.presence.find((p) => {
-      const sid = p.sender_id;
-      return typeof sid === "string" && sid !== me;
+      const sid =
+        (typeof p.sender_id === "string" && p.sender_id) ||
+        (typeof p.user_id === "string" && p.user_id) ||
+        "";
+      return Boolean(sid) && sid !== me;
     });
-    const name = typeof entry?.name === "string" ? entry.name : "Them";
+    const name =
+      (typeof entry?.name === "string" && entry.name) ||
+      (typeof entry?.display_name === "string" && entry.display_name) ||
+      "Partner";
     const photoUrl =
-      typeof entry?.photo_url === "string" ? entry.photo_url : null;
+      (typeof entry?.photo_url === "string" && entry.photo_url) || null;
     return { name, photoUrl };
   }, [room.presence, room.senderId]);
 
