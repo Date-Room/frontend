@@ -10,7 +10,9 @@ import {
   UserPlus,
   ArrowLeft,
   Loader2,
+  Palette,
 } from "lucide-react";
+import { CustomizeSheet } from "@/components/CustomizeSheet";
 import { PageShell } from "@/components/PageShell";
 import { cn } from "@/lib/utils";
 import {
@@ -96,6 +98,7 @@ export default function PreRoom() {
   const navigate = useNavigate();
   const [starting, setStarting] = useState(false);
   const [copiedKey, setCopiedKey] = useState<CopiedKey>(null);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
 
   // Server-authoritative list of my rooms — gets us the canonical
   // code/pin/state/expiry without a per-page-load /by-code call.
@@ -425,17 +428,38 @@ export default function PreRoom() {
           Share the link above. They&apos;ll join from it — then start the session whenever you&apos;re both ready.
         </p>
 
-        {/* Start / Rejoin */}
-        <button
-          type="button"
-          onClick={start}
-          disabled={!room || starting}
-          className="btn-primary flex w-full items-center justify-center gap-2 rounded-[1.15rem] py-4 font-semibold disabled:opacity-50"
-        >
-          {starting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-          {live ? "Rejoin" : "Start session"}
-        </button>
+        {/* Customize + Start / Rejoin */}
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setCustomizeOpen(true)}
+            disabled={!room}
+            className="focus-ring flex w-full items-center justify-center gap-2 rounded-[1.15rem] border border-white/15 py-3 text-sm font-medium text-cream transition hover:bg-white/[0.04] disabled:opacity-50"
+          >
+            <Palette className="h-4 w-4" aria-hidden /> Customize
+          </button>
+          <button
+            type="button"
+            onClick={start}
+            disabled={!room || starting}
+            className="btn-primary flex w-full items-center justify-center gap-2 rounded-[1.15rem] py-4 font-semibold disabled:opacity-50"
+          >
+            {starting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+            {live ? "Rejoin" : "Start session"}
+          </button>
+        </div>
       </main>
+
+      {/* Customize sheet — picks theme + background, saves per tap. */}
+      {room && (
+        <CustomizeSheet
+          roomId={room.id}
+          open={customizeOpen}
+          onOpenChange={setCustomizeOpen}
+          initialThemeId={room.theme_color}
+          initialBackgroundId={room.background_id}
+        />
+      )}
     </PreRoomShell>
   );
 }
