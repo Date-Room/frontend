@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -7,6 +7,7 @@ import {
   Loader2,
   Search,
   X,
+  Check,
 } from "lucide-react";
 import { authClient } from "@/lib/authClient";
 import { getMe, updateMe, type UserMe } from "@/lib/users";
@@ -19,6 +20,21 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { COUNTRIES, countryByCode, flagFor, type Country } from "@/lib/countries";
 
@@ -34,10 +50,17 @@ const MAX_PHOTO_BYTES = 750 * 1024;
  * - Email under the avatar in small muted text.
  * - Grouped settings card with hairline-divided rows: Name + Country.
  *   Country row has flag + name + chevron.
- * - Country picker is a bottom sheet that stays under the status bar
- *   (max-height 80vh, doesn't push past the top).
  * - Save button below the card.
  * - Sign-out is a red text link at the bottom, not a primary CTA.
+ *
+ * Desktop refinements:
+ * - Container widens to `max-w-2xl` so the form doesn't feel cramped
+ *   on a wide canvas.
+ * - Each group (Profile / Details / Account) gets a left-aligned
+ *   small-caps section header.
+ * - Country picker swaps to a shadcn Command palette inside a Dialog
+ *   on md+ — searchable list with keyboard nav (↑/↓/Enter). Mobile
+ *   keeps the bottom Sheet picker.
  */
 export default function Settings() {
   const navigate = useNavigate();
@@ -156,7 +179,7 @@ export default function Settings() {
   const country = countryByCode(countryCode);
 
   return (
-    <CardPage title="Profile" onBack={() => navigate("/home")} maxWidth="sm:max-w-xl">
+    <CardPage title="Profile" onBack={() => navigate("/home")} maxWidth="sm:max-w-xl md:max-w-2xl">
       <input
         ref={photoInputRef}
         type="file"
@@ -168,6 +191,13 @@ export default function Settings() {
           if (f) void pickPhoto(f);
         }}
       />
+
+      {/* Desktop section header — small-caps label above the avatar
+          block. Hidden on mobile (single-column already reads cleanly
+          without one). */}
+      <p className="hidden md:block px-1 pb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        Account
+      </p>
 
       {/* ─── Avatar + email ─── */}
       <div className="flex flex-col items-center gap-2 pt-2">
@@ -264,9 +294,10 @@ export default function Settings() {
         </button>
       </div>
 
-      {/* Country picker — bottom sheet capped at 80vh, doesn't push
-          past the status bar even with the keyboard up. */}
-      <CountryPickerSheet
+      {/* Country picker — Sheet on mobile (capped at 80vh, doesn't push
+          past the status bar even with the keyboard up), Command palette
+          inside a Dialog on desktop (keyboard nav, fuzzy search). */}
+      <CountryPicker
         open={countryOpen}
         onOpenChange={setCountryOpen}
         current={countryCode}
@@ -309,7 +340,23 @@ export default function Settings() {
   );
 }
 
-/* ─────────────────────── Country picker sheet ─────────────────────── */
+/* ─────────────────────── Country picker ─────────────────────── */
+
+/**
+ * Country picker. On mobile, a bottom Sheet with a search field —
+ * familiar shape, `useSafeArea`-ish capping at 80vh so it stays under
+ * the status bar. On desktop, a shadcn Command palette inside a Dialog
+ * — fuzzy search, ↑/↓ keyboard nav, Enter to select.
+ */
+function CountryPicker(props: {
+  open: boolean;
+  onOpenChange: (b: boolean) => void;
+  current: string | null;
+  onPick: (c: Country) => void;
+}) {
+  const isMobile = useIsMobile();
+  return isMobile ? <CountryPickerSheet {...props} /> : <CountryPickerCommand {...props} />;
+}
 
 function CountryPickerSheet({
   open,
@@ -384,5 +431,71 @@ function CountryPickerSheet({
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function CountryPickerCommand({
+  open,
+  onOpenChange,
+  current,
+  onPick,
+}: {
+  open: boolean;
+  onOpenChange: (b: boolean) => void;
+  current: string | null;
+  onPick: (c: Country) => void;
+}) {
+  // Pre-sort so the currently-selected country floats to the top
+  // when the palette opens — small affordance, big payoff for
+  // repeat opens.
+  const orderedCountries = useMemo(() => {
+    if (!current) return COUNTRIES;
+    const sel = COUNTRIES.find((c) => c.code === current);
+    if (!sel) return COUNTRIES;
+    return [sel, ...COUNTRIES.filter((c) => c.code !== current)];
+  }, [current]);
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg border-white/[0.08] bg-[#1A1410] p-0 text-cream">
+        <DialogHeader className="px-4 pt-4">
+          <DialogTitle className="text-cream font-serif text-lg italic">Country</DialogTitle>
+        </DialogHeader>
+        <Command
+          // CMDK's default value filter handles fuzzy matching across name + code.
+          className="bg-transparent"
+          filter={(value, search) =>
+            value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+          }
+        >
+          <CommandInput placeholder="Search…" autoFocus className="text-cream" />
+          <CommandList className="max-h-[420px]">
+            <CommandEmpty>No matches.</CommandEmpty>
+            <CommandGroup>
+              {orderedCountries.map((c) => {
+                const selected = c.code === current;
+                return (
+                  <CommandItem
+                    key={c.code}
+                    // Value gates the filter; include both code and name so
+                    // typing either matches.
+                    value={`${c.name} ${c.code}`}
+                    onSelect={() => onPick(c)}
+                    className={cn(
+                      "gap-3 text-cream aria-selected:bg-primary/15 aria-selected:text-cream",
+                      selected && "text-primary",
+                    )}
+                  >
+                    <span className="text-lg" aria-hidden>{flagFor(c.code)}</span>
+                    <span className="flex-1 text-[14px]">{c.name}</span>
+                    <span className="text-[11px] tracking-wider text-muted-foreground">{c.code}</span>
+                    {selected && <Check className="h-4 w-4 text-primary" aria-hidden />}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,6 +1,10 @@
 /**
- * Bottom sheet for picking a theme color + background for any room.
- * Mirrors mobile's `customize_sheet.dart`.
+ * Customize-room picker — theme color + background.
+ *
+ * Mobile: bottom Sheet (mirrors mobile's `customize_sheet.dart`).
+ * Desktop (md+): centered Dialog (~640pt max width) — bottom sheets
+ * feel cramped on a wide canvas and the user has plenty of room for
+ * a focused modal.
  *
  * Defaults / 'Original' semantics:
  *   - First theme swatch = "Original" — saves theme_color: null and
@@ -24,6 +28,14 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { updateRoom } from "@/lib/rooms";
 import {
@@ -54,6 +66,7 @@ export function CustomizeSheet({
   initialBackgroundId,
   onSaved,
 }: Props) {
+  const isMobile = useIsMobile();
   const [themeId, setThemeId] = useState<string | null>(initialThemeId);
   const [backgroundId, setBackgroundId] = useState<string | null>(initialBackgroundId);
   const [saving, setSaving] = useState(false);
@@ -99,111 +112,139 @@ export function CustomizeSheet({
   const bg = backgroundForId(backgroundId);
   const previewGradient = backgroundGradient(backgroundId);
 
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="border-white/[0.06] bg-[#1A1410] text-cream max-h-[88vh] overflow-y-auto rounded-t-3xl"
-      >
-        <SheetHeader className="space-y-1 text-left">
-          <SheetTitle className="text-cream">Customize the room</SheetTitle>
-          <SheetDescription className="text-muted-foreground">
-            The look applies to both sides. Saves as you tap.
-          </SheetDescription>
-        </SheetHeader>
-
-        {/* Live preview — re-renders on every tap so users pick against
-            the actual outcome rather than guessing from swatches. */}
-        <div className="mt-4">
+  // Shared body — the only difference between the mobile and desktop
+  // surfaces is the framing component.
+  const body = (
+    <>
+      {/* Live preview — re-renders on every tap so users pick against
+          the actual outcome rather than guessing from swatches. */}
+      <div className="mt-4">
+        <div
+          className="relative h-40 w-full overflow-hidden rounded-2xl border border-white/10 md:h-48"
+          style={{ background: previewGradient }}
+        >
+          {/* Centred preview avatars (one in-call, one idle) so users
+              can read the accent halo against the chosen background. */}
+          <div className="absolute inset-0 flex items-center justify-center gap-3">
+            <PreviewAvatar accent={theme.accent} inCall={false} />
+            <PreviewAvatar accent={theme.accent} inCall={true} />
+          </div>
+          {/* Themed CTA pill at the bottom — same shape Main uses. */}
           <div
-            className="relative h-40 w-full overflow-hidden rounded-2xl border border-white/10"
-            style={{ background: previewGradient }}
+            className="absolute bottom-3 left-3 right-3 flex h-8 items-center justify-center rounded-[10px] border text-[12px] font-semibold tracking-wide"
+            style={{
+              color: theme.accent,
+              backgroundColor: `${theme.accent}2E`,
+              borderColor: `${theme.accent}80`,
+            }}
           >
-            {/* Centred preview avatars (one in-call, one idle) so users
-                can read the accent halo against the chosen background. */}
-            <div className="absolute inset-0 flex items-center justify-center gap-3">
-              <PreviewAvatar accent={theme.accent} inCall={false} />
-              <PreviewAvatar accent={theme.accent} inCall={true} />
-            </div>
-            {/* Themed CTA pill at the bottom — same shape Main uses. */}
-            <div
-              className="absolute bottom-3 left-3 right-3 flex h-8 items-center justify-center rounded-[10px] border text-[12px] font-semibold tracking-wide"
-              style={{
-                color: theme.accent,
-                backgroundColor: `${theme.accent}2E`,
-                borderColor: `${theme.accent}80`,
-              }}
-            >
-              Start the call
-            </div>
-            {/* Theme + background label */}
-            <div className="absolute left-2.5 top-2.5 rounded-md bg-black/40 px-2 py-1 text-[10px] tracking-wider text-cream">
-              {bg ? `${theme.label} · ${bg.label}` : theme.label}
-            </div>
+            Start the call
+          </div>
+          {/* Theme + background label */}
+          <div className="absolute left-2.5 top-2.5 rounded-md bg-black/40 px-2 py-1 text-[10px] tracking-wider text-cream">
+            {bg ? `${theme.label} · ${bg.label}` : theme.label}
           </div>
         </div>
+      </div>
 
-        {/* Theme color */}
-        <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Theme color
-        </p>
-        <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-          {/* 'Original' — clears the override, default DateRoom theme. */}
-          <OriginalThemeSwatch
-            selected={themeId === null}
-            onClick={() => void saveTheme(null)}
-            accent={defaultTheme.accent}
+      {/* Theme color */}
+      <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        Theme color
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2 pb-1 md:flex-nowrap md:overflow-x-auto">
+        {/* 'Original' — clears the override, default DateRoom theme. */}
+        <OriginalThemeSwatch
+          selected={themeId === null}
+          onClick={() => void saveTheme(null)}
+          accent={defaultTheme.accent}
+        />
+        {roomThemes.map((t) => (
+          <Swatch
+            key={t.id}
+            color={t.accent}
+            selected={themeId === t.id}
+            onClick={() => void saveTheme(t.id)}
+            aria-label={t.label}
           />
-          {roomThemes.map((t) => (
-            <Swatch
-              key={t.id}
-              color={t.accent}
-              selected={themeId === t.id}
-              onClick={() => void saveTheme(t.id)}
-              aria-label={t.label}
-            />
-          ))}
-        </div>
+        ))}
+      </div>
 
-        {/* Background */}
-        <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Background
-        </p>
-        <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+      {/* Background — wraps to a grid on desktop so all tiles are
+          visible without horizontal scrolling. */}
+      <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        Background
+      </p>
+      <div className="mt-2 flex gap-2 overflow-x-auto pb-1 md:grid md:grid-cols-5 md:overflow-visible">
+        <BackgroundTile
+          isOriginal
+          selected={backgroundId === null}
+          onClick={() => void saveBackground(null)}
+          label="Original"
+          gradient={backgroundGradient(null)}
+        />
+        {roomBackgrounds.map((b) => (
           <BackgroundTile
-            isOriginal
-            selected={backgroundId === null}
-            onClick={() => void saveBackground(null)}
-            label="Original"
-            gradient={backgroundGradient(null)}
+            key={b.id}
+            selected={backgroundId === b.id}
+            onClick={() => void saveBackground(b.id)}
+            label={b.label}
+            gradient={`linear-gradient(135deg, ${b.stops[0]}, ${b.stops[1]})`}
           />
-          {roomBackgrounds.map((b) => (
-            <BackgroundTile
-              key={b.id}
-              selected={backgroundId === b.id}
-              onClick={() => void saveBackground(b.id)}
-              label={b.label}
-              gradient={`linear-gradient(135deg, ${b.stops[0]}, ${b.stops[1]})`}
-            />
-          ))}
-        </div>
+        ))}
+      </div>
 
-        {error && (
-          <p className="mt-3 text-sm text-rose">{error}</p>
-        )}
+      {error && <p className="mt-3 text-sm text-rose">{error}</p>}
 
-        <div className="mt-5 flex items-center justify-end gap-3">
-          {saving && <Loader2 className="h-4 w-4 animate-spin text-amber" aria-hidden />}
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="rounded-full px-4 py-2 text-sm font-semibold text-amber transition hover:bg-amber/10"
-          >
-            Done
-          </button>
-        </div>
-      </SheetContent>
-    </Sheet>
+      <div className="mt-5 flex items-center justify-end gap-3">
+        {saving && <Loader2 className="h-4 w-4 animate-spin text-amber" aria-hidden />}
+        <button
+          type="button"
+          onClick={() => onOpenChange(false)}
+          className="rounded-full px-4 py-2 text-sm font-semibold text-amber transition hover:bg-amber/10"
+        >
+          Done
+        </button>
+      </div>
+    </>
+  );
+
+  // Mobile (md-) → bottom sheet. Desktop (md+) → centered Dialog.
+  // `useIsMobile` is undefined for one render on mount; render the
+  // mobile sheet during that beat so we don't flash a desktop dialog
+  // on a phone.
+  if (isMobile) {
+    return (
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent
+          side="bottom"
+          className="border-white/[0.06] bg-[#1A1410] text-cream max-h-[88vh] overflow-y-auto rounded-t-3xl"
+        >
+          <SheetHeader className="space-y-1 text-left">
+            <SheetTitle className="text-cream">Customize the room</SheetTitle>
+            <SheetDescription className="text-muted-foreground">
+              The look applies to both sides. Saves as you tap.
+            </SheetDescription>
+          </SheetHeader>
+          {body}
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[640px] border-white/[0.08] bg-[#1A1410] text-cream">
+        <DialogHeader>
+          <DialogTitle className="text-cream font-serif text-xl italic">
+            Customize the room
+          </DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            The look applies to both sides. Saves as you tap.
+          </DialogDescription>
+        </DialogHeader>
+        {body}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -282,7 +323,7 @@ function BackgroundTile({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-24 shrink-0 flex-col items-stretch gap-1"
+      className="flex w-24 shrink-0 flex-col items-stretch gap-1 md:w-auto"
     >
       <div
         className={cn(
