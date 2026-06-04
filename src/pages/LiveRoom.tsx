@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { LogOut, LayoutGrid, Clock } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
-import { RoomSessionProvider, type RoomIdentity } from "@/context/RoomSessionContext";
+import { RoomSessionProvider, useRoomSession, type RoomIdentity } from "@/context/RoomSessionContext";
 import { RoomVideo } from "@/components/RoomVideo";
 import { ActivityTray } from "@/components/ActivityTray";
 import { MediaMiniPlayer } from "@/components/MediaMiniPlayer";
+import { toast } from "sonner";
 import { authClient } from "@/lib/authClient";
 import { DATE_NAME } from "@/lib/room";
 
@@ -40,6 +41,30 @@ function Countdown({ expiresAt }: { expiresAt: string }) {
   );
 }
 
+/** Listens for 'kicked' broadcasts on the room channel. If the kicked
+ *  participant_id matches our own, we navigate home with a toast.
+ *  Mirrors mobile's broadcast listener in live_room_notifier.dart +
+ *  pre_room_screen.dart. */
+function KickedListener({ onKicked }: { onKicked: () => void }) {
+  const session = useRoomSession();
+  useEffect(() => {
+    const myPid = session.participantId;
+    // Signed-in members don't have a participant_id surfaced here, so
+    // they can't be addressed by the kick broadcast (the host should
+    // use the destroy-room path instead). Guests do.
+    if (!myPid) return;
+    const off = session.channel.onBroadcast((e) => {
+      if (e.kind !== "kicked") return;
+      const kickedPid = e.payload?.participant_id;
+      if (typeof kickedPid !== "string") return;
+      if (kickedPid !== myPid) return;
+      onKicked();
+    });
+    return () => off();
+  }, [session, onKicked]);
+  return null;
+}
+
 function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; isHost: boolean; roomId: string }) {
   const navigate = useNavigate();
   const [trayOpen, setTrayOpen] = useState(false);
@@ -66,6 +91,14 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
       grain={false}
       className="h-screen flex overflow-hidden bg-[#0a0508]"
     >
+      {/* Listen for the host's 'kicked' broadcast. If our participant_id
+          is the one being kicked, navigate home with a toast. */}
+      <KickedListener
+        onKicked={() => {
+          toast.message("You were removed from this room");
+          navigate("/home");
+        }}
+      />
       {/* Left column: video + chrome (full width on mobile, flex-1 beside the panel on desktop) */}
       <div className="flex-1 min-w-0 flex flex-col relative">
       {/* Header chrome over the video */}

@@ -102,6 +102,20 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
     setKicking(participantId);
     try {
       await kickParticipant(session.roomId, participantId);
+      // Optimistic local eject — filter out their presence rows until
+      // their client tears down. Mirrors mobile's markEjected flow.
+      setEjectedIds((prev) => {
+        const next = new Set(prev);
+        next.add(participantId);
+        return next;
+      });
+      // Broadcast on the room channel so the kicked partner's client
+      // navigates home (LiveRoom listens for 'kicked' on the channel).
+      // The backend kick only marks left_at — without this broadcast
+      // the kicked client just keeps publishing presence.
+      try {
+        await session.channel.broadcast("kicked", { participant_id: participantId });
+      } catch { /* soft-fail — local filter still hides them */ }
       toast.success(`${name} removed.`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't remove that participant.");
@@ -111,8 +125,12 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
   }
 
   const inviteUrl = room ? `${window.location.origin}/i/${room.code}/${room.pin}` : "";
-  // Presence list minus the host themselves (you can't kick yourself).
-  const others = session.presence.filter((p) => p.sender_id !== session.senderId);
+  // Participants we've optimistically kicked but whose presence row
+  // hasn't disappeared yet (the kicked client keeps publishing for a
+  // beat before our 'kicked' broadcast reaches it). Filtering them
+  // out locally stops the host's UI from looking like nothing happened.
+  // Mirrors mobile's `ejectedParticipantIds` set.
+  const [ejectedIds, setEjectedIds] = useState<Set<string>>(new Set());
 
   return (
     <div className="flex flex-col gap-5 p-5">
@@ -165,12 +183,14 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
 
       {/* People — live presence list with kick. */}
       <section className="space-y-3">
-        <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">In the room ({session.presence.length})</p>
+        <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">In the room ({session.presence.filter((p) => !(typeof p.participant_id === "string" && ejectedIds.has(p.participant_id))).length})</p>
         <div className="rounded-2xl border border-border bg-card/60 divide-y divide-white/[0.06]">
           {session.presence.length === 0 ? (
             <p className="px-4 py-3 text-sm text-muted-foreground">Just you — waiting on your guest.</p>
           ) : (
-            session.presence.map((p) => {
+            session.presence
+              .filter((p) => !(typeof p.participant_id === "string" && ejectedIds.has(p.participant_id)))
+              .map((p) => {
               const isSelf = p.sender_id === session.senderId;
               // Only guests have participant_id from /join. Signed-in
               // partners join via session and don't expose one to the
