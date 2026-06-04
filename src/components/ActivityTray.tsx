@@ -279,12 +279,47 @@ function ActivityView({ id, onLeave }: { id: string; onLeave: () => void }) {
   }
 }
 
-export function ActivityTray({ open, onClose, onLeave }: { open: boolean; onClose: () => void; onLeave: () => void }) {
+export function ActivityTray({
+  open,
+  onClose,
+  onLeave,
+  onActiveActivityChange,
+  externalOpenActivityId,
+  onExternalOpenHandled,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onLeave: () => void;
+  /** Optional — notify the parent which activity is in front so the
+   *  mini-player can hide when its activity is open. */
+  onActiveActivityChange?: (id: string | null) => void;
+  /** Optional — when set non-null, the tray navigates to that activity
+   *  (and on mobile, opens itself). Parent should clear it back to null
+   *  via [onExternalOpenHandled] once handled. */
+  externalOpenActivityId?: string | null;
+  onExternalOpenHandled?: () => void;
+}) {
   // Separate category vs. activity ids so single-activity categories (Watch,
   // Chat) whose ids match their activity can't collide and break "back".
   const [catId, setCatId] = useState<string | null>(null);
   const [actId, setActId] = useState<string | null>(null);
   const { isHost } = useRoomSession();
+
+  // Surface activity changes to the parent (mini-player visibility).
+  useEffect(() => {
+    onActiveActivityChange?.(actId);
+  }, [actId, onActiveActivityChange]);
+
+  // External open requests (from the mini-player).
+  useEffect(() => {
+    if (!externalOpenActivityId) return;
+    // Find the category that hosts this activity so 'back' navigates
+    // sensibly.
+    const cat = CATEGORIES.find((c) => c.activities.some((a) => a.id === externalOpenActivityId));
+    if (cat) setCatId(cat.id);
+    setActId(externalOpenActivityId);
+    onExternalOpenHandled?.();
+  }, [externalOpenActivityId, onExternalOpenHandled]);
 
   // The Room/Manage category is host-only — guests don't need to see
   // (or accidentally tap into) the host's PIN-rotation + kick controls.

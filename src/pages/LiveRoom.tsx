@@ -5,6 +5,7 @@ import { PageShell } from "@/components/PageShell";
 import { RoomSessionProvider, type RoomIdentity } from "@/context/RoomSessionContext";
 import { RoomVideo } from "@/components/RoomVideo";
 import { ActivityTray } from "@/components/ActivityTray";
+import { MediaMiniPlayer } from "@/components/MediaMiniPlayer";
 import { authClient } from "@/lib/authClient";
 import { DATE_NAME } from "@/lib/room";
 
@@ -43,6 +44,12 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
   const navigate = useNavigate();
   const [trayOpen, setTrayOpen] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  // Which activity is currently in front of the user — drives the
+  // media-mini-player visibility (hides when its activity is open).
+  const [activeActivityId, setActiveActivityId] = useState<string | null>(null);
+  // When the mini-player asks the tray to open a specific activity,
+  // we set this and the tray clears it via onExternalOpenHandled.
+  const [externalOpen, setExternalOpen] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);
@@ -103,6 +110,25 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
         open={trayOpen}
         onClose={() => setTrayOpen(false)}
         onLeave={() => navigate("/home")}
+        onActiveActivityChange={setActiveActivityId}
+        externalOpenActivityId={externalOpen}
+        onExternalOpenHandled={() => setExternalOpen(null)}
+      />
+
+      {/* Persistent media mini-player — visible when DJ has a track or
+          Watch has a video AND that activity isn't already open. Tap
+          opens the activity in the tray (mobile) / docked panel (desktop). */}
+      <MediaMiniPlayer
+        currentActivityId={activeActivityId}
+        onOpenActivity={(id) => {
+          setExternalOpen(id);
+          // On mobile the tray is hidden by default — pop it up too.
+          setTrayOpen(true);
+        }}
+        // Mobile clears the Activities pill (~72px tall including padding);
+        // sit just above it so it doesn't visually collide. Desktop's
+        // docked panel never overlaps so 12px is fine there too.
+        bottomOffsetPx={80}
       />
 
       {showLeaveConfirm && (
