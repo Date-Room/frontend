@@ -246,6 +246,32 @@
   100% { background-position: 200% 0; }
 }
 
+/* Mobile-parity shimmer sweep — accent-tinted band passes left→right
+   across a rounded surface. ~1400ms duration so it reads as 'content
+   arriving' rather than stalled. Mounted via .shimmer-skeleton class
+   in ui/skeleton.tsx (ShimmerSkeleton). */
+@keyframes shimmer-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.shimmer-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(244, 233, 216, 0.13) 50%,
+    transparent 100%
+  );
+  animation: shimmer-sweep 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-skeleton::after { animation: none; }
+}
+
 @keyframes float-up {
   from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: translateY(0); }
