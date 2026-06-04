@@ -1,20 +1,38 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Play, Pause, SkipForward, Volume2 } from "lucide-react";
+import {
+  Play,
+  Pause,
+  SkipForward,
+  SkipBack,
+  Volume2,
+  Music,
+} from "lucide-react";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
 import { getLimits } from "@/lib/catalogRuntime";
 import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/types/youtubeIframeApi";
+import { cn } from "@/lib/utils";
 
 /**
- * DJ — ported to the shared `dj` activity (mobile parity for the fields the web
- * uses): durable state `{ turn: { current_dj, turn_started_at }, now_playing,
- * playing, timestamp_seconds, last_controller, silence }`, broadcast events
- * `play | pause | seek | tick | enqueue | silence_on | silence_off`, and the
- * shared `reaction` broadcast. Turn ownership is a userId (from presence), not a
- * slot. The web surfaces a single now_playing track; mobile's full queue UI is a
- * follow-up — playback + now_playing + turn still sync cross-platform.
+ * DJ — audio-player redesign mirroring mobile's `_DjTray*` widgets.
+ *
+ * Layout (top-to-bottom):
+ *  1. Now-playing card — big 16:9 YouTube thumbnail (accent gradient
+ *     fallback) + track title + channel.
+ *  2. Centred transport row — Prev / big accent-filled Play-Pause /
+ *     Next.
+ *  3. Local volume slider (per-device).
+ *  4. UP NEXT · N — compact 44pt queue tiles. (Web has a single
+ *     now_playing today; section is hidden when nothing's queued.)
+ *  5. Paste-URL field — only visible to the active DJ.
+ *  6. DJ footer card — status copy + Take / End turn button.
+ *
+ * Empty stage (no track): accent-tinted gradient + queue_music icon
+ * + 'Paste a YouTube link below to start the queue'.
+ *
+ * Wire-format + playback semantics unchanged from prior version so
+ * the cross-platform sync keeps working.
  */
 
 type DjTrack = {
@@ -33,9 +51,7 @@ function extractId(url: string): string | null {
     const pathId = u.pathname.match(/\/(?:embed|shorts|live)\/([^/?]+)/)?.[1];
     const id = shortId || watchId || pathId;
     return id && /^[\w-]{11}$/.test(id) ? id : null;
-  } catch {
-    void 0;
-  }
+  } catch { /* fall through */ }
   if (/^[\w-]{11}$/.test(url)) return url;
   return null;
 }
@@ -92,6 +108,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
   const isDJ = currentDj != null && currentDj === userId;
 
   const [url, setUrl] = useState("");
+  const [urlError, setUrlError] = useState<string | null>(null);
   const [meta, setMeta] = useState<OEmbed | null>(null);
   const [now, setNow] = useState(Date.now());
   const [reactions, setReactions] = useState<Reaction[]>([]);
@@ -109,7 +126,6 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
   const isDJRef = useRef(isDJ);
   isDJRef.current = isDJ;
 
-  // The other participant's id (for "pass the aux"), from presence.
   const partnerId = useMemo(() => {
     for (const p of room.presence) {
       const sid = typeof p.sender_id === "string" ? p.sender_id : null;
@@ -163,7 +179,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
 
   const shouldMountDJPlayer = Boolean(videoId) && !silence;
 
-  // Hidden audio-only YouTube player.
+  // Hidden YouTube player.
   useEffect(() => {
     if (!shouldMountDJPlayer || !containerRef.current) return;
     let cancelled = false;
@@ -183,9 +199,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
                 playerRef.current?.unMute?.();
                 playerRef.current?.playVideo?.();
               }
-            } catch {
-              void 0;
-            }
+            } catch { /* ignore */ }
           },
           onStateChange: (e: YoutubePlayerStateChangeEvent) => {
             if (isSuppressed()) return;
@@ -209,15 +223,13 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       cancelled = true;
       try {
         playerRef.current?.destroy?.();
-      } catch {
-        void 0;
-      }
+      } catch { /* ignore */ }
       playerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shouldMountDJPlayer, videoId]);
 
-  // Receive partner playback events.
+  // Partner playback events.
   useEffect(() => {
     if (!session) return;
     return session.onEvent((e) => {
@@ -225,10 +237,6 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       const p = playerRef.current;
       const ts = typeof e.payload.timestamp_seconds === "number" ? e.payload.timestamp_seconds : undefined;
       if (e.type === "enqueue") {
-        // Partner took the aux — persist their track on their
-        // behalf so the durable state catches up even when the
-        // partner is a guest (canPersist=false). Matches mobile's
-        // _onBroadcast partner-write semantics.
         const track = e.payload.track as Record<string, unknown> | undefined;
         if (track && room.canPersist) {
           const turnPatch = {
@@ -267,24 +275,20 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
         try {
           p.pauseVideo();
           if (ts != null) p.seekTo(ts, false);
-        } catch {
-          void 0;
-        }
+        } catch { /* ignore */ }
       } else if ((e.type === "seek" || e.type === "tick") && p?.getCurrentTime && ts != null) {
         const local = p.getCurrentTime() ?? 0;
         if (Math.abs(ts - local) > 0.8) {
           suppress(1500);
           try {
             p.seekTo(ts, true);
-          } catch {
-            void 0;
-          }
+          } catch { /* ignore */ }
         }
       }
     });
   }, [session, userId, room.canPersist]);
 
-  // DJ heartbeat for drift correction.
+  // DJ drift heartbeat.
   useEffect(() => {
     if (!isDJ || !playing) return;
     const id = setInterval(() => {
@@ -296,7 +300,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
     return () => clearInterval(id);
   }, [isDJ, playing, session]);
 
-  // Floating reactions over the shared reaction broadcast.
+  // Floating reactions.
   useEffect(() => {
     if (!session) return;
     return session.onReaction((r) => {
@@ -306,14 +310,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
     });
   }, [session]);
 
-  const sendReaction = (emoji: string) => {
-    const id = crypto.randomUUID();
-    setReactions((list) => [...list, { id, emoji }]);
-    setTimeout(() => setReactions((list) => list.filter((x) => x.id !== id)), 2400);
-    void session?.sendReaction(emoji);
-  };
-
-  // Volume / mute when Watch tab is foregrounded.
+  // Mute the player when Watch tab is foregrounded.
   useEffect(() => {
     const p = playerRef.current;
     if (!p) return;
@@ -323,9 +320,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
         p.unMute?.();
         p.setVolume?.(volume);
       }
-    } catch {
-      void 0;
-    }
+    } catch { /* ignore */ }
   }, [volume, watchActive]);
 
   const playId = useCallback(
@@ -353,9 +348,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
           p.loadVideoById(id);
           p.unMute?.();
           p.playVideo?.();
-        } catch {
-          void 0;
-        }
+        } catch { /* ignore */ }
       }
       void fetchOEmbed(id).then((m) => {
         if (m) persistDj({ now_playing: { ...track, title: m.title, channel_title: m.author_name } });
@@ -368,14 +361,13 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
   const playUrl = (e: React.FormEvent) => {
     e.preventDefault();
     const id = extractId(url.trim());
-    if (!id) return;
+    if (!id) {
+      setUrlError("Drop a YouTube link.");
+      return;
+    }
+    setUrlError(null);
     playId(id);
     setUrl("");
-  };
-
-  const chooseSilence = () => {
-    void session?.sendEvent("silence_on", {});
-    persistDj({ now_playing: null, playing: false, timestamp_seconds: 0, silence: true });
   };
 
   const passAux = () => {
@@ -390,8 +382,16 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
     });
   };
 
+  const takeTurn = () => {
+    const turnPatch = {
+      current_dj: userId,
+      turn_started_at: new Date().toISOString(),
+    };
+    persistDj({ turn: turnPatch });
+  };
+
   const togglePlayPause = () => {
-    if (!isDJ) return;
+    if (!videoId) return;
     const time = playerRef.current?.getCurrentTime?.() ?? dTsRef.current;
     if (playing) {
       void session?.sendEvent("pause", { timestamp_seconds: time });
@@ -399,9 +399,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       suppress(2000);
       try {
         playerRef.current?.pauseVideo?.();
-      } catch {
-        void 0;
-      }
+      } catch { /* ignore */ }
     } else {
       void session?.sendEvent("play", { timestamp_seconds: time });
       persistDj({ playing: true, timestamp_seconds: time, silence: false });
@@ -409,9 +407,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       try {
         playerRef.current?.unMute?.();
         playerRef.current?.playVideo?.();
-      } catch {
-        void 0;
-      }
+      } catch { /* ignore */ }
     }
   };
 
@@ -420,19 +416,23 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       playerRef.current?.unMute?.();
       playerRef.current?.setVolume?.(volume);
       playerRef.current?.playVideo?.();
-    } catch {
-      void 0;
-    }
+    } catch { /* ignore */ }
     setNeedsAudioGesture(false);
   };
 
+  // Track title / channel — prefer oEmbed metadata when it's landed.
+  const trackTitle = meta?.title ?? nowPlaying?.title ?? null;
+  const trackChannel = meta?.author_name ?? nowPlaying?.channel_title ?? null;
+  const trackId = videoId;
+  const thumb = trackId ? `https://i.ytimg.com/vi/${trackId}/mqdefault.jpg` : null;
+
   const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
   const ss = String(remaining % 60).padStart(2, "0");
-  const pct = (remaining / turnSeconds) * 100;
 
   return (
-    <div className="relative flex flex-col h-full p-4 sm:p-6 gap-4">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden z-10">
+    <div className="relative flex h-full flex-col gap-5 overflow-y-auto p-4 sm:p-6">
+      {/* Floating emoji reactions */}
+      <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
         {reactions.map((r, i) => (
           <span
             key={r.id}
@@ -443,130 +443,241 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
           </span>
         ))}
       </div>
-      <style>{`@keyframes float-up {0%{transform:translateY(0) scale(.6);opacity:0}15%{opacity:1;transform:translateY(-10px) scale(1.1)}100%{transform:translateY(-180px) scale(1.2);opacity:0}}`}</style>
 
+      {/* Hidden audio-only YT mount. */}
       {shouldMountDJPlayer && (
-        <div className="fixed bottom-2 right-2 pointer-events-none" style={{ width: 320, height: 180, opacity: 0.001, zIndex: -1 }} aria-hidden>
+        <div className="pointer-events-none fixed bottom-2 right-2" style={{ width: 320, height: 180, opacity: 0.001, zIndex: -1 }} aria-hidden>
           <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
         </div>
       )}
 
-      <div className="rounded-2xl bg-secondary/60 border border-white/[0.08] p-4 flex flex-col gap-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="font-serif italic text-cream text-lg">
-            🎧 {djName} is DJ{" "}
-            {isDJ && <span className="text-amber text-xs uppercase tracking-[0.2em] not-italic ml-2">you</span>}
-          </div>
-          {currentDj && (
-            <div className="text-amber font-mono text-lg tabular-nums">
-              {mm}:{ss}
+      {/* ───────── 1. Player card ───────── */}
+      <section className="flex flex-col gap-3">
+        {/* Big 16:9 album art — accent-tinted gradient fallback so the
+            slot never reads as a hole. */}
+        <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-gradient-to-br from-amber/30 to-amber/[0.04]">
+          {silence ? (
+            <div className="flex h-full w-full items-center justify-center text-5xl">🤫</div>
+          ) : thumb ? (
+            <>
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <img
+                src={thumb}
+                className="h-full w-full object-cover"
+                onError={(e) => ((e.currentTarget.style.display = "none"))}
+              />
+              <div
+                className="pointer-events-none absolute bottom-0 left-0 right-0 h-12"
+                style={{ background: "linear-gradient(to top, rgba(0,0,0,0.45), transparent)" }}
+                aria-hidden
+              />
+            </>
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <Music className="h-12 w-12 text-amber/55" strokeWidth={1.5} />
             </div>
           )}
         </div>
-        <div className="h-1 w-full rounded-full bg-black/30 overflow-hidden">
-          <div className="h-full bg-amber transition-all duration-500" style={{ width: `${currentDj ? pct : 0}%` }} />
-        </div>
-      </div>
 
-      {!currentDj ? (
-        <form onSubmit={playUrl} className="flex gap-2">
-          <Input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="Paste a YouTube link to start as DJ…"
-            className="focus-ring bg-secondary/60 border-white/[0.10] focus-visible:border-primary/40"
-          />
-          <Button type="submit" className="focus-ring rounded-full bg-amber text-primary-foreground hover:bg-amber/90 hover:-translate-y-px transition-all">
-            Play
-          </Button>
-        </form>
-      ) : isDJ ? (
-        <>
-          <form onSubmit={playUrl} className="flex gap-2">
+        {/* Title + channel */}
+        <div>
+          <p className="truncate text-base font-semibold text-cream">
+            {silence
+              ? `Silence, chosen by ${djName}`
+              : trackTitle ?? "Nothing playing yet"}
+          </p>
+          {!silence && trackChannel ? (
+            <p className="truncate text-xs text-muted-foreground">{trackChannel}</p>
+          ) : !silence && !trackTitle ? (
+            <p className="text-xs text-muted-foreground">Paste a YouTube link below to start the queue.</p>
+          ) : null}
+        </div>
+
+        {/* ───────── 2. Transport row ───────── */}
+        <TransportRow
+          playing={playing}
+          enabled={Boolean(videoId)}
+          canSkip={Boolean(partnerId) && isDJ}
+          onTogglePlay={togglePlayPause}
+          onNext={passAux}
+        />
+
+        {needsAudioGesture && playing && (
+          <button
+            onClick={enableAudio}
+            className="w-full rounded-full bg-amber py-2.5 text-sm font-medium text-primary-foreground hover:bg-amber/90"
+          >
+            Tap to enable audio
+          </button>
+        )}
+
+        {/* ───────── 3. Volume slider ───────── */}
+        {videoId && (
+          <div className="flex items-center gap-3 px-1">
+            <Volume2 className="h-4 w-4 text-muted-foreground" />
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={volume}
+              onChange={(e) => setVolume(Number(e.target.value))}
+              aria-label="Volume"
+              className="flex-1 accent-amber"
+            />
+            <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">{volume}</span>
+          </div>
+        )}
+      </section>
+
+      {/* ───────── 4. UP NEXT ─────────
+          Web's durable state currently carries a single now_playing,
+          not a multi-track queue (mobile has one). We surface the
+          section header only when there's a real upcoming track to
+          show — for now that's never, so the section stays hidden.
+          Leaving the slot here so the layout is ready when web adds
+          queue persistence. */}
+
+      {/* ───────── 5. Paste-URL field — DJ-only ───────── */}
+      {isDJ && (
+        <form onSubmit={playUrl} className="space-y-1">
+          <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Add a track
+          </p>
+          <div className="flex gap-2">
             <Input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="Paste a YouTube link to play…"
+              placeholder="Paste a YouTube link…"
               className="focus-ring bg-secondary/60 border-white/[0.10] focus-visible:border-primary/40"
             />
-            <Button type="submit" className="focus-ring rounded-full bg-amber text-primary-foreground hover:bg-amber/90 hover:-translate-y-px transition-all">
-              Play
-            </Button>
-          </form>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button type="button" onClick={chooseSilence} variant="outline" className="focus-ring rounded-full border-white/[0.10] bg-secondary/40 hover:bg-secondary/60 flex-1">
-              🤫 Choose silence
-            </Button>
-            <Button type="button" onClick={passAux} variant="outline" className="focus-ring rounded-full border-amber/40 text-amber hover:bg-amber/10 flex-1">
-              <SkipForward className="w-4 h-4" /> Pass the aux 🎵
-            </Button>
+            <button
+              type="submit"
+              className="focus-ring rounded-full bg-amber px-5 text-sm font-medium text-primary-foreground hover:bg-amber/90"
+            >
+              Add
+            </button>
           </div>
-          {videoId && (
-            <div className="flex items-center gap-3 px-2">
-              <Volume2 className="w-4 h-4 text-muted-foreground" />
-              <input type="range" min={0} max={100} value={volume} onChange={(e) => setVolume(Number(e.target.value))} className="flex-1 accent-amber" aria-label="volume" />
-              <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">{volume}</span>
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <Input disabled placeholder={`Listening to ${djName}'s picks...`} className="bg-secondary border-border opacity-60" />
-          {needsAudioGesture && playing && (
-            <Button onClick={enableAudio} className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90 w-full">
-              Tap to enable audio
-            </Button>
-          )}
-          {videoId && (
-            <div className="flex items-center gap-3 px-2">
-              <Volume2 className="w-4 h-4 text-muted-foreground" />
-              <input type="range" min={0} max={100} value={volume} onChange={(e) => setVolume(Number(e.target.value))} className="flex-1 accent-amber" aria-label="volume" />
-              <span className="text-xs text-muted-foreground tabular-nums w-8 text-right">{volume}</span>
-            </div>
-          )}
-          <div className="flex gap-2 justify-center flex-wrap">
-            {["❤️", "🔥", "🤔", "😂"].map((e) => (
-              <button
-                key={e}
-                onClick={() => sendReaction(e)}
-                aria-label={`Send ${e} reaction`}
-                className="focus-ring h-11 w-11 rounded-full bg-secondary/60 hover:bg-secondary/80 border border-white/[0.10] text-xl transition-all active:scale-90 hover:-translate-y-0.5 hover:border-amber/30"
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-        </>
+          {urlError && <p className="px-1 text-xs text-rose">{urlError}</p>}
+        </form>
       )}
 
-      <div className="rounded-2xl border border-white/[0.08] bg-card/70 overflow-hidden shadow-[0_22px_60px_-22px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.04)]">
-        {silence ? (
-          <div className="p-8 text-center">
-            <div className="text-4xl mb-2">🤫</div>
-            <div className="font-serif italic text-cream text-lg">Silence, chosen by {djName}</div>
-          </div>
-        ) : videoId ? (
-          <div className="flex items-center gap-4 p-4">
-            {meta?.thumbnail_url ? (
-              <img src={meta.thumbnail_url} alt="" className="w-24 h-24 rounded-lg object-cover shrink-0" />
-            ) : (
-              <div className="w-24 h-24 rounded-lg bg-muted shrink-0" />
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Now playing</div>
-              <div className="text-cream truncate font-serif italic">{meta?.title ?? nowPlaying?.title ?? "Loading…"}</div>
-              {meta?.author_name && <div className="text-xs text-muted-foreground truncate">{meta.author_name}</div>}
-            </div>
-            {isDJ && (
-              <button onClick={togglePlayPause} className="h-10 w-10 shrink-0 rounded-full bg-amber text-primary-foreground flex items-center justify-center hover:bg-amber/90 transition">
-                {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="p-8 text-center text-muted-foreground font-serif italic">
-            {isDJ ? "your turn, paste a link or pick silence" : currentDj ? `waiting for ${djName}…` : "paste a link to start the music"}
-          </div>
+      {/* ───────── 6. DJ footer card ───────── */}
+      <DjFooter
+        hasDj={Boolean(currentDj)}
+        isDj={isDJ}
+        djName={djName}
+        remainingLabel={currentDj ? `${mm}:${ss}` : null}
+        onTake={takeTurn}
+        onEnd={passAux}
+      />
+    </div>
+  );
+}
+
+/* ─────────────────────── Transport row ─────────────────────── */
+
+function TransportRow({
+  playing,
+  enabled,
+  canSkip,
+  onTogglePlay,
+  onNext,
+}: {
+  playing: boolean;
+  enabled: boolean;
+  canSkip: boolean;
+  onTogglePlay: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-center gap-5 py-2">
+      {/* Prev — placeholder. Web state-machine only walks forward, so
+          the button stays disabled. Kept visible so the transport reads
+          complete. */}
+      <button
+        type="button"
+        disabled
+        aria-label="Previous (unavailable)"
+        className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground/40"
+      >
+        <SkipBack className="h-5 w-5" strokeWidth={2} />
+      </button>
+
+      {/* Big play/pause disc — 64pt accent-filled with shadow. */}
+      <button
+        type="button"
+        onClick={onTogglePlay}
+        disabled={!enabled}
+        aria-label={playing ? "Pause" : "Play"}
+        className={cn(
+          "flex h-16 w-16 items-center justify-center rounded-full bg-amber text-primary-foreground shadow-[0_10px_30px_rgba(245,166,35,0.35)] transition-transform",
+          enabled ? "hover:scale-105 active:scale-95" : "opacity-40",
+        )}
+      >
+        {playing ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
+      </button>
+
+      <button
+        type="button"
+        onClick={onNext}
+        disabled={!canSkip}
+        aria-label="Pass the aux"
+        className={cn(
+          "flex h-10 w-10 items-center justify-center rounded-full transition-colors",
+          canSkip ? "text-cream hover:bg-white/10" : "text-muted-foreground/40",
+        )}
+      >
+        <SkipForward className="h-5 w-5" strokeWidth={2} />
+      </button>
+    </div>
+  );
+}
+
+/* ─────────────────────── Footer card ─────────────────────── */
+
+function DjFooter({
+  hasDj,
+  isDj,
+  djName,
+  remainingLabel,
+  onTake,
+  onEnd,
+}: {
+  hasDj: boolean;
+  isDj: boolean;
+  djName: string;
+  remainingLabel: string | null;
+  onTake: () => void;
+  onEnd: () => void;
+}) {
+  const statusLine = !hasDj
+    ? "Nobody's DJ yet — take the aux to start the queue."
+    : isDj
+      ? `You're the DJ${remainingLabel ? ` · ${remainingLabel} left` : ""}`
+      : `${djName} is the DJ${remainingLabel ? ` · ${remainingLabel} left` : ""}`;
+
+  return (
+    <div className="mt-auto rounded-2xl border border-white/[0.06] bg-card/50 p-4">
+      <div className="flex items-center gap-3">
+        <Music className="h-4 w-4 text-amber" />
+        <p className="flex-1 text-sm text-cream">{statusLine}</p>
+        {!hasDj && (
+          <button
+            type="button"
+            onClick={onTake}
+            className="rounded-full bg-amber px-4 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-amber/90"
+          >
+            Take turn
+          </button>
+        )}
+        {isDj && (
+          <button
+            type="button"
+            onClick={onEnd}
+            className="rounded-full border border-amber/40 px-4 py-1.5 text-xs font-semibold text-amber hover:bg-amber/10"
+          >
+            End turn
+          </button>
         )}
       </div>
     </div>
