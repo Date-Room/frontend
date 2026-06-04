@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Check,
@@ -11,15 +11,27 @@ import {
   ArrowLeft,
   Loader2,
   Palette,
+  MoreVertical,
+  UserMinus,
+  KeyRound,
 } from "lucide-react";
 import { CustomizeSheet } from "@/components/CustomizeSheet";
 import { PageShell } from "@/components/PageShell";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
   listMyRooms,
   startRoom,
   deleteRoom,
   getRoomByCode,
+  kickParticipant,
+  rotateRoomPin,
   type Room,
   type InviteCard,
   type ParticipantInfo,
@@ -96,6 +108,7 @@ function CodeCopyTile({
 export default function PreRoom() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [starting, setStarting] = useState(false);
   const [copiedKey, setCopiedKey] = useState<CopiedKey>(null);
   const [customizeOpen, setCustomizeOpen] = useState(false);
@@ -193,6 +206,55 @@ export default function PreRoom() {
     }
     return null;
   }, [presence, me]);
+
+  // Anonymous guests publish `participant_id` on their presence row
+  // (see RoomSessionContext.track()). Signed-in partners don't — they
+  // aren't kickable from this UI either way. Surfaces the id so the
+  // host's Remove action has something to address.
+  const kickableGuest = useMemo(() => {
+    if (!me) return null;
+    for (const p of presence) {
+      const uid = (p.user_id ?? p.sender_id) as string | undefined;
+      if (!uid || uid === me.id) continue;
+      const pid = typeof p.participant_id === "string" ? p.participant_id : null;
+      if (!pid) continue;
+      const name = (p.display_name ?? p.name) as string | undefined;
+      return { participantId: pid, name: name ?? "Guest" };
+    }
+    return null;
+  }, [presence, me]);
+
+  async function onKickPartner() {
+    if (!room || !kickableGuest) return;
+    if (!window.confirm(`Remove ${kickableGuest.name} from the room?`)) return;
+    try {
+      await kickParticipant(room.id, kickableGuest.participantId);
+      // Broadcast on the room channel so the kicked partner's client
+      // navigates home (LiveRoom listens for 'kicked' on the channel).
+      try {
+        await channelRef.current?.broadcast("kicked", {
+          participant_id: kickableGuest.participantId,
+        });
+      } catch { /* soft-fail — backend kick still freed the seat */ }
+      toast.success(`${kickableGuest.name} removed.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't remove that participant.");
+    }
+  }
+
+  async function onRotatePin() {
+    if (!room) return;
+    if (!window.confirm("Rotate the PIN? The current invite link will stop working.")) return;
+    try {
+      await rotateRoomPin(room.id);
+      // Invalidate the rooms list so the new PIN lands in the UI
+      // immediately. The InviteCard query (keyed by code) is unaffected.
+      await queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
+      toast.success("PIN rotated. Re-share the new link.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't rotate the PIN.");
+    }
+  }
 
   // Effective partner attribution: prefer the InviteCard, fall back
   // to whatever the live presence is announcing (covers the case
@@ -316,19 +378,50 @@ export default function PreRoom() {
             </p>
           )}
         </div>
-        {room?.persistence === "persistent" && (
-          <button
-            type="button"
-            onClick={destroy}
-            className="focus-ring text-destructive/70 hover:text-destructive transition"
-            aria-label="Destroy room"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+        {/* Host actions menu — mirrors mobile's PreRoom kebab. Shows
+            Remove partner (when a kickable guest is in the room),
+            Rotate PIN, and Destroy room (persistent only). Hidden
+            entirely when none of the actions apply. */}
+        {room && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Room actions"
+                className="focus-ring rounded-full p-2 text-muted-foreground transition hover:text-cream hover:bg-white/[0.04]"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[200px]">
+              {kickableGuest && (
+                <DropdownMenuItem
+                  onClick={() => void onKickPartner()}
+                  className="gap-2 text-destructive focus:text-destructive"
+                >
+                  <UserMinus className="h-4 w-4" /> Remove {kickableGuest.name}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={() => void onRotatePin()} className="gap-2">
+                <KeyRound className="h-4 w-4" /> Rotate PIN
+              </DropdownMenuItem>
+              {room.persistence === "persistent" && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={destroy}
+                    className="gap-2 text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" /> Destroy room
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </header>
 
-      <main className="mx-auto mt-6 w-full max-w-2xl space-y-6 px-4 sm:px-6">
+      <main className="mx-auto mt-6 w-full max-w-2xl space-y-6 px-4 sm:px-6 lg:max-w-3xl">
         {/* Avatar pair — always renders. Partner side shows the
             person-plus placeholder when unknown. */}
         <div className="flex flex-col items-center gap-3">
@@ -359,31 +452,41 @@ export default function PreRoom() {
           )}
         </div>
 
-        {/* Invite card */}
-        <section className="rounded-2xl border border-primary/20 bg-primary/[0.04] p-5 space-y-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-            Invite
-          </p>
-          {/* Method A — Room ID + PIN tap-to-copy tiles. */}
-          <div className="grid grid-cols-2 gap-3">
-            <CodeCopyTile
-              label="Room ID"
-              value={room?.code ?? ""}
-              copied={copiedKey === "room-id"}
-              loading={!room}
-              onCopy={() => room && void copyValue(room.code, "room-id")}
-            />
-            <CodeCopyTile
-              label="PIN"
-              value={room?.pin ?? ""}
-              copied={copiedKey === "pin"}
-              loading={!room}
-              onCopy={() => room && void copyValue(room.pin, "pin")}
-            />
-          </div>
+        {/* Invite section.
+            Mobile / sm / md: single card with code-tiles on top and the
+            link/share row beneath, separated by an 'or' rule.
+            Desktop (lg+): two cards side-by-side — codes left, link/share
+            right — so a wide canvas isn't wasted vertically. */}
+        <div className="space-y-5 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
+          {/* Codes card */}
+          <section className="rounded-2xl border border-primary/20 bg-primary/[0.04] p-5 space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              Share a code
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <CodeCopyTile
+                label="Room ID"
+                value={room?.code ?? ""}
+                copied={copiedKey === "room-id"}
+                loading={!room}
+                onCopy={() => room && void copyValue(room.code, "room-id")}
+              />
+              <CodeCopyTile
+                label="PIN"
+                value={room?.pin ?? ""}
+                copied={copiedKey === "pin"}
+                loading={!room}
+                onCopy={() => room && void copyValue(room.pin, "pin")}
+              />
+            </div>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Tell them the Room ID and PIN — they enter it on the Join screen.
+            </p>
+          </section>
 
-          {/* "or" rule */}
-          <div className="flex items-center gap-3" aria-hidden>
+          {/* 'or' rule — mobile/tablet only. Desktop's grid layout makes
+              the divider redundant (cards sit side-by-side). */}
+          <div className="flex items-center gap-3 lg:hidden" aria-hidden>
             <span className="h-px flex-1 bg-white/10" />
             <span className="text-[10px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
               or
@@ -391,37 +494,45 @@ export default function PreRoom() {
             <span className="h-px flex-1 bg-white/10" />
           </div>
 
-          {/* Method B — copy link / Share. */}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => room && void copyValue(inviteUrl, "link")}
-              disabled={!room}
-              className={cn(
-                "flex flex-1 items-center justify-center gap-2 rounded-full border border-white/15 py-2.5 text-sm text-cream transition hover:bg-white/5 disabled:opacity-50",
-                copiedKey === "link" && "border-emerald-400/40 text-emerald-200",
-              )}
-            >
-              {copiedKey === "link" ? (
-                <>
-                  <Check className="h-4 w-4" aria-hidden /> Link copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4" aria-hidden /> Copy link
-                </>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={share}
-              disabled={!room}
-              className="flex flex-1 items-center justify-center gap-2 rounded-full bg-amber py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-amber/90 disabled:opacity-50"
-            >
-              <Share2 className="h-4 w-4" aria-hidden /> Share…
-            </button>
-          </div>
-        </section>
+          {/* Link / share card */}
+          <section className="rounded-2xl border border-primary/20 bg-primary/[0.04] p-5 space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+              Send a link
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
+              <button
+                type="button"
+                onClick={() => room && void copyValue(inviteUrl, "link")}
+                disabled={!room}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-2 rounded-full border border-white/15 py-2.5 text-sm text-cream transition hover:bg-white/5 disabled:opacity-50",
+                  copiedKey === "link" && "border-emerald-400/40 text-emerald-200",
+                )}
+              >
+                {copiedKey === "link" ? (
+                  <>
+                    <Check className="h-4 w-4" aria-hidden /> Link copied
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" aria-hidden /> Copy link
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={share}
+                disabled={!room}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full bg-amber py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-amber/90 disabled:opacity-50"
+              >
+                <Share2 className="h-4 w-4" aria-hidden /> Share…
+              </button>
+            </div>
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Drops them straight into the room when tapped.
+            </p>
+          </section>
+        </div>
 
         {/* Helper copy */}
         <p className="rounded-2xl border border-white/[0.08] bg-card/40 p-4 text-center text-sm text-muted-foreground">
