@@ -174,7 +174,7 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
                 onClick={() => navigate("/home")}
                 className="focus-ring text-muted-foreground hover:text-cream py-2 text-sm transition"
               >
-                Back to your rooms
+                Back to our rooms
               </button>
             </div>
           </div>

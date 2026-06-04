@@ -10,6 +10,7 @@ import {
 } from "@/lib/activities/activityState";
 import { authClient } from "@/lib/authClient";
 import { claimRoom, promoteRoom } from "@/lib/rooms";
+import { toast } from "sonner";
 
 const ACTIVITY_LABELS: Record<string, string> = {
   questions: "21 Questions",
@@ -218,8 +219,9 @@ export default function Recap() {
 
       {/* Promote-to-persistent CTA. Signed-in only; server enforces
        *  the rest (must be a session room in grace, partner must
-       *  have an account, etc.). On success we dive into the
-       *  freshly-minted Our Room. */}
+       *  have an account, etc.). On success the (now-forever) room
+       *  goes to home — there's no separate Our Room view anymore
+       *  (persistent rooms render as plain tiles in the unified list). */}
       {authClient.getSession() && id && (
         <button
           type="button"
@@ -228,12 +230,11 @@ export default function Recap() {
             setPromoting(true);
             setPromoteError(null);
             try {
-              const room = await promoteRoom(id);
+              await promoteRoom(id);
               queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
               queryClient.invalidateQueries({ queryKey: ["my-connections"] });
-              if (room.connection_id) {
-                navigate(`/our-room/${room.connection_id}`);
-              }
+              toast.success("This room is now forever");
+              navigate("/home");
             } catch (e) {
               setPromoteError(e instanceof Error ? e.message : "Couldn't save this room.");
             } finally {
@@ -246,8 +247,8 @@ export default function Recap() {
             {promoting ? <Loader2 className="w-5 h-5 text-rosegold animate-spin" /> : <Sparkles className="w-5 h-5 text-rosegold" />}
           </div>
           <div className="flex-1 text-left">
-            <p className="text-sm font-medium text-cream">Make this our room</p>
-            <p className="text-xs text-muted-foreground">Keep going as a couple — opens an Our Room.</p>
+            <p className="text-sm font-medium text-cream">Make this room forever</p>
+            <p className="text-xs text-muted-foreground">Keep going as a couple — drops the 24h timer.</p>
           </div>
           <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
         </button>

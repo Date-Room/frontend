@@ -166,7 +166,7 @@ export default function Paywall() {
             onClick={() => navigate("/home")}
             className="btn-primary focus-ring w-full py-4 rounded-[1.15rem] font-semibold"
           >
-            Back to your rooms
+            Back to our rooms
           </button>
         )}
       </div>
