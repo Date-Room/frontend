@@ -31,3 +31,17 @@ export function getMe(): Promise<UserMe> {
 export function updateMe(patch: UserUpdate): Promise<UserMe> {
   return api.patch<UserMe>("/v1/users/me", patch);
 }
+
+/** GET /v1/users/me/referrals — the current user's referral surface
+ * (code, how many people they've referred, and a pre-rendered share URL
+ * built from the backend's WEB_BASE_URL). Reward mechanics ship later;
+ * v1 is just the mechanism. */
+export type UserReferrals = {
+  code: string;
+  referred_count: number;
+  share_url: string;
+};
+
+export function getReferrals(): Promise<UserReferrals> {
+  return api.get<UserReferrals>("/v1/users/me/referrals");
+}

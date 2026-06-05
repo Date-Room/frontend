@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { authClient } from "@/lib/authClient";
+import { clearPendingReferral, getPendingReferral } from "@/lib/pendingReferral";
 import { PageShell } from "@/components/PageShell";
 
 const REDIRECT_KEY = "post_auth_redirect";
@@ -109,7 +110,8 @@ export default function AuthCallback() {
           if (cancelled || caught) return;
         }
         try {
-          await authClient.verifyLink(token);
+          await authClient.verifyLink(token, getPendingReferral());
+          clearPendingReferral();
           if (cancelled) return;
           go();
         } catch (err) {

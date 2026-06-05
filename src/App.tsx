@@ -24,6 +24,7 @@ import NotFound from "./pages/NotFound";
 import NeedInvite from "./pages/NeedInvite";
 import Paywall from "./pages/Paywall";
 import ProfileComplete from "./pages/ProfileComplete";
+import ReferralLanding from "./pages/ReferralLanding";
 import { AuthGuard } from "./components/AuthGuard";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ const App = () => {
             <Route path="/join" element={<JoinByCode />} />
             <Route path="/i/:id" element={<Lobby />} />
             <Route path="/i/:id/:pin" element={<Lobby />} />
+            <Route path="/r/:code" element={<AuthGuard requireAuth={false}><ReferralLanding /></AuthGuard>} />
 
             {/* Authenticated Dashboard */}
             <Route path="/home" element={<AuthGuard><Home /></AuthGuard>} />

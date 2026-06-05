@@ -7,7 +7,8 @@
         "paths": [
           "/auth/callback",
           "/auth/callback/*",
-          "/i/*"
+          "/i/*",
+          "/r/*"
         ]
       }
     ]

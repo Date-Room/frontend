@@ -8,9 +8,12 @@ import {
   Search,
   X,
   Check,
+  Gift,
+  Copy,
+  Share2,
 } from "lucide-react";
 import { authClient } from "@/lib/authClient";
-import { getMe, updateMe, type UserMe } from "@/lib/users";
+import { getMe, getReferrals, updateMe, type UserMe, type UserReferrals } from "@/lib/users";
 import { applyThemePreference } from "@/lib/theme";
 import { CardPage } from "@/components/CardPage";
 import { PageShell } from "@/components/PageShell";
@@ -285,6 +288,8 @@ export default function Settings() {
         Save
       </button>
 
+      <InviteSection />
+
       {/* Sign out — quiet red text link, not a primary CTA. */}
       <div className="mt-10 flex justify-center">
         <button
@@ -339,6 +344,120 @@ export default function Settings() {
         </SheetContent>
       </Sheet>
     </CardPage>
+  );
+}
+
+/* ─────────────────────── Invite section ─────────────────────── */
+
+/** Mirrors the mobile Profile invite card. Fetches GET /v1/users/me/referrals,
+ * shows the share URL with a tap-to-copy chip, and a Share button that
+ * uses the Web Share API on mobile browsers, falls back to copy on
+ * desktop. Reward mechanics ship later; v1 is the mechanism. */
+function InviteSection() {
+  const [refs, setRefs] = useState<UserReferrals | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await getReferrals();
+        if (!cancelled) setRefs(r);
+      } catch {
+        // Silent — the section just stays empty; not worth a toast.
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function copy() {
+    if (!refs) return;
+    try {
+      await navigator.clipboard.writeText(refs.share_url);
+      setCopied(true);
+      toast.success("Invite link copied.");
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Couldn't copy.");
+    }
+  }
+
+  async function share() {
+    if (!refs) return;
+    const text = `Come date with me on DateRoom — ${refs.share_url}`;
+    // Web Share API is the native sheet on iOS Safari / Android Chrome;
+    // falls back to copy elsewhere (most desktops).
+    if (typeof navigator !== "undefined" && "share" in navigator) {
+      try {
+        await navigator.share({ title: "Join me on DateRoom", text, url: refs.share_url });
+        return;
+      } catch {
+        // User dismissed — silent.
+        return;
+      }
+    }
+    await copy();
+  }
+
+  return (
+    <div className="mt-8 space-y-2">
+      <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        Invite
+      </p>
+      <div className="overflow-hidden rounded-2xl border border-border bg-card/40 p-4">
+        {loading ? (
+          <div className="flex h-16 items-center justify-center">
+            <Loader2 className="h-4 w-4 animate-spin text-rosegold" aria-hidden />
+          </div>
+        ) : !refs ? (
+          <p className="text-sm text-muted-foreground">
+            Sign in to share your invite link.
+          </p>
+        ) : (
+          <>
+            <div className="flex items-center gap-3">
+              <Gift className="h-5 w-5 text-rosegold" aria-hidden />
+              <p className="flex-1 text-[15px] font-medium text-cream">Invite a friend</p>
+              {refs.referred_count > 0 && (
+                <span className="rounded-full border border-rosegold/25 bg-rosegold/10 px-2.5 py-1 text-[11px] font-semibold text-rosegold">
+                  {refs.referred_count} joined
+                </span>
+              )}
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Share your link. Soon, every friend who joins earns you a free room.
+            </p>
+            <button
+              type="button"
+              onClick={() => void copy()}
+              className="mt-3 flex w-full items-center gap-2 rounded-xl border border-border bg-background/60 px-3 py-2.5 text-left transition hover:border-rosegold/40"
+            >
+              <span className="flex-1 truncate font-mono text-sm text-rosegold">
+                {refs.share_url}
+              </span>
+              {copied ? (
+                <Check className="h-4 w-4 text-rosegold" aria-hidden />
+              ) : (
+                <Copy className="h-4 w-4 text-muted-foreground" aria-hidden />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => void share()}
+              className="btn-primary mt-3 flex w-full items-center justify-center gap-2 rounded-[1.15rem] py-3 font-semibold"
+            >
+              <Share2 className="h-4 w-4" aria-hidden />
+              Share invite
+            </button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 

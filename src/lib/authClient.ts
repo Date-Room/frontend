@@ -120,33 +120,50 @@ class AuthClient {
     return next;
   }
 
-  async requestOtp(email: string): Promise<void> {
+  async requestOtp(email: string, referralCode?: string | null): Promise<void> {
     const response = await fetch(`${API_BASE}/v1/auth/request-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, client: "web" }),
+      body: JSON.stringify({
+        email,
+        client: "web",
+        ...(referralCode ? { referral_code: referralCode } : {}),
+      }),
       credentials: "include", // browser-bound magic-link cookie
     });
     if (!response.ok) throw await asError(response, "Could not send the sign-in code.");
   }
 
-  async verifyOtp(email: string, code: string): Promise<Session> {
+  async verifyOtp(
+    email: string,
+    code: string,
+    referralCode?: string | null,
+  ): Promise<Session> {
     const response = await fetch(`${API_BASE}/v1/auth/verify-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       // `device_label: "web"` keeps the refresh token on the rolling
       // TTL — shared browsers shouldn't keep their session forever.
-      body: JSON.stringify({ email, code, device_label: "web" }),
+      body: JSON.stringify({
+        email,
+        code,
+        device_label: "web",
+        ...(referralCode ? { referral_code: referralCode } : {}),
+      }),
     });
     if (!response.ok) throw await asError(response, "Could not verify the code.");
     return this.finalizeSignIn(await response.json());
   }
 
-  async verifyLink(token: string): Promise<Session> {
+  async verifyLink(token: string, referralCode?: string | null): Promise<Session> {
     const response = await fetch(`${API_BASE}/v1/auth/verify-link`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token, device_label: "web" }),
+      body: JSON.stringify({
+        token,
+        device_label: "web",
+        ...(referralCode ? { referral_code: referralCode } : {}),
+      }),
       credentials: "include", // matches the browser cookie set on request-otp
     });
     if (!response.ok) throw await asError(response, "This sign-in link no longer works.");

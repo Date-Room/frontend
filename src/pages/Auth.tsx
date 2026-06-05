@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, ChevronLeft, MailCheck } from "lucide-react";
 import { BRAND_NAME } from "@/lib/constants";
 import { authClient, authConfigured } from "@/lib/authClient";
+import { clearPendingReferral, getPendingReferral } from "@/lib/pendingReferral";
 import { toast } from "sonner";
 import { PageShell } from "@/components/PageShell";
 
@@ -44,7 +45,7 @@ export default function Auth() {
       /* ignore */
     }
     try {
-      await authClient.requestOtp(email.trim());
+      await authClient.requestOtp(email.trim(), getPendingReferral());
       setStep("code");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not send the code.");
@@ -58,7 +59,10 @@ export default function Auth() {
     if (code.length !== 6) return;
     setLoading(true);
     try {
-      await authClient.verifyOtp(email.trim(), code);
+      await authClient.verifyOtp(email.trim(), code, getPendingReferral());
+      // Attribution attempted — clear so a subsequent unrelated sign-in
+      // on this browser isn't mis-credited.
+      clearPendingReferral();
       // Where to land — same as AuthCallback.
       let dest = "/home";
       try {
