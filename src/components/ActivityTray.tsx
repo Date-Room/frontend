@@ -11,7 +11,14 @@ import { TwoTruths } from "@/components/TwoTruths";
 import { TruthOrDare } from "@/components/TruthOrDare";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { cn } from "@/lib/utils";
-import { kickParticipant, listMyRooms, rotateRoomPin, type Room } from "@/lib/rooms";
+import {
+  kickParticipant,
+  listMyRooms,
+  rotateRoomPin,
+  getRoomByCode,
+  type ParticipantInfo,
+  type Room,
+} from "@/lib/rooms";
 
 /**
  * Activity tray — mobile's category model (Games/Watch/Music/Chat/Room), made
@@ -48,6 +55,7 @@ const CATEGORIES: Category[] = [
 function RoomDetails({ onLeave }: { onLeave: () => void }) {
   const session = useRoomSession();
   const [room, setRoom] = useState<Room | null>(null);
+  const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [copiedKey, setCopiedKey] = useState<"room-id" | "pin" | "link" | null>(null);
   const [rotating, setRotating] = useState(false);
   const [kicking, setKicking] = useState<string | null>(null);
@@ -61,7 +69,18 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
       try {
         const all = await listMyRooms();
         if (cancelled) return;
-        setRoom(all.find((r) => r.id === session.roomId) ?? null);
+        const r = all.find((r) => r.id === session.roomId) ?? null;
+        setRoom(r);
+        // Pull the InviteCard so we have every participant's
+        // participant_id (signed-in OR anonymous). The presence payload
+        // only surfaces participant_id for guests — signed-in partners
+        // didn't, so the host's Remove menu hid for them.
+        if (r) {
+          try {
+            const card = await getRoomByCode(r.code);
+            if (!cancelled) setParticipants(card.participants);
+          } catch { /* leave empty — falls back to presence only */ }
+        }
       } catch {
         /* leave room null — the rest of the panel still works */
       }
@@ -187,19 +206,58 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
 
       {/* People — live presence list with kick. */}
       <section className="space-y-3">
-        <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">In the room ({session.presence.filter((p) => !(typeof p.participant_id === "string" && ejectedIds.has(p.participant_id))).length})</p>
+        {(() => {
+          // Hide both guest rows (matched by their published
+          // participant_id) AND signed-in rows (matched by user_id
+          // through the InviteCard) the moment we optimistically kick.
+          // Otherwise signed-in partners would keep showing in the
+          // host's list until their client tore down.
+          const isEjected = (p: typeof session.presence[number]) => {
+            const pPid = typeof p.participant_id === "string" ? p.participant_id : null;
+            if (pPid && ejectedIds.has(pPid)) return true;
+            const pUid = (p.user_id ?? p.sender_id) as string | undefined;
+            if (pUid) {
+              const cardPid = participants.find((cp) => cp.user_id === pUid)?.participant_id;
+              if (cardPid && ejectedIds.has(cardPid)) return true;
+            }
+            return false;
+          };
+          return (
+            <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
+              In the room ({session.presence.filter((p) => !isEjected(p)).length})
+            </p>
+          );
+        })()}
         <div className="rounded-2xl border border-border bg-card/60 divide-y divide-white/[0.06]">
           {session.presence.length === 0 ? (
             <p className="px-4 py-3 text-sm text-muted-foreground">Just you — waiting on your guest.</p>
           ) : (
             session.presence
-              .filter((p) => !(typeof p.participant_id === "string" && ejectedIds.has(p.participant_id)))
+              .filter((p) => {
+                const pPid = typeof p.participant_id === "string" ? p.participant_id : null;
+                if (pPid && ejectedIds.has(pPid)) return false;
+                const pUid = (p.user_id ?? p.sender_id) as string | undefined;
+                if (pUid) {
+                  const cardPid = participants.find((cp) => cp.user_id === pUid)?.participant_id;
+                  if (cardPid && ejectedIds.has(cardPid)) return false;
+                }
+                return true;
+              })
               .map((p) => {
               const isSelf = p.sender_id === session.senderId;
-              // Only guests have participant_id from /join. Signed-in
-              // partners join via session and don't expose one to the
-              // wire — they aren't kickable from this UI.
-              const kickable = !isSelf && typeof p.participant_id === "string";
+              // Resolve a participant_id we can use to DELETE the row.
+              // Guests publish it on their presence (legacy path).
+              // Signed-in partners don't — look them up by user_id in
+              // the InviteCard's participants list. Either way, a
+              // resolved id means "kickable".
+              const presencePid = typeof p.participant_id === "string" ? p.participant_id : null;
+              const presenceUid = (p.user_id ?? p.sender_id) as string | undefined;
+              const cardPid =
+                presenceUid && !isSelf
+                  ? participants.find((cp) => cp.user_id === presenceUid)?.participant_id ?? null
+                  : null;
+              const resolvedPid = !isSelf ? (presencePid ?? cardPid) : null;
+              const kickable = Boolean(resolvedPid);
               return (
                 <div key={`${p.sender_id}-${p.slot}`} className="flex items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
@@ -210,14 +268,14 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
                       Seat {String(p.slot || "?").toUpperCase()} {p.is_host ? "· host" : ""}
                     </p>
                   </div>
-                  {kickable && (
+                  {kickable && resolvedPid && (
                     <button
                       type="button"
-                      onClick={() => void onKick(String(p.participant_id), p.name ?? "Guest")}
-                      disabled={kicking === p.participant_id}
+                      onClick={() => void onKick(resolvedPid, (p.name as string | undefined) ?? "Guest")}
+                      disabled={kicking === resolvedPid}
                       className="flex items-center gap-1.5 rounded-full border border-destructive/30 text-destructive/80 hover:text-destructive hover:bg-destructive/10 px-3 py-1.5 text-[11px] uppercase tracking-[0.2em] transition disabled:opacity-50"
                     >
-                      {kicking === p.participant_id ? (
+                      {kicking === resolvedPid ? (
                         <Loader2 className="w-3 h-3 animate-spin" aria-hidden />
                       ) : (
                         <UserMinus className="w-3 h-3" aria-hidden />

@@ -43,6 +43,10 @@ export type Room = {
 };
 
 export type ParticipantInfo = {
+  /** Row id needed to address the participant via DELETE
+   *  /rooms/{room_id}/participants/{participant_id}. Backend always
+   *  populates this; signed-in and anonymous participants both have one. */
+  participant_id: string;
   user_id: string | null;
   display_name: string;
   photo_url: string | null;

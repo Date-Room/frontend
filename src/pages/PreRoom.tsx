@@ -151,7 +151,7 @@ export default function PreRoom() {
     for (const p of card.participants as ParticipantInfo[]) {
       if (!p.user_id) continue;
       if (me?.id && p.user_id === me.id) continue;
-      return { name: p.display_name, photo: p.photo_url, participantId: null };
+      return { name: p.display_name, photo: p.photo_url, participantId: p.participant_id };
     }
     return null;
   }, [card, me]);
@@ -207,12 +207,24 @@ export default function PreRoom() {
     return null;
   }, [presence, me]);
 
-  // Anonymous guests publish `participant_id` on their presence row
-  // (see RoomSessionContext.track()). Signed-in partners don't — they
-  // aren't kickable from this UI either way. Surfaces the id so the
-  // host's Remove action has something to address.
-  const kickableGuest = useMemo(() => {
+  // Source the kickable partner from the InviteCard's authoritative
+  // participants list (every participant has a participant_id, signed-in
+  // or anonymous). Previously we only saw guests because the presence
+  // payload only carried participant_id for guests — signed-in partners
+  // joined via session, so the host's Remove menu hid for them.
+  //
+  // Falls back to scanning presence for the rare case where the
+  // InviteCard hasn't yet refetched after the partner joined; the
+  // presence-derived path stays as a safety net for guests.
+  const kickableGuest = useMemo<{ participantId: string; name: string } | null>(() => {
     if (!me) return null;
+    if (card) {
+      for (const p of card.participants as ParticipantInfo[]) {
+        if (p.user_id && p.user_id === me.id) continue; // skip self
+        return { participantId: p.participant_id, name: p.display_name || "Guest" };
+      }
+    }
+    // No InviteCard partner yet — fall back to a guest presence row.
     for (const p of presence) {
       const uid = (p.user_id ?? p.sender_id) as string | undefined;
       if (!uid || uid === me.id) continue;
@@ -222,7 +234,7 @@ export default function PreRoom() {
       return { participantId: pid, name: name ?? "Guest" };
     }
     return null;
-  }, [presence, me]);
+  }, [card, presence, me]);
 
   async function onKickPartner() {
     if (!room || !kickableGuest) return;
