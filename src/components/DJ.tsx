@@ -430,7 +430,10 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
   const ss = String(remaining % 60).padStart(2, "0");
 
   return (
-    <div className="relative flex h-full flex-col gap-5 overflow-y-auto p-4 sm:p-6">
+    // Desktop docked-panel mode (lg+) gives the activity ~46vw and a
+    // tall canvas — widen the inner padding + spacing so the player
+    // breathes. Mobile / sm / md keep the existing tight rhythm.
+    <div className="relative flex h-full flex-col gap-5 overflow-y-auto p-4 sm:p-6 lg:gap-6 lg:p-7 xl:gap-7 xl:p-8">
       {/* Floating emoji reactions */}
       <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
         {reactions.map((r, i) => (
@@ -479,17 +482,18 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
           )}
         </div>
 
-        {/* Title + channel */}
+        {/* Title + channel — bigger typographic mass on desktop where
+            we have the room for it. */}
         <div>
-          <p className="truncate text-base font-semibold text-cream">
+          <p className="truncate text-base font-semibold text-cream lg:text-lg">
             {silence
               ? `Silence, chosen by ${djName}`
               : trackTitle ?? "Nothing playing yet"}
           </p>
           {!silence && trackChannel ? (
-            <p className="truncate text-xs text-muted-foreground">{trackChannel}</p>
+            <p className="truncate text-xs text-muted-foreground lg:text-sm">{trackChannel}</p>
           ) : !silence && !trackTitle ? (
-            <p className="text-xs text-muted-foreground">Paste a YouTube link below to start the queue.</p>
+            <p className="text-xs text-muted-foreground lg:text-sm">Paste a YouTube link below to start the queue.</p>
           ) : null}
         </div>
 
@@ -530,12 +534,18 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       </section>
 
       {/* ───────── 4. UP NEXT ─────────
-          Web's durable state currently carries a single now_playing,
-          not a multi-track queue (mobile has one). We surface the
-          section header only when there's a real upcoming track to
-          show — for now that's never, so the section stays hidden.
-          Leaving the slot here so the layout is ready when web adds
-          queue persistence. */}
+          Web's durable state carries a single `now_playing`, not a
+          multi-track queue. Mobile has the multi-track shape; web
+          doesn't surface it yet, so the section stays hidden.
+
+          TODO(web-dj-queue): wire the queue UI once web's durable
+          state can carry a list. Needed shape on the server:
+            - dj.state.queue: DjTrack[]  (FIFO; head is currentN+1)
+            - on enqueue event → push to queue (DJ's session)
+            - on track-ended / skip → shift queue → now_playing
+          Re-enable this block, render queue.map() as 44pt tiles
+          on mobile / 56pt with bigger thumbs on desktop (lg:),
+          plus a "Clear" affordance for the DJ. */}
 
       {/* ───────── 5. Paste-URL field — DJ-only ───────── */}
       {isDJ && (

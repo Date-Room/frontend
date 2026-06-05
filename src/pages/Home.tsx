@@ -251,7 +251,14 @@ export default function Home() {
           </div>
           <span className="font-serif text-xl font-semibold italic text-cream">{BRAND_NAME}</span>
 
-          {/* Mobile compact pinned title — fades in once big title scrolls past. */}
+          {/* Mobile compact pinned title — WhatsApp-style swap-in once the
+              big inline title scrolls past. `lg:hidden` because desktop
+              already has a persistent tab nav in the same header band
+              (Rooms / Recap / Profile to the right), which serves the
+              same orientation purpose. Adding a second title there would
+              just duplicate the active tab label. If we ever drop the
+              desktop tab nav in favour of a different header pattern
+              (e.g. logo + breadcrumb), wire a desktop version here. */}
           <div
             className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-base font-semibold text-cream lg:hidden"
             style={{ opacity: compactT, transition: "opacity 160ms ease-out" }}

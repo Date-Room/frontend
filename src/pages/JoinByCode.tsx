@@ -63,7 +63,10 @@ export default function JoinByCode() {
       <p className="mb-8 text-center text-sm text-muted-foreground">
         Type the Room ID and PIN your host shared.
       </p>
-      <form onSubmit={submit} className="space-y-7">
+      {/* Cap the form width on big monitors so the slot row doesn't
+          stretch across a 1440px canvas. CardPage already centres us
+          horizontally — this just keeps the visual mass compact. */}
+      <form onSubmit={submit} className="mx-auto max-w-md space-y-7">
         <SlotInput
           label="ROOM ID"
           length={6}
