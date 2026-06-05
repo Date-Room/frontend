@@ -1,0 +1,158 @@
+/**
+ * Room customization context — keeps the room's chosen theme + background
+ * accessible to every component inside the LiveRoom subtree (and PreRoom,
+ * if we ever want to preview from there).
+ *
+ * Source of truth: `GET /v1/rooms/by-code/{code}` (the InviteCard, which
+ * returns `theme_color` + `background_id`). We fetch via React Query so
+ * cache invalidation is the trigger to re-render — exactly mirrors mobile's
+ * `ref.invalidate(roomCustomizationProvider(roomId))` semantic.
+ *
+ * Live updates: the channel sends a "customize" broadcast after a PATCH
+ * lands, and the listener invalidates the InviteCard query so the partner's
+ * open tab refetches without a full reload.
+ *
+ * Apply: render <RoomCustomizationStyle /> as the first child of any
+ * subtree that should follow the accent. It sets a CSS variable
+ * `--room-accent` (+ `--room-accent-soft` for translucent washes) on its
+ * own scope so descendant components can read it via Tailwind arbitrary
+ * values: `bg-[var(--room-accent)]`, `border-[var(--room-accent)]/40`,
+ * etc.
+ */
+import { createContext, useContext, useEffect, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getRoomByCode, listMyRooms, type InviteCard } from "@/lib/rooms";
+import {
+  backgroundForId,
+  backgroundGradient,
+  themeForId,
+  type RoomBackgroundPreset,
+  type RoomThemePalette,
+} from "@/lib/roomTheme";
+import { useRoomSession } from "@/context/RoomSessionContext";
+
+export type RoomCustomization = {
+  /** Resolved theme palette — never null; falls back to the default. */
+  theme: RoomThemePalette;
+  /** Resolved background, or null when the host hasn't picked one. */
+  background: RoomBackgroundPreset | null;
+  /** CSS linear-gradient string for the background (default when null). */
+  backgroundCss: string;
+  /** Raw stored slug — null when nothing's picked. */
+  themeId: string | null;
+  backgroundId: string | null;
+};
+
+/** Default DateRoom theme — returned when a component reads the hook
+ *  outside the provider (so reads never throw or render undefined). */
+const DEFAULT_CUSTOMIZATION: RoomCustomization = {
+  theme: themeForId(null),
+  background: null,
+  backgroundCss: backgroundGradient(null),
+  themeId: null,
+  backgroundId: null,
+};
+
+const Ctx = createContext<RoomCustomization>(DEFAULT_CUSTOMIZATION);
+
+// eslint-disable-next-line react-refresh/only-export-components -- hook + provider co-located
+export function useRoomCustomization(): RoomCustomization {
+  return useContext(Ctx);
+}
+
+/**
+ * Wraps `useRoomSession()` to derive the active room's theme/background
+ * from the InviteCard. The `roomId` we need comes from the session
+ * context; the room code we need to fetch the InviteCard comes from the
+ * server-authoritative `listMyRooms` query (already cached by PreRoom in
+ * the common host flow).
+ *
+ * Anonymous guests don't have access to `listMyRooms` (no auth token).
+ * In that case we still try to look the room up by id by listening on the
+ * shared cache for an InviteCard the host already populated — if nothing's
+ * there, we silently fall back to the default theme.
+ */
+export function RoomCustomizationProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const session = useRoomSession();
+  const queryClient = useQueryClient();
+
+  // Find the room code for this id. We piggyback on `my-rooms` for
+  // signed-in users (cheap, cached, host always has it). Guests don't
+  // have it — the value just stays undefined and we fall back to scanning
+  // the existing query cache for an InviteCard that happens to be there.
+  const { data: rooms } = useQuery({
+    queryKey: ["my-rooms"],
+    queryFn: listMyRooms,
+    staleTime: 5_000,
+    enabled: session.canPersist,
+    retry: false,
+  });
+
+  const roomCode = useMemo(() => {
+    const fromList = rooms?.find((r) => r.id === session.roomId)?.code;
+    if (fromList) return fromList;
+    // Anonymous-guest path — scan any cached InviteCard for our room id.
+    const cached = queryClient.getQueriesData<InviteCard>({ queryKey: ["invite-card"] });
+    for (const [, card] of cached) {
+      if (card && card.id === session.roomId) return card.code;
+    }
+    return undefined;
+  }, [rooms, session.roomId, queryClient]);
+
+  const { data: card } = useQuery({
+    queryKey: ["invite-card", roomCode],
+    queryFn: () => (roomCode ? getRoomByCode(roomCode) : Promise.reject("no code")),
+    enabled: !!roomCode,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+
+  // Listen for the host's "customize" broadcast — invalidate the
+  // InviteCard query so this client refetches and re-derives. Replaces
+  // the need to broadcast the full payload (the client just refetches
+  // the canonical state).
+  useEffect(() => {
+    const off = session.channel.onBroadcast((e) => {
+      if (e.kind !== "customize") return;
+      if (!roomCode) return;
+      void queryClient.invalidateQueries({ queryKey: ["invite-card", roomCode] });
+    });
+    return () => off();
+  }, [session.channel, roomCode, queryClient]);
+
+  const themeId = card?.theme_color ?? null;
+  const backgroundId = card?.background_id ?? null;
+
+  const value = useMemo<RoomCustomization>(() => {
+    const theme = themeForId(themeId);
+    const background = backgroundForId(backgroundId);
+    return {
+      theme,
+      background,
+      backgroundCss: backgroundGradient(backgroundId),
+      themeId,
+      backgroundId,
+    };
+  }, [themeId, backgroundId]);
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
+/**
+ * Inline style block — drops the resolved accent into a CSS variable on
+ * its parent scope. Pair with a `style={{ ... }}` on the LiveRoom shell
+ * for the background gradient. Components inside the scope read
+ * `var(--room-accent)` via Tailwind arbitrary values.
+ */
+export function roomAccentStyle(theme: RoomThemePalette): React.CSSProperties {
+  return {
+    // Hex accent for solid fills/text/borders.
+    ["--room-accent" as string]: theme.accent,
+    // 12% rgba wash for halos/soft backgrounds.
+    ["--room-accent-soft" as string]: theme.halo,
+  };
+}

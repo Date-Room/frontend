@@ -561,7 +561,12 @@ export default function PreRoom() {
         </div>
       </main>
 
-      {/* Customize sheet — picks theme + background, saves per tap. */}
+      {/* Customize sheet — picks theme + background, saves per tap.
+          After each save we (1) broadcast on the room channel so any
+          partner currently inside the LiveRoom refetches their
+          InviteCard and re-themes, and (2) invalidate our local
+          'my-rooms' + 'invite-card' caches so the PreRoom UI itself
+          (host preview, partner's PreRoom view) re-renders immediately. */}
       {room && (
         <CustomizeSheet
           roomId={room.id}
@@ -569,6 +574,11 @@ export default function PreRoom() {
           onOpenChange={setCustomizeOpen}
           initialThemeId={room.theme_color}
           initialBackgroundId={room.background_id}
+          onBroadcast={() => {
+            void channelRef.current?.broadcast("customize", {});
+            void queryClient.invalidateQueries({ queryKey: ["invite-card", room.code] });
+            void queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
+          }}
         />
       )}
     </PreRoomShell>

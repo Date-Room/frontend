@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type PageShellProps = {
@@ -10,6 +10,9 @@ type PageShellProps = {
   grain?: boolean;
   /** Edge darkening */
   vignette?: boolean;
+  /** Inline style — used by LiveRoom to paint the customized
+   *  background gradient + drop the --room-accent CSS variable. */
+  style?: CSSProperties;
 };
 
 /**
@@ -22,9 +25,13 @@ export function PageShell({
   orbs = true,
   grain = true,
   vignette = true,
+  style,
 }: PageShellProps) {
   return (
-    <div className={cn("min-h-screen relative bg-background text-foreground overflow-x-hidden", className)}>
+    <div
+      className={cn("min-h-screen relative bg-background text-foreground overflow-x-hidden", className)}
+      style={style}
+    >
       {vignette ? <div className="vignette" aria-hidden /> : null}
       {grain ? <div className="page-grain" aria-hidden /> : null}
       {orbs ? (

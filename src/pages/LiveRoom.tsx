@@ -12,6 +12,11 @@ import {
 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { RoomSessionProvider, useRoomSession, type RoomIdentity } from "@/context/RoomSessionContext";
+import {
+  RoomCustomizationProvider,
+  roomAccentStyle,
+  useRoomCustomization,
+} from "@/context/RoomCustomizationContext";
 import { RoomVideo } from "@/components/RoomVideo";
 import { ActivityTray } from "@/components/ActivityTray";
 import { MediaMiniPlayer } from "@/components/MediaMiniPlayer";
@@ -188,6 +193,7 @@ function DesktopQuickLaunch({ onLaunch }: { onLaunch: (id: string) => void }) {
 
 function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; isHost: boolean; roomId: string }) {
   const navigate = useNavigate();
+  const customization = useRoomCustomization();
   const [trayOpen, setTrayOpen] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   // Which activity is currently in front of the user — drives the
@@ -205,12 +211,21 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
     ? now >= new Date(expiresAt).getTime()
     : false;
 
+  // Apply the chosen background gradient to the room shell. Defaults
+  // to the warm-dark DateRoom gradient when the host hasn't picked one
+  // (NEVER transparent — mirrors mobile's _defaultRoomGradient).
+  const shellStyle: React.CSSProperties = {
+    ...roomAccentStyle(customization.theme),
+    background: customization.backgroundCss,
+  };
+
   return (
     <PageShell
       orbs={false}
       vignette={false}
       grain={false}
-      className="h-screen flex overflow-hidden bg-[#0a0508]"
+      className="h-screen flex overflow-hidden"
+      style={shellStyle}
     >
       {/* Listen for the host's 'kicked' broadcast. If our participant_id
           is the one being kicked, navigate home with a toast. */}
@@ -424,7 +439,9 @@ export default function LiveRoom() {
 
   return (
     <RoomSessionProvider roomId={roomId} identity={identity}>
-      <RoomShell expiresAt={expiresAt} isHost={identity.isHost} roomId={roomId} />
+      <RoomCustomizationProvider>
+        <RoomShell expiresAt={expiresAt} isHost={identity.isHost} roomId={roomId} />
+      </RoomCustomizationProvider>
     </RoomSessionProvider>
   );
 }

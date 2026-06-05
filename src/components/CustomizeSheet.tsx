@@ -56,6 +56,13 @@ type Props = {
   /** Notify the parent once the server-side patch lands so it can
    *  re-fetch / re-render with the chosen colour. */
   onSaved?: (patch: { theme_color: string | null; background_id: string | null }) => void;
+  /** Fire-and-forget broadcaster — invoked after each successful save
+   *  so the partner's open tab refetches the InviteCard and re-derives
+   *  the new theme/background without a hard reload. Parent passes the
+   *  room channel's broadcast fn (PreRoom owns a transient channel;
+   *  LiveRoom uses the session channel). When null, the partner sees
+   *  the change on their next idle refetch instead of live. */
+  onBroadcast?: () => void;
 };
 
 export function CustomizeSheet({
@@ -65,6 +72,7 @@ export function CustomizeSheet({
   initialThemeId,
   initialBackgroundId,
   onSaved,
+  onBroadcast,
 }: Props) {
   const isMobile = useIsMobile();
   const [themeId, setThemeId] = useState<string | null>(initialThemeId);
@@ -85,6 +93,7 @@ export function CustomizeSheet({
     try {
       await updateRoom(roomId, { theme_color: next });
       onSaved?.({ theme_color: next, background_id: backgroundId });
+      onBroadcast?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save the theme.");
     } finally {
@@ -101,6 +110,7 @@ export function CustomizeSheet({
     try {
       await updateRoom(roomId, { background_id: next });
       onSaved?.({ theme_color: themeId, background_id: next });
+      onBroadcast?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't save the background.");
     } finally {
