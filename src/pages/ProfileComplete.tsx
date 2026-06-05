@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Camera, User as UserIcon, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { CardPage } from "@/components/CardPage";
+import { UserAvatarImg } from "@/components/UserAvatarImg";
 import { authClient } from "@/lib/authClient";
 import { getMe, updateMe, type UserMe } from "@/lib/users";
 
@@ -164,11 +165,12 @@ export default function ProfileComplete() {
           aria-label="Pick a profile photo"
           className="focus-ring relative h-24 w-24 rounded-full overflow-hidden border-2 border-rosegold/25 bg-gradient-to-br from-rosegold/30 to-romantic/20 flex items-center justify-center text-3xl font-serif text-cream transition hover:border-rosegold/55"
         >
-          {photoUrl ? (
-            <img src={photoUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span>{initial}</span>
-          )}
+          <UserAvatarImg
+            src={photoUrl}
+            alt=""
+            className="h-full w-full object-cover"
+            fallback={<span>{initial}</span>}
+          />
           <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/55 py-1 text-[10px] uppercase tracking-[0.2em] text-cream">
             <Camera className="h-3 w-3" /> {photoUrl ? "Change" : "Add"}
           </span>

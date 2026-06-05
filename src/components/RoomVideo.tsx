@@ -13,6 +13,7 @@ import { Mic, MicOff, Video, VideoOff, Camera, VideoOff as VideoOffIcon } from "
 import { livekitToken } from "@/lib/rooms";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useChromeVisible } from "@/context/ChromeVisibilityContext";
+import { UserAvatarImg } from "@/components/UserAvatarImg";
 import { cn } from "@/lib/utils";
 
 const REACTIONS = ["❤️", "🔥", "😂", "🤔", "🥹"];
@@ -246,11 +247,14 @@ function HaloAvatarPresentational({
               "linear-gradient(135deg, color-mix(in srgb, var(--room-accent) 30%, transparent), color-mix(in srgb, var(--room-accent) 12%, transparent), transparent)",
           }}
         >
-          {photoUrl ? (
-            <img src={photoUrl} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className="font-serif text-6xl sm:text-7xl text-cream">{initial}</span>
-          )}
+          <UserAvatarImg
+            src={photoUrl}
+            alt=""
+            className="h-full w-full object-cover"
+            fallback={
+              <span className="font-serif text-6xl sm:text-7xl text-cream">{initial}</span>
+            }
+          />
         </div>
       </div>
       <div className="text-center">

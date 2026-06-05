@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
+import { UserAvatarImg } from "@/components/UserAvatarImg";
 import { getConnection, lastMetLabel, type Connection } from "@/lib/connections";
 import { createRoom } from "@/lib/rooms";
 import { listJournal, type JournalEntry } from "@/lib/journal";
@@ -88,14 +89,16 @@ export default function OurRoom() {
         {/* Header: avatar + 'You & <name>' + last-met. */}
         <header className="flex items-center gap-4 pb-8 border-b border-white/[0.06]">
           <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-rosegold/30 bg-rosegold/[0.08] flex items-center justify-center">
-            {connection.partner.photo_url ? (
-              // eslint-disable-next-line jsx-a11y/alt-text
-              <img src={connection.partner.photo_url} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <span className="font-serif text-xl text-rosegold">
-                {name ? name[0].toUpperCase() : "·"}
-              </span>
-            )}
+            <UserAvatarImg
+              src={connection.partner.photo_url}
+              alt=""
+              className="h-full w-full object-cover"
+              fallback={
+                <span className="font-serif text-xl text-rosegold">
+                  {name ? name[0].toUpperCase() : "·"}
+                </span>
+              }
+            />
           </div>
           <div className="min-w-0">
             <h1 className="font-serif text-2xl italic text-cream">

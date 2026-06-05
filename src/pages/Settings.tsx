@@ -14,6 +14,7 @@ import { getMe, updateMe, type UserMe } from "@/lib/users";
 import { applyThemePreference } from "@/lib/theme";
 import { CardPage } from "@/components/CardPage";
 import { PageShell } from "@/components/PageShell";
+import { UserAvatarImg } from "@/components/UserAvatarImg";
 import {
   Sheet,
   SheetContent,
@@ -203,14 +204,15 @@ export default function Settings() {
       <div className="flex flex-col items-center gap-2 pt-2">
         <div className="relative">
           <div className="h-[104px] w-[104px] overflow-hidden rounded-full border border-border bg-secondary/60">
-            {avatarUrl ? (
-              // eslint-disable-next-line jsx-a11y/alt-text
-              <img src={avatarUrl} className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center font-serif text-4xl text-primary">
-                {initial}
-              </div>
-            )}
+            <UserAvatarImg
+              src={avatarUrl}
+              className="h-full w-full object-cover"
+              fallback={
+                <div className="flex h-full w-full items-center justify-center font-serif text-4xl text-primary">
+                  {initial}
+                </div>
+              }
+            />
           </div>
           {/* Calmer accent-tinted edit pencil disc badge — not the loud amber camera. */}
           <button

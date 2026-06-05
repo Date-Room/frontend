@@ -22,6 +22,7 @@ import { ChromeVisibilityContext } from "@/context/ChromeVisibilityContext";
 import { RoomVideo } from "@/components/RoomVideo";
 import { ActivityTray } from "@/components/ActivityTray";
 import { MediaMiniPlayer } from "@/components/MediaMiniPlayer";
+import { UserAvatarImg } from "@/components/UserAvatarImg";
 import { toast } from "sonner";
 import { authClient } from "@/lib/authClient";
 import { DATE_NAME } from "@/lib/room";
@@ -209,13 +210,16 @@ function PresenceAvatar({
       }
       title={name}
     >
-      {photo ? (
-        <img src={photo} alt="" className="h-full w-full object-cover" />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center bg-[var(--room-accent-soft)] font-serif text-sm text-cream">
-          {initial}
-        </div>
-      )}
+      <UserAvatarImg
+        src={photo}
+        alt=""
+        className="h-full w-full object-cover"
+        fallback={
+          <div className="flex h-full w-full items-center justify-center bg-[var(--room-accent-soft)] font-serif text-sm text-cream">
+            {initial}
+          </div>
+        }
+      />
     </div>
   );
 }

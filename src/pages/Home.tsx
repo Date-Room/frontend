@@ -26,6 +26,7 @@ import {
 } from "@/lib/rooms";
 import { PageShell } from "@/components/PageShell";
 import { ShimmerSkeleton } from "@/components/ui/skeleton";
+import { UserAvatarImg } from "@/components/UserAvatarImg";
 import { cn } from "@/lib/utils";
 
 const ALIVE_STATES = new Set<RoomStateName>(["created", "waiting", "live", "active"]);
@@ -298,13 +299,16 @@ export default function Home() {
               onClick={() => setTab("profile")}
               className="flex items-center gap-2.5 rounded-full border border-white/[0.08] bg-white/[0.03] py-1 pl-1 pr-3.5 transition-colors hover:border-primary/25"
             >
-              {me?.photo_url ? (
-                <img src={me.photo_url} alt="" className="h-7 w-7 rounded-full object-cover" />
-              ) : (
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-rosegold/40 to-romantic/30 font-serif text-sm text-cream">
-                  {initial}
-                </span>
-              )}
+              <UserAvatarImg
+                src={me?.photo_url}
+                alt=""
+                className="h-7 w-7 rounded-full object-cover"
+                fallback={
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-rosegold/40 to-romantic/30 font-serif text-sm text-cream">
+                    {initial}
+                  </span>
+                }
+              />
               <span className="max-w-[10rem] truncate text-sm text-cream">{me?.display_name || me?.email?.split("@")[0]}</span>
             </button>
             <button
@@ -693,20 +697,7 @@ function DuoCircle({
   awaitingJoin?: boolean;
   className?: string;
 }) {
-  if (photo) {
-    return (
-      <div
-        className={cn(
-          "h-9 w-9 overflow-hidden rounded-full ring-2 ring-background",
-          className,
-        )}
-      >
-        {/* eslint-disable-next-line jsx-a11y/alt-text */}
-        <img src={photo} className="h-full w-full object-cover" />
-      </div>
-    );
-  }
-  return (
+  const placeholder = (
     <div
       className={cn(
         "flex h-9 w-9 items-center justify-center rounded-full ring-2 ring-background",
@@ -721,6 +712,21 @@ function DuoCircle({
       ) : (
         <User className="h-4 w-4 text-primary" strokeWidth={1.5} />
       )}
+    </div>
+  );
+  if (!photo) return placeholder;
+  return (
+    <div
+      className={cn(
+        "h-9 w-9 overflow-hidden rounded-full ring-2 ring-background",
+        className,
+      )}
+    >
+      <UserAvatarImg
+        src={photo}
+        fallback={placeholder}
+        className="h-full w-full object-cover"
+      />
     </div>
   );
 }
@@ -795,13 +801,16 @@ function ProfilePane({
   return (
     <div className="mx-auto max-w-xl animate-float-up space-y-4 stagger-children">
       <div className="editorial-card flex items-center gap-4 p-6">
-        {me?.photo_url ? (
-          <img src={me.photo_url} alt="" className="h-16 w-16 rounded-full border-2 border-rosegold/20 object-cover" />
-        ) : (
-          <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-rosegold/20 bg-gradient-to-br from-rosegold/30 to-romantic/30 font-serif text-2xl text-cream">
-            {initial}
-          </div>
-        )}
+        <UserAvatarImg
+          src={me?.photo_url}
+          alt=""
+          className="h-16 w-16 rounded-full border-2 border-rosegold/20 object-cover"
+          fallback={
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-rosegold/20 bg-gradient-to-br from-rosegold/30 to-romantic/30 font-serif text-2xl text-cream">
+              {initial}
+            </div>
+          }
+        />
         <div className="min-w-0">
           <p className="truncate text-lg font-medium text-cream">{me?.display_name || me?.email?.split("@")[0]}</p>
           <p className="truncate text-xs text-muted-foreground">{me?.email}</p>

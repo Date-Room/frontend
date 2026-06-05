@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { CustomizeSheet } from "@/components/CustomizeSheet";
 import { PageShell } from "@/components/PageShell";
+import { UserAvatarImg } from "@/components/UserAvatarImg";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -657,15 +658,7 @@ function Avatar64({
   awaiting?: boolean;
 }) {
   const initial = name?.trim() ? name.trim()[0]?.toUpperCase() : null;
-  if (photo) {
-    return (
-      <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-primary/40">
-        {/* eslint-disable-next-line jsx-a11y/alt-text */}
-        <img src={photo} className="h-full w-full object-cover" />
-      </div>
-    );
-  }
-  return (
+  const placeholder = (
     <div
       className={cn(
         "flex h-16 w-16 items-center justify-center rounded-full border-2",
@@ -679,6 +672,16 @@ function Avatar64({
       ) : (
         <UserPlus className="h-6 w-6 text-muted-foreground" strokeWidth={1.5} />
       )}
+    </div>
+  );
+  if (!photo) return placeholder;
+  return (
+    <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-primary/40">
+      <UserAvatarImg
+        src={photo}
+        fallback={placeholder}
+        className="h-full w-full object-cover"
+      />
     </div>
   );
 }
