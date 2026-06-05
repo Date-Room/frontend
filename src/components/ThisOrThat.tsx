@@ -202,7 +202,11 @@ export function ThisOrThat() {
               <p className={["font-serif italic text-lg", isMatch ? "text-amber" : "text-cream/80"].join(" ")}>
                 {isMatch ? "you both leaned the same way" : "different paths"}
               </p>
-              <Button onClick={nextRound} className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90">
+              <Button
+                onClick={nextRound}
+                className="rounded-full text-primary-foreground hover:opacity-90"
+                style={{ backgroundColor: "var(--room-accent)" }}
+              >
                 Next round
               </Button>
             </div>

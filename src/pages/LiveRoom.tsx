@@ -45,11 +45,16 @@ function Countdown({ expiresAt }: { expiresAt: string }) {
   const remaining = Math.max(0, Math.floor((new Date(expiresAt).getTime() - now) / 1000));
   const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
   const ss = String(remaining % 60).padStart(2, "0");
-  const color = remaining <= 30 ? "text-rose" : remaining <= 120 ? "text-amber" : "text-cream/90";
+  // Warn-amber follows the room accent; the rose < 30s state stays as
+  // a fixed danger colour (the customised theme shouldn't suppress an
+  // imminent-end warning).
+  const colorClass = remaining <= 30 ? "text-rose" : "text-cream/90";
+  const colorStyle =
+    remaining > 30 && remaining <= 120 ? { color: "var(--room-accent)" } : undefined;
   return (
     <div className="flex items-center gap-1.5 rounded-full bg-black/45 backdrop-blur px-3 py-1.5">
       <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-      <span className={`tabular-nums text-sm font-medium ${color}`}>
+      <span className={`tabular-nums text-sm font-medium ${colorClass}`} style={colorStyle}>
         {mm}:{ss}
       </span>
     </div>
@@ -145,15 +150,20 @@ function PresenceAvatar({
   return (
     <div
       className={cn(
-        "relative h-9 w-9 overflow-hidden rounded-full transition",
-        present ? "ring-2 ring-rosegold/85 shadow-[0_0_18px_rgba(212,130,106,0.45)]" : "ring-2 ring-white/15",
+        "relative h-9 w-9 overflow-hidden rounded-full transition ring-2",
+        present ? "ring-[var(--room-accent)]/85" : "ring-white/15",
       )}
+      style={
+        present
+          ? { boxShadow: "0 0 18px var(--room-accent-soft)" }
+          : undefined
+      }
       title={name}
     >
       {photo ? (
         <img src={photo} alt="" className="h-full w-full object-cover" />
       ) : (
-        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-rosegold/40 to-romantic/30 font-serif text-sm text-cream">
+        <div className="flex h-full w-full items-center justify-center bg-[var(--room-accent-soft)] font-serif text-sm text-cream">
           {initial}
         </div>
       )}
@@ -240,7 +250,10 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
       {/* Header chrome over the video */}
       <header className="relative z-20 flex items-center justify-between gap-2 px-3 sm:px-6 py-3 shrink-0">
         <div className="flex items-center gap-2 rounded-full bg-black/45 backdrop-blur px-3 py-1.5 min-w-0 ring-1 ring-white/[0.08]">
-          <span className="w-1.5 h-1.5 rounded-full bg-rosegold animate-pulse-glow shrink-0" />
+          <span
+            className="w-1.5 h-1.5 rounded-full animate-pulse-glow shrink-0"
+            style={{ backgroundColor: "var(--room-accent)" }}
+          />
           <h1 className="font-serif italic text-cream text-sm tracking-wide truncate">
             {DATE_NAME || "Our Room"}
           </h1>
@@ -282,7 +295,11 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
         <button
           type="button"
           onClick={() => setTrayOpen(true)}
-          className="flex items-center gap-2 rounded-full bg-amber text-primary-foreground px-6 py-3 text-sm font-medium shadow-[0_8px_28px_rgba(212,130,106,0.35)] hover:bg-amber/90 transition"
+          className="flex items-center gap-2 rounded-full text-primary-foreground px-6 py-3 text-sm font-medium transition hover:opacity-90"
+          style={{
+            backgroundColor: "var(--room-accent)",
+            boxShadow: "0 8px 28px var(--room-accent-soft)",
+          }}
         >
           <LayoutGrid className="w-4 h-4" /> Activities
         </button>
@@ -350,8 +367,14 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
       {expired && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/90 backdrop-blur-md animate-fade-in">
           <div className="w-full max-w-md mx-4 editorial-card grain p-8 text-center animate-scale-in">
-            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-rosegold/15 ring-1 ring-rosegold/35">
-              <Clock className="h-6 w-6 text-rosegold" aria-hidden />
+            <div
+              className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full"
+              style={{
+                backgroundColor: "var(--room-accent-soft)",
+                boxShadow: "inset 0 0 0 1px var(--room-accent)",
+              }}
+            >
+              <Clock className="h-6 w-6" style={{ color: "var(--room-accent)" }} aria-hidden />
             </div>
             <h2 className="font-serif italic text-cream text-2xl mb-2">The evening's over</h2>
             <p className="text-sm text-muted-foreground leading-relaxed mb-6">

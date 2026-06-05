@@ -139,9 +139,10 @@ export function Chat() {
                 <div
                   className={`px-3 py-2 rounded-2xl text-sm leading-snug whitespace-pre-wrap break-words shadow-[0_4px_18px_-8px_rgba(0,0,0,0.45)] ${
                     isMine
-                      ? "bg-amber text-primary-foreground rounded-br-sm"
+                      ? "text-primary-foreground rounded-br-sm"
                       : "bg-card text-cream border border-white/[0.08] rounded-bl-sm"
                   }`}
+                  style={isMine ? { backgroundColor: "var(--room-accent)" } : undefined}
                 >
                   {m.text}
                 </div>
@@ -161,7 +162,8 @@ export function Chat() {
         <Button
           type="submit"
           disabled={!text.trim()}
-          className="focus-ring rounded-full bg-amber text-primary-foreground hover:bg-amber/90 disabled:opacity-40 transition-all hover:-translate-y-px"
+          className="focus-ring rounded-full text-primary-foreground hover:opacity-90 disabled:opacity-40 transition-all hover:-translate-y-px"
+          style={{ backgroundColor: "var(--room-accent)" }}
         >
           <Send className="w-4 h-4" />
         </Button>

@@ -181,32 +181,46 @@ function CameraOffAvatar({
     <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-background/40 via-background/30 to-background/60">
       <div className="relative">
         {/* Halo — pulses when the partner's mic picks them up. Two
-            concentric rings so the wave reads even at a glance. */}
+            concentric rings so the wave reads even at a glance. The
+            colour follows the room's customized accent. */}
         <span
           aria-hidden
           className={[
-            "absolute inset-0 -m-6 rounded-full bg-rosegold/25 blur-xl transition-all duration-300",
+            "absolute inset-0 -m-6 rounded-full blur-xl transition-all duration-300",
             isSpeaking ? "scale-125 opacity-100" : "scale-100 opacity-0",
           ].join(" ")}
+          style={{ backgroundColor: "var(--room-accent-soft)" }}
         />
         <span
           aria-hidden
           className={[
-            "absolute inset-0 -m-3 rounded-full border-2 border-rosegold/50 transition-all duration-200",
+            "absolute inset-0 -m-3 rounded-full border-2 transition-all duration-200",
             isSpeaking
               ? "scale-110 opacity-100 animate-pulse"
               : "scale-100 opacity-0",
           ].join(" ")}
+          style={{ borderColor: "color-mix(in srgb, var(--room-accent) 50%, transparent)" }}
         />
         <div
           className={[
             "relative h-28 w-28 sm:h-32 sm:w-32 rounded-full overflow-hidden flex items-center justify-center",
             "border-2 transition-all duration-300",
-            isSpeaking
-              ? "border-rosegold/80 shadow-[0_0_60px_rgba(212,130,106,0.45)]"
-              : "border-white/15 shadow-[0_18px_50px_-15px_rgba(0,0,0,0.7)]",
-            "bg-gradient-to-br from-rosegold/25 via-rosegold/10 to-transparent",
           ].join(" ")}
+          style={
+            isSpeaking
+              ? {
+                  borderColor: "color-mix(in srgb, var(--room-accent) 80%, transparent)",
+                  boxShadow: "0 0 60px var(--room-accent-soft)",
+                  background:
+                    "linear-gradient(135deg, color-mix(in srgb, var(--room-accent) 25%, transparent), color-mix(in srgb, var(--room-accent) 10%, transparent), transparent)",
+                }
+              : {
+                  borderColor: "rgba(255,255,255,0.15)",
+                  boxShadow: "0 18px 50px -15px rgba(0,0,0,0.7)",
+                  background:
+                    "linear-gradient(135deg, color-mix(in srgb, var(--room-accent) 25%, transparent), color-mix(in srgb, var(--room-accent) 10%, transparent), transparent)",
+                }
+          }
         >
           {photoUrl ? (
             <img src={photoUrl} alt="" className="h-full w-full object-cover" />
@@ -220,8 +234,9 @@ function CameraOffAvatar({
         <p
           className={[
             "mt-1 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.28em] transition-colors",
-            isSpeaking ? "text-rosegold" : "text-muted-foreground/60",
+            isSpeaking ? "" : "text-muted-foreground/60",
           ].join(" ")}
+          style={isSpeaking ? { color: "var(--room-accent)" } : undefined}
         >
           <VideoOff className="h-3 w-3" aria-hidden />
           {isSpeaking ? "speaking" : "camera off"}
@@ -363,7 +378,10 @@ function Stage() {
       {/* Capture countdown */}
       {countdown != null && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/30">
-          <span className="font-serif text-[140px] leading-none text-amber drop-shadow-[0_4px_30px_rgba(0,0,0,0.6)]">
+          <span
+            className="font-serif text-[140px] leading-none drop-shadow-[0_4px_30px_rgba(0,0,0,0.6)]"
+            style={{ color: "var(--room-accent)" }}
+          >
             {countdown}
           </span>
         </div>
@@ -459,7 +477,11 @@ export function RoomVideo() {
   if (!conn) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="w-2 h-2 rounded-full bg-rosegold animate-pulse-glow" aria-hidden />
+        <div
+          className="w-2 h-2 rounded-full animate-pulse-glow"
+          style={{ backgroundColor: "var(--room-accent)" }}
+          aria-hidden
+        />
       </div>
     );
   }

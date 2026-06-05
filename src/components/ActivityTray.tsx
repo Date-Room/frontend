@@ -170,7 +170,11 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
               type="button"
               onClick={onRotate}
               disabled={rotating}
-              className="w-full flex items-center justify-center gap-2 rounded-full border border-amber/40 text-amber py-2.5 text-sm hover:bg-amber/10 transition disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 rounded-full border py-2.5 text-sm transition disabled:opacity-50 hover:bg-[var(--room-accent)]/10"
+              style={{
+                borderColor: "color-mix(in srgb, var(--room-accent) 40%, transparent)",
+                color: "var(--room-accent)",
+              }}
             >
               {rotating ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <KeyRound className="w-4 h-4" aria-hidden />}
               Rotate PIN

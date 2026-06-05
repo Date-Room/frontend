@@ -281,7 +281,8 @@ export function WatchTogether() {
         />
         <Button
           type="submit"
-          className="focus-ring rounded-full bg-amber text-primary-foreground hover:bg-amber/90 transition-all hover:-translate-y-px"
+          className="focus-ring rounded-full text-primary-foreground hover:opacity-90 transition-all hover:-translate-y-px"
+          style={{ backgroundColor: "var(--room-accent)" }}
         >
           Play
         </Button>
@@ -321,7 +322,8 @@ export function WatchTogether() {
             }
             setPlaying(true);
           }}
-          className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90 self-center"
+          className="rounded-full text-primary-foreground hover:opacity-90 self-center"
+          style={{ backgroundColor: "var(--room-accent)" }}
         >
           <Play className="w-4 h-4 mr-1.5" /> Tap to sync & catch up
         </Button>

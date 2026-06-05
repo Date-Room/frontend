@@ -458,7 +458,13 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       <section className="flex flex-col gap-3">
         {/* Big 16:9 album art — accent-tinted gradient fallback so the
             slot never reads as a hole. */}
-        <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-gradient-to-br from-amber/30 to-amber/[0.04]">
+        <div
+          className="relative aspect-video w-full overflow-hidden rounded-2xl"
+          style={{
+            background:
+              "linear-gradient(135deg, color-mix(in srgb, var(--room-accent) 30%, transparent), color-mix(in srgb, var(--room-accent) 4%, transparent))",
+          }}
+        >
           {silence ? (
             <div className="flex h-full w-full items-center justify-center text-5xl">🤫</div>
           ) : thumb ? (
@@ -477,7 +483,11 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
             </>
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              <Music className="h-12 w-12 text-amber/55" strokeWidth={1.5} />
+              <Music
+                className="h-12 w-12"
+                style={{ color: "color-mix(in srgb, var(--room-accent) 55%, transparent)" }}
+                strokeWidth={1.5}
+              />
             </div>
           )}
         </div>
@@ -509,7 +519,8 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
         {needsAudioGesture && playing && (
           <button
             onClick={enableAudio}
-            className="w-full rounded-full bg-amber py-2.5 text-sm font-medium text-primary-foreground hover:bg-amber/90"
+            className="w-full rounded-full py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+            style={{ backgroundColor: "var(--room-accent)" }}
           >
             Tap to enable audio
           </button>
@@ -526,7 +537,8 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
               value={volume}
               onChange={(e) => setVolume(Number(e.target.value))}
               aria-label="Volume"
-              className="flex-1 accent-amber"
+              className="flex-1"
+              style={{ accentColor: "var(--room-accent)" }}
             />
             <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">{volume}</span>
           </div>
@@ -562,7 +574,8 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
             />
             <button
               type="submit"
-              className="focus-ring rounded-full bg-amber px-5 text-sm font-medium text-primary-foreground hover:bg-amber/90"
+              className="focus-ring rounded-full px-5 text-sm font-medium text-primary-foreground hover:opacity-90"
+              style={{ backgroundColor: "var(--room-accent)" }}
             >
               Add
             </button>
@@ -620,9 +633,13 @@ function TransportRow({
         disabled={!enabled}
         aria-label={playing ? "Pause" : "Play"}
         className={cn(
-          "flex h-16 w-16 items-center justify-center rounded-full bg-amber text-primary-foreground shadow-[0_10px_30px_rgba(245,166,35,0.35)] transition-transform",
+          "flex h-16 w-16 items-center justify-center rounded-full text-primary-foreground transition-transform",
           enabled ? "hover:scale-105 active:scale-95" : "opacity-40",
         )}
+        style={{
+          backgroundColor: "var(--room-accent)",
+          boxShadow: "0 10px 30px var(--room-accent-soft)",
+        }}
       >
         {playing ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6" />}
       </button>
@@ -669,13 +686,14 @@ function DjFooter({
   return (
     <div className="mt-auto rounded-2xl border border-white/[0.06] bg-card/50 p-4">
       <div className="flex items-center gap-3">
-        <Music className="h-4 w-4 text-amber" />
+        <Music className="h-4 w-4" style={{ color: "var(--room-accent)" }} />
         <p className="flex-1 text-sm text-cream">{statusLine}</p>
         {!hasDj && (
           <button
             type="button"
             onClick={onTake}
-            className="rounded-full bg-amber px-4 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-amber/90"
+            className="rounded-full px-4 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
+            style={{ backgroundColor: "var(--room-accent)" }}
           >
             Take turn
           </button>
@@ -684,7 +702,11 @@ function DjFooter({
           <button
             type="button"
             onClick={onEnd}
-            className="rounded-full border border-amber/40 px-4 py-1.5 text-xs font-semibold text-amber hover:bg-amber/10"
+            className="rounded-full border px-4 py-1.5 text-xs font-semibold hover:bg-[var(--room-accent)]/10"
+            style={{
+              borderColor: "color-mix(in srgb, var(--room-accent) 40%, transparent)",
+              color: "var(--room-accent)",
+            }}
           >
             End turn
           </button>

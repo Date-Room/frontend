@@ -126,7 +126,8 @@ export function MediaMiniPlayer({ currentActivityId, onOpenActivity, bottomOffse
         type="button"
         onClick={togglePlay}
         aria-label={playing ? "Pause" : "Play"}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber text-primary-foreground transition hover:bg-amber/90"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-primary-foreground transition hover:opacity-90"
+        style={{ backgroundColor: "var(--room-accent)" }}
       >
         {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
       </button>
