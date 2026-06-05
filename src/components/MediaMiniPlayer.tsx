@@ -92,7 +92,15 @@ export function MediaMiniPlayer({ currentActivityId, onOpenActivity, bottomOffse
       type="button"
       onClick={() => onOpenActivity(active)}
       className={cn(
-        "fixed left-1/2 z-30 flex w-[min(96vw,520px)] -translate-x-1/2 items-center gap-3 rounded-full border border-white/[0.08] bg-black/65 px-2 py-2 pr-3 shadow-[0_14px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl transition hover:bg-black/75",
+        // Mobile / sm / md — wide pill close to the viewport edges so
+        // the title doesn't truncate. Desktop (lg+) — compact max-w-sm
+        // capsule docked bottom-centre with a soft drop shadow; the
+        // surrounding LiveRoom canvas has the docked activity panel
+        // taking up the right column, so a narrow pill keeps the
+        // visual weight light.
+        "fixed left-1/2 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full border border-white/[0.08] bg-black/65 px-2 py-2 pr-3 backdrop-blur-xl transition hover:bg-black/75",
+        "w-[min(96vw,520px)] shadow-[0_14px_40px_rgba(0,0,0,0.45)]",
+        "lg:w-[384px] lg:shadow-[0_22px_60px_rgba(0,0,0,0.55)]",
       )}
       style={{ bottom: 12 + bottomOffsetPx }}
       aria-label={`Open ${active === "dj" ? "DJ" : "Watch"}`}

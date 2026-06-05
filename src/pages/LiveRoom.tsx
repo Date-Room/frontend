@@ -1,6 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { LogOut, LayoutGrid, Clock } from "lucide-react";
+import {
+  LogOut,
+  LayoutGrid,
+  Clock,
+  MessageCircle,
+  Headphones,
+  Play,
+  Gamepad2,
+  type LucideIcon,
+} from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { RoomSessionProvider, useRoomSession, type RoomIdentity } from "@/context/RoomSessionContext";
 import { RoomVideo } from "@/components/RoomVideo";
@@ -9,6 +18,7 @@ import { MediaMiniPlayer } from "@/components/MediaMiniPlayer";
 import { toast } from "sonner";
 import { authClient } from "@/lib/authClient";
 import { DATE_NAME } from "@/lib/room";
+import { cn } from "@/lib/utils";
 
 function Loading({ label }: { label: string }) {
   return (
@@ -63,6 +73,118 @@ function KickedListener({ onKicked }: { onKicked: () => void }) {
     return () => off();
   }, [session, onKicked]);
   return null;
+}
+
+/** Desktop bottom-left presence strip — small Snapchat-style row of
+ *  self + partner avatars, halo when they're in the room. Reads the
+ *  room channel's presence (we don't have a separate `is_in_call`
+ *  signal on web — being in the room and rendering the LiveKit context
+ *  is the practical equivalent). Hidden on mobile (lg-) where the
+ *  partner already takes the full-bleed video area. */
+function DesktopPresenceStrip() {
+  const session = useRoomSession();
+  // De-dupe presence by sender_id/user_id so a quick re-track during
+  // reconnects doesn't render two avatars for the same person.
+  const people = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { id: string; name: string; photo: string | null; isSelf: boolean }[] = [];
+    for (const p of session.presence) {
+      const id =
+        (typeof p.sender_id === "string" && p.sender_id) ||
+        (typeof p.user_id === "string" && p.user_id) ||
+        "";
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      const name =
+        (typeof p.name === "string" && p.name) ||
+        (typeof p.display_name === "string" && p.display_name) ||
+        (id === session.senderId ? "You" : "Guest");
+      const photo =
+        (typeof p.photo_url === "string" && p.photo_url) || null;
+      out.push({ id, name, photo, isSelf: id === session.senderId });
+    }
+    // Self always renders even if our own presence hasn't echoed back
+    // yet (race on connect). Synthesise a row from the session identity.
+    if (!out.some((p) => p.isSelf)) {
+      out.unshift({
+        id: session.senderId,
+        name: session.displayName || "You",
+        photo: session.photoUrl ?? null,
+        isSelf: true,
+      });
+    }
+    // Self left, partner right.
+    out.sort((a, b) => (a.isSelf === b.isSelf ? 0 : a.isSelf ? -1 : 1));
+    return out;
+  }, [session.presence, session.senderId, session.displayName, session.photoUrl]);
+
+  return (
+    <div className="hidden lg:flex absolute left-4 bottom-4 z-30 items-center gap-2 rounded-full bg-black/45 backdrop-blur px-2 py-1.5 ring-1 ring-white/[0.08]">
+      {people.map((p) => (
+        <PresenceAvatar key={p.id} name={p.name} photo={p.photo} present />
+      ))}
+    </div>
+  );
+}
+
+function PresenceAvatar({
+  name,
+  photo,
+  present,
+}: {
+  name: string;
+  photo: string | null;
+  present: boolean;
+}) {
+  const initial = name?.trim()[0]?.toUpperCase() || "?";
+  return (
+    <div
+      className={cn(
+        "relative h-9 w-9 overflow-hidden rounded-full transition",
+        present ? "ring-2 ring-rosegold/85 shadow-[0_0_18px_rgba(212,130,106,0.45)]" : "ring-2 ring-white/15",
+      )}
+      title={name}
+    >
+      {photo ? (
+        // eslint-disable-next-line jsx-a11y/alt-text
+        <img src={photo} className="h-full w-full object-cover" />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-rosegold/40 to-romantic/30 font-serif text-sm text-cream">
+          {initial}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Desktop quick-launch chips — small row of one-tap activity launchers
+ *  in the bottom-right of the video. Mirrors mobile's Main-page wrap
+ *  grid in spirit: lets the user jump straight into a favourite
+ *  activity without going through the category list. Mobile keeps its
+ *  Main grid and Activities pill. */
+function DesktopQuickLaunch({ onLaunch }: { onLaunch: (id: string) => void }) {
+  const chips: { id: string; label: string; Icon: LucideIcon }[] = [
+    { id: "chat", label: "Chat", Icon: MessageCircle },
+    { id: "dj", label: "Music", Icon: Headphones },
+    { id: "watch", label: "Watch", Icon: Play },
+    { id: "this_or_that", label: "This or That", Icon: Gamepad2 },
+  ];
+  return (
+    <div className="hidden lg:flex absolute right-4 bottom-4 z-30 items-center gap-1.5 rounded-full bg-black/45 backdrop-blur px-2 py-1.5 ring-1 ring-white/[0.08]">
+      {chips.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          onClick={() => onLaunch(c.id)}
+          title={c.label}
+          aria-label={`Open ${c.label}`}
+          className="focus-ring flex h-9 w-9 items-center justify-center rounded-full text-cream/80 transition hover:bg-white/10 hover:text-cream"
+        >
+          <c.Icon className="h-4 w-4" />
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; isHost: boolean; roomId: string }) {
@@ -125,6 +247,20 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
       {/* Full-bleed partner video; LiveKit's own mic/cam controls sit at its base */}
       <main className="flex-1 min-h-0 relative">
         <RoomVideo />
+        {/* Desktop overlays — surface the Main-page concepts (presence,
+            quick-launch) directly on the canvas instead of burying them
+            behind the Activities pill. Both are lg-only; mobile keeps
+            the existing single-action layout with the centered call-bar
+            and the Activities pill below. */}
+        <DesktopPresenceStrip />
+        <DesktopQuickLaunch
+          onLaunch={(id) => {
+            // The tray's `externalOpenActivityId` channel already exists
+            // for the mini-player; quick-launch is the same gesture
+            // ("open this activity") from a different surface.
+            setExternalOpen(id);
+          }}
+        />
       </main>
 
       {/* Activities launcher — mobile only; desktop shows the docked panel */}
@@ -139,6 +275,19 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
       </div>
       </div>
 
+      {/*
+        Talk CTA (desktop) — mobile has a big `_StartCallCard` that
+        gates the user into the call. Web doesn't have an equivalent
+        gate: LiveKit auto-connects the moment we enter the room and
+        the mic/cam are already publishable (subject to browser
+        permissions, which `<RoomVideo>` prompts for). The bottom call
+        bar inside `<RoomVideo>` already exposes mute/unmute toggles
+        and `<DesktopPresenceStrip>` shows the partner's halo when
+        they arrive — together those cover the "Join them" affordance
+        without a dedicated CTA pill. If we add a manual `connect={false}`
+        join step later (e.g. for cellular bandwidth gating), wire the
+        pill above the panel header here.
+      */}
       <ActivityTray
         open={trayOpen}
         onClose={() => setTrayOpen(false)}
