@@ -278,7 +278,56 @@ function HaloAvatarPresentational({
   );
 }
 
-/** Partner full-bleed, self as a draggable picture-in-picture. */
+/** Small cam-off / no-track tile used inside the PIP. Mirrors mobile's
+ *  `SelfPip._Tile` camera-off branch: dark gradient backdrop, circular
+ *  avatar with initial fallback. The PIP frame paints the shadow + rim,
+ *  so this stays visually flat. */
+function PipAvatarTile({
+  name,
+  photoUrl,
+}: {
+  name: string;
+  photoUrl: string | null;
+}) {
+  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+  return (
+    <div
+      className="w-full h-full flex items-center justify-center"
+      style={{ background: "linear-gradient(160deg, hsl(22 16% 18%), hsl(22 14% 12%))" }}
+    >
+      <div
+        className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border"
+        style={{
+          borderColor: "color-mix(in srgb, var(--room-accent) 60%, transparent)",
+          background:
+            "linear-gradient(135deg, color-mix(in srgb, var(--room-accent) 25%, transparent), transparent)",
+        }}
+      >
+        <UserAvatarImg
+          src={photoUrl}
+          alt=""
+          className="h-full w-full object-cover"
+          fallback={
+            <span className="font-serif text-2xl text-cream/85">{initial}</span>
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Partner full-bleed, self as a draggable picture-in-picture.
+ *
+ *  Two state bits worth understanding before touching this:
+ *   - `selfIsPrimary` — flipped by tapping the PIP. When true, the local
+ *     camera is the big stage tile and the partner moves into the PIP.
+ *     Matches mobile's `_selfIsPrimary` in live_room_screen.dart so the
+ *     swap reads identical across platforms.
+ *   - PIP renders *unconditionally* once `pos` is computed (was: only when
+ *     a local camera track existed). With camera off, the PIP falls back
+ *     to a small self-avatar tile so users can still see the swap target.
+ *     Mirrors mobile's `SelfPip._Tile` cam-off branch.
+ */
 function Stage() {
   const room = useRoomSession();
   const chromeVisible = useChromeVisible();
@@ -291,6 +340,9 @@ function Stage() {
   const partnerWrapRef = useRef<HTMLDivElement>(null);
   const selfWrapRef = useRef<HTMLDivElement>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  // Tap the PIP to swap which participant occupies the big stage tile.
+  // Resets to false on remount.
+  const [selfIsPrimary, setSelfIsPrimary] = useState(false);
 
   // Synced capture: broadcast a target time; both run the 3-2-1, then composite.
   function scheduleCapture(at: number) {
@@ -351,8 +403,18 @@ function Stage() {
   const PIP_W = 132;
   const PIP_H = 188;
   const PIP_PAD = 20;
+  // Tap-vs-drag slop. A pointer-up within this many px (chebyshev) of
+  // the pointer-down position counts as a tap → toggle `selfIsPrimary`.
+  // Matches mobile's `_tapSlop = 8`, trimmed slightly for mouse jitter.
+  const TAP_SLOP_PX = 6;
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
-  const dragRef = useRef<{ dx: number; dy: number; moved: boolean } | null>(null);
+  const dragRef = useRef<{
+    dx: number;
+    dy: number;
+    startX: number;
+    startY: number;
+    moved: boolean;
+  } | null>(null);
   useEffect(() => {
     const place = () => {
       const x = Math.max(PIP_PAD, window.innerWidth - PIP_W - PIP_PAD);
@@ -375,17 +437,43 @@ function Stage() {
   function onPointerDown(e: React.PointerEvent) {
     if (!pos) return;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    dragRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y, moved: false };
+    dragRef.current = {
+      dx: e.clientX - pos.x,
+      dy: e.clientY - pos.y,
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+    };
   }
   function onPointerMove(e: React.PointerEvent) {
-    if (!dragRef.current) return;
-    const x = Math.max(PIP_PAD, Math.min(window.innerWidth - PIP_W - PIP_PAD, e.clientX - dragRef.current.dx));
-    const y = Math.max(PIP_PAD, Math.min(window.innerHeight - PIP_H - PIP_PAD, e.clientY - dragRef.current.dy));
-    if (Math.hypot(e.movementX, e.movementY) > 1) dragRef.current.moved = true;
+    const d = dragRef.current;
+    if (!d) return;
+    // Only mark "moved" once we've crossed the slop threshold against
+    // the original down position — incidental sub-pixel jitter on mouse
+    // wheels / trackpads shouldn't suppress the tap.
+    if (
+      !d.moved &&
+      (Math.abs(e.clientX - d.startX) > TAP_SLOP_PX ||
+        Math.abs(e.clientY - d.startY) > TAP_SLOP_PX)
+    ) {
+      d.moved = true;
+    }
+    // Don't move the box until we've decided it's a drag — otherwise a
+    // tap that crosses 1px shifts the PIP under the user's finger.
+    if (!d.moved) return;
+    const x = Math.max(PIP_PAD, Math.min(window.innerWidth - PIP_W - PIP_PAD, e.clientX - d.dx));
+    const y = Math.max(PIP_PAD, Math.min(window.innerHeight - PIP_H - PIP_PAD, e.clientY - d.dy));
     setPos({ x, y });
   }
   function onPointerUp() {
+    const d = dragRef.current;
     dragRef.current = null;
+    if (d && !d.moved) {
+      // Treat as tap — swap primary/secondary tiles. State is local to
+      // this Stage so reload resets to "partner-primary" (matches the
+      // mobile default).
+      setSelfIsPrimary((p) => !p);
+    }
   }
 
   // Pull the partner's display name + photo from presence so the
@@ -411,38 +499,68 @@ function Stage() {
     return { name, photoUrl };
   }, [room.presence, room.senderId]);
 
-  // What to render in the main stage:
-  //   - partner video on, track subscribed → VideoTrack
-  //   - partner present but cam off → halo avatar (state="off")
-  //   - no partner yet → halo avatar (state="waiting", no participant)
+  // What to render in either slot (big stage tile or PIP):
+  //   - participant's video on, track subscribed → VideoTrack
+  //   - participant present but cam off → halo / avatar
+  //   - participant not present yet → static halo
+  // Layout role (big vs small) is decided by `selfIsPrimary`; identity
+  // (self vs partner) is decided by which TrackReference we feed in.
+  // This split is what lets capturePhoto keep emitting the right
+  // partner-then-self order regardless of who's currently primary.
   const remoteMuted = remote?.publication?.isMuted === true;
-  const showVideo = remote && !remoteMuted;
+  const showRemoteVideo = remote && !remoteMuted;
+  const showLocalVideo = local && isCameraEnabled;
+
+  // Self in the BIG tile when swapped; otherwise partner.
+  const primaryIsSelf = selfIsPrimary;
 
   return (
     <div className="absolute inset-0" onDoubleClick={() => sendReaction("❤️")}>
-      {/* Partner — full-bleed inside the stage frame. The frame itself
+      {/* BIG tile — full-bleed inside the stage frame. The frame itself
           is painted by LiveRoom (rounded card on desktop, edge-to-edge
-          on mobile). */}
-      <div ref={partnerWrapRef} className="absolute inset-0">
-        {showVideo ? (
-          <VideoTrack trackRef={remote} className="w-full h-full object-cover" />
-        ) : remote ? (
-          <PartnerHaloAvatar
-            participant={remote.participant}
-            name={partnerDisplay.name}
-            photoUrl={partnerDisplay.photoUrl}
-            state="off"
-          />
+          on mobile). Content swaps based on `selfIsPrimary`. */}
+      <div className="absolute inset-0">
+        {primaryIsSelf ? (
+          // Self as primary. Mirror only when showing our own video.
+          <div ref={selfWrapRef} className="absolute inset-0">
+            {showLocalVideo ? (
+              <VideoTrack
+                trackRef={local}
+                className="w-full h-full object-cover scale-x-[-1]"
+              />
+            ) : (
+              <HaloAvatarPresentational
+                name={room.displayName || "You"}
+                photoUrl={room.photoUrl ?? null}
+                state="off"
+                isSpeaking={false}
+              />
+            )}
+          </div>
         ) : (
-          // No partner participant yet — fall through to the static halo
-          // (the `useIsSpeaking` hook needs a participant, and there
-          // isn't one to feed it).
-          <HaloAvatarPresentational
-            name={partnerDisplay.name}
-            photoUrl={partnerDisplay.photoUrl}
-            state="waiting"
-            isSpeaking={false}
-          />
+          // Partner as primary (default).
+          <div ref={partnerWrapRef} className="absolute inset-0">
+            {showRemoteVideo ? (
+              <VideoTrack trackRef={remote} className="w-full h-full object-cover" />
+            ) : remote ? (
+              <PartnerHaloAvatar
+                participant={remote.participant}
+                name={partnerDisplay.name}
+                photoUrl={partnerDisplay.photoUrl}
+                state="off"
+              />
+            ) : (
+              // No partner participant yet — fall through to the static
+              // halo (the `useIsSpeaking` hook needs a participant, and
+              // there isn't one to feed it).
+              <HaloAvatarPresentational
+                name={partnerDisplay.name}
+                photoUrl={partnerDisplay.photoUrl}
+                state="waiting"
+                isSpeaking={false}
+              />
+            )}
+          </div>
         )}
       </div>
 
@@ -460,15 +578,26 @@ function Stage() {
         </div>
       )}
 
-      {/* Self PIP — draggable on desktop, fixed corner on mobile.
-          Rounded with a soft accent-tinted shadow that brightens on
-          drag. Hidden until pos is computed (avoids a top-left flash). */}
-      {local && pos && (
+      {/* PIP — draggable on desktop, fixed corner on mobile. Always
+          renders the *non-primary* participant. Tap to swap; drag to
+          reposition. Rounded with a soft accent-tinted shadow that
+          brightens on drag. Hidden until `pos` is computed (avoids a
+          top-left flash on first paint). */}
+      {pos && (
         <div
-          ref={selfWrapRef}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          role="button"
+          tabIndex={0}
+          aria-label="Tap to swap view"
+          title="Tap to swap view"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setSelfIsPrimary((p) => !p);
+            }
+          }}
           style={{
             left: pos.x,
             top: pos.y,
@@ -477,16 +606,39 @@ function Stage() {
             boxShadow:
               "0 18px 50px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.10), 0 0 32px var(--room-accent-soft)",
           }}
-          className="absolute z-20 rounded-[22px] overflow-hidden cursor-grab active:cursor-grabbing touch-none transition-shadow duration-200"
+          className="absolute z-20 rounded-[22px] overflow-hidden cursor-grab active:cursor-grabbing touch-none transition-shadow duration-200 focus-ring"
         >
-          {isCameraEnabled ? (
-            <VideoTrack trackRef={local} className="w-full h-full object-cover scale-x-[-1]" />
+          {primaryIsSelf ? (
+            // Partner in the PIP — same render branches as the big
+            // tile, just scaled to the PIP frame. Refs follow identity:
+            // partner content stays under partnerWrapRef so the camera
+            // capture composite always picks the partner video, never
+            // the self video that happens to be in the big tile.
+            <div ref={partnerWrapRef} className="w-full h-full">
+              {showRemoteVideo ? (
+                <VideoTrack trackRef={remote} className="w-full h-full object-cover" />
+              ) : (
+                <PipAvatarTile
+                  name={partnerDisplay.name}
+                  photoUrl={partnerDisplay.photoUrl}
+                />
+              )}
+            </div>
           ) : (
-            <div
-              className="w-full h-full flex items-center justify-center text-cream/60"
-              style={{ background: "linear-gradient(160deg, hsl(22 16% 18%), hsl(22 14% 12%))" }}
-            >
-              <VideoOff className="w-5 h-5" />
+            // Self in the PIP (default). Mirror so it reads as the user
+            // sees themselves.
+            <div ref={selfWrapRef} className="w-full h-full">
+              {showLocalVideo ? (
+                <VideoTrack
+                  trackRef={local}
+                  className="w-full h-full object-cover scale-x-[-1]"
+                />
+              ) : (
+                <PipAvatarTile
+                  name={room.displayName || "You"}
+                  photoUrl={room.photoUrl ?? null}
+                />
+              )}
             </div>
           )}
         </div>
