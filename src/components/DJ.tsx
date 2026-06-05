@@ -100,6 +100,11 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
   const turn = (durable?.turn ?? {}) as { current_dj?: string | null; turn_started_at?: string | null };
   const currentDj = typeof turn.current_dj === "string" ? turn.current_dj : null;
   const nowPlaying = (durable?.now_playing ?? null) as DjTrack | null;
+  const queue = useMemo<DjTrack[]>(() => {
+    const raw = durable?.queue;
+    if (!Array.isArray(raw)) return [];
+    return raw.filter((t): t is DjTrack => !!t && typeof (t as DjTrack).id === "string");
+  }, [durable?.queue]);
   const playing = durable?.playing === true;
   const silence = durable?.silence === true;
   const videoId = nowPlaying?.video_id ?? null;
@@ -151,6 +156,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       {
         turn,
         now_playing: nowPlaying,
+        queue,
         playing,
         timestamp_seconds: dTsRef.current,
         last_controller: userId,
@@ -239,26 +245,71 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       if (e.type === "enqueue") {
         const track = e.payload.track as Record<string, unknown> | undefined;
         if (track && room.canPersist) {
-          const turnPatch = {
-            current_dj: e.userId,
-            turn_started_at: new Date().toISOString(),
-          };
-          persistDj(
-            {
-              turn: turnPatch,
-              now_playing: track,
-              playing: true,
+          // First track auto-plays. Subsequent enqueues go to the
+          // tail of the queue so the current track plays through
+          // instead of getting clobbered (mirrors mobile's
+          // DjModule.reduce on DjEvent.enqueue).
+          if (nowPlaying == null) {
+            const turnPatch = currentDj
+              ? turn
+              : {
+                  current_dj: e.userId,
+                  turn_started_at: new Date().toISOString(),
+                };
+            persistDj(
+              {
+                turn: turnPatch,
+                now_playing: track,
+                playing: true,
+                timestamp_seconds: 0,
+                silence: false,
+              },
+              typeof track.video_id === "string"
+                ? {
+                    event_type: "queued_track",
+                    payload: { text: `youtu.be/${track.video_id}` },
+                  }
+                : undefined,
+            );
+          } else {
+            persistDj({ queue: [...queue, track as unknown as DjTrack] });
+          }
+        }
+        return;
+      }
+      if (e.type === "skip_to_next" || e.type === "end_turn") {
+        // Advance the queue locally so partners stay in sync. Only the
+        // current DJ's skip mutates state (mirrors mobile guard).
+        if (!room.canPersist) return;
+        if (e.type === "skip_to_next" && e.userId !== currentDj) return;
+        if (queue.length === 0) {
+          // Nothing queued — clear now_playing and (for end_turn) the
+          // turn itself; skip just stops the music.
+          if (e.type === "end_turn") {
+            persistDj({
+              turn: { current_dj: null, turn_started_at: null },
+              now_playing: null,
+              queue: [],
+              playing: false,
               timestamp_seconds: 0,
               silence: false,
-            },
-            typeof track.video_id === "string"
-              ? {
-                  event_type: "queued_track",
-                  payload: { text: `youtu.be/${track.video_id}` },
-                }
-              : undefined,
-          );
+            });
+          } else {
+            persistDj({ now_playing: null, playing: false, timestamp_seconds: 0 });
+          }
+          return;
         }
+        // Shift queue → now_playing. end_turn from a non-DJ doesn't
+        // touch state (only the DJ can end their turn) but skip_to_next
+        // from the DJ does.
+        if (e.type === "end_turn" && e.userId !== currentDj) return;
+        const [next, ...rest] = queue;
+        persistDj({
+          now_playing: next,
+          queue: rest,
+          playing: true,
+          timestamp_seconds: 0,
+        });
         return;
       }
       if (e.type === "play" && p?.playVideo) {
@@ -332,10 +383,36 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
         channel_title: null,
         video_id: id,
       };
+      // Broadcast the enqueue so the partner can mirror; their reducer
+      // appends to queue if something's already playing.
+      void session?.sendEvent("enqueue", { track });
+      if (nowPlaying != null) {
+        // A track is already playing — append to OUR queue (the partner's
+        // enqueue-listener does the same on their side).
+        persistDj(
+          { queue: [...queue, track] },
+          { event_type: "queued_track", payload: { text: `youtu.be/${id}` } },
+        );
+        void fetchOEmbed(id).then((m) => {
+          if (m) {
+            // Patch the queued track with metadata once it lands. We
+            // re-read the latest queue snapshot at apply time so we
+            // don't clobber concurrent enqueues; the lookup is by id.
+            persistDj({
+              queue: [...queue, track].map((t) =>
+                t.id === track.id
+                  ? { ...t, title: m.title, channel_title: m.author_name }
+                  : t,
+              ),
+            });
+          }
+        });
+        return;
+      }
+      // Empty stage — start playback immediately.
       const nextTurn = currentDj
         ? { ...turn, turn_started_at: turn.turn_started_at ?? new Date().toISOString() }
         : { current_dj: userId, turn_started_at: new Date().toISOString() };
-      void session?.sendEvent("enqueue", { track });
       void session?.sendEvent("play", { timestamp_seconds: 0 });
       persistDj(
         { turn: nextTurn, now_playing: track, playing: true, timestamp_seconds: 0, silence: false },
@@ -355,7 +432,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [session, userId, currentDj, turn],
+    [session, userId, currentDj, turn, nowPlaying, queue],
   );
 
   const playUrl = (e: React.FormEvent) => {
@@ -371,11 +448,27 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
   };
 
   const passAux = () => {
+    // If there's anything queued, "next" means advance the queue,
+    // not end the turn — matches mobile's distinct
+    // skipToNext vs endTurn events.
+    if (queue.length > 0) {
+      const [nextTrack, ...rest] = queue;
+      void session?.sendEvent("skip_to_next", {});
+      persistDj({
+        now_playing: nextTrack,
+        queue: rest,
+        playing: true,
+        timestamp_seconds: 0,
+      });
+      return;
+    }
+    // Empty queue — pass the aux to the partner (or clear if no partner).
     const next = partnerId ?? null;
     void session?.sendEvent("end_turn", {});
     persistDj({
       turn: { current_dj: next, turn_started_at: next ? new Date().toISOString() : null },
       now_playing: null,
+      queue: [],
       playing: false,
       timestamp_seconds: 0,
       silence: false,
@@ -507,11 +600,15 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
           ) : null}
         </div>
 
-        {/* ───────── 2. Transport row ───────── */}
+        {/* ───────── 2. Transport row ─────────
+            "Next" is enabled when there's something to advance to:
+            either a queued track (skip-to-next), or a partner who can
+            take the aux when the queue's empty. Either way, it only
+            functions for the active DJ. */}
         <TransportRow
           playing={playing}
           enabled={Boolean(videoId)}
-          canSkip={Boolean(partnerId) && isDJ}
+          canSkip={isDJ && (queue.length > 0 || Boolean(partnerId))}
           onTogglePlay={togglePlayPause}
           onNext={passAux}
         />
@@ -546,18 +643,68 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       </section>
 
       {/* ───────── 4. UP NEXT ─────────
-          Web's durable state carries a single `now_playing`, not a
-          multi-track queue. Mobile has the multi-track shape; web
-          doesn't surface it yet, so the section stays hidden.
-
-          TODO(web-dj-queue): wire the queue UI once web's durable
-          state can carry a list. Needed shape on the server:
-            - dj.state.queue: DjTrack[]  (FIFO; head is currentN+1)
-            - on enqueue event → push to queue (DJ's session)
-            - on track-ended / skip → shift queue → now_playing
-          Re-enable this block, render queue.map() as 44pt tiles
-          on mobile / 56pt with bigger thumbs on desktop (lg:),
-          plus a "Clear" affordance for the DJ. */}
+          Compact list of queued tracks. Mirrors mobile's _DjUpNextList:
+          44pt tiles with a thumbnail and the track title. DJ-only
+          "Clear" affordance lives in the section header. */}
+      {queue.length > 0 && (
+        <section className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between px-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Up next · {queue.length}
+            </p>
+            {isDJ && (
+              <button
+                type="button"
+                onClick={() => persistDj({ queue: [] })}
+                className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground transition hover:text-cream"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <ul className="flex flex-col gap-1">
+            {queue.map((t, idx) => {
+              const tThumb = t.video_id
+                ? `https://i.ytimg.com/vi/${t.video_id}/mqdefault.jpg`
+                : null;
+              return (
+                <li
+                  key={`${t.id}-${idx}`}
+                  className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-card/40 px-2 py-1.5"
+                >
+                  <div className="h-9 w-9 shrink-0 overflow-hidden rounded-md bg-secondary">
+                    {tThumb ? (
+                      // eslint-disable-next-line jsx-a11y/alt-text
+                      <img src={tThumb} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-[10px] text-muted-foreground">
+                        ▶
+                      </div>
+                    )}
+                  </div>
+                  <p className="min-w-0 flex-1 truncate text-[13px] text-cream">
+                    {t.title || "Track"}
+                  </p>
+                  {isDJ && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        persistDj({
+                          queue: queue.filter((_, i) => i !== idx),
+                        })
+                      }
+                      aria-label="Remove from queue"
+                      className="text-[11px] text-muted-foreground transition hover:text-cream"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {/* ───────── 5. Paste-URL field — DJ-only ───────── */}
       {isDJ && (
