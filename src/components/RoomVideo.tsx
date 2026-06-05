@@ -9,9 +9,11 @@ import {
 } from "@livekit/components-react";
 import { Track, type Participant } from "livekit-client";
 import "@livekit/components-styles";
-import { Mic, MicOff, Video, VideoOff, Camera } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Camera, VideoOff as VideoOffIcon } from "lucide-react";
 import { livekitToken } from "@/lib/rooms";
 import { useRoomSession } from "@/context/RoomSessionContext";
+import { useChromeVisible } from "@/context/ChromeVisibilityContext";
+import { cn } from "@/lib/utils";
 
 const REACTIONS = ["❤️", "🔥", "😂", "🤔", "🥹"];
 
@@ -162,84 +164,110 @@ function capturePhoto(
   a.click();
 }
 
-/** When the partner's camera is off, show their avatar centered with
- * a pulse-on-speech halo so you can tell they're talking even when
- * audio is muted on your side. Reads `isSpeaking` from the remote
- * Participant via the LiveKit context. */
-function CameraOffAvatar({
+/** Partner avatar at scale with a slow breathing halo. Rendered when
+ *  the partner's camera is off OR before their video track lands, so
+ *  the room feels open instead of showing a hard "Connecting…" card.
+ *  Halo brightens on speech when a Participant is provided.
+ *
+ *  This variant must be used *inside* a LiveKitRoom (it taps the
+ *  `useIsSpeaking` hook). For the pre-connect screen, see
+ *  `PreConnectHalo` which renders the same shape statically. */
+function PartnerHaloAvatar({
   participant,
   name,
   photoUrl,
+  state,
 }: {
   participant: Participant;
   name: string;
   photoUrl: string | null;
+  /** 'waiting' shows the warm halo + 'we're listening' caption; 'off'
+   *  shows the camera-off caption. Both paint the breathing glow. */
+  state: "waiting" | "off";
 }) {
   const isSpeaking = useIsSpeaking(participant);
-  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-gradient-to-b from-background/40 via-background/30 to-background/60">
+    <HaloAvatarPresentational
+      name={name}
+      photoUrl={photoUrl}
+      state={state}
+      isSpeaking={isSpeaking}
+    />
+  );
+}
+
+/** Pure presentational halo avatar — no hooks, safe to render outside
+ *  a LiveKitRoom (pre-connect, error states, etc). */
+function HaloAvatarPresentational({
+  name,
+  photoUrl,
+  state,
+  isSpeaking,
+}: {
+  name: string;
+  photoUrl: string | null;
+  state: "waiting" | "off";
+  isSpeaking: boolean;
+}) {
+  const initial = (name || "?").trim().charAt(0).toUpperCase() || "?";
+  const caption = state === "waiting" ? "we're listening" : isSpeaking ? "speaking" : "camera off";
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 px-6">
       <div className="relative">
-        {/* Halo — pulses when the partner's mic picks them up. Two
-            concentric rings so the wave reads even at a glance. The
-            colour follows the room's customized accent. */}
+        {/* Outer breathing bloom — slow, low-amplitude. Brightens on speech. */}
         <span
           aria-hidden
-          className={[
-            "absolute inset-0 -m-6 rounded-full blur-xl transition-all duration-300",
-            isSpeaking ? "scale-125 opacity-100" : "scale-100 opacity-0",
-          ].join(" ")}
-          style={{ backgroundColor: "var(--room-accent-soft)" }}
+          className="absolute inset-0 -m-16 rounded-full blur-3xl"
+          style={{
+            background:
+              "radial-gradient(circle, var(--room-accent-soft) 0%, transparent 70%)",
+            animation: "breathe-halo 5.5s ease-in-out infinite",
+            opacity: isSpeaking ? 0.95 : undefined,
+          }}
         />
+        {/* Inner accent ring — punchy ping when speaking. */}
         <span
           aria-hidden
-          className={[
-            "absolute inset-0 -m-3 rounded-full border-2 transition-all duration-200",
-            isSpeaking
-              ? "scale-110 opacity-100 animate-pulse"
-              : "scale-100 opacity-0",
-          ].join(" ")}
-          style={{ borderColor: "color-mix(in srgb, var(--room-accent) 50%, transparent)" }}
+          className={cn(
+            "absolute inset-0 -m-4 rounded-full border transition-all duration-300",
+            isSpeaking ? "scale-110 opacity-100" : "scale-100 opacity-40",
+          )}
+          style={{ borderColor: "color-mix(in srgb, var(--room-accent) 55%, transparent)" }}
         />
+        {/* Avatar disc */}
         <div
-          className={[
-            "relative h-28 w-28 sm:h-32 sm:w-32 rounded-full overflow-hidden flex items-center justify-center",
-            "border-2 transition-all duration-300",
-          ].join(" ")}
-          style={
-            isSpeaking
-              ? {
-                  borderColor: "color-mix(in srgb, var(--room-accent) 80%, transparent)",
-                  boxShadow: "0 0 60px var(--room-accent-soft)",
-                  background:
-                    "linear-gradient(135deg, color-mix(in srgb, var(--room-accent) 25%, transparent), color-mix(in srgb, var(--room-accent) 10%, transparent), transparent)",
-                }
-              : {
-                  borderColor: "rgba(255,255,255,0.15)",
-                  boxShadow: "0 18px 50px -15px rgba(0,0,0,0.7)",
-                  background:
-                    "linear-gradient(135deg, color-mix(in srgb, var(--room-accent) 25%, transparent), color-mix(in srgb, var(--room-accent) 10%, transparent), transparent)",
-                }
-          }
+          className="relative flex h-32 w-32 sm:h-40 sm:w-40 items-center justify-center overflow-hidden rounded-full border-2 transition-shadow duration-300"
+          style={{
+            borderColor: "color-mix(in srgb, var(--room-accent) 70%, transparent)",
+            boxShadow: isSpeaking
+              ? "0 0 80px var(--room-accent-soft), inset 0 0 0 1px rgba(255,255,255,0.06)"
+              : "0 22px 60px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.06)",
+            background:
+              "linear-gradient(135deg, color-mix(in srgb, var(--room-accent) 30%, transparent), color-mix(in srgb, var(--room-accent) 12%, transparent), transparent)",
+          }}
         >
           {photoUrl ? (
             <img src={photoUrl} alt="" className="h-full w-full object-cover" />
           ) : (
-            <span className="font-serif text-5xl sm:text-6xl text-cream">{initial}</span>
+            <span className="font-serif text-6xl sm:text-7xl text-cream">{initial}</span>
           )}
         </div>
       </div>
       <div className="text-center">
-        <p className="font-serif italic text-cream text-base">{name || "Partner"}</p>
+        <p className="font-serif italic text-cream text-lg">{name || "Partner"}</p>
         <p
-          className={[
-            "mt-1 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.28em] transition-colors",
-            isSpeaking ? "" : "text-muted-foreground/60",
-          ].join(" ")}
-          style={isSpeaking ? { color: "var(--room-accent)" } : undefined}
+          className={cn(
+            "mt-1.5 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.28em] transition-colors",
+            isSpeaking || state === "waiting" ? "" : "text-muted-foreground/60",
+          )}
+          style={
+            isSpeaking || state === "waiting"
+              ? { color: "var(--room-accent)" }
+              : undefined
+          }
         >
-          <VideoOff className="h-3 w-3" aria-hidden />
-          {isSpeaking ? "speaking" : "camera off"}
+          {state === "off" && <VideoOffIcon className="h-3 w-3" aria-hidden />}
+          {caption}
         </p>
       </div>
     </div>
@@ -249,6 +277,7 @@ function CameraOffAvatar({
 /** Partner full-bleed, self as a draggable picture-in-picture. */
 function Stage() {
   const room = useRoomSession();
+  const chromeVisible = useChromeVisible();
   const cameraTracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const local = cameraTracks.find((t) => t.participant.isLocal);
   const remote = cameraTracks.find((t) => !t.participant.isLocal);
@@ -311,18 +340,44 @@ function Stage() {
     scheduleCapture(at);
   }
 
-  // Draggable PIP position.
-  const [pos, setPos] = useState({ x: 16, y: 90 });
-  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
+  // Draggable PIP. Default bottom-right (PIP_W + 24px from each edge);
+  // computed inside an effect so SSR / first paint doesn't crash on
+  // `window`. Re-clamps to the viewport on resize so a window-shrink
+  // doesn't strand the PIP off-screen.
+  const PIP_W = 132;
+  const PIP_H = 188;
+  const PIP_PAD = 20;
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const dragRef = useRef<{ dx: number; dy: number; moved: boolean } | null>(null);
+  useEffect(() => {
+    const place = () => {
+      const x = Math.max(PIP_PAD, window.innerWidth - PIP_W - PIP_PAD);
+      const y = Math.max(PIP_PAD, window.innerHeight - PIP_H - PIP_PAD - 96);
+      setPos((cur) => {
+        if (!cur) return { x, y };
+        // Re-clamp; don't reset a user-chosen position unless it's now
+        // off-screen.
+        return {
+          x: Math.min(Math.max(PIP_PAD, cur.x), window.innerWidth - PIP_W - PIP_PAD),
+          y: Math.min(Math.max(PIP_PAD, cur.y), window.innerHeight - PIP_H - PIP_PAD),
+        };
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, []);
 
   function onPointerDown(e: React.PointerEvent) {
+    if (!pos) return;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    dragRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
+    dragRef.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y, moved: false };
   }
   function onPointerMove(e: React.PointerEvent) {
     if (!dragRef.current) return;
-    const x = Math.max(8, Math.min(window.innerWidth - 120, e.clientX - dragRef.current.dx));
-    const y = Math.max(72, Math.min(window.innerHeight - 200, e.clientY - dragRef.current.dy));
+    const x = Math.max(PIP_PAD, Math.min(window.innerWidth - PIP_W - PIP_PAD, e.clientX - dragRef.current.dx));
+    const y = Math.max(PIP_PAD, Math.min(window.innerHeight - PIP_H - PIP_PAD, e.clientY - dragRef.current.dy));
+    if (Math.hypot(e.movementX, e.movementY) > 1) dragRef.current.moved = true;
     setPos({ x, y });
   }
   function onPointerUp() {
@@ -352,24 +407,38 @@ function Stage() {
     return { name, photoUrl };
   }, [room.presence, room.senderId]);
 
+  // What to render in the main stage:
+  //   - partner video on, track subscribed → VideoTrack
+  //   - partner present but cam off → halo avatar (state="off")
+  //   - no partner yet → halo avatar (state="waiting", no participant)
+  const remoteMuted = remote?.publication?.isMuted === true;
+  const showVideo = remote && !remoteMuted;
+
   return (
     <div className="absolute inset-0" onDoubleClick={() => sendReaction("❤️")}>
-      {/* Partner */}
+      {/* Partner — full-bleed inside the stage frame. The frame itself
+          is painted by LiveRoom (rounded card on desktop, edge-to-edge
+          on mobile). */}
       <div ref={partnerWrapRef} className="absolute inset-0">
-        {remote ? (
-          remote.publication?.isMuted ? (
-            <CameraOffAvatar
-              participant={remote.participant}
-              name={partnerDisplay.name}
-              photoUrl={partnerDisplay.photoUrl}
-            />
-          ) : (
-            <VideoTrack trackRef={remote} className="w-full h-full object-cover" />
-          )
+        {showVideo ? (
+          <VideoTrack trackRef={remote} className="w-full h-full object-cover" />
+        ) : remote ? (
+          <PartnerHaloAvatar
+            participant={remote.participant}
+            name={partnerDisplay.name}
+            photoUrl={partnerDisplay.photoUrl}
+            state="off"
+          />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <p className="font-serif italic text-cream/70 text-lg">Waiting for them…</p>
-          </div>
+          // No partner participant yet — fall through to the static halo
+          // (the `useIsSpeaking` hook needs a participant, and there
+          // isn't one to feed it).
+          <HaloAvatarPresentational
+            name={partnerDisplay.name}
+            photoUrl={partnerDisplay.photoUrl}
+            state="waiting"
+            isSpeaking={false}
+          />
         )}
       </div>
 
@@ -387,60 +456,140 @@ function Stage() {
         </div>
       )}
 
-      {/* Self PIP */}
-      {local && (
+      {/* Self PIP — draggable on desktop, fixed corner on mobile.
+          Rounded with a soft accent-tinted shadow that brightens on
+          drag. Hidden until pos is computed (avoids a top-left flash). */}
+      {local && pos && (
         <div
           ref={selfWrapRef}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
-          style={{ left: pos.x, top: pos.y }}
-          className="absolute z-20 w-[104px] h-[150px] rounded-2xl overflow-hidden border border-white/15 shadow-lg cursor-grab active:cursor-grabbing touch-none"
+          style={{
+            left: pos.x,
+            top: pos.y,
+            width: PIP_W,
+            height: PIP_H,
+            boxShadow:
+              "0 18px 50px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.10), 0 0 32px var(--room-accent-soft)",
+          }}
+          className="absolute z-20 rounded-[22px] overflow-hidden cursor-grab active:cursor-grabbing touch-none transition-shadow duration-200"
         >
           {isCameraEnabled ? (
             <VideoTrack trackRef={local} className="w-full h-full object-cover scale-x-[-1]" />
           ) : (
-            <div className="w-full h-full bg-secondary flex items-center justify-center text-cream/50">
+            <div
+              className="w-full h-full flex items-center justify-center text-cream/60"
+              style={{ background: "linear-gradient(160deg, hsl(22 16% 18%), hsl(22 14% 12%))" }}
+            >
               <VideoOff className="w-5 h-5" />
             </div>
           )}
         </div>
       )}
 
-      {/* Reaction bar + mic/cam controls */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-full bg-black/45 backdrop-blur px-3 py-2">
-        <button
-          type="button"
-          aria-label="Toggle mic"
-          onClick={() => void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
-          className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-cream hover:bg-white/20 transition"
+      {/* Bottom control island — glass pill, fades with chrome. Holds
+          mic / cam / capture + reactions. Sits above the MediaMiniPlayer
+          and Activities pill via the spacer-padding on LiveRoom's main. */}
+      <div
+        className={cn(
+          "pointer-events-none absolute left-1/2 -translate-x-1/2 z-30 transition-all duration-300",
+          chromeVisible
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 translate-y-3",
+        )}
+        style={{ bottom: 24 }}
+      >
+        <div
+          className={cn(
+            "pointer-events-auto flex items-center gap-1.5 rounded-full px-2 py-2",
+            "backdrop-blur-2xl border border-white/[0.10]",
+          )}
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(20,16,12,0.55), rgba(20,16,12,0.72))",
+            boxShadow:
+              "0 22px 60px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)",
+          }}
         >
-          {isMicrophoneEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4 text-rose" />}
-        </button>
-        <button
-          type="button"
-          aria-label="Toggle camera"
-          onClick={() => void localParticipant.setCameraEnabled(!isCameraEnabled)}
-          className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-cream hover:bg-white/20 transition"
-        >
-          {isCameraEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4 text-rose" />}
-        </button>
-        <button
-          type="button"
-          aria-label="Take a photo together"
-          onClick={startCapture}
-          disabled={countdown != null}
-          className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-cream hover:bg-white/20 transition disabled:opacity-50"
-        >
-          <Camera className="w-4 h-4" />
-        </button>
-        <div className="w-px h-6 bg-white/15" />
-        {REACTIONS.map((e) => (
-          <button key={e} type="button" onClick={() => sendReaction(e)} className="w-9 h-9 rounded-full hover:bg-white/10 text-lg transition">
-            {e}
-          </button>
-        ))}
+          <CallButton
+            label={isMicrophoneEnabled ? "Mute" : "Unmute"}
+            onClick={() => void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
+            tone={isMicrophoneEnabled ? "default" : "alert"}
+          >
+            {isMicrophoneEnabled ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
+          </CallButton>
+          <CallButton
+            label={isCameraEnabled ? "Camera off" : "Camera on"}
+            onClick={() => void localParticipant.setCameraEnabled(!isCameraEnabled)}
+            tone={isCameraEnabled ? "default" : "alert"}
+          >
+            {isCameraEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+          </CallButton>
+          <CallButton
+            label="Take a photo together"
+            onClick={startCapture}
+            disabled={countdown != null}
+          >
+            <Camera className="w-4 h-4" />
+          </CallButton>
+          <span className="mx-1 h-6 w-px bg-white/10" aria-hidden />
+          {REACTIONS.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => sendReaction(e)}
+              aria-label={`React ${e}`}
+              className="focus-ring h-9 w-9 rounded-full text-lg transition hover:bg-white/10"
+            >
+              {e}
+            </button>
+          ))}
+        </div>
       </div>
+    </div>
+  );
+}
+
+/** Single control button in the floating island. `tone="alert"` flips
+ *  the icon colour to the destructive rose (muted mic / cam off) so
+ *  the user can see the state at a glance without the icon being the
+ *  cue. Hover surfaces the label as a tooltip caption above. */
+function CallButton({
+  children,
+  label,
+  onClick,
+  disabled,
+  tone = "default",
+}: {
+  children: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  tone?: "default" | "alert";
+}) {
+  return (
+    <div className="group relative">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        className={cn(
+          "focus-ring flex h-10 w-10 items-center justify-center rounded-full transition",
+          "bg-white/[0.06] text-cream hover:bg-white/[0.12]",
+          tone === "alert" && "text-rose bg-rose/10 hover:bg-rose/15",
+          disabled && "opacity-50",
+        )}
+      >
+        {children}
+      </button>
+      <span
+        className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/70 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-cream/85 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+        aria-hidden
+      >
+        {label}
+      </span>
     </div>
   );
 }
@@ -475,15 +624,12 @@ export function RoomVideo() {
     return <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">{error}</div>;
   }
   if (!conn) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div
-          className="w-2 h-2 rounded-full animate-pulse-glow"
-          style={{ backgroundColor: "var(--room-accent)" }}
-          aria-hidden
-        />
-      </div>
-    );
+    // Pre-connect we don't yet have the partner's presence Participant
+    // either, so a halo avatar with the resolved partner name is
+    // friendlier than a literal spinner card. We can pull the name
+    // from the room channel's presence (mounted before the LiveKit
+    // token resolves).
+    return <PreConnectHalo />;
   }
 
   return (
@@ -491,5 +637,37 @@ export function RoomVideo() {
       <Stage />
       <RoomAudioRenderer />
     </LiveKitRoom>
+  );
+}
+
+/** Outside-LiveKitRoom equivalent of the in-Stage halo, used while we
+ *  fetch the LiveKit token. Same visual language so the transition
+ *  into the call doesn't read as a jump-cut. */
+function PreConnectHalo() {
+  const room = useRoomSession();
+  const partner = useMemo(() => {
+    const me = room.senderId;
+    const entry = room.presence.find((p) => {
+      const sid =
+        (typeof p.sender_id === "string" && p.sender_id) ||
+        (typeof p.user_id === "string" && p.user_id) ||
+        "";
+      return Boolean(sid) && sid !== me;
+    });
+    const name =
+      (typeof entry?.name === "string" && entry.name) ||
+      (typeof entry?.display_name === "string" && entry.display_name) ||
+      "Partner";
+    const photoUrl =
+      (typeof entry?.photo_url === "string" && entry.photo_url) || null;
+    return { name, photoUrl };
+  }, [room.presence, room.senderId]);
+  return (
+    <HaloAvatarPresentational
+      name={partner.name}
+      photoUrl={partner.photoUrl}
+      state="waiting"
+      isSpeaking={false}
+    />
   );
 }

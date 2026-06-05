@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -18,6 +18,7 @@ import {
   roomAccentStyle,
   useRoomCustomization,
 } from "@/context/RoomCustomizationContext";
+import { ChromeVisibilityContext } from "@/context/ChromeVisibilityContext";
 import { RoomVideo } from "@/components/RoomVideo";
 import { ActivityTray } from "@/components/ActivityTray";
 import { MediaMiniPlayer } from "@/components/MediaMiniPlayer";
@@ -53,12 +54,12 @@ function Countdown({ expiresAt }: { expiresAt: string }) {
   const colorStyle =
     remaining > 30 && remaining <= 120 ? { color: "var(--room-accent)" } : undefined;
   return (
-    <div className="flex items-center gap-1.5 rounded-full bg-black/45 backdrop-blur px-3 py-1.5">
+    <ChromePill>
       <Clock className="w-3.5 h-3.5 text-muted-foreground" />
       <span className={`tabular-nums text-sm font-medium ${colorClass}`} style={colorStyle}>
         {mm}:{ss}
       </span>
-    </div>
+    </ChromePill>
   );
 }
 
@@ -84,6 +85,45 @@ function KickedListener({ onKicked }: { onKicked: () => void }) {
     return () => off();
   }, [session, onKicked]);
   return null;
+}
+
+/** Shared chrome pill — translucent rounded capsule used by the
+ *  header (room name, countdown, leave). Keeps spacing/border/blur
+ *  identical so the top edge reads as a row of floating pills, not
+ *  a header bar. */
+function ChromePill({
+  children,
+  className,
+  asButton,
+  ...rest
+}: {
+  children: React.ReactNode;
+  className?: string;
+  asButton?: boolean;
+} & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children">) {
+  const cls = cn(
+    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 backdrop-blur-xl",
+    "border border-white/[0.08]",
+    className,
+  );
+  const style = {
+    background:
+      "linear-gradient(180deg, rgba(20,16,12,0.55), rgba(20,16,12,0.72))",
+    boxShadow:
+      "0 14px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)",
+  } as React.CSSProperties;
+  if (asButton) {
+    return (
+      <button {...rest} className={cn(cls, "focus-ring transition hover:bg-white/[0.04]")} style={style}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <div className={cls} style={style}>
+      {children}
+    </div>
+  );
 }
 
 /** Desktop bottom-left presence strip — small Snapchat-style row of
@@ -130,7 +170,7 @@ function DesktopPresenceStrip() {
   }, [session.presence, session.senderId, session.displayName, session.photoUrl]);
 
   return (
-    <div className="hidden lg:flex absolute left-4 bottom-4 z-30 items-center gap-2 rounded-full bg-black/45 backdrop-blur px-2 py-1.5 ring-1 ring-white/[0.08]">
+    <div className="hidden lg:flex items-center gap-2">
       {people.map((p) => (
         <PresenceAvatar key={p.id} name={p.name} photo={p.photo} present />
       ))}
@@ -151,12 +191,20 @@ function PresenceAvatar({
   return (
     <div
       className={cn(
-        "relative h-9 w-9 overflow-hidden rounded-full transition ring-2",
-        present ? "ring-[var(--room-accent)]/85" : "ring-white/15",
+        "relative h-10 w-10 overflow-hidden rounded-full transition",
+        present ? "ring-2 ring-offset-0" : "ring-1 ring-white/15",
       )}
       style={
         present
-          ? { boxShadow: "0 0 18px var(--room-accent-soft)" }
+          ? {
+              boxShadow:
+                "0 0 24px var(--room-accent-soft), 0 6px 18px rgba(0,0,0,0.45)",
+              // Tailwind's `ring-[var(--room-accent)]/85` doesn't compose
+              // colour-mix inside `ring` cleanly, so set the colour
+              // directly with `--tw-ring-color`.
+              ["--tw-ring-color" as string]:
+                "color-mix(in srgb, var(--room-accent) 75%, transparent)",
+            }
           : undefined
       }
       title={name}
@@ -185,7 +233,15 @@ function DesktopQuickLaunch({ onLaunch }: { onLaunch: (id: string) => void }) {
     { id: "this_or_that", label: "This or That", Icon: Gamepad2 },
   ];
   return (
-    <div className="hidden lg:flex absolute right-4 bottom-4 z-30 items-center gap-1.5 rounded-full bg-black/45 backdrop-blur px-2 py-1.5 ring-1 ring-white/[0.08]">
+    <div
+      className="hidden lg:flex items-center gap-1.5 rounded-full px-2 py-1.5 backdrop-blur-xl border border-white/[0.08]"
+      style={{
+        background:
+          "linear-gradient(180deg, rgba(20,16,12,0.55), rgba(20,16,12,0.72))",
+        boxShadow:
+          "0 14px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)",
+      }}
+    >
       {chips.map((c) => (
         <button
           key={c.id}
@@ -200,6 +256,89 @@ function DesktopQuickLaunch({ onLaunch }: { onLaunch: (id: string) => void }) {
       ))}
     </div>
   );
+}
+
+/** Two slow-drifting ambient blooms behind the stage. Sit between the
+ *  customised background and the stage frame so the video reads on top
+ *  of a deep, lived-in scene rather than a flat wash. Desktop-only —
+ *  on mobile they'd compete with the full-bleed video for attention. */
+function AmbientBlooms() {
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 hidden lg:block overflow-hidden"
+      aria-hidden
+    >
+      <div
+        className="absolute -left-[18%] -top-[20%] h-[60%] w-[60%] rounded-full blur-[120px]"
+        style={{
+          background:
+            "radial-gradient(circle, var(--room-accent-soft) 0%, transparent 70%)",
+          opacity: 0.55,
+          animation: "drift-bloom-a 32s ease-in-out infinite",
+        }}
+      />
+      <div
+        className="absolute -right-[14%] -bottom-[18%] h-[55%] w-[55%] rounded-full blur-[110px]"
+        style={{
+          background:
+            "radial-gradient(circle, color-mix(in srgb, var(--room-accent) 38%, transparent) 0%, transparent 70%)",
+          opacity: 0.4,
+          animation: "drift-bloom-b 38s ease-in-out infinite",
+        }}
+      />
+    </div>
+  );
+}
+
+/** Tracks mouse-still for FaceTime-style chrome auto-hide. Always-on
+ *  on touch devices (no `mousemove` to detect stillness). */
+function useAutoHideChrome(idleMs: number = 3000): {
+  visible: boolean;
+  /** Mount on the LiveRoom root so all movement bumps it. */
+  bind: { onMouseMove: () => void; onMouseLeave: () => void };
+  /** Imperative force-show — call from controls that take focus. */
+  show: () => void;
+} {
+  const [visible, setVisible] = useState(true);
+  const timerRef = useRef<number | null>(null);
+  const touchOnlyRef = useRef(false);
+  // Detect touch-only devices and keep chrome up.
+  useEffect(() => {
+    const mq = window.matchMedia("(hover: none)");
+    touchOnlyRef.current = mq.matches;
+    const onChange = () => {
+      touchOnlyRef.current = mq.matches;
+      if (mq.matches) setVisible(true);
+    };
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+  const arm = useCallback(() => {
+    if (timerRef.current != null) window.clearTimeout(timerRef.current);
+    if (touchOnlyRef.current) {
+      setVisible(true);
+      return;
+    }
+    timerRef.current = window.setTimeout(() => setVisible(false), idleMs);
+  }, [idleMs]);
+  useEffect(() => {
+    arm();
+    return () => {
+      if (timerRef.current != null) window.clearTimeout(timerRef.current);
+    };
+  }, [arm]);
+  const show = useCallback(() => {
+    setVisible(true);
+    arm();
+  }, [arm]);
+  return {
+    visible,
+    bind: {
+      onMouseMove: show,
+      onMouseLeave: () => setVisible(true),
+    },
+    show,
+  };
 }
 
 function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; isHost: boolean; roomId: string }) {
@@ -222,6 +361,12 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
   const expired = expiresAt
     ? now >= new Date(expiresAt).getTime()
     : false;
+  const { visible: chromeVisible, bind: autoHideBind } = useAutoHideChrome(3000);
+  // Force chrome up whenever the tray opens / a confirm modal shows —
+  // otherwise tapping a control could trigger a hide while focus is on
+  // the modal.
+  const forceChromeOn = trayOpen || showLeaveConfirm || expired;
+  const effectiveChromeVisible = chromeVisible || forceChromeOn;
 
   // Apply the chosen background gradient to the room shell. Defaults
   // to the warm-dark DateRoom gradient when the host hasn't picked one
@@ -232,12 +377,13 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
   };
 
   return (
-    <PageShell
-      orbs={false}
-      vignette={false}
-      className="h-screen flex overflow-hidden"
-      style={shellStyle}
-    >
+    <ChromeVisibilityContext.Provider value={effectiveChromeVisible}>
+      <PageShell
+        orbs={false}
+        vignette={false}
+        className="h-screen flex overflow-hidden"
+        style={shellStyle}
+      >
       {/* Listen for the host's 'kicked' broadcast. If our participant_id
           is the one being kicked, navigate home with a toast. */}
       <KickedListener
@@ -252,53 +398,109 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
           navigate("/home");
         }}
       />
-      {/* Left column: video + chrome (full width on mobile, flex-1 beside the panel on desktop) */}
-      <div className="flex-1 min-w-0 flex flex-col relative">
-      {/* Header chrome over the video */}
-      <header className="relative z-20 flex items-center justify-between gap-2 px-3 sm:px-6 py-3 shrink-0">
-        <div className="flex items-center gap-2 rounded-full bg-black/45 backdrop-blur px-3 py-1.5 min-w-0 ring-1 ring-white/[0.08]">
-          <span
-            className="w-1.5 h-1.5 rounded-full animate-pulse-glow shrink-0"
-            style={{ backgroundColor: "var(--room-accent)" }}
-          />
-          <h1 className="font-serif italic text-cream text-sm tracking-wide truncate">
-            {DATE_NAME || "Our Room"}
-          </h1>
+      {/* Left column: cinematic stage + chrome (full width on mobile,
+          flex-1 beside the docked panel on desktop). The mouse-move
+          listener feeds the auto-hide; pointermove fires for both
+          mouse and trackpad. */}
+      <div
+        className="flex-1 min-w-0 flex flex-col relative cursor-default"
+        onMouseMove={autoHideBind.onMouseMove}
+        onMouseLeave={autoHideBind.onMouseLeave}
+      >
+        {/* Ambient blooms — desktop scene depth behind the stage. */}
+        <AmbientBlooms />
+
+      {/* Header chrome — floating pills, no divider, fades out with
+          auto-hide. `pointer-events-none` keeps the strip from blocking
+          double-tap-to-react on the stage; child pills opt back in. */}
+      <header
+        className={cn(
+          "pointer-events-none relative z-30 flex items-center justify-between gap-2 px-4 sm:px-8 pt-4 shrink-0 transition-all duration-300",
+          effectiveChromeVisible
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 -translate-y-2",
+        )}
+      >
+        <div className="pointer-events-auto flex items-center gap-2 min-w-0">
+          <ChromePill className="min-w-0">
+            <span
+              className="w-1.5 h-1.5 rounded-full animate-pulse-glow shrink-0"
+              style={{ backgroundColor: "var(--room-accent)" }}
+            />
+            <h1 className="font-serif italic text-cream text-sm tracking-wide truncate">
+              {DATE_NAME || "Our Room"}
+            </h1>
+          </ChromePill>
+          {/* Timer is a host-side tool — the guest doesn't get to plan
+              around the room's lifespan. Hide it from non-hosts. */}
+          {expiresAt && isHost && (
+            <div className="pointer-events-auto">
+              <Countdown expiresAt={expiresAt} />
+            </div>
+          )}
         </div>
-        {/* Timer is a host-side tool — the guest doesn't get to plan
-            around the room's lifespan. Hide it from non-hosts. */}
-        {expiresAt && isHost && <Countdown expiresAt={expiresAt} />}
-        <button
-          onClick={() => setShowLeaveConfirm(true)}
-          aria-label="Leave the room"
-          className="focus-ring flex items-center gap-1.5 rounded-full bg-black/45 backdrop-blur px-2.5 sm:px-3 py-1.5 text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-cream transition shrink-0 ring-1 ring-white/[0.08]"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Leave</span>
-        </button>
+        <div className="pointer-events-auto">
+          <ChromePill
+            asButton
+            onClick={() => setShowLeaveConfirm(true)}
+            aria-label="Leave the room"
+            className="text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-cream"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Leave</span>
+          </ChromePill>
+        </div>
       </header>
 
-      {/* Full-bleed partner video; LiveKit's own mic/cam controls sit at its base */}
-      <main className="flex-1 min-h-0 relative">
-        <RoomVideo />
-        {/* Desktop overlays — surface the Main-page concepts (presence,
-            quick-launch) directly on the canvas instead of burying them
-            behind the Activities pill. Both are lg-only; mobile keeps
-            the existing single-action layout with the centered call-bar
-            and the Activities pill below. */}
-        <DesktopPresenceStrip />
-        <DesktopQuickLaunch
-          onLaunch={(id) => {
-            // The tray's `externalOpenActivityId` channel already exists
-            // for the mini-player; quick-launch is the same gesture
-            // ("open this activity") from a different surface.
-            setExternalOpen(id);
-          }}
-        />
+      {/* Cinematic stage — partner video floats inside a rounded card on
+          desktop (with an outer glow), full-bleed on mobile. The video
+          and all in-stage overlays (PIP, reactions, controls) live
+          inside RoomVideo. z-10 keeps the stage above the AmbientBlooms
+          backdrop. */}
+      <main className="flex-1 min-h-0 relative z-10 px-0 pt-4 pb-0 lg:px-8 lg:pt-6">
+        <div className="relative h-full w-full overflow-hidden lg:rounded-[28px]" style={{
+          boxShadow: "0 40px 100px -30px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06), 0 0 60px var(--room-accent-soft)",
+        }}>
+          <RoomVideo />
+        </div>
+
+        {/* Desktop bottom-edge floating row — presence on the left, the
+            quick-launch chips on the right. Lives outside the video's
+            rounded mask so the avatars get their full halo bloom. Fades
+            with chrome. */}
+        <div
+          className={cn(
+            "pointer-events-none absolute inset-x-8 bottom-7 z-30 hidden lg:flex items-end justify-between transition-all duration-300",
+            effectiveChromeVisible
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 translate-y-2",
+          )}
+        >
+          <div className="pointer-events-auto">
+            <DesktopPresenceStrip />
+          </div>
+          <div className="pointer-events-auto">
+            <DesktopQuickLaunch
+              onLaunch={(id) => {
+                // The tray's `externalOpenActivityId` channel already exists
+                // for the mini-player; quick-launch is the same gesture
+                // ("open this activity") from a different surface.
+                setExternalOpen(id);
+              }}
+            />
+          </div>
+        </div>
       </main>
 
       {/* Activities launcher — mobile only; desktop shows the docked panel */}
-      <div className="lg:hidden relative z-20 flex justify-center py-3 shrink-0">
+      <div
+        className={cn(
+          "lg:hidden relative z-20 flex justify-center py-3 shrink-0 transition-all duration-300",
+          effectiveChromeVisible
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 translate-y-3",
+        )}
+      >
         <button
           type="button"
           onClick={() => setTrayOpen(true)}
@@ -318,13 +520,11 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
         gates the user into the call. Web doesn't have an equivalent
         gate: LiveKit auto-connects the moment we enter the room and
         the mic/cam are already publishable (subject to browser
-        permissions, which `<RoomVideo>` prompts for). The bottom call
-        bar inside `<RoomVideo>` already exposes mute/unmute toggles
-        and `<DesktopPresenceStrip>` shows the partner's halo when
-        they arrive — together those cover the "Join them" affordance
-        without a dedicated CTA pill. If we add a manual `connect={false}`
-        join step later (e.g. for cellular bandwidth gating), wire the
-        pill above the panel header here.
+        permissions, which `<RoomVideo>` prompts for). The floating
+        glass control island inside `<RoomVideo>` exposes mute/unmute
+        + camera + photo + reactions, and `<DesktopPresenceStrip>`
+        shows the partner's halo when they arrive — together those
+        cover the "Join them" affordance without a dedicated CTA pill.
       */}
       <ActivityTray
         open={trayOpen}
@@ -337,19 +537,29 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
 
       {/* Persistent media mini-player — visible when DJ has a track or
           Watch has a video AND that activity isn't already open. Tap
-          opens the activity in the tray (mobile) / docked panel (desktop). */}
-      <MediaMiniPlayer
-        currentActivityId={activeActivityId}
-        onOpenActivity={(id) => {
-          setExternalOpen(id);
-          // On mobile the tray is hidden by default — pop it up too.
-          setTrayOpen(true);
-        }}
-        // Mobile clears the Activities pill (~72px tall including padding);
-        // sit just above it so it doesn't visually collide. Desktop's
-        // docked panel never overlaps so 12px is fine there too.
-        bottomOffsetPx={80}
-      />
+          opens the activity in the tray (mobile) / docked panel (desktop).
+          Hidden when chrome auto-hides so the scene goes completely
+          quiet on mouse-still. */}
+      <div
+        className={cn(
+          "transition-opacity duration-300",
+          effectiveChromeVisible ? "opacity-100" : "opacity-0 pointer-events-none",
+        )}
+      >
+        <MediaMiniPlayer
+          currentActivityId={activeActivityId}
+          onOpenActivity={(id) => {
+            setExternalOpen(id);
+            // On mobile the tray is hidden by default — pop it up too.
+            setTrayOpen(true);
+          }}
+          // Sit above the bottom control island (~88px tall including
+          // padding) so the two don't overlap. Mobile clears the
+          // Activities pill (~72px tall) and the chrome — same value
+          // works for both.
+          bottomOffsetPx={96}
+        />
+      </div>
 
       {showLeaveConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in">
@@ -406,7 +616,8 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
           </div>
         </div>
       )}
-    </PageShell>
+      </PageShell>
+    </ChromeVisibilityContext.Provider>
   );
 }
 

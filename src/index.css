@@ -231,6 +231,28 @@
   75% { transform: scale(1.1) translateX(-1px); opacity: 0.8; }
 }
 
+/* Slow breathing radial glow — used behind the LiveRoom partner video
+   to make the scene feel alive even when nothing is happening. Low
+   amplitude on purpose so it's felt, not seen. ~6s cycle keeps it
+   restful (faster cycles read as anxious / a pulse-monitor). */
+@keyframes breathe-halo {
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50% { transform: scale(1.08); opacity: 0.85; }
+}
+
+/* Two ambient blooms drifting in slow counter-phase behind the
+   LiveRoom canvas — desktop only, decoupled from the breathing halo so
+   the motion has two timescales. Equivalents of mobile's LiveBackground
+   amber+rose orbits, expressed as CSS transforms. */
+@keyframes drift-bloom-a {
+  0%, 100% { transform: translate(-12%, -18%) scale(1); }
+  50% { transform: translate(8%, -4%) scale(1.08); }
+}
+@keyframes drift-bloom-b {
+  0%, 100% { transform: translate(10%, 14%) scale(1); }
+  50% { transform: translate(-6%, 22%) scale(1.05); }
+}
+
 @keyframes scale-in {
   from { opacity: 0; transform: scale(0.96); }
   to   { opacity: 1; transform: scale(1); }
