@@ -21,12 +21,14 @@ import OurRoom from "./pages/OurRoom";
 import Settings from "./pages/Settings";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
+import Support from "./pages/Support";
 import NotFound from "./pages/NotFound";
 import NeedInvite from "./pages/NeedInvite";
 import Paywall from "./pages/Paywall";
 import ProfileComplete from "./pages/ProfileComplete";
 import ReferralLanding from "./pages/ReferralLanding";
 import { AuthGuard } from "./components/AuthGuard";
+import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +50,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <ScrollToTop />
           <Routes>
             {/* Public / Marketing */}
             <Route path="/" element={<AuthGuard requireAuth={false}><Landing /></AuthGuard>} />
@@ -55,6 +58,7 @@ const App = () => {
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
+            <Route path="/support" element={<Support />} />
 
             {/* Room Entry / Gating */}
             <Route path="/invite" element={<AuthGuard requireAuth={false}><NeedInvite /></AuthGuard>} />
