@@ -3,13 +3,27 @@
  *  - durable state `{ messages: [{ id, from_user_id, text, sent_at }] }`
  *  - broadcast event type `send` carrying one message
  * Messages converge via broadcast first; signed-in members persist the list.
+ *
+ * Two send-shape variants to reconcile:
+ *   - mobile emits a *minimal* broadcast payload `{ id, text }` and relies on
+ *     the activity envelope's `userId` / `timestamp` for attribution + ordering
+ *     (see `ChatModule.reduce` in activity_chat_module.dart).
+ *   - web previously embedded the full ChatMessage shape inside `payload`,
+ *     which worked for web→web but crashed web on every mobile→web message:
+ *     `payload.sent_at` was undefined, the sort's `.localeCompare(undefined)`
+ *     threw, React tore the tree down → blank brown page.
+ *
+ * Fix: `normalizeIncoming(envelope)` rebuilds a full ChatMessage from envelope
+ * + payload regardless of which shape arrived. Web's own send stays canonical
+ * (envelope userId + payload `{id, text}`) so mobile reads it cleanly too.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Component, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
+import type { ActivityEvent } from "@/lib/activitySession";
 
 type ChatMessage = {
   id: string;
@@ -20,16 +34,74 @@ type ChatMessage = {
 
 const MAX_KEEP = 200;
 
+/** Read one message out of the durable state blob, fully validated. Anything
+ *  missing required fields is dropped (rather than coerced) so a single
+ *  malformed row from a future schema can't crash the renderer. */
+function asChatMessage(raw: unknown): ChatMessage | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const id = typeof r.id === "string" ? r.id : null;
+  const text = typeof r.text === "string" ? r.text : null;
+  if (!id || text == null) return null;
+  return {
+    id,
+    text,
+    from_user_id: typeof r.from_user_id === "string" ? r.from_user_id : "",
+    sent_at: typeof r.sent_at === "string" ? r.sent_at : "",
+  };
+}
+
 function readMessages(state: Record<string, unknown> | null): ChatMessage[] {
   const raw = state?.messages;
   if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (m): m is ChatMessage =>
-      !!m && typeof m === "object" && typeof (m as ChatMessage).id === "string",
-  );
+  const out: ChatMessage[] = [];
+  for (const m of raw) {
+    const parsed = asChatMessage(m);
+    if (parsed) out.push(parsed);
+  }
+  return out;
 }
 
-/** Union by id, preserving order, capped. */
+/** Rebuild a ChatMessage from a broadcast envelope. Reads `id` and `text`
+ *  from the payload (mobile only ships these two), and falls back to the
+ *  envelope's `userId` / `timestamp` for the message-shape fields that mobile
+ *  derives from the envelope rather than the payload. Returns null if the
+ *  required `id` or `text` are missing — drop, don't crash. */
+function normalizeIncoming(e: ActivityEvent): ChatMessage | null {
+  const p = e.payload ?? {};
+  const id =
+    typeof p.id === "string"
+      ? p.id
+      : typeof (p as { message_id?: unknown }).message_id === "string"
+        ? (p as { message_id: string }).message_id
+        : null;
+  const text =
+    typeof p.text === "string"
+      ? p.text
+      : typeof (p as { body?: unknown }).body === "string"
+        ? (p as { body: string }).body
+        : null;
+  if (!id || text == null) return null;
+  return {
+    id,
+    text,
+    // Envelope is authoritative for sender / timestamp. Fall back to
+    // payload-embedded fields for web→web messages emitted before this
+    // normalization shipped.
+    from_user_id:
+      typeof (p as { from_user_id?: unknown }).from_user_id === "string"
+        ? (p as { from_user_id: string }).from_user_id
+        : e.userId || "",
+    sent_at:
+      typeof (p as { sent_at?: unknown }).sent_at === "string"
+        ? (p as { sent_at: string }).sent_at
+        : e.timestamp || new Date().toISOString(),
+  };
+}
+
+/** Union by id, preserving order, capped. Sort is defensive — missing
+ *  `sent_at` would have thrown on `.localeCompare`, which is exactly how the
+ *  whole chat surface used to take the page down. */
 function mergeMessages(a: ChatMessage[], b: ChatMessage[]): ChatMessage[] {
   const seen = new Set<string>();
   const out: ChatMessage[] = [];
@@ -38,7 +110,7 @@ function mergeMessages(a: ChatMessage[], b: ChatMessage[]): ChatMessage[] {
     seen.add(m.id);
     out.push(m);
   }
-  out.sort((x, y) => x.sent_at.localeCompare(y.sent_at));
+  out.sort((x, y) => (x.sent_at || "").localeCompare(y.sent_at || ""));
   return out.slice(-MAX_KEEP);
 }
 
@@ -66,8 +138,8 @@ export function Chat() {
     if (!session) return;
     return session.onEvent((e) => {
       if (e.type !== "send") return;
-      const m = e.payload as unknown as ChatMessage;
-      if (!m?.id) return;
+      const m = normalizeIncoming(e);
+      if (!m) return;
       setMessages((prev) => {
         const next = mergeMessages(prev, [m]);
         // Persist only when the broadcast came from someone else;
@@ -98,7 +170,12 @@ export function Chat() {
     };
     const next = mergeMessages(messages, [msg]);
     setMessages(next);
-    void session.sendEvent("send", msg as unknown as Record<string, unknown>);
+    // Match mobile's minimal broadcast payload `{id, text}` so the
+    // partner's `reduce()` reads sender + timestamp from the envelope.
+    // Web's onEvent path still normalizes fully (envelope-or-payload)
+    // so older builds that embed the full message in payload keep
+    // working.
+    void session.sendEvent("send", { id: msg.id, text: msg.text });
     // Piggyback the recap event on the durable PUT — every sent
     // message lands on the timeline with its text in payload.text.
     void session.persist(
@@ -169,5 +246,58 @@ export function Chat() {
         </Button>
       </form>
     </div>
+  );
+}
+
+/** Containment for the chat surface. Any uncaught render error inside
+ *  Chat (e.g. a future schema mismatch we didn't normalize for) shows
+ *  an inline placeholder instead of unmounting the whole LiveRoom into
+ *  React's default fatal-error blank page. */
+class ChatErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error) {
+    // Surface so it lands in browser logs / Sentry without bringing
+    // the page down.
+    console.error("[Chat] render error", error);
+  }
+
+  reset = () => this.setState({ error: null });
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex flex-col h-full items-center justify-center gap-3 p-6 text-center">
+          <p className="font-serif italic text-cream/80 text-sm max-w-xs leading-relaxed">
+            chat hit a snag. refresh to keep going.
+          </p>
+          <button
+            type="button"
+            onClick={this.reset}
+            className="focus-ring text-[10px] uppercase tracking-[0.28em] text-muted-foreground hover:text-cream transition"
+          >
+            try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/** Public wrapper — what the tray mounts. Keeps the boundary co-located
+ *  with the component most likely to throw on bad envelopes. */
+export function ChatWithBoundary() {
+  return (
+    <ChatErrorBoundary>
+      <Chat />
+    </ChatErrorBoundary>
   );
 }

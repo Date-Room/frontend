@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, X, LogOut, Gamepad2, Play, Headphones, MessageCircle, DoorOpen, Copy, Check, KeyRound, UserMinus, Loader2, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Chat } from "@/components/Chat";
+import { ChatWithBoundary } from "@/components/Chat";
 import { WatchTogether } from "@/components/WatchTogether";
 import { ThisOrThat } from "@/components/ThisOrThat";
 import { DJ } from "@/components/DJ";
@@ -343,7 +343,7 @@ function CopyTile({
 function ActivityView({ id, onLeave }: { id: string; onLeave: () => void }) {
   switch (id) {
     case "chat":
-      return <Chat />;
+      return <ChatWithBoundary />;
     case "watch":
       return <WatchTogether />;
     case "this_or_that":
