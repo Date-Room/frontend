@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { getRoomByCode, joinRoom, type InviteCard } from "@/lib/rooms";
 import { getMe, updateMe } from "@/lib/users";
@@ -358,6 +358,11 @@ export default function Lobby() {
                   </form>
                   <p className="text-center text-[10px] text-cream/40">
                     By entering you confirm you are 18 or older.
+                  </p>
+                  <p className="text-center text-[10px] tracking-[0.25em] uppercase text-cream/40">
+                    <Link to="/privacy" className="hover:text-cream transition-colors">Privacy</Link>
+                    <span className="mx-2 opacity-60" aria-hidden>·</span>
+                    <Link to="/terms" className="hover:text-cream transition-colors">Terms</Link>
                   </p>
                 </div>
               ) : (

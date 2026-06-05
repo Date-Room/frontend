@@ -20,6 +20,7 @@ import Recap from "./pages/Recap";
 import OurRoom from "./pages/OurRoom";
 import Settings from "./pages/Settings";
 import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
 import NeedInvite from "./pages/NeedInvite";
 import Paywall from "./pages/Paywall";
@@ -53,6 +54,7 @@ const App = () => {
             <Route path="/auth" element={<AuthGuard requireAuth={false}><Auth /></AuthGuard>} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
 
             {/* Room Entry / Gating */}
             <Route path="/invite" element={<AuthGuard requireAuth={false}><NeedInvite /></AuthGuard>} />

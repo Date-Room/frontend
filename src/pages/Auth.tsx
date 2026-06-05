@@ -238,6 +238,11 @@ export default function Auth() {
         <p className="mt-5 text-center text-[10px] font-light leading-relaxed tracking-[0.25em] text-muted-foreground/30">
           By continuing you confirm you are 18 or older.
         </p>
+        <p className="mt-2 text-center text-[10px] tracking-[0.25em] uppercase text-muted-foreground/40">
+          <Link to="/privacy" className="hover:text-cream transition-colors">Privacy</Link>
+          <span className="mx-2 opacity-60" aria-hidden>·</span>
+          <Link to="/terms" className="hover:text-cream transition-colors">Terms</Link>
+        </p>
       </div>
     </PageShell>
   );

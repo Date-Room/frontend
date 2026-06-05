@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, Camera, User as UserIcon, Calendar } from "lucide-react";
 import { toast } from "sonner";
@@ -237,6 +237,12 @@ export default function ProfileComplete() {
           "Continue"
         )}
       </button>
+
+      <p className="text-center text-[10px] tracking-[0.25em] uppercase text-muted-foreground/40">
+        <Link to="/privacy" className="hover:text-cream transition-colors">Privacy</Link>
+        <span className="mx-2 opacity-60" aria-hidden>·</span>
+        <Link to="/terms" className="hover:text-cream transition-colors">Terms</Link>
+      </p>
     </CardPage>
   );
 }

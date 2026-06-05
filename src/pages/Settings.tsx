@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Pencil,
@@ -300,6 +300,13 @@ export default function Settings() {
           Sign out
         </button>
       </div>
+
+      {/* Legal footer — Privacy + Terms */}
+      <p className="mt-4 text-center text-[10px] tracking-[0.25em] uppercase text-muted-foreground/50">
+        <Link to="/privacy" className="hover:text-cream transition-colors">Privacy</Link>
+        <span className="mx-2 opacity-60" aria-hidden>·</span>
+        <Link to="/terms" className="hover:text-cream transition-colors">Terms</Link>
+      </p>
 
       {/* Country picker — Sheet on mobile (capped at 80vh, doesn't push
           past the status bar even with the keyboard up), Command palette

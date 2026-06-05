@@ -387,7 +387,11 @@ export default function Landing() {
           </div>
 
           <FooterCol title="Product" links={["Features", "Pricing", "How it works"]} />
-          <FooterCol title="Company" links={["About us", "Privacy", "Terms"]} />
+          <FooterCol
+            title="Company"
+            links={["About us", "Privacy", "Terms"]}
+            hrefs={[undefined, "/privacy", "/terms"]}
+          />
           <FooterCol title="Connect" links={["Twitter", "Instagram", "Contact"]} icons={[Twitter, Instagram, Mail]} />
         </div>
         <div className="border-t border-lpborder/40">
@@ -412,19 +416,46 @@ function PricingCard({ name, price, unit, desc, cta, featured }: { name: string;
   );
 }
 
-function FooterCol({ title, links, icons }: { title: string; links: string[]; icons?: Array<ComponentType<{ className?: string }>> }) {
+function FooterCol({
+  title,
+  links,
+  icons,
+  hrefs,
+}: {
+  title: string;
+  links: string[];
+  icons?: Array<ComponentType<{ className?: string }>>;
+  /** Optional per-link hrefs. Internal SPA paths starting with "/" are routed
+   *  via <Link>; anything else falls back to a placeholder anchor. */
+  hrefs?: Array<string | undefined>;
+}) {
   return (
     <div>
       <div className="lp-eyebrow !text-lpmuted">{title}</div>
       <ul className="mt-5 space-y-3 text-sm text-lpcream/85">
         {links.map((l, i) => {
           const Icon = icons?.[i];
+          const href = hrefs?.[i];
+          const inner = (
+            <>
+              {Icon ? <Icon className="h-4 w-4" /> : null}
+              {l}
+            </>
+          );
           return (
             <li key={l}>
-              <a href="#" className="inline-flex items-center gap-2 transition hover:text-lppeach">
-                {Icon ? <Icon className="h-4 w-4" /> : null}
-                {l}
-              </a>
+              {href && href.startsWith("/") ? (
+                <Link
+                  to={href}
+                  className="inline-flex items-center gap-2 transition hover:text-lppeach"
+                >
+                  {inner}
+                </Link>
+              ) : (
+                <a href={href ?? "#"} className="inline-flex items-center gap-2 transition hover:text-lppeach">
+                  {inner}
+                </a>
+              )}
             </li>
           );
         })}
