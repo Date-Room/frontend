@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, X, LogOut, Gamepad2, Play, Headphones, MessageCircle, DoorOpen, Copy, Check, KeyRound, UserMinus, Loader2, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { Chat } from "@/components/Chat";
 import { WatchTogether } from "@/components/WatchTogether";
 import { ThisOrThat } from "@/components/ThisOrThat";
@@ -54,6 +55,7 @@ const CATEGORIES: Category[] = [
  * Room tray category itself is hidden from non-hosts). */
 function RoomDetails({ onLeave }: { onLeave: () => void }) {
   const session = useRoomSession();
+  const queryClient = useQueryClient();
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<ParticipantInfo[]>([]);
   const [copiedKey, setCopiedKey] = useState<"room-id" | "pin" | "link" | null>(null);
@@ -135,6 +137,12 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
       try {
         await session.channel.broadcast("kicked", { participant_id: participantId });
       } catch { /* soft-fail — local filter still hides them */ }
+      // Backend's kick path now also deletes recap-bearing rows
+      // (activity_state, room_activity_event, capture). Invalidate the
+      // recap query for this room so the host's next /recap visit shows
+      // the fresh state instead of cached stale data.
+      void queryClient.invalidateQueries({ queryKey: ["recap", session.roomId] });
+      void queryClient.invalidateQueries({ queryKey: ["invite-card"] });
       toast.success(`${name} removed.`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't remove that participant.");

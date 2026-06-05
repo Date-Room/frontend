@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   LogOut,
   LayoutGrid,
@@ -203,6 +204,7 @@ function DesktopQuickLaunch({ onLaunch }: { onLaunch: (id: string) => void }) {
 
 function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; isHost: boolean; roomId: string }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const customization = useRoomCustomization();
   const [trayOpen, setTrayOpen] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -242,6 +244,12 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
       <KickedListener
         onKicked={() => {
           toast.message("You were removed from this room");
+          // The host's kick wiped this room's recap-bearing rows
+          // server-side. Invalidate our own recap cache so any later
+          // visit (e.g. through Home) refetches and shows the
+          // post-kick state, not a stale snapshot.
+          void queryClient.invalidateQueries({ queryKey: ["recap", roomId] });
+          void queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
           navigate("/home");
         }}
       />

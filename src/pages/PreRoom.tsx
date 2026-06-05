@@ -248,6 +248,12 @@ export default function PreRoom() {
           participant_id: kickableGuest.participantId,
         });
       } catch { /* soft-fail — backend kick still freed the seat */ }
+      // Backend's kick also wipes the recap-bearing tables for the
+      // room. Invalidate the local caches so any reopen shows the
+      // fresh state.
+      void queryClient.invalidateQueries({ queryKey: ["recap", room.id] });
+      void queryClient.invalidateQueries({ queryKey: ["invite-card", room.code] });
+      void queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
       toast.success(`${kickableGuest.name} removed.`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't remove that participant.");
