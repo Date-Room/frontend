@@ -6,7 +6,11 @@
 import { api } from "@/lib/api";
 
 export type RoomPersistence = "session" | "persistent";
-export type RoomPackage = "single_pass" | "subscription";
+export type RoomPackage =
+  | "single_pass"  // Try — free 20-min session
+  | "date_pack"    // Date Pack consumable — 60-min session
+  | "long_pack"    // Long Pack consumable — 120-min session
+  | "subscription"; // Together — persistent
 export type RoomStateName =
   | "created"
   | "waiting"

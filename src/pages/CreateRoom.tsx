@@ -1,42 +1,159 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { CardPage } from "@/components/CardPage";
-import { createRoom, type RoomPersistence } from "@/lib/rooms";
+import { createRoom, type RoomPackage, type RoomPersistence } from "@/lib/rooms";
+import {
+  createCheckoutSession,
+  createPackCheckoutSession,
+  getEntitlement,
+  type Entitlement,
+} from "@/lib/billing";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
+type Plan = "try" | "date_pack" | "long_pack" | "together";
+
+type PlanMeta = {
+  id: Plan;
+  title: string;
+  desc: string;
+  icon: string;
+  persistence: RoomPersistence;
+  package: RoomPackage;
+};
+
+const PLANS: PlanMeta[] = [
+  {
+    id: "try",
+    title: "Try",
+    desc: "One session, 20 minutes. Free.",
+    icon: "🕯️",
+    persistence: "session",
+    package: "single_pass",
+  },
+  {
+    id: "date_pack",
+    title: "Date Pack",
+    desc: "Three sessions, 1 hour each.",
+    icon: "💌",
+    persistence: "session",
+    package: "date_pack",
+  },
+  {
+    id: "long_pack",
+    title: "Long Pack",
+    desc: "Five sessions, 2 hours each.",
+    icon: "🌙",
+    persistence: "session",
+    package: "long_pack",
+  },
+  {
+    id: "together",
+    title: "Together",
+    desc: "A room that stays open. Monthly.",
+    icon: "🏠",
+    persistence: "persistent",
+    package: "subscription",
+  },
+];
+
 /**
- * Create Room — matches mobile's single-screen `room_creation_screen.dart`:
- * a persistence choice + an optional greeting. No recipient/scheduling/ambiance
- * steps (those don't exist on mobile). After create, go to the pre-room screen.
+ * Create Room — four-plan picker matching the landing page and the
+ * mobile catalog: Try / Date Pack / Long Pack / Together. The picker
+ * reads `/v1/entitlements` to render per-pack balance badges and
+ * decides whether to bounce through Stripe Checkout before creating
+ * the room when balances are zero.
  */
 export default function CreateRoom() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [persistence, setPersistence] = useState<RoomPersistence>("session");
+  const [selected, setSelected] = useState<Plan>("try");
+  const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const [headline, setHeadline] = useState("");
   const [note, setNote] = useState("");
   const [creating, setCreating] = useState(false);
 
+  // Pull the entitlement snapshot once on mount so balance badges and
+  // CTA copy reflect reality. The webhook updates it asynchronously
+  // after Stripe Checkout; we re-fetch on focus to catch that.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const e = await getEntitlement();
+        if (!cancelled) setEntitlement(e);
+      } catch {
+        // Silent — backend will gate on create with 402 if entitlement
+        // is missing. The picker just hides badges.
+      }
+    })();
+    const onFocus = async () => {
+      try {
+        const e = await getEntitlement();
+        if (!cancelled) setEntitlement(e);
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
+
+  function purchaseRequired(plan: Plan, e: Entitlement | null): boolean {
+    if (e === null) return false;
+    switch (plan) {
+      case "try":
+        return false;
+      case "date_pack":
+        return e.date_pack_remaining <= 0;
+      case "long_pack":
+        return e.long_pack_remaining <= 0;
+      case "together":
+        return !e.has_active_subscription;
+    }
+  }
+
   async function handleCreate() {
     setCreating(true);
     try {
+      const meta = PLANS.find((p) => p.id === selected);
+      if (!meta) return;
+
+      // If this plan needs a purchase first, bounce to Stripe and let
+      // the success URL re-enter this page. The user can come back
+      // here, balance updates via /entitlements, and they tap Create
+      // again — no race because state resets.
+      if (purchaseRequired(selected, entitlement)) {
+        const { url } =
+          selected === "together"
+            ? await createCheckoutSession()
+            : await createPackCheckoutSession(
+                selected === "date_pack" ? "date_pack" : "long_pack",
+              );
+        window.location.href = url;
+        return;
+      }
+
       const room = await createRoom({
-        persistence,
-        package: persistence === "persistent" ? "subscription" : "single_pass",
+        persistence: meta.persistence,
+        package: meta.package,
         greeting_headline: headline.trim() || null,
         greeting_subtext: note.trim() || null,
       });
       await queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
       navigate(`/rooms/${room.id}/pre`);
     } catch (e) {
-      // Backend 402 = paywall gate. Send them to the pitch instead of
-      // surfacing a generic error.
       if (e instanceof ApiError && e.status === 402) {
-        toast.message("Persistent rooms need a subscription.");
+        // Edge case: the entitlement cache disagreed with the backend
+        // (race during Stripe webhook materialisation). Send the user
+        // to the paywall.
+        toast.message("This room needs an active credit.");
         navigate("/paywall");
         return;
       }
@@ -46,20 +163,37 @@ export default function CreateRoom() {
     }
   }
 
-  const options: { id: RoomPersistence; title: string; desc: string; icon: string }[] = [
-    {
-      id: "session",
-      title: "Just for tonight",
-      desc: "One session, 90 minutes. Single Pass.",
-      icon: "🕯️",
-    },
-    {
-      id: "persistent",
-      title: "Keep going forward",
-      desc: "Ongoing Our Room. Needs a subscription.",
-      icon: "🏠",
-    },
-  ];
+  function badgeFor(plan: Plan): string | null {
+    if (entitlement === null) return null;
+    switch (plan) {
+      case "date_pack":
+        return entitlement.date_pack_remaining > 0
+          ? `${entitlement.date_pack_remaining} left`
+          : null;
+      case "long_pack":
+        return entitlement.long_pack_remaining > 0
+          ? `${entitlement.long_pack_remaining} left`
+          : null;
+      case "together":
+        return entitlement.has_active_subscription ? "Active" : null;
+      case "try":
+        return null;
+    }
+  }
+
+  function ctaLabel(): string {
+    if (!purchaseRequired(selected, entitlement)) return "Create room";
+    switch (selected) {
+      case "together":
+        return "Subscribe & create";
+      case "date_pack":
+        return "Buy Date Pack & create";
+      case "long_pack":
+        return "Buy Long Pack & create";
+      case "try":
+        return "Create room";
+    }
+  }
 
   const charsLeft = 240 - note.length;
   return (
@@ -70,15 +204,16 @@ export default function CreateRoom() {
       bodyClassName="space-y-8 animate-float-up"
     >
       <section className="space-y-3">
-        <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Keep this room?</p>
+        <p className="text-[11px] uppercase tracking-[0.28em] text-muted-foreground">Pick a plan</p>
         <div className="stagger-children space-y-3">
-          {options.map((opt) => {
-            const active = persistence === opt.id;
+          {PLANS.map((opt) => {
+            const active = selected === opt.id;
+            const badge = badgeFor(opt.id);
             return (
               <button
                 key={opt.id}
                 type="button"
-                onClick={() => setPersistence(opt.id)}
+                onClick={() => setSelected(opt.id)}
                 aria-pressed={active}
                 className={cn(
                   "focus-ring group w-full text-left rounded-[1.5rem] p-5 border transition-all flex items-start gap-4",
@@ -93,12 +228,16 @@ export default function CreateRoom() {
                 )}>
                   {opt.icon}
                 </div>
-                <div className="min-w-0 pt-0.5">
-                  <p className="text-cream font-medium">{opt.title}</p>
+                <div className="min-w-0 pt-0.5 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-cream font-medium">{opt.title}</p>
+                    {badge && (
+                      <span className="rounded-full border border-rosegold/25 bg-rosegold/10 px-2 py-0.5 text-[10px] font-semibold text-rosegold">
+                        {badge}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
-                  <span className={cn("mt-2 inline-block", active ? (opt.id === "persistent" ? "pill-rose" : "pill-amber") : "pill-muted")}>
-                    {opt.id === "persistent" ? "Perm" : "Temp"}
-                  </span>
                 </div>
                 <span
                   className={cn(
@@ -164,10 +303,10 @@ export default function CreateRoom() {
       >
         {creating ? (
           <>
-            <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Creating room…
+            <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> Working…
           </>
         ) : (
-          "Create room"
+          ctaLabel()
         )}
       </button>
     </CardPage>

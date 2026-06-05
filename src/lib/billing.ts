@@ -38,3 +38,26 @@ export function getSubscriptionStatus(): Promise<SubscriptionStatus> {
 export function createCheckoutSession(): Promise<{ url: string }> {
   return api.post<{ url: string }>("/v1/billing/checkout-session");
 }
+
+/** Full entitlement snapshot — used by the room-creation picker to
+ * render per-pack balances and decide whether to bounce the user
+ * through Stripe before creating the room. */
+export type Entitlement = {
+  has_active_subscription: boolean;
+  remaining_passes: number;
+  date_pack_remaining: number;
+  long_pack_remaining: number;
+};
+
+export function getEntitlement(): Promise<Entitlement> {
+  return api.get<Entitlement>("/v1/entitlements");
+}
+
+/** Mint a one-time Stripe Checkout URL for a consumable pack. */
+export function createPackCheckoutSession(
+  pack_kind: "date_pack" | "long_pack",
+): Promise<{ url: string }> {
+  return api.post<{ url: string }>("/v1/billing/pack-checkout-session", {
+    pack_kind,
+  });
+}
