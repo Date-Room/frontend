@@ -165,7 +165,7 @@ export default function Recap() {
           <Loader2 className="w-6 h-6 text-rosegold animate-spin" aria-hidden />
         </div>
       ) : activities.length === 0 && events.length === 0 ? (
-        <div className="editorial-card grain p-8 text-center text-sm text-muted-foreground italic mb-8">
+        <div className="editorial-card p-8 text-center text-sm text-muted-foreground italic mb-8">
           No activity was saved for this room yet.
         </div>
       ) : (

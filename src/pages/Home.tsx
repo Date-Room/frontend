@@ -794,7 +794,7 @@ function ProfilePane({
 }) {
   return (
     <div className="mx-auto max-w-xl animate-float-up space-y-4 stagger-children">
-      <div className="editorial-card grain flex items-center gap-4 p-6">
+      <div className="editorial-card flex items-center gap-4 p-6">
         {me?.photo_url ? (
           <img src={me.photo_url} alt="" className="h-16 w-16 rounded-full border-2 border-rosegold/20 object-cover" />
         ) : (

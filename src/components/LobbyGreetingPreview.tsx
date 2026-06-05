@@ -60,8 +60,6 @@ export function LobbyGreetingPreview({
           positionClassName="absolute inset-0"
           loading="lazy"
         />
-        <div className="page-grain pointer-events-none absolute inset-0 z-[1] opacity-[0.3]" aria-hidden />
-
         <div className="relative z-10 flex h-full flex-col justify-end px-5 pb-7 pt-10 text-center sm:px-6 sm:pb-8 sm:pt-12">
           <div aria-live="polite" className="mx-auto mb-6 flex max-w-[17.5rem] flex-col items-center gap-4 sm:mb-7 sm:max-w-[18rem]">
             <div className={cn("w-full px-1 py-0.5 transition-all duration-200", highlightField === "headline" ? focusRing : "")}>

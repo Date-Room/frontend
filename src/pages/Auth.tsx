@@ -99,7 +99,7 @@ export default function Auth() {
       </Link>
 
       <div className="relative z-10 w-full max-w-md animate-scale-in sm:max-w-lg lg:max-w-xl">
-        <div className="grain editorial-card grain rounded-[1.75rem] px-6 py-7 sm:rounded-[2.25rem] sm:px-10 sm:py-9 lg:px-12 lg:py-10">
+        <div className="editorial-card rounded-[1.75rem] px-6 py-7 sm:rounded-[2.25rem] sm:px-10 sm:py-9 lg:px-12 lg:py-10">
           <div className="mb-4 flex justify-center sm:mb-5">
             <div className="h-2 w-2 animate-pulse-glow rounded-full bg-rosegold" />
           </div>

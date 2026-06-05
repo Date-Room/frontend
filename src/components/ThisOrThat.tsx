@@ -146,7 +146,7 @@ export function ThisOrThat() {
         onClick={() => choose(side)}
         disabled={!!myPick}
         className={[
-          "focus-ring group relative flex-1 rounded-3xl border-2 p-6 sm:p-8 min-h-[180px] md:min-h-[280px] flex flex-col items-center justify-center gap-4 text-center grain transition-all duration-500 shadow-[0_22px_60px_-22px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.05)]",
+          "focus-ring group relative flex-1 rounded-3xl border-2 p-6 sm:p-8 min-h-[180px] md:min-h-[280px] flex flex-col items-center justify-center gap-4 text-center transition-all duration-500 shadow-[0_22px_60px_-22px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.05)]",
           chosenByMe && chosenByOther
             ? "border-amber bg-amber/15 scale-[1.02] shadow-[0_30px_80px_-22px_rgba(245,166,35,0.45)]"
             : chosenByMe

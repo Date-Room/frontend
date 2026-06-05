@@ -4,7 +4,6 @@ export function Opening({ name, onEnter }: { name: string; onEnter: () => void }
   return (
     <div className="min-h-screen flex items-center justify-center px-6 relative">
       <div className="vignette" aria-hidden />
-      <div className="page-grain" aria-hidden />
 
       <div className="text-center relative z-10 flex flex-col items-center gap-8 animate-fade-in">
         {/* Candle */}

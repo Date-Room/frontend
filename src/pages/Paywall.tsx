@@ -109,7 +109,7 @@ export default function Paywall() {
       </header>
 
       {!open && !entitled && (
-        <section className="editorial-card grain p-5 space-y-3">
+        <section className="editorial-card p-5 space-y-3">
           {[
             { Icon: Heart, label: "Persistent Our Room", desc: "Same code, every night." },
             { Icon: Sparkles, label: "Recap timeline", desc: "Replay how the date played out." },
@@ -129,7 +129,7 @@ export default function Paywall() {
       )}
 
       {entitled && status?.subscription && (
-        <section className="editorial-card grain p-5 space-y-2 text-sm">
+        <section className="editorial-card p-5 space-y-2 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Status</span>
             <span className="pill-live">{status.subscription.status}</span>

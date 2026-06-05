@@ -235,7 +235,6 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
     <PageShell
       orbs={false}
       vignette={false}
-      grain={false}
       className="h-screen flex overflow-hidden"
       style={shellStyle}
     >
@@ -354,7 +353,7 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
 
       {showLeaveConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-sm mx-4 rounded-3xl p-6 glass-strong grain text-center card-shadow">
+          <div className="w-full max-w-sm mx-4 rounded-3xl p-6 glass-strong text-center card-shadow">
             <h2 className="font-serif text-xl text-cream mb-2">Leave the room?</h2>
             <p className="text-sm text-muted-foreground mb-6">Your date night will end for you.</p>
             <div className="flex gap-3">
@@ -374,7 +373,7 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
 
       {expired && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/90 backdrop-blur-md animate-fade-in">
-          <div className="w-full max-w-md mx-4 editorial-card grain p-8 text-center animate-scale-in">
+          <div className="w-full max-w-md mx-4 editorial-card p-8 text-center animate-scale-in">
             <div
               className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full"
               style={{

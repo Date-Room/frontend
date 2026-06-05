@@ -65,7 +65,7 @@ export default function OurRoom() {
           <button onClick={() => navigate("/home")} className="btn-ghost focus-ring mb-6 text-sm inline-flex items-center gap-1">
             <ArrowLeft className="h-4 w-4" /> Back
           </button>
-          <div className="editorial-card grain p-8 text-center text-muted-foreground">
+          <div className="editorial-card p-8 text-center text-muted-foreground">
             This Our Room isn&apos;t available.
           </div>
         </div>
@@ -235,7 +235,7 @@ function JournalPanel({ connectionId }: { connectionId: string }) {
   }
   if (error) {
     return (
-      <div className="editorial-card grain p-6 text-center text-sm text-muted-foreground">
+      <div className="editorial-card p-6 text-center text-sm text-muted-foreground">
         Couldn&apos;t load the journal. Refresh to try again.
       </div>
     );
@@ -243,7 +243,7 @@ function JournalPanel({ connectionId }: { connectionId: string }) {
   const items = page?.items ?? [];
   if (items.length === 0) {
     return (
-      <div className="editorial-card grain p-8 text-center animate-float-up">
+      <div className="editorial-card p-8 text-center animate-float-up">
         <Sparkles className="mx-auto h-8 w-8 text-rosegold/70 mb-3" />
         <h3 className="font-serif text-lg text-cream italic">Your journal will fill up here</h3>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -311,7 +311,7 @@ function PlaceholderPanel({
 }) {
   return (
     <div className="space-y-4 animate-float-up">
-      <div className="editorial-card grain p-6">
+      <div className="editorial-card p-6">
         <h3 className="font-serif text-lg italic text-cream">{title}</h3>
         <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
       </div>

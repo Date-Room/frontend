@@ -6,8 +6,6 @@ type PageShellProps = {
   className?: string;
   /** Soft rose / primary gradient blobs */
   orbs?: boolean;
-  /** Film grain overlay */
-  grain?: boolean;
   /** Edge darkening */
   vignette?: boolean;
   /** Inline style — used by LiveRoom to paint the customized
@@ -16,14 +14,17 @@ type PageShellProps = {
 };
 
 /**
- * Shared full-page backdrop: theme background, optional orbs, grain, vignette.
- * Use `grain={false}` / `vignette={false}` when a page paints its own full-bleed art (e.g. lobby hero).
+ * Shared full-page backdrop: theme background, optional orbs, vignette.
+ *
+ * Grain was previously layered on by default. Mobile reads candle-lit and
+ * clean (no perceptible noise); the web wash made glass surfaces feel
+ * tacky. The atmosphere now comes from the warm-dark base, the orbs, and
+ * each page's own gradients — no SVG noise overlay.
  */
 export function PageShell({
   children,
   className,
   orbs = true,
-  grain = true,
   vignette = true,
   style,
 }: PageShellProps) {
@@ -33,7 +34,6 @@ export function PageShell({
       style={style}
     >
       {vignette ? <div className="vignette" aria-hidden /> : null}
-      {grain ? <div className="page-grain" aria-hidden /> : null}
       {orbs ? (
         <>
           <div

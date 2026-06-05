@@ -262,7 +262,7 @@ export default function Lobby() {
     : null;
 
   return (
-    <PageShell orbs={false} vignette={false} grain={false} className="overflow-hidden">
+    <PageShell orbs={false} vignette={false} className="overflow-hidden">
       <AmbientSceneStack ambiance={ambientPreset} positionClassName="fixed inset-0 z-[1]" />
       <div className="live-room-soft-vignette" aria-hidden />
       <div
@@ -271,7 +271,6 @@ export default function Lobby() {
         data-photo-backdrop="true"
         aria-hidden
       />
-      <div className="page-grain" aria-hidden />
 
       <div className="relative z-10 min-h-screen flex flex-col items-center px-6 py-10 sm:py-14">
         <div className="flex justify-center pb-6">
@@ -285,7 +284,7 @@ export default function Lobby() {
         <div className="flex-1 w-full flex items-center justify-center">
           <div className="w-full max-w-md sm:max-w-xl">
             <div
-              className="editorial-card grain animate-scale-in flex flex-col items-center gap-6 p-6 text-center sm:p-10"
+              className="editorial-card animate-scale-in flex flex-col items-center gap-6 p-6 text-center sm:p-10"
               style={{ boxShadow: "0 30px 80px -20px rgba(0,0,0,0.6), inset 0 0 60px rgba(212,130,106,0.04)" }}
             >
               {invite.greeting_headline && (

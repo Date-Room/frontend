@@ -35,7 +35,7 @@ export default function NeedInvite() {
         </p>
 
         <div className="space-y-4">
-          <div className="editorial-card grain p-5 text-left">
+          <div className="editorial-card p-5 text-left">
             <div className="flex items-start gap-4">
               <div className="w-10 h-10 rounded-full bg-rosegold/10 border border-rosegold/20 flex items-center justify-center shrink-0">
                 <MessageSquare className="w-5 h-5 text-rosegold" />
