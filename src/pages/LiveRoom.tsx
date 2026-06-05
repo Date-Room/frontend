@@ -146,8 +146,7 @@ function PresenceAvatar({
       title={name}
     >
       {photo ? (
-        // eslint-disable-next-line jsx-a11y/alt-text
-        <img src={photo} className="h-full w-full object-cover" />
+        <img src={photo} alt="" className="h-full w-full object-cover" />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-rosegold/40 to-romantic/30 font-serif text-sm text-cream">
           {initial}
