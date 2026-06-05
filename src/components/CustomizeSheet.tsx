@@ -37,6 +37,7 @@ import {
 } from "@/components/ui/dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { authClient } from "@/lib/authClient";
 import { updateRoom } from "@/lib/rooms";
 import {
   roomThemes,
@@ -79,10 +80,18 @@ export function CustomizeSheet({
   const [backgroundId, setBackgroundId] = useState<string | null>(initialBackgroundId);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   // Per-save serial so a stale tap doesn't squash a newer tap's state
   // once the request returns. Mirrors mobile's `_saveSeq`.
   const [, setSeq] = useState(0);
+
+  // Belt-and-braces — every launcher already gates on `canCustomize`,
+  // so by construction no anonymous guest should reach the sheet. If
+  // one does (stale render, hot-reload, etc.), fail closed with a hard
+  // null instead of a UI banner — the backend PATCH would 403 anyway
+  // (host-only for session rooms, host + signed-in participants for
+  // persistent rooms; anonymous guests are never allowed). Keep this
+  // check *after* every hook above so render-order stays stable.
+  if (!authClient.getSession()) return null;
 
   async function saveTheme(next: string | null) {
     const mySeq = Date.now();

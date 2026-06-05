@@ -9,6 +9,7 @@ import {
   Headphones,
   Play,
   Gamepad2,
+  Palette,
   type LucideIcon,
 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
@@ -21,6 +22,7 @@ import {
 import { ChromeVisibilityContext } from "@/context/ChromeVisibilityContext";
 import { RoomVideo } from "@/components/RoomVideo";
 import { ActivityTray } from "@/components/ActivityTray";
+import { CustomizeSheet } from "@/components/CustomizeSheet";
 import { MediaMiniPlayer } from "@/components/MediaMiniPlayer";
 import { UserAvatarImg } from "@/components/UserAvatarImg";
 import { toast } from "sonner";
@@ -349,7 +351,15 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const customization = useRoomCustomization();
+  const session = useRoomSession();
   const [trayOpen, setTrayOpen] = useState(false);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  // Mirror mobile's docstring on `customize_sheet.dart`: host always;
+  // signed-in non-host gets parity for persistent rooms (server enforces
+  // the precise rule). Anonymous guests have no auth token and the PATCH
+  // would 403 — keep the affordance hidden entirely so they never see a
+  // "please sign in to continue" dead-end.
+  const canCustomize = isHost || session.canPersist;
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   // Which activity is currently in front of the user — drives the
   // media-mini-player visibility (hides when its activity is open).
@@ -443,7 +453,22 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
             </div>
           )}
         </div>
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto flex items-center gap-2">
+          {/* Customize — mirrors mobile's palette icon in the main-room
+              header. Hidden for anonymous guests (no auth token, the
+              PATCH would 403 anyway). Session rooms: server further
+              restricts to host; persistent rooms: host or any signed-in
+              participant. */}
+          {canCustomize && (
+            <ChromePill
+              asButton
+              onClick={() => setCustomizeOpen(true)}
+              aria-label="Customize the room"
+              className="text-muted-foreground hover:text-cream"
+            >
+              <Palette className="w-3.5 h-3.5" />
+            </ChromePill>
+          )}
           <ChromePill
             asButton
             onClick={() => setShowLeaveConfirm(true)}
@@ -538,6 +563,26 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
         externalOpenActivityId={externalOpen}
         onExternalOpenHandled={() => setExternalOpen(null)}
       />
+
+      {/* Customize sheet — same component PreRoom uses. Mounted only
+          when the caller is allowed (host always; signed-in non-host
+          for persistent rooms). After each save we broadcast on the
+          room channel so the partner's open tab refetches the InviteCard
+          and re-themes without a hard reload. */}
+      {canCustomize && (
+        <CustomizeSheet
+          roomId={roomId}
+          open={customizeOpen}
+          onOpenChange={setCustomizeOpen}
+          initialThemeId={customization.themeId}
+          initialBackgroundId={customization.backgroundId}
+          onBroadcast={() => {
+            void session.channel.broadcast("customize", {});
+            void queryClient.invalidateQueries({ queryKey: ["invite-card"] });
+            void queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
+          }}
+        />
+      )}
 
       {/* Persistent media mini-player — visible when DJ has a track or
           Watch has a video AND that activity isn't already open. Tap
