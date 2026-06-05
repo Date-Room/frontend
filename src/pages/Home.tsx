@@ -221,7 +221,14 @@ export default function Home() {
 
   function enterRoom(r: Room) {
     const slot = me && r.host_id === me.id ? "a" : "b";
-    const exp = r.expires_at ? `&expires_at=${encodeURIComponent(r.expires_at)}` : "";
+    // Persistent rooms have no hard cutoff — never forward an
+    // expires_at on the URL even if the cached Room row still carries
+    // a stale session-era stamp. The LiveRoom screen keys "expired"
+    // off this param; leaking it makes a live perm room read as ended.
+    const exp =
+      r.persistence === "persistent" || !r.expires_at
+        ? ""
+        : `&expires_at=${encodeURIComponent(r.expires_at)}`;
     navigate(`/room/${r.id}?slot=${slot}${exp}`);
   }
 

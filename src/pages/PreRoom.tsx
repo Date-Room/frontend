@@ -337,7 +337,14 @@ export default function PreRoom() {
     setStarting(true);
     try {
       if (!live) await startRoom(room.id);
-      const exp = room.expires_at ? `&expires_at=${encodeURIComponent(room.expires_at)}` : "";
+      // Persistent rooms have no hard cutoff — never forward an
+      // expires_at on the URL even if the cached Room still carries a
+      // stale session-era stamp. The LiveRoom screen keys "expired"
+      // off this param; leaking it makes a live perm room read as ended.
+      const exp =
+        room.persistence === "persistent" || !room.expires_at
+          ? ""
+          : `&expires_at=${encodeURIComponent(room.expires_at)}`;
       navigate(`/room/${room.id}?slot=a${exp}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not start the session.");

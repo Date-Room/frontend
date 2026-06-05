@@ -144,7 +144,13 @@ export default function Lobby() {
         slot: res.slot,
         name: displayName,
       });
-      if (res.expires_at) params.set("expires_at", res.expires_at);
+      // Persistent rooms have no hard cutoff — never forward an
+      // expires_at on the URL even if backend somehow leaked a stamp.
+      // The LiveRoom screen keys "expired" off this param; leaking it
+      // would make a live perm room read as ended.
+      if (res.expires_at && invite.persistence !== "persistent") {
+        params.set("expires_at", res.expires_at);
+      }
       navigate(`/room/${res.room_id}?${params.toString()}`, { replace: true });
     } catch (err) {
       // Backend 403 "Persistent rooms require an account" → divert

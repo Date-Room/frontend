@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { listMyRooms, type Room } from "@/lib/rooms";
 import {
   LogOut,
   LayoutGrid,
@@ -352,6 +353,27 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
   const queryClient = useQueryClient();
   const customization = useRoomCustomization();
   const session = useRoomSession();
+  // Server-authoritative Room — gives us persistence so we can ignore
+  // any stale `expires_at` URL param when the room is actually perm.
+  // The URL carries `expires_at` from the previous screen (Home / PreRoom
+  // / Lobby), which historically forwarded `room.expires_at` blindly. A
+  // perm room whose row still carries its session-era stamp (promoted
+  // before promote_to_persistent started clearing the column) would
+  // otherwise read as expired here even though the backend correctly
+  // nulls it on the wire. Treat persistence === 'persistent' as the
+  // single source of truth and short-circuit the expiry check.
+  const { data: rooms } = useQuery({
+    queryKey: ["my-rooms"],
+    queryFn: listMyRooms,
+    staleTime: 5_000,
+    // Anonymous guests (canPersist === false) can't list rooms (401)
+    // — skip the call so we don't churn the error boundary. They only
+    // exist on session rooms anyway, so the URL expiresAt is authoritative
+    // for them (perm rooms reject anonymous joins server-side).
+    enabled: session.canPersist,
+  });
+  const room: Room | undefined = rooms?.find((r) => r.id === roomId);
+  const isPersistent = room?.persistence === "persistent";
   const [trayOpen, setTrayOpen] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   // Mirror mobile's docstring on `customize_sheet.dart`: host always;
@@ -372,7 +394,13 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, []);
-  const expired = expiresAt
+  // Persistent rooms never expire — ignore any stale URL `expires_at`
+  // param. Without this guard a perm room whose backing row still
+  // carries its session-era stamp (promoted before
+  // promote_to_persistent started clearing the column) would read as
+  // expired the moment LiveRoom mounts. See the
+  // `isPersistent` comment above.
+  const expired = !isPersistent && expiresAt
     ? now >= new Date(expiresAt).getTime()
     : false;
   const { visible: chromeVisible, bind: autoHideBind } = useAutoHideChrome(3000);
@@ -446,8 +474,11 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
             </h1>
           </ChromePill>
           {/* Timer is a host-side tool — the guest doesn't get to plan
-              around the room's lifespan. Hide it from non-hosts. */}
-          {expiresAt && isHost && (
+              around the room's lifespan. Hide it from non-hosts. Also
+              hidden on persistent rooms, which don't have a hard
+              cutoff — the URL param can leak a stale stamp from older
+              promoted rows. */}
+          {expiresAt && isHost && !isPersistent && (
             <div className="pointer-events-auto">
               <Countdown expiresAt={expiresAt} />
             </div>
