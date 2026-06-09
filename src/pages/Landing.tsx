@@ -144,7 +144,7 @@ export default function Landing() {
                 <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.78_0.14_75)]" />
                 <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.70_0.14_140)]" />
               </div>
-              <div className="font-mono tracking-[0.3em] text-lpcream/80">ROOM · 668 890</div>
+              <div className="font-mono tracking-[0.3em] text-lpcream/80">DATE ROOM</div>
               <div className="text-[11px] uppercase tracking-widest text-lppeach">live</div>
             </div>
 

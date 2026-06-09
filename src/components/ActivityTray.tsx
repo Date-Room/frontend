@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, X, LogOut, Gamepad2, Play, Headphones, MessageCircle, DoorOpen, Copy, Check, KeyRound, UserMinus, Loader2, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,6 +11,7 @@ import { The36 } from "@/components/The36";
 import { TwoTruths } from "@/components/TwoTruths";
 import { TruthOrDare } from "@/components/TruthOrDare";
 import { useRoomSession } from "@/context/RoomSessionContext";
+import { getRoomExperience, isActivityEnabled } from "@/lib/roomExperience";
 import { cn } from "@/lib/utils";
 import {
   kickParticipant,
@@ -393,7 +394,22 @@ export function ActivityTray({
   // Chat) whose ids match their activity can't collide and break "back".
   const [catId, setCatId] = useState<string | null>(null);
   const [actId, setActId] = useState<string | null>(null);
-  const { isHost } = useRoomSession();
+  const { isHost, roomId } = useRoomSession();
+
+  // Host's curated activity selection from the create flow (null when
+  // nothing was saved — legacy rooms / cross-device guests show all).
+  const curated = useMemo(() => getRoomExperience(roomId), [roomId]);
+
+  // Apply curation to each category: keep always-on activities + the
+  // chosen ones, then drop categories that end up empty.
+  const curatedCategories = useMemo(
+    () =>
+      CATEGORIES.map((c) => ({
+        ...c,
+        activities: c.activities.filter((a) => isActivityEnabled(a.id, curated)),
+      })).filter((c) => c.activities.length > 0),
+    [curated],
+  );
 
   // Surface activity changes to the parent (mini-player visibility).
   useEffect(() => {
@@ -413,7 +429,9 @@ export function ActivityTray({
 
   // The Room/Manage category is host-only — guests don't need to see
   // (or accidentally tap into) the host's PIN-rotation + kick controls.
-  const visibleCategories = isHost ? CATEGORIES : CATEGORIES.filter((c) => c.id !== "room");
+  const visibleCategories = isHost
+    ? curatedCategories
+    : curatedCategories.filter((c) => c.id !== "room");
 
   const category = visibleCategories.find((c) => c.id === catId);
   const activity = visibleCategories.flatMap((c) => c.activities).find((a) => a.id === actId);

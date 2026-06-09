@@ -1,273 +1,516 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Plus, SkipForward, ArrowRightLeft, Sparkles } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Check, Bookmark, BookmarkCheck, PenLine, Repeat2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getQuestions } from "@/lib/catalogRuntime";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
+import { getQuestions, getReactions, getLimits } from "@/lib/catalogRuntime";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
-import {
-  CUSTOM_ID_BASE,
-  MAX_CUSTOMS,
-  TARGET_SETUP_COUNT,
-  initialQuestionsState,
-  questionsFromJson,
-  reduceQuestions,
-  type QuestionsState,
-} from "@/lib/activities/questions";
+import { cn } from "@/lib/utils";
 
-/**
- * 21 Questions — full mobile-parity state machine (setup → swap → play → done).
- * Event-driven: every broadcast event (own echo included) runs through the
- * shared reducer; members persist the result for late-join. See lib/activities/
- * questions.ts.
- */
+const CUSTOM_INDEX_BASE = 1_000_000;
+
+type DeckState = {
+  hands: Record<string, number[]>;
+  next_index: number;
+  revisit: number[];
+  trade: { proposer: string; offered: number; at: string } | null;
+  skips: Record<string, number>;
+  customs: Record<string, { text: string; by: string }>;
+  customs_used: Record<string, number>;
+};
+
+type FloatingEmoji = { id: number; emoji: string };
+
+function emptyState(): DeckState {
+  return {
+    hands: {},
+    next_index: 6,
+    revisit: [],
+    trade: null,
+    skips: {},
+    customs: {},
+    customs_used: {},
+  };
+}
+
+function hydrateState(raw: Record<string, unknown> | null): DeckState {
+  if (!raw) return emptyState();
+  return {
+    hands: (raw.hands ?? {}) as Record<string, number[]>,
+    next_index: typeof raw.next_index === "number" ? raw.next_index : 6,
+    revisit: Array.isArray(raw.revisit) ? raw.revisit : [],
+    trade: raw.trade as DeckState["trade"] ?? null,
+    skips: (raw.skips ?? {}) as Record<string, number>,
+    customs: (raw.customs ?? {}) as Record<string, { text: string; by: string }>,
+    customs_used: (raw.customs_used ?? {}) as Record<string, number>,
+  };
+}
+
+function resolveText(
+  pool: string[],
+  idx: number,
+  customs: Record<string, { text: string; by: string }>,
+): string {
+  if (idx >= CUSTOM_INDEX_BASE) {
+    const entry = customs[String(idx)];
+    if (entry) return entry.text;
+  }
+  if (pool.length === 0) return "…";
+  return pool[idx % pool.length];
+}
+
 export function QuestionDeck() {
   const room = useRoomSession();
   const me = room.senderId;
-  const { session, state: durable } = useActivitySession("questions");
+  const { session, state: durable, ready } = useActivitySession("questions");
   const pool = useMemo(() => getQuestions(), []);
+  const limits = useMemo(() => getLimits(), []);
+  const reactions = useMemo(() => [...getReactions()], []);
 
-  const [state, setState] = useState<QuestionsState>(initialQuestionsState);
+  const [state, setState] = useState<DeckState>(emptyState);
   const stateRef = useRef(state);
   stateRef.current = state;
   const seeded = useRef(false);
-  const [customText, setCustomText] = useState("");
-  // One-shot recap event the next emit-driven persist consumes. Set by
-  // emit() and cleared inside the reducer effect after the persist call
-  // for the matching local event. Self-events only.
-  const nextRecap = useRef<{
-    event_type: string;
-    payload?: Record<string, unknown>;
-  } | null>(null);
 
-  // Seed once from the persisted snapshot (initial hydrate / late join).
+  const [floats, setFloats] = useState<FloatingEmoji[]>([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customDraft, setCustomDraft] = useState("");
+  const [customError, setCustomError] = useState<string | null>(null);
+
+  // Seed from persisted state, or from empty once hydration resolves (new room)
   useEffect(() => {
-    if (seeded.current || !durable) return;
-    const init = questionsFromJson(durable);
+    if (seeded.current) return;
+    if (!ready) return;
+    const init = durable ? hydrateState(durable) : emptyState();
     stateRef.current = init;
     setState(init);
     seeded.current = true;
-  }, [durable]);
+  }, [durable, ready]);
 
-  // Every event (incl. self-echo) drives state through the reducer.
+  // Deal initial hand if we don't have one yet
+  useEffect(() => {
+    if (!seeded.current) return;
+    const s = stateRef.current;
+    if (s.hands[me] && s.hands[me].length > 0) return;
+    const others = Object.keys(s.hands);
+    const taken = new Set(others.flatMap((k) => s.hands[k] ?? []));
+    let nextIdx = s.next_index;
+    const hand: number[] = [];
+    for (let i = 0; hand.length < 3 && i < 100; i++) {
+      if (!taken.has(nextIdx)) hand.push(nextIdx);
+      else hand.push(nextIdx);
+      nextIdx++;
+    }
+    const next: DeckState = {
+      ...s,
+      hands: { ...s.hands, [me]: hand },
+      next_index: nextIdx,
+    };
+    stateRef.current = next;
+    setState(next);
+    persist(next);
+  }, [seeded.current, me]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Listen for state_sync events from the other side
   useEffect(() => {
     if (!session) return;
     return session.onEvent((e) => {
-      const next = reduceQuestions(stateRef.current, {
-        type: e.type,
-        payload: e.payload,
-        userId: e.userId,
-      });
-      if (next === stateRef.current) return;
-      stateRef.current = next;
-      setState(next);
-      if (room.canPersist) {
-        // Only attach the recap event when this is OUR move — partner
-        // moves echo through here too and we don't want to double-log.
-        const recap = e.userId === me ? nextRecap.current ?? undefined : undefined;
-        if (recap) nextRecap.current = null;
-        void session.persist(next as unknown as Record<string, unknown>, recap);
+      if (e.type === "state_sync" && e.userId !== me) {
+        const synced = hydrateState(e.payload as Record<string, unknown>);
+        // Merge: keep our own hand if it exists, take their updates
+        const merged: DeckState = {
+          ...synced,
+          hands: { ...synced.hands, ...(stateRef.current.hands[me] ? { [me]: stateRef.current.hands[me] } : {}) },
+        };
+        // Accept trade-related changes fully from syncer
+        if (synced.trade !== undefined) merged.trade = synced.trade;
+        stateRef.current = merged;
+        setState(merged);
       }
     });
-  }, [session, room.canPersist, me]);
+  }, [session, me]);
 
-  function emit(
-    type: string,
-    payload: Record<string, unknown> = {},
-    recap?: { event_type: string; payload?: Record<string, unknown> },
-  ) {
-    nextRecap.current = recap ?? null;
-    void session?.sendEvent(type, payload);
+  // Listen for reactions
+  useEffect(() => {
+    if (!session) return;
+    return session.onReaction((r) => {
+      if (r.from === me) return;
+      spawnFloat(r.kind);
+    });
+  }, [session, me]);
+
+  function persist(s: DeckState) {
+    void session?.persist(s as unknown as Record<string, unknown>);
   }
 
-  const resolveCard = (id: number): string =>
-    id >= CUSTOM_ID_BASE ? state.customs[String(id)] ?? "(custom)" : pool[id] ?? `Question ${id + 1}`;
+  function sync(s: DeckState) {
+    stateRef.current = s;
+    setState(s);
+    persist(s);
+    void session?.sendEvent("state_sync", s as unknown as Record<string, unknown>);
+  }
 
-  // ── Setup phase ──────────────────────────────────────────────────────────
-  if (state.phase === "setup") {
-    const mine = state.setup[me] ?? [];
-    const count = mine.length;
-    const customsUsed = state.customs_used[me] ?? 0;
-    const iSent = state.sent[me] === true;
+  function spawnFloat(emoji: string) {
+    const id = Date.now() + Math.random();
+    setFloats((f) => [...f, { id, emoji }]);
+    window.setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), 2200);
+  }
 
-    if (iSent) {
-      return (
-        <div className="flex flex-col h-full items-center justify-center p-8 text-center gap-3">
-          <Sparkles className="w-8 h-8 text-rosegold" aria-hidden />
-          <p className="font-serif italic text-cream text-xl">Deck sent</p>
-          <p className="text-sm text-muted-foreground max-w-xs">
-            Waiting for your partner to finish their 24 — then you'll each play the other's deck.
-          </p>
-        </div>
-      );
+  function sendReaction(emoji: string) {
+    if (emoji === "🤔") {
+      const s = stateRef.current;
+      const hand = s.hands[me] ?? [];
+      const cur = hand[0];
+      if (cur != null && !s.revisit.includes(cur)) {
+        sync({ ...s, revisit: [...s.revisit, cur] });
+      }
+      return;
     }
+    spawnFloat(emoji);
+    void session?.sendReaction(emoji);
+  }
 
+  function handleAnswered() {
+    const s = stateRef.current;
+    const hand = s.hands[me] ?? [];
+    const drawn = s.next_index;
+    const newHand = [hand[1], hand[2], drawn].filter((v) => v != null) as number[];
+    sync({
+      ...s,
+      hands: { ...s.hands, [me]: newHand },
+      next_index: drawn + 1,
+    });
+  }
+
+  function handleSkip() {
+    const s = stateRef.current;
+    const skipsUsed = s.skips[me] ?? 0;
+    if (skipsUsed >= limits.skipLimit) return;
+    const hand = s.hands[me] ?? [];
+    const drawn = s.next_index;
+    const newHand = [hand[1], hand[2], drawn].filter((v) => v != null) as number[];
+    sync({
+      ...s,
+      hands: { ...s.hands, [me]: newHand },
+      next_index: drawn + 1,
+      skips: { ...s.skips, [me]: skipsUsed + 1 },
+    });
+  }
+
+  function proposeTrade() {
+    const s = stateRef.current;
+    if (s.trade) return;
+    const hand = s.hands[me] ?? [];
+    sync({
+      ...s,
+      trade: { proposer: me, offered: hand[0], at: new Date().toISOString() },
+    });
+  }
+
+  function declineTrade() {
+    sync({ ...stateRef.current, trade: null });
+  }
+
+  function acceptTradeWith(slotIndex: number) {
+    const s = stateRef.current;
+    if (!s.trade) return;
+    const myHand = [...(s.hands[me] ?? [])];
+    const myCard = myHand[slotIndex];
+    myHand[slotIndex] = s.trade.offered;
+    const proposerHand = [...(s.hands[s.trade.proposer] ?? [])];
+    proposerHand[0] = myCard;
+    sync({
+      ...s,
+      hands: { ...s.hands, [me]: myHand, [s.trade.proposer]: proposerHand },
+      trade: null,
+    });
+  }
+
+  function bringBack(qIdx: number) {
+    const s = stateRef.current;
+    const hand = s.hands[me] ?? [];
+    const newHand = [qIdx, hand[1], hand[2]].filter((v) => v != null) as number[];
+    sync({ ...s, hands: { ...s.hands, [me]: newHand } });
+    setDrawerOpen(false);
+  }
+
+  function submitCustomQuestion() {
+    const text = customDraft.trim();
+    if (!text) { setCustomError("Type something first."); return; }
+    if (text.length > 240) { setCustomError("Keep it under 240 characters."); return; }
+    const s = stateRef.current;
+    const used = s.customs_used[me] ?? 0;
+    if (used >= limits.customQuestionLimit) {
+      setCustomError(`You've used all ${limits.customQuestionLimit}.`);
+      return;
+    }
+    const customId = CUSTOM_INDEX_BASE + Date.now();
+    const otherIds = Object.keys(s.hands).filter((k) => k !== me);
+    const otherId = otherIds[0];
+    if (!otherId) { setCustomError("No partner in the room yet."); return; }
+    const otherHand = [...(s.hands[otherId] ?? [])];
+    const newOtherHand = [customId, otherHand[1], otherHand[2]].filter((v) => v != null) as number[];
+    sync({
+      ...s,
+      hands: { ...s.hands, [otherId]: newOtherHand },
+      customs: { ...s.customs, [String(customId)]: { text, by: me } },
+      customs_used: { ...s.customs_used, [me]: used + 1 },
+    });
+    setCustomDraft("");
+    setCustomError(null);
+    setCustomOpen(false);
+  }
+
+  // Derived
+  const myHand = state.hands[me] ?? [];
+  const current = myHand[0] ?? 0;
+  const upcoming = myHand.slice(1, 3);
+  const skipsUsed = state.skips[me] ?? 0;
+  const skipsLeft = Math.max(0, limits.skipLimit - skipsUsed);
+  const customsUsed = state.customs_used[me] ?? 0;
+  const customLeft = Math.max(0, limits.customQuestionLimit - customsUsed);
+  const incomingTrade = state.trade && state.trade.proposer !== me;
+  const outgoingTrade = state.trade && state.trade.proposer === me;
+
+  const otherIds = Object.keys(state.hands).filter((k) => k !== me);
+  const proposerName = state.trade
+    ? (otherIds[0] ? "Your partner" : "Someone")
+    : "";
+
+  const isCustomFromOther = current >= CUSTOM_INDEX_BASE && state.customs[String(current)]?.by !== me;
+  const customAuthor = isCustomFromOther ? "your partner" : null;
+
+  if (!seeded.current) {
     return (
-      <div className="flex flex-col h-full p-4 sm:p-6 gap-3 min-h-0">
-        <div className="flex items-center justify-between">
-          <p className="font-serif italic text-cream text-lg">Build their deck</p>
-          <span className="text-xs tabular-nums text-muted-foreground">
-            {count}/{TARGET_SETUP_COUNT}
-          </span>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Pick {TARGET_SETUP_COUNT} questions (+ up to {MAX_CUSTOMS} of your own). Your partner answers these.
-        </p>
+      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+        warming the deck…
+      </div>
+    );
+  }
 
-        <div className="flex gap-2">
-          <Input
-            value={customText}
-            onChange={(e) => setCustomText(e.target.value)}
-            placeholder="Write your own question…"
-            className="bg-secondary border-border"
-            disabled={customsUsed >= MAX_CUSTOMS || count >= TARGET_SETUP_COUNT}
-          />
-          <Button
-            type="button"
-            onClick={() => {
-              const text = customText.trim();
-              if (!text) return;
-              emit("add_custom", { custom_id: CUSTOM_ID_BASE + customsUsed, text });
-              setCustomText("");
-            }}
-            disabled={!customText.trim() || customsUsed >= MAX_CUSTOMS || count >= TARGET_SETUP_COUNT}
-            className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90 shrink-0"
+  return (
+    <div className="flex flex-col h-full p-4 sm:p-6 gap-4 sm:gap-6">
+      {/* Top actions: custom question + revisit */}
+      <div className="flex items-center justify-between gap-2">
+        <Sheet open={customOpen} onOpenChange={setCustomOpen}>
+          <SheetTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => { setCustomError(null); setCustomDraft(""); setCustomOpen(true); }}
+              disabled={customLeft <= 0}
+              className="rounded-full border-amber/40 text-amber hover:bg-amber/10 disabled:opacity-50"
+            >
+              <PenLine className="w-3.5 h-3.5 mr-1.5" />
+              Write your own ({customLeft})
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="bg-card border-border">
+            <SheetHeader>
+              <SheetTitle className="font-serif text-cream">Write a question for them</SheetTitle>
+            </SheetHeader>
+            <div className="mt-4 space-y-3">
+              <Textarea
+                value={customDraft}
+                onChange={(e) => setCustomDraft(e.target.value)}
+                placeholder="Type the question you want them to answer…"
+                rows={3}
+                maxLength={240}
+                className="bg-secondary border-border"
+              />
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>{Math.max(0, customLeft - 1)} more after this one</span>
+                <span>{customDraft.length}/240</span>
+              </div>
+              {customError && <p className="text-rose text-sm">{customError}</p>}
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setCustomOpen(false)} className="rounded-full">Cancel</Button>
+                <Button
+                  onClick={submitCustomQuestion}
+                  disabled={!customDraft.trim() || customLeft <= 0}
+                  className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90"
+                >
+                  Send to them
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground italic">
+                It'll replace their current card. They'll see it's from you.
+              </p>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="sm" className="rounded-full">
+              <Bookmark className="w-3.5 h-3.5 mr-1.5" />
+              Revisit ({state.revisit.length})
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="bg-card border-border">
+            <SheetHeader>
+              <SheetTitle className="font-serif text-cream">Saved to revisit</SheetTitle>
+            </SheetHeader>
+            <div className="mt-6 space-y-3 overflow-y-auto max-h-[calc(100vh-8rem)]">
+              {state.revisit.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Tap 🤔 on a question to save it for later.
+                </p>
+              )}
+              {state.revisit.map((qIdx) => (
+                <div key={qIdx} className="rounded-2xl border border-border bg-secondary/40 p-4 flex flex-col gap-3">
+                  <p className="font-serif italic text-cream leading-snug">
+                    "{resolveText(pool, qIdx, state.customs)}"
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() => bringBack(qIdx)}
+                    className="self-start rounded-full bg-amber text-primary-foreground hover:bg-amber/90"
+                  >
+                    Bring it back
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* Main card area */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 relative">
+        {/* Current card */}
+        <div className="relative w-full max-w-md">
+          <div className="absolute -inset-6 rounded-[2rem] ember-glow pointer-events-none" aria-hidden />
+          <div className="absolute inset-0 translate-x-2 translate-y-2 rounded-3xl bg-secondary/60 border border-amber/10" />
+          <div className="absolute inset-0 translate-x-1 translate-y-1 rounded-3xl bg-secondary/80 border border-amber/10" />
+          <div
+            className={cn(
+              "relative rounded-3xl bg-card border border-border p-6 sm:p-10 min-h-[220px] sm:min-h-[260px] flex items-center justify-center text-center card-shadow transition-opacity duration-300",
+              incomingTrade && "opacity-40",
+            )}
           >
-            <Plus className="w-4 h-4" />
-          </Button>
+            {state.revisit.includes(current) && (
+              <BookmarkCheck className="absolute top-3 right-3 w-4 h-4 text-amber" />
+            )}
+            {isCustomFromOther && (
+              <div className="absolute top-3 left-3 text-[10px] uppercase tracking-[0.2em] text-amber italic flex items-center gap-1">
+                <PenLine className="w-3 h-3" />
+                from {customAuthor}
+              </div>
+            )}
+            <p className="font-serif text-xl sm:text-3xl leading-snug text-cream italic">
+              "{resolveText(pool, current, state.customs)}"
+            </p>
+
+            {/* Floating reactions */}
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-full overflow-hidden">
+              {floats.map((f) => (
+                <span
+                  key={f.id}
+                  className="absolute bottom-2 left-1/2 -translate-x-1/2 text-3xl animate-float-up"
+                  style={{ left: `${30 + Math.random() * 40}%` }}
+                >
+                  {f.emoji}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Incoming trade overlay */}
+          {incomingTrade && state.trade && (
+            <div className="absolute inset-0 rounded-3xl bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3 p-4 text-center">
+              <p className="text-sm text-cream">{proposerName} wants to swap.</p>
+              <p className="font-serif italic text-cream/80 text-sm">
+                "{resolveText(pool, state.trade.offered, state.customs)}"
+              </p>
+              <p className="text-xs text-muted-foreground">Pick one of your cards to send.</p>
+              <Button variant="outline" size="sm" onClick={declineTrade} className="rounded-full mt-1">
+                <X className="w-3.5 h-3.5 mr-1.5" /> Not this one
+              </Button>
+            </div>
+          )}
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto rounded-2xl bg-secondary/40 border border-border p-2 flex flex-col gap-1.5">
-          {pool.map((q, idx) => {
-            const selected = mine.includes(idx);
+        {/* Reactions row */}
+        <div className="flex flex-col items-center gap-1.5">
+          <p className="text-[11px] italic text-muted-foreground/80">Tap to react</p>
+          <div className="flex gap-2">
+            {reactions.map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => sendReaction(emoji)}
+                className="w-10 h-10 rounded-full bg-secondary/60 border border-border hover:bg-secondary text-xl transition"
+                aria-label={`React ${emoji}`}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Upcoming hand */}
+        <div className="w-full max-w-md grid grid-cols-2 gap-3">
+          {upcoming.map((qIdx, slot) => {
+            const handSlot = slot + 1;
+            const tappable = !!incomingTrade;
             return (
               <button
-                key={idx}
-                type="button"
-                onClick={() => emit("toggle_card", { card_id: idx })}
-                disabled={!selected && count >= TARGET_SETUP_COUNT}
-                className={`flex items-center gap-3 rounded-xl border p-2.5 text-left text-sm transition ${
-                  selected
-                    ? "border-amber bg-amber/10 text-cream"
-                    : "border-border bg-card/60 text-cream/80 hover:border-amber/40 disabled:opacity-40"
-                }`}
+                key={`${qIdx}-${slot}`}
+                disabled={!tappable}
+                onClick={() => tappable && acceptTradeWith(handSlot)}
+                className={cn(
+                  "rounded-2xl border border-border bg-secondary/40 p-3 text-left text-cream/80 text-xs sm:text-sm font-serif italic min-h-[80px] transition relative",
+                  tappable && "hover:bg-amber/20 hover:border-amber cursor-pointer",
+                  !tappable && "opacity-70",
+                )}
               >
-                <span
-                  className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
-                    selected ? "bg-amber border-amber text-primary-foreground" : "border-muted-foreground/40"
-                  }`}
-                >
-                  {selected && <Check className="w-3 h-3" />}
-                </span>
-                <span className="min-w-0">{q}</span>
+                {state.revisit.includes(qIdx) && (
+                  <BookmarkCheck className="absolute top-2 right-2 w-3 h-3 text-amber" />
+                )}
+                "{resolveText(pool, qIdx, state.customs)}"
               </button>
             );
           })}
         </div>
+        {incomingTrade && (
+          <button onClick={() => acceptTradeWith(0)} className="text-xs underline text-amber">
+            Send my current card instead
+          </button>
+        )}
+      </div>
 
-        <Button
-          type="button"
-          onClick={() => emit("send_deck")}
-          disabled={count !== TARGET_SETUP_COUNT}
-          className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90 disabled:opacity-50"
-        >
-          {count === TARGET_SETUP_COUNT ? "Send deck" : `Pick ${TARGET_SETUP_COUNT - count} more`}
+      {/* Bottom actions */}
+      <div className="flex gap-3 justify-center flex-wrap items-center">
+        <Button variant="outline" onClick={proposeTrade} disabled={!!state.trade} className="rounded-full">
+          <Repeat2 className="w-4 h-4 mr-2" />
+          {outgoingTrade ? "Waiting for swap…" : "Propose trade"}
         </Button>
-      </div>
-    );
-  }
-
-  // ── Done phase ───────────────────────────────────────────────────────────
-  if (state.phase === "done") {
-    return (
-      <div className="flex flex-col h-full items-center justify-center p-8 text-center gap-3">
-        <div className="text-4xl">🎉</div>
-        <p className="font-serif italic text-cream text-2xl">You made it through all 21</p>
-        <p className="text-sm text-muted-foreground max-w-xs">That's the whole deck, both ways. Nicely done.</p>
-      </div>
-    );
-  }
-
-  // ── Play phase ───────────────────────────────────────────────────────────
-  const asker = state.turn;
-  const myTurn = asker === me;
-  const currentDeck = asker ? state.deck[asker] ?? [] : [];
-  const currentCardId = currentDeck[0];
-  const cardText = currentCardId != null ? resolveCard(currentCardId) : "…";
-  const cardsLeft = Object.values(state.deck).reduce((n, d) => n + d.length, 0);
-  const trade = state.trade;
-  const iAmProposer = trade?.proposer_id === me;
-
-  return (
-    <div className="flex flex-col h-full p-4 sm:p-6 gap-4 min-h-0">
-      <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-muted-foreground">
-        <span>{myTurn ? "Your turn to ask" : "Their turn to ask"}</span>
-        <span className="tabular-nums">{cardsLeft} left</span>
-      </div>
-
-      <div
-        key={cardText}
-        className="flex-1 min-h-0 flex items-center justify-center rounded-3xl border-2 border-amber/30 bg-amber/5 p-6 text-center animate-scale-in shadow-[0_28px_72px_-22px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.05)]"
-      >
-        <p className="font-serif italic text-cream text-2xl leading-snug">{cardText}</p>
-      </div>
-
-      {trade && (
-        <div className="rounded-2xl border border-rosegold/30 bg-rosegold/10 p-4 text-center space-y-3">
-          {iAmProposer ? (
-            <p className="text-sm text-cream">Trade proposed — waiting for your partner…</p>
-          ) : (
-            <>
-              <p className="text-sm text-cream">Your partner wants to swap the top cards.</p>
-              <div className="flex gap-2 justify-center">
-                <Button type="button" onClick={() => emit("accept_trade")} className="rounded-full bg-amber text-primary-foreground">
-                  Accept
-                </Button>
-                <Button type="button" variant="outline" onClick={() => emit("decline_trade")} className="rounded-full border-border">
-                  Decline
-                </Button>
-              </div>
-            </>
-          )}
+        <div className="flex flex-col items-center gap-0.5">
+          <Button
+            variant="outline"
+            onClick={handleSkip}
+            disabled={!!incomingTrade || skipsLeft <= 0}
+            className={cn("rounded-full", skipsLeft <= 0 && "opacity-50")}
+          >
+            Skip {skipsLeft > 0 ? `(${skipsLeft} left)` : ""}
+          </Button>
+          {skipsLeft <= 0 && <span className="text-[10px] text-muted-foreground">No skips left</span>}
         </div>
-      )}
-
-      <div className="flex flex-wrap gap-2 justify-center">
-        {myTurn && (
-          <Button
-            type="button"
-            onClick={() =>
-              emit("answered", {}, { event_type: "answered", payload: { text: cardText } })
-            }
-            className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90"
-          >
-            <Check className="w-4 h-4 mr-1.5" /> Answered — next
-          </Button>
-        )}
-        {myTurn && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() =>
-              emit("skip", {}, { event_type: "skipped", payload: { text: cardText } })
-            }
-            disabled={state.skips_left <= 0}
-            className="rounded-full border-border"
-          >
-            <SkipForward className="w-4 h-4 mr-1.5" /> Skip ({state.skips_left})
-          </Button>
-        )}
-        {!trade && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => emit("propose_trade")}
-            disabled={state.trades_left <= 0}
-            className="rounded-full border-border"
-          >
-            <ArrowRightLeft className="w-4 h-4 mr-1.5" /> Trade ({state.trades_left})
-          </Button>
-        )}
+        <Button
+          onClick={handleAnswered}
+          disabled={!!incomingTrade}
+          className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90"
+        >
+          <Check className="w-4 h-4 mr-2" /> Answered
+        </Button>
       </div>
     </div>
   );

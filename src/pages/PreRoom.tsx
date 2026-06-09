@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -10,12 +10,14 @@ import {
   UserPlus,
   ArrowLeft,
   Loader2,
-  Palette,
   MoreVertical,
   UserMinus,
   KeyRound,
+  Mic,
+  MicOff,
+  Video,
+  VideoOff,
 } from "lucide-react";
-import { CustomizeSheet } from "@/components/CustomizeSheet";
 import { PageShell } from "@/components/PageShell";
 import { UserAvatarImg } from "@/components/UserAvatarImg";
 import {
@@ -34,9 +36,9 @@ import {
   kickParticipant,
   rotateRoomPin,
   type Room,
-  type InviteCard,
   type ParticipantInfo,
 } from "@/lib/rooms";
+import { getInvitedGuestName, saveInvitedGuestName } from "@/lib/invitedGuest";
 import { getMe } from "@/lib/users";
 import { RoomChannel, type PresenceState } from "@/lib/realtime/roomChannel";
 import { ShimmerSkeleton } from "@/components/ui/skeleton";
@@ -108,11 +110,90 @@ function CodeCopyTile({
  */
 export default function PreRoom() {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [starting, setStarting] = useState(false);
   const [copiedKey, setCopiedKey] = useState<CopiedKey>(null);
-  const [customizeOpen, setCustomizeOpen] = useState(false);
+
+  const [cameraEnabled, setCameraEnabled] = useState(() => {
+    try {
+      const saved = localStorage.getItem("dr_pre_camera_enabled");
+      return saved !== null ? saved === "true" : true;
+    } catch {
+      return true;
+    }
+  });
+  const [micEnabled, setMicEnabled] = useState(() => {
+    try {
+      const saved = localStorage.getItem("dr_pre_mic_enabled");
+      return saved !== null ? saved === "true" : true;
+    } catch {
+      return true;
+    }
+  });
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("dr_pre_camera_enabled", String(cameraEnabled));
+    } catch {}
+  }, [cameraEnabled]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("dr_pre_mic_enabled", String(micEnabled));
+    } catch {}
+  }, [micEnabled]);
+
+  // Keep streamRef in sync so the cleanup branch always sees the live track.
+  useEffect(() => {
+    streamRef.current = stream;
+  }, [stream]);
+
+  // Unmount cleanup — stop any lingering camera tracks regardless of state.
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (cameraEnabled) {
+      navigator.mediaDevices
+        .getUserMedia({ video: true, audio: false })
+        .then((s) => {
+          if (cancelled) {
+            s.getTracks().forEach((t) => t.stop());
+            return;
+          }
+          streamRef.current = s;
+          setStream(s);
+          if (videoRef.current) {
+            videoRef.current.srcObject = s;
+          }
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            console.warn("Camera access denied or unavailable", err);
+            setCameraEnabled(false);
+          }
+        });
+    } else {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      setStream(null);
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [cameraEnabled]);
 
   // Server-authoritative list of my rooms — gets us the canonical
   // code/pin/state/expiry without a per-page-load /by-code call.
@@ -122,6 +203,18 @@ export default function PreRoom() {
     staleTime: 5_000,
   });
   const room: Room | undefined = rooms?.find((r) => r.id === id);
+
+  // Persist the name the host typed in the create wizard (navigation
+  // state on first landing, localStorage on return visits).
+  useEffect(() => {
+    if (!room?.id) return;
+    const fromNav = (location.state as { guestName?: string } | null)?.guestName;
+    if (typeof fromNav === "string" && fromNav.trim()) {
+      saveInvitedGuestName(room.id, fromNav);
+    }
+  }, [room?.id, location.state]);
+
+  const invitedGuestName = room?.id ? getInvitedGuestName(room.id) : null;
 
   // InviteCard fetch via the room code once we know it — gives us
   // partner attribution (the /v1/rooms list endpoint doesn't return
@@ -278,7 +371,7 @@ export default function PreRoom() {
   // Effective partner attribution: prefer the InviteCard, fall back
   // to whatever the live presence is announcing (covers the case
   // where the partner is in but the card hasn't refetched yet).
-  const effectivePartnerName = partner?.name ?? presencePartnerName;
+  const effectivePartnerName = partner?.name ?? presencePartnerName ?? invitedGuestName;
   const effectivePartnerPhoto = partner?.photo ?? null;
 
   // Status line — presence-driven, exactly like mobile.
@@ -385,7 +478,7 @@ export default function PreRoom() {
   return (
     <PreRoomShell>
       {/* Top bar — back + (host) destroy. */}
-      <header className="mx-auto flex max-w-2xl items-center px-1">
+      <header className="mx-auto flex max-w-4xl items-center px-4 sm:px-6 lg:px-8">
         <button
           type="button"
           onClick={() => navigate("/home")}
@@ -447,166 +540,198 @@ export default function PreRoom() {
         )}
       </header>
 
-      <main className="mx-auto mt-6 w-full max-w-2xl space-y-6 px-4 sm:px-6 lg:max-w-3xl">
-        {/* Avatar pair — always renders. Partner side shows the
-            person-plus placeholder when unknown. */}
-        <div className="flex flex-col items-center gap-3">
-          <AvatarPair
-            selfPhoto={me?.photo_url ?? null}
-            selfName={me?.display_name ?? null}
-            partnerPhoto={effectivePartnerPhoto}
-            partnerName={effectivePartnerName}
-          />
-          {/* Title + status line — skeleton until the InviteCard lands. */}
-          {!card ? (
-            <div className="flex flex-col items-center gap-2">
-              <ShimmerSkeleton width={140} height={18} />
-              <ShimmerSkeleton width={200} height={12} />
+      <main className="mx-auto mt-6 w-full max-w-4xl px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-12 md:items-start">
+          
+          {/* Left: Preflight Cam/Mic Check */}
+          <div className="md:col-span-7 space-y-4">
+            <div className="relative aspect-video w-full overflow-hidden rounded-[24px] border border-white/10 bg-black/45 shadow-2xl flex items-center justify-center">
+              {cameraEnabled ? (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="h-full w-full object-cover scale-x-[-1]"
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-3 text-muted-foreground text-center">
+                  <div className="h-16 w-16 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center">
+                    <VideoOff className="h-6 w-6 text-muted-foreground/60" />
+                  </div>
+                  <p className="text-sm font-medium">Camera is turned off</p>
+                </div>
+              )}
+              
+              {/* Mic/Cam status indicators overlay */}
+              <div className="absolute bottom-4 left-4 flex gap-1.5 pointer-events-none">
+                <div className={cn(
+                  "p-1.5 rounded-lg backdrop-blur-md border border-white/10 text-[10px] uppercase tracking-wider font-semibold flex items-center gap-1",
+                  micEnabled ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                )}>
+                  {micEnabled ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
+                  <span>{micEnabled ? "Mic On" : "Muted"}</span>
+                </div>
+              </div>
             </div>
-          ) : (
-            <>
-              <p className="text-center text-base font-semibold text-cream">{headerTitle}</p>
-              <p
-                className={cn(
-                  "text-center text-sm",
-                  partnerPresent ? "text-primary" : "text-muted-foreground",
-                )}
-              >
-                {statusLine}
+
+            {/* Video & Audio Preflight controls */}
+            <div className="flex flex-col items-center gap-3">
+              <div className="flex items-center gap-4">
+                {/* Microphone Toggle */}
+                <div className="flex flex-col items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMicEnabled(!micEnabled)}
+                    aria-label={micEnabled ? "Mute Microphone" : "Unmute Microphone"}
+                    className={cn(
+                      "flex h-14 w-14 items-center justify-center rounded-full border transition-all duration-200 focus-ring shadow-lg",
+                      micEnabled
+                        ? "bg-white/[0.06] border-white/15 text-cream hover:bg-white/[0.12]"
+                        : "bg-rose-500/15 border-rose-500/30 text-rose-300 hover:bg-rose-500/25"
+                    )}
+                  >
+                    {micEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+                  </button>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-1">
+                    {micEnabled ? "Mute" : "Unmute"}
+                  </span>
+                </div>
+
+                {/* Camera Toggle */}
+                <div className="flex flex-col items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setCameraEnabled(!cameraEnabled)}
+                    aria-label={cameraEnabled ? "Turn off camera" : "Turn on camera"}
+                    className={cn(
+                      "flex h-14 w-14 items-center justify-center rounded-full border transition-all duration-200 focus-ring shadow-lg",
+                      cameraEnabled
+                        ? "bg-white/[0.06] border-white/15 text-cream hover:bg-white/[0.12]"
+                        : "bg-rose-500/15 border-rose-500/30 text-rose-300 hover:bg-rose-500/25"
+                    )}
+                  >
+                    {cameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                  </button>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-1">
+                    {cameraEnabled ? "Stop Video" : "Start Video"}
+                  </span>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground text-center max-w-sm mt-1">
+                Choose your settings here. They will carry over automatically when you start the date.
               </p>
-            </>
-          )}
-        </div>
-
-        {/* Invite section.
-            Mobile / sm / md: single card with code-tiles on top and the
-            link/share row beneath, separated by an 'or' rule.
-            Desktop (lg+): two cards side-by-side — codes left, link/share
-            right — so a wide canvas isn't wasted vertically. */}
-        <div className="space-y-5 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
-          {/* Codes card */}
-          <section className="rounded-2xl border border-primary/20 bg-primary/[0.04] p-5 space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              Share a code
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <CodeCopyTile
-                label="Room ID"
-                value={room?.code ?? ""}
-                copied={copiedKey === "room-id"}
-                loading={!room}
-                onCopy={() => room && void copyValue(room.code, "room-id")}
-              />
-              <CodeCopyTile
-                label="PIN"
-                value={room?.pin ?? ""}
-                copied={copiedKey === "pin"}
-                loading={!room}
-                onCopy={() => room && void copyValue(room.pin, "pin")}
-              />
             </div>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Tell them the Room ID and PIN — they enter it on the Join screen.
-            </p>
-          </section>
-
-          {/* 'or' rule — mobile/tablet only. Desktop's grid layout makes
-              the divider redundant (cards sit side-by-side). */}
-          <div className="flex items-center gap-3 lg:hidden" aria-hidden>
-            <span className="h-px flex-1 bg-white/10" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-              or
-            </span>
-            <span className="h-px flex-1 bg-white/10" />
           </div>
 
-          {/* Link / share card */}
-          <section className="rounded-2xl border border-primary/20 bg-primary/[0.04] p-5 space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              Send a link
-            </p>
-            <div className="flex flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
+          {/* Right: Meeting Details & Actions */}
+          <div className="md:col-span-5 space-y-6">
+            
+            {/* Header info */}
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 flex flex-col items-center gap-4 text-center backdrop-blur-md shadow-lg">
+              <AvatarPair
+                selfPhoto={me?.photo_url ?? null}
+                selfName={me?.display_name ?? null}
+                partnerPhoto={effectivePartnerPhoto}
+                partnerName={effectivePartnerName}
+              />
+              
+              {!card ? (
+                <div className="flex flex-col items-center gap-2">
+                  <ShimmerSkeleton width={140} height={18} />
+                  <ShimmerSkeleton width={200} height={12} />
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <p className="text-base font-semibold text-cream tracking-wide">{headerTitle}</p>
+                  <p className={cn(
+                    "text-xs font-medium tracking-wide transition-colors duration-200",
+                    partnerPresent ? "text-primary animate-pulse" : "text-muted-foreground/85"
+                  )}>
+                    {statusLine}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Meeting Access Card */}
+            <div className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-5 space-y-4 backdrop-blur-md shadow-xl relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 to-transparent pointer-events-none" />
+              
+              <div className="flex items-center justify-between border-b border-white/5 pb-2 relative z-10">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/90">
+                  Meeting Details
+                </span>
+                <span className="text-[9px] uppercase font-semibold text-primary/80 bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5">
+                  Info
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 relative z-10">
+                <CodeCopyTile
+                  label="Meeting ID"
+                  value={room?.code ?? ""}
+                  copied={copiedKey === "room-id"}
+                  loading={!room}
+                  onCopy={() => room && void copyValue(room.code, "room-id")}
+                />
+                <CodeCopyTile
+                  label="Passcode (PIN)"
+                  value={room?.pin ?? ""}
+                  copied={copiedKey === "pin"}
+                  loading={!room}
+                  onCopy={() => room && void copyValue(room.pin, "pin")}
+                />
+              </div>
+
+              <div className="flex flex-col gap-2 pt-1 relative z-10">
+                <button
+                  type="button"
+                  onClick={() => room && void copyValue(inviteUrl, "link")}
+                  disabled={!room}
+                  className={cn(
+                    "flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/[0.02] py-2.5 text-xs text-cream transition hover:bg-white/5 disabled:opacity-50 font-medium",
+                    copiedKey === "link" && "border-emerald-500/40 text-emerald-300 bg-emerald-500/5",
+                  )}
+                >
+                  {copiedKey === "link" ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" aria-hidden /> Link copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" aria-hidden /> Copy Invite Link
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={share}
+                  disabled={!room}
+                  className="flex items-center justify-center gap-2 rounded-full bg-amber py-2.5 text-xs font-semibold text-primary-foreground transition hover:bg-amber/90 disabled:opacity-50 shadow-md"
+                >
+                  <Share2 className="h-3.5 w-3.5" aria-hidden /> Invite Partner...
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-2">
               <button
                 type="button"
-                onClick={() => room && void copyValue(inviteUrl, "link")}
-                disabled={!room}
-                className={cn(
-                  "flex flex-1 items-center justify-center gap-2 rounded-full border border-white/15 py-2.5 text-sm text-cream transition hover:bg-white/5 disabled:opacity-50",
-                  copiedKey === "link" && "border-emerald-400/40 text-emerald-200",
-                )}
+                onClick={start}
+                disabled={!room || starting}
+                className="btn-primary flex w-full items-center justify-center gap-2 rounded-full py-3.5 font-bold text-sm tracking-wide shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
               >
-                {copiedKey === "link" ? (
-                  <>
-                    <Check className="h-4 w-4" aria-hidden /> Link copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4" aria-hidden /> Copy link
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={share}
-                disabled={!room}
-                className="flex flex-1 items-center justify-center gap-2 rounded-full bg-amber py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-amber/90 disabled:opacity-50"
-              >
-                <Share2 className="h-4 w-4" aria-hidden /> Share…
+                {starting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+                {live ? "Rejoin Room" : "Enter Room"}
               </button>
             </div>
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Drops them straight into the room when tapped.
-            </p>
-          </section>
-        </div>
 
-        {/* Helper copy */}
-        <p className="rounded-2xl border border-white/[0.08] bg-card/40 p-4 text-center text-sm text-muted-foreground">
-          Share the link above. They&apos;ll join from it — then start the session whenever you&apos;re both ready.
-        </p>
+          </div>
 
-        {/* Customize + Start / Rejoin */}
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={() => setCustomizeOpen(true)}
-            disabled={!room}
-            className="focus-ring flex w-full items-center justify-center gap-2 rounded-[1.15rem] border border-white/15 py-3 text-sm font-medium text-cream transition hover:bg-white/[0.04] disabled:opacity-50"
-          >
-            <Palette className="h-4 w-4" aria-hidden /> Customize
-          </button>
-          <button
-            type="button"
-            onClick={start}
-            disabled={!room || starting}
-            className="btn-primary flex w-full items-center justify-center gap-2 rounded-[1.15rem] py-4 font-semibold disabled:opacity-50"
-          >
-            {starting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-            {live ? "Rejoin" : "Start session"}
-          </button>
         </div>
       </main>
 
-      {/* Customize sheet — picks theme + background, saves per tap.
-          After each save we (1) broadcast on the room channel so any
-          partner currently inside the LiveRoom refetches their
-          InviteCard and re-themes, and (2) invalidate our local
-          'my-rooms' + 'invite-card' caches so the PreRoom UI itself
-          (host preview, partner's PreRoom view) re-renders immediately. */}
-      {room && (
-        <CustomizeSheet
-          roomId={room.id}
-          open={customizeOpen}
-          onOpenChange={setCustomizeOpen}
-          initialThemeId={room.theme_color}
-          initialBackgroundId={room.background_id}
-          onBroadcast={() => {
-            void channelRef.current?.broadcast("customize", {});
-            void queryClient.invalidateQueries({ queryKey: ["invite-card", room.code] });
-            void queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
-          }}
-        />
-      )}
     </PreRoomShell>
   );
 }
@@ -626,7 +751,7 @@ function PreRoomShell({ children }: { children: React.ReactNode }) {
             "radial-gradient(ellipse 130% 95% at 50% 118%, rgba(155, 95, 50, 0.45) 0%, transparent 58%), radial-gradient(circle at 18% 18%, rgba(245, 166, 35, 0.18) 0%, transparent 42%), radial-gradient(circle at 85% 12%, rgba(212, 130, 106, 0.16) 0%, transparent 40%)",
         }}
       />
-      <div className="relative z-10 mx-auto min-h-screen w-full px-4 py-6 sm:px-6 sm:py-10">
+      <div className="relative z-10 mx-auto min-h-screen w-full py-6 sm:py-10">
         {children}
       </div>
     </PageShell>

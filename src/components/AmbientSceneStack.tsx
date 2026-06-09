@@ -4,7 +4,7 @@ import { resolveAmbiancePreset } from "@/lib/ambiance";
 import { LOBBY_PREVIEW_SCENES } from "@/lib/lobbyPreviewScenes";
 
 type AmbientSceneStackProps = {
-  /** Room mood from `room_state.ambiance_preset` or create-flow selection */
+  /** Room mood from create-flow selection or persisted background_id */
   ambiance?: AmbiancePresetId | null;
   /** Wrapper positioning — e.g. `fixed inset-0 z-[1]` (full viewport) or `absolute inset-0` (nested frame) */
   positionClassName: string;

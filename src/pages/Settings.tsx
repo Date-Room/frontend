@@ -13,7 +13,12 @@ import {
   Share2,
 } from "lucide-react";
 import { authClient } from "@/lib/authClient";
-import { getMe, getReferrals, updateMe, type UserMe, type UserReferrals } from "@/lib/users";
+import { useQuery } from "@tanstack/react-query";
+import { getMe, getReferrals, updateMe, type UserMe } from "@/lib/users";
+import {
+  buildReferralShareMessage,
+  buildReferralShareUrl,
+} from "@/lib/referralShare";
 import { applyThemePreference } from "@/lib/theme";
 import { CardPage } from "@/components/CardPage";
 import { PageShell } from "@/components/PageShell";
@@ -288,7 +293,7 @@ export default function Settings() {
         Save
       </button>
 
-      <InviteSection />
+      {me ? <InviteSection me={me} inviterName={displayName} /> : null}
 
       {/* Sign out — quiet red text link, not a primary CTA. */}
       <div className="mt-10 flex justify-center">
@@ -356,36 +361,29 @@ export default function Settings() {
 
 /* ─────────────────────── Invite section ─────────────────────── */
 
-/** Mirrors the mobile Profile invite card. Fetches GET /v1/users/me/referrals,
- * shows the share URL with a tap-to-copy chip, and a Share button that
- * uses the Web Share API on mobile browsers, falls back to copy on
- * desktop. Reward mechanics ship later; v1 is the mechanism. */
-function InviteSection() {
-  const [refs, setRefs] = useState<UserReferrals | null>(null);
-  const [loading, setLoading] = useState(true);
+/** Friend invite card — share `dateroom.io/r/{code}` from the profile.
+ *  Primary source: `referral_code` on GET /v1/users/me (works on older
+ *  API deploys). Optional GET /v1/users/me/referrals enriches with count. */
+function InviteSection({ me, inviterName }: { me: UserMe; inviterName: string }) {
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const r = await getReferrals();
-        if (!cancelled) setRefs(r);
-      } catch {
-        // Silent — the section just stays empty; not worth a toast.
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data: refs } = useQuery({
+    queryKey: ["referrals"],
+    queryFn: getReferrals,
+    retry: false,
+    staleTime: 60_000,
+  });
+
+  const shareUrl =
+    (me.referral_code ? buildReferralShareUrl(me.referral_code) : null) ??
+    refs?.share_url ??
+    null;
+  const referredCount = refs?.referred_count ?? 0;
 
   async function copy() {
-    if (!refs) return;
+    if (!shareUrl) return;
     try {
-      await navigator.clipboard.writeText(refs.share_url);
+      await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       toast.success("Invite link copied.");
       window.setTimeout(() => setCopied(false), 1500);
@@ -395,16 +393,13 @@ function InviteSection() {
   }
 
   async function share() {
-    if (!refs) return;
-    const text = `Come date with me on DateRoom — ${refs.share_url}`;
-    // Web Share API is the native sheet on iOS Safari / Android Chrome;
-    // falls back to copy elsewhere (most desktops).
+    if (!shareUrl) return;
+    const text = buildReferralShareMessage(shareUrl, inviterName);
     if (typeof navigator !== "undefined" && "share" in navigator) {
       try {
-        await navigator.share({ title: "Join me on DateRoom", text, url: refs.share_url });
+        await navigator.share({ title: "Join me on DateRoom", text, url: shareUrl });
         return;
       } catch {
-        // User dismissed — silent.
         return;
       }
     }
@@ -417,27 +412,23 @@ function InviteSection() {
         Invite
       </p>
       <div className="overflow-hidden rounded-2xl border border-border bg-card/40 p-4">
-        {loading ? (
-          <div className="flex h-16 items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-rosegold" aria-hidden />
-          </div>
-        ) : !refs ? (
+        {!shareUrl ? (
           <p className="text-sm text-muted-foreground">
-            Sign in to share your invite link.
+            Your invite link is loading. Pull to refresh or try again in a moment.
           </p>
         ) : (
           <>
             <div className="flex items-center gap-3">
               <Gift className="h-5 w-5 text-rosegold" aria-hidden />
-              <p className="flex-1 text-[15px] font-medium text-cream">Invite a friend</p>
-              {refs.referred_count > 0 && (
+              <p className="flex-1 text-[15px] font-medium text-cream">Invite a friend to DateRoom</p>
+              {referredCount > 0 && (
                 <span className="rounded-full border border-rosegold/25 bg-rosegold/10 px-2.5 py-1 text-[11px] font-semibold text-rosegold">
-                  {refs.referred_count} joined
+                  {referredCount} joined
                 </span>
               )}
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              Share your link. Soon, every friend who joins earns you a free room.
+              Share your personal link. Friends land on DateRoom.io and can sign up from there.
             </p>
             <button
               type="button"
@@ -445,7 +436,7 @@ function InviteSection() {
               className="mt-3 flex w-full items-center gap-2 rounded-xl border border-border bg-background/60 px-3 py-2.5 text-left transition hover:border-rosegold/40"
             >
               <span className="flex-1 truncate font-mono text-sm text-rosegold">
-                {refs.share_url}
+                {shareUrl}
               </span>
               {copied ? (
                 <Check className="h-4 w-4 text-rosegold" aria-hidden />

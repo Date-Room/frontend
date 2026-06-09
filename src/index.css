@@ -30,6 +30,7 @@
     --input: 30 10% 22%;
     --ring: 16 56% 64%;
     --radius: 1.5rem;
+    --champagne: 38 72% 72%;
   }
 }
 
@@ -161,6 +162,11 @@
 
   .card-shadow {
     @apply shadow-[0_20px_50px_rgba(0,0,0,0.5)];
+  }
+
+  .ember-glow {
+    background: radial-gradient(ellipse at 50% 50%, rgba(212,130,106,0.12) 0%, transparent 70%);
+    pointer-events: none;
   }
 
   .activity-tab {

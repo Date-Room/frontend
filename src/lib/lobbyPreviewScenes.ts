@@ -28,7 +28,6 @@ const Q = "auto=format&fit=crop&w=1800&q=88";
 /** Curated IDs — compositions chosen for portrait phone framing + mood fidelity. */
 export const LOBBY_PREVIEW_SCENES: Record<AmbiancePresetId, LobbyPreviewScene> = {
   candlelit: {
-    /** Generated / self-hosted art — warm candle bokeh portrait crop for lobby + live room backdrop. */
     src: `/lobby-mood-candlelit.png`,
     objectPosition: "50% 52%",
     washT: "from-[#0a0305]/96",

@@ -15,6 +15,8 @@ export type UserMe = {
   country: string | null;
   age_verified: boolean;
   created_at: string;
+  /** Public handle for `dateroom.io/r/{code}` friend invites. */
+  referral_code?: string;
 };
 
 export type UserUpdate = {

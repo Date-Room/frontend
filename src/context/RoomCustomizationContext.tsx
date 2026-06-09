@@ -22,35 +22,31 @@
 import { createContext, useContext, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRoomByCode, listMyRooms, type InviteCard } from "@/lib/rooms";
-import {
-  backgroundForId,
-  backgroundGradient,
-  themeForId,
-  type RoomBackgroundPreset,
-  type RoomThemePalette,
-} from "@/lib/roomTheme";
+import type { AmbiancePresetId } from "@/lib/ambiance";
+import { resolveAmbianceFromBackgroundId } from "@/lib/roomAmbiance";
+import { themeForId, type RoomThemePalette } from "@/lib/roomTheme";
 import { useRoomSession } from "@/context/RoomSessionContext";
 
 export type RoomCustomization = {
   /** Resolved theme palette — never null; falls back to the default. */
   theme: RoomThemePalette;
-  /** Resolved background, or null when the host hasn't picked one. */
-  background: RoomBackgroundPreset | null;
-  /** CSS linear-gradient string for the background (default when null). */
+  /** Near-black shell behind photo backdrops. */
   backgroundCss: string;
   /** Raw stored slug — null when nothing's picked. */
   themeId: string | null;
   backgroundId: string | null;
+  /** Lobby / live-room mood from the create wizard (photo + CSS wash). */
+  ambiancePreset: AmbiancePresetId;
 };
 
 /** Default DateRoom theme — returned when a component reads the hook
  *  outside the provider (so reads never throw or render undefined). */
 const DEFAULT_CUSTOMIZATION: RoomCustomization = {
   theme: themeForId(null),
-  background: null,
-  backgroundCss: backgroundGradient(null),
+  backgroundCss: "#0a0508",
   themeId: null,
   backgroundId: null,
+  ambiancePreset: "candlelit",
 };
 
 const Ctx = createContext<RoomCustomization>(DEFAULT_CUSTOMIZATION);
@@ -124,20 +120,24 @@ export function RoomCustomizationProvider({
     return () => off();
   }, [session.channel, roomCode, queryClient]);
 
-  const themeId = card?.theme_color ?? null;
-  const backgroundId = card?.background_id ?? null;
+  const roomRow = useMemo(
+    () => rooms?.find((r) => r.id === session.roomId),
+    [rooms, session.roomId],
+  );
+
+  const themeId = card?.theme_color ?? roomRow?.theme_color ?? null;
+  const backgroundId = card?.background_id ?? roomRow?.background_id ?? null;
+  const ambiancePreset = resolveAmbianceFromBackgroundId(backgroundId);
 
   const value = useMemo<RoomCustomization>(() => {
-    const theme = themeForId(themeId);
-    const background = backgroundForId(backgroundId);
     return {
-      theme,
-      background,
-      backgroundCss: backgroundGradient(backgroundId),
+      theme: themeForId(themeId),
+      backgroundCss: "#0a0508",
       themeId,
       backgroundId,
+      ambiancePreset,
     };
-  }, [themeId, backgroundId]);
+  }, [themeId, backgroundId, ambiancePreset]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
