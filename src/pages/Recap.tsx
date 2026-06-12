@@ -1,16 +1,68 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Calendar, ChevronRight, Loader2, Sparkles } from "lucide-react";
 import { CardPage } from "@/components/CardPage";
+import { PaymentCheckout } from "@/components/PaymentCheckout";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   getRoomRecap,
   type ActivityEventResponse,
   type ActivityStateResponse,
 } from "@/lib/activities/activityState";
+import { ApiError } from "@/lib/api";
 import { authClient } from "@/lib/authClient";
+import {
+  getBillingConfig,
+  getEntitlement,
+  type BillableProduct,
+  type Entitlement,
+} from "@/lib/billing";
 import { claimRoom, promoteRoom } from "@/lib/rooms";
+import {
+  billingProductForTier,
+  formatTierPrice,
+  tierPricingMeta,
+} from "@/lib/tierPricing";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+
+const RECAP_PROMOTE_STORAGE_KEY = "dateroom:recap:promote-room";
+
+const PERSISTENT_TIERS = [
+  {
+    product: "together" as const,
+    title: "Together",
+    desc: "Persistent room for two — vision board, bookshelf, watch party.",
+    emoji: "🏠",
+  },
+  {
+    product: "crew" as const,
+    title: "Crew",
+    desc: "Group watch parties and a room that stays for your crew.",
+    emoji: "🎬",
+  },
+];
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function canPromoteWithoutPayment(entitlement: Entitlement | undefined): boolean {
+  return entitlement?.has_active_subscription === true;
+}
+
+function stripeReturnPaths(roomId: string, product: BillableProduct) {
+  return {
+    successPath: `/room/${roomId}/recap?checkout=success&plan=${product}&session_id={CHECKOUT_SESSION_ID}`,
+    cancelPath: `/room/${roomId}/recap?checkout=cancel&plan=${product}`,
+  };
+}
 
 const ACTIVITY_LABELS: Record<string, string> = {
   questions: "21 Questions",
@@ -92,12 +144,91 @@ export default function Recap() {
   const [claiming, setClaiming] = useState(false);
   const [promoting, setPromoting] = useState(false);
   const [promoteError, setPromoteError] = useState<string | null>(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeProduct, setUpgradeProduct] = useState<BillableProduct | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["recap", id, inviteToken ?? ""],
     enabled: !!id,
     queryFn: () => getRoomRecap(id as string, participantId, inviteToken),
   });
+
+  const { data: entitlement } = useQuery({
+    queryKey: ["entitlement"],
+    queryFn: getEntitlement,
+    enabled: Boolean(authClient.getSession()),
+  });
+
+  const { data: billingConfig } = useQuery({
+    queryKey: ["billing-config"],
+    queryFn: getBillingConfig,
+    enabled: Boolean(authClient.getSession()),
+  });
+
+  const refreshBilling = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["entitlement"] }),
+      queryClient.invalidateQueries({ queryKey: ["billing-config"] }),
+    ]);
+  }, [queryClient]);
+
+  const promoteRoomNow = useCallback(async () => {
+    if (!id) return;
+    setPromoting(true);
+    setPromoteError(null);
+    try {
+      await promoteRoom(id);
+      queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["my-connections"] });
+      toast.success("This room is now forever");
+      navigate("/home");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 402) {
+        setUpgradeOpen(true);
+        setUpgradeProduct(null);
+        return;
+      }
+      setPromoteError(e instanceof Error ? e.message : "Couldn't save this room.");
+    } finally {
+      setPromoting(false);
+    }
+  }, [id, navigate, queryClient]);
+
+  useEffect(() => {
+    const checkout = params.get("checkout");
+    if (!checkout || !id) return;
+
+    let cancelled = false;
+    void (async () => {
+      const storedRoomId = sessionStorage.getItem(RECAP_PROMOTE_STORAGE_KEY);
+
+      if (checkout === "success" && storedRoomId === id) {
+        await refreshBilling();
+        let e = await getEntitlement();
+        for (let i = 0; i < 6 && !canPromoteWithoutPayment(e); i += 1) {
+          await sleep(2000);
+          if (cancelled) return;
+          e = await getEntitlement();
+        }
+        if (!cancelled && canPromoteWithoutPayment(e)) {
+          toast.success("Payment received — saving your room forever.");
+          await promoteRoomNow();
+        } else if (!cancelled) {
+          toast.message("Payment received — tap Make this room forever to finish.");
+          setUpgradeOpen(false);
+        }
+      } else if (checkout === "cancel") {
+        toast.message("Checkout cancelled.");
+      }
+
+      sessionStorage.removeItem(RECAP_PROMOTE_STORAGE_KEY);
+      navigate(`/room/${id}/recap`, { replace: true });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, navigate, params, promoteRoomNow, refreshBilling]);
 
   // Post-auth claim. If we have a token AND we're signed in AND we
   // haven't already claimed this room (idempotent server-side, so
@@ -130,6 +261,35 @@ export default function Recap() {
     ),
   );
   const partnerName = actorNames.length >= 2 ? actorNames[actorNames.length - 1] : null;
+
+  async function handleMakeForever() {
+    if (canPromoteWithoutPayment(entitlement)) {
+      await promoteRoomNow();
+      return;
+    }
+    setPromoteError(null);
+    setUpgradeProduct(null);
+    setUpgradeOpen(true);
+  }
+
+  async function handleUpgradeComplete() {
+    await refreshBilling();
+    setUpgradeOpen(false);
+    setUpgradeProduct(null);
+    await promoteRoomNow();
+  }
+
+  function handlePickUpgrade(product: BillableProduct) {
+    if (id) sessionStorage.setItem(RECAP_PROMOTE_STORAGE_KEY, id);
+    setUpgradeProduct(product);
+  }
+
+  const upgradeTitle =
+    upgradeProduct === "crew"
+      ? "Subscribe to Crew"
+      : upgradeProduct === "together"
+        ? "Subscribe to Together"
+        : "Make this room forever";
 
   return (
     <CardPage
@@ -226,21 +386,7 @@ export default function Recap() {
         <button
           type="button"
           disabled={promoting}
-          onClick={async () => {
-            setPromoting(true);
-            setPromoteError(null);
-            try {
-              await promoteRoom(id);
-              queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
-              queryClient.invalidateQueries({ queryKey: ["my-connections"] });
-              toast.success("This room is now forever");
-              navigate("/home");
-            } catch (e) {
-              setPromoteError(e instanceof Error ? e.message : "Couldn't save this room.");
-            } finally {
-              setPromoting(false);
-            }
-          }}
+          onClick={() => void handleMakeForever()}
           className="mb-4 w-full rounded-[1.5rem] border border-primary/30 bg-gradient-to-br from-primary/[0.12] to-transparent shadow-[0_22px_60px_-20px_rgba(212,130,106,0.35)] flex items-center gap-4 p-5 focus-ring hover-lift-strong disabled:opacity-60 disabled:cursor-wait"
         >
           <div className="w-10 h-10 rounded-xl bg-rosegold/15 border border-rosegold/25 flex items-center justify-center">
@@ -253,6 +399,80 @@ export default function Recap() {
           <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" aria-hidden />
         </button>
       )}
+
+      <Dialog
+        open={upgradeOpen}
+        onOpenChange={(open) => {
+          setUpgradeOpen(open);
+          if (!open) setUpgradeProduct(null);
+        }}
+      >
+        <DialogContent className="border-white/10 bg-card/95 text-cream sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif italic text-xl">{upgradeTitle}</DialogTitle>
+          </DialogHeader>
+
+          {!upgradeProduct ? (
+            <div className="space-y-4">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Persistent rooms need a <span className="text-cream">Together</span> or{" "}
+                <span className="text-cream">Crew</span> subscription. Pick a plan to keep
+                this room — no 24h timer.
+              </p>
+              <ul className="space-y-3">
+                {PERSISTENT_TIERS.map((tier) => {
+                  const meta = billingProductForTier(tier.product, billingConfig?.products);
+                  const price = formatTierPrice(tier.product, meta);
+                  const unit = tierPricingMeta(tier.product).unit;
+                  return (
+                    <li key={tier.product}>
+                      <button
+                        type="button"
+                        onClick={() => handlePickUpgrade(tier.product)}
+                        className={cn(
+                          "flex w-full items-center gap-4 rounded-[1.25rem] border border-white/[0.08]",
+                          "bg-black/20 p-4 text-left transition hover:border-primary/30 hover:bg-primary/[0.06]",
+                        )}
+                      >
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xl ring-1 ring-primary/20">
+                          {tier.emoji}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold text-cream">{tier.title}</span>
+                            <span className="text-sm font-semibold tabular-nums text-primary">
+                              {price}
+                            </span>
+                          </span>
+                          <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                            {tier.desc}
+                            {unit ? ` · ${unit}` : ""}
+                          </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : billingConfig ? (
+            <PaymentCheckout
+              config={billingConfig}
+              product={upgradeProduct}
+              label={
+                upgradeProduct === "crew" ? "Subscribe to Crew" : "Subscribe to Together"
+              }
+              returnPaths={id ? stripeReturnPaths(id, upgradeProduct) : undefined}
+              onConfigRefresh={refreshBilling}
+              onComplete={handleUpgradeComplete}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">Loading checkout…</p>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {promoteError && (
         <p className="mb-4 text-xs text-rose-300">{promoteError}</p>
       )}

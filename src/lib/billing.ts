@@ -1,19 +1,15 @@
 /**
- * Billing client — Stripe-backed subscription surface on the web.
- *
- * Two endpoints:
- *  - GET  /v1/billing/subscription   — current entitlement + flag.
- *  - POST /v1/billing/checkout-session → Stripe Checkout URL the
- *    client navigates the browser to.
- *
- * Server-side webhook does the post-checkout state mutation; the
- * client polls /subscription on the success bounce to confirm.
+ * Billing client — Stripe (global) + M-Pesa (KE/TZ/UG) payment rails.
  */
 import { api } from "@/lib/api";
 
+export type AccountTier = "try" | "date_pack" | "long_pack" | "together" | "crew";
+export type PaymentProvider = "stripe" | "mpesa";
+export type BillableProduct = "date_pack" | "long_pack" | "together" | "crew";
+
 export type SubscriptionSnapshot = {
   id: string;
-  platform: "ios" | "android" | "stripe";
+  platform: "ios" | "android" | "stripe" | "mpesa";
   status: "active" | "grace" | "cancelled" | "expired";
   product_id: string;
   current_period_start: string;
@@ -21,43 +17,209 @@ export type SubscriptionSnapshot = {
 };
 
 export type SubscriptionStatus = {
-  /** Server-side feature flag. When false the client skips paywall
-   *  UI entirely — everything is treated as entitled. */
   paywall_enabled: boolean;
-  /** Whether the user can use premium features right now. Honours
-   *  the flag (always true when paywall is off). */
   entitled: boolean;
   subscription: SubscriptionSnapshot | null;
+  account_tier: AccountTier;
+  account_tier_label: string;
+  watch_party_enabled?: boolean;
+  watch_party_capacity?: number;
+  payment_provider: PaymentProvider;
+  country_code: string | null;
+};
+
+export type Entitlement = {
+  has_active_subscription: boolean;
+  remaining_passes: number;
+  date_pack_remaining: number;
+  long_pack_remaining: number;
+  account_tier: AccountTier;
+  account_tier_label: string;
+  watch_party_enabled?: boolean;
+  watch_party_capacity?: number;
+  payment_provider: PaymentProvider;
+  country_code: string | null;
+};
+
+export type BillingProduct = {
+  id: BillableProduct;
+  label: string;
+  amount: number | null;
+  currency: string;
+  available: boolean;
+};
+
+export type BillingConfig = {
+  paywall_enabled: boolean;
+  payment_provider: PaymentProvider;
+  country_code: string | null;
+  stripe_configured: boolean;
+  mpesa_configured: boolean;
+  dev_checkout_enabled?: boolean;
+  account_tier: AccountTier;
+  account_tier_label: string;
+  products: BillingProduct[];
+};
+
+export type MpesaStkPushResponse = {
+  transaction_id: string;
+  checkout_request_id: string;
+  message: string;
+};
+
+export type MpesaTransactionStatus = {
+  transaction_id: string;
+  status: "pending" | "completed" | "failed" | string;
+  product_kind: BillableProduct;
+  result_description: string | null;
 };
 
 export function getSubscriptionStatus(): Promise<SubscriptionStatus> {
   return api.get<SubscriptionStatus>("/v1/billing/subscription");
 }
 
-/** Mint a Stripe Checkout URL — caller navigates the browser to it. */
-export function createCheckoutSession(): Promise<{ url: string }> {
-  return api.post<{ url: string }>("/v1/billing/checkout-session");
-}
-
-/** Full entitlement snapshot — used by the room-creation picker to
- * render per-pack balances and decide whether to bounce the user
- * through Stripe before creating the room. */
-export type Entitlement = {
-  has_active_subscription: boolean;
-  remaining_passes: number;
-  date_pack_remaining: number;
-  long_pack_remaining: number;
-};
-
 export function getEntitlement(): Promise<Entitlement> {
   return api.get<Entitlement>("/v1/entitlements");
 }
 
-/** Mint a one-time Stripe Checkout URL for a consumable pack. */
+export function getBillingConfig(): Promise<BillingConfig> {
+  return api.get<BillingConfig>("/v1/billing/config");
+}
+
+export type CheckoutReturnPaths = {
+  successPath?: string;
+  cancelPath?: string;
+};
+
+export function createCheckoutSession(
+  product: "together" | "crew" = "together",
+  paths?: CheckoutReturnPaths,
+): Promise<{ url: string }> {
+  return api.post<{ url: string }>("/v1/billing/checkout-session", {
+    product,
+    success_path: paths?.successPath,
+    cancel_path: paths?.cancelPath,
+  });
+}
+
 export function createPackCheckoutSession(
   pack_kind: "date_pack" | "long_pack",
+  paths?: CheckoutReturnPaths,
 ): Promise<{ url: string }> {
   return api.post<{ url: string }>("/v1/billing/pack-checkout-session", {
     pack_kind,
+    success_path: paths?.successPath,
+    cancel_path: paths?.cancelPath,
   });
+}
+
+export function devPurchaseProduct(
+  product: BillableProduct,
+): Promise<void> {
+  return api.post<void>("/v1/billing/dev/purchase", { product });
+}
+
+export function initiateMpesaStkPush(payload: {
+  phone: string;
+  product_kind: BillableProduct;
+  country_code?: string | null;
+}): Promise<MpesaStkPushResponse> {
+  return api.post<MpesaStkPushResponse>("/v1/billing/mpesa/stk-push", payload);
+}
+
+export function getMpesaTransactionStatus(
+  transactionId: string,
+): Promise<MpesaTransactionStatus> {
+  return api.get<MpesaTransactionStatus>(
+    `/v1/billing/mpesa/transactions/${transactionId}`,
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+/** Poll M-Pesa STK until completed or failed (max ~2 min). */
+export async function waitForMpesaPayment(
+  transactionId: string,
+  opts?: { onPending?: () => void },
+): Promise<MpesaTransactionStatus> {
+  for (let i = 0; i < 40; i += 1) {
+    const status = await getMpesaTransactionStatus(transactionId);
+    if (status.status === "completed") return status;
+    if (status.status === "failed") {
+      throw new Error(status.result_description || "M-Pesa payment failed.");
+    }
+    opts?.onPending?.();
+    await sleep(3000);
+  }
+  throw new Error("Payment is taking longer than expected — check your phone and try again.");
+}
+
+/** Start checkout on the correct rail. Stripe redirects; M-Pesa returns when done. */
+export async function purchaseProduct(
+  product: BillableProduct,
+  config: BillingConfig,
+  phone?: string,
+  paths?: CheckoutReturnPaths,
+): Promise<"redirected" | "completed"> {
+  if (config.dev_checkout_enabled) {
+    await devPurchaseProduct(product);
+    return "completed";
+  }
+
+  if (config.payment_provider === "mpesa") {
+    if (!phone?.trim()) {
+      throw new Error("Enter your M-Pesa mobile number.");
+    }
+    if (!config.country_code) {
+      throw new Error("Pick your country below before paying with M-Pesa.");
+    }
+    const { transaction_id } = await initiateMpesaStkPush({
+      phone: phone.trim(),
+      product_kind: product,
+      country_code: config.country_code,
+    });
+    await waitForMpesaPayment(transaction_id);
+    return "completed";
+  }
+
+  const { url } =
+    product === "together" || product === "crew"
+      ? await createCheckoutSession(product, paths)
+      : await createPackCheckoutSession(product, paths);
+  window.location.assign(url);
+  return "redirected";
+}
+
+export function formatProductPrice(product: BillingProduct): string | null {
+  if (product.amount == null) return null;
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: product.currency,
+      maximumFractionDigits: 0,
+    }).format(product.amount);
+  } catch {
+    return `${product.currency} ${product.amount}`;
+  }
+}
+
+export function paymentRailLabel(provider: PaymentProvider): string {
+  return provider === "mpesa" ? "M-Pesa" : "Stripe";
+}
+
+/** True when the server can start checkout on the user's payment rail. */
+export function isCheckoutReady(config: BillingConfig): boolean {
+  if (config.dev_checkout_enabled) return true;
+  return config.payment_provider === "mpesa"
+    ? config.mpesa_configured
+    : config.stripe_configured;
+}
+
+export function checkoutBlockedMessage(config: BillingConfig): string | null {
+  if (!isCheckoutReady(config)) {
+    return `Checkout is not available yet — ${paymentRailLabel(config.payment_provider)} is not configured on the server.`;
+  }
+  return null;
 }

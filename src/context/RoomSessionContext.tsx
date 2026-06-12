@@ -9,11 +9,13 @@
  */
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { RoomChannel, type PresenceState } from "@/lib/realtime/roomChannel";
+import type { RoomPackage } from "@/lib/rooms";
+import type { CuratableActivityId } from "@/lib/roomExperience";
 
 export type RoomIdentity = {
   /** Stable id used as the sender on broadcasts: user id, or `guest-<participantId>`. */
   senderId: string;
-  /** Seat in the room, "a" | "b". */
+  /** Seat in the room — host is "a"; watch parties use a–l. */
   slot: string;
   /** Present for anonymous guests (from the join response). */
   participantId?: string;
@@ -33,6 +35,10 @@ export type RoomSession = RoomIdentity & {
   presence: PresenceState[];
   /** Channel subscription status, for debug surfaces. */
   status: string;
+  roomPackage: RoomPackage | null;
+  curatedActivityIds: CuratableActivityId[];
+  /** Max people allowed in the room (2 for dates, 12 for watch parties). */
+  maxParticipants: number;
 };
 
 const Ctx = createContext<RoomSession | null>(null);
@@ -47,10 +53,16 @@ export function useRoomSession(): RoomSession {
 export function RoomSessionProvider({
   roomId,
   identity,
+  roomPackage = null,
+  curatedActivityIds = [],
+  maxParticipants = 2,
   children,
 }: {
   roomId: string;
   identity: RoomIdentity;
+  roomPackage?: RoomPackage | null;
+  curatedActivityIds?: CuratableActivityId[];
+  maxParticipants?: number;
   children: React.ReactNode;
 }) {
   const channelRef = useRef<RoomChannel | null>(null);
@@ -113,8 +125,17 @@ export function RoomSessionProvider({
   }, [roomId]);
 
   const value = useMemo<RoomSession>(
-    () => ({ roomId, channel, presence, status, ...identity }),
-    [roomId, channel, presence, status, identity],
+    () => ({
+      roomId,
+      channel,
+      presence,
+      status,
+      roomPackage,
+      curatedActivityIds,
+      maxParticipants,
+      ...identity,
+    }),
+    [roomId, channel, presence, status, roomPackage, curatedActivityIds, maxParticipants, identity],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

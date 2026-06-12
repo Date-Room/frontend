@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { listMyRooms, type Room } from "@/lib/rooms";
+import { AddMoreTimeCheckout } from "@/components/AddMoreTimeCheckout";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { isTryPackage, getRoomExperience, isActivityEnabled, getRoomPlan, saveRoomPlanFromServer, isSubscriptionPackage, type CuratableActivityId } from "@/lib/roomExperience";
+import { getRoomExperienceApi, listMyRooms, type Room, type RoomPackage } from "@/lib/rooms";
 import { LogOut, Clock, Maximize2, Minimize2, Sparkles } from "lucide-react";
 import { AmbientSceneStack } from "@/components/AmbientSceneStack";
 import type { AmbiancePresetId } from "@/lib/ambiance";
 import { ambianceMeta } from "@/lib/ambiance";
-import { getRoomExperience, isActivityEnabled, type CuratableActivityId } from "@/lib/roomExperience";
 import { RoomAmbianceSheet } from "@/components/RoomAmbianceSheet";
 import { PageShell } from "@/components/PageShell";
 import { RoomSessionProvider, useRoomSession, type RoomIdentity } from "@/context/RoomSessionContext";
@@ -18,6 +25,9 @@ import {
 import { RoomVideo } from "@/components/RoomVideo";
 import { ChatWithBoundary } from "@/components/Chat";
 import { WatchTogether } from "@/components/WatchTogether";
+import { VisionBoard } from "@/components/VisionBoard";
+import { FridgeBookshelf } from "@/components/FridgeBookshelf";
+import { PinnedNoteGate } from "@/components/PinnedNoteGate";
 import { ThisOrThat } from "@/components/ThisOrThat";
 import { DJ } from "@/components/DJ";
 import { QuestionDeck } from "@/components/QuestionDeck";
@@ -75,6 +85,8 @@ function LiveRoomAmbianceBackdrop({ preset }: { preset: AmbiancePresetId }) {
 /* ───────────────── Tab definitions ───────────────── */
 
 type ActivityTabId =
+  | "vision_board"
+  | "fridge"
   | "questions"
   | "this_or_that"
   | "the_36"
@@ -91,20 +103,41 @@ type TabDef = {
   curatableId: CuratableActivityId | null;
 };
 
-const ALL_TABS: TabDef[] = [
-  { id: "questions",     label: "Questions",       icon: "💬", curatableId: "questions" },
-  { id: "this_or_that",  label: "This or That",    icon: "⚖️", curatableId: "this_or_that" },
-  { id: "the_36",        label: "The 36",          icon: "🫶", curatableId: "the_36" },
-  { id: "2_truths",      label: "2 Truths",        icon: "🎭", curatableId: "2_truths" },
-  { id: "truth_or_dare", label: "Truth or Dare",   icon: "🔥", curatableId: "truth_or_dare" },
-  { id: "watch",         label: "Watch",           icon: "📺", curatableId: "watch" },
-  { id: "dj",            label: "DJ",              icon: "🎵", curatableId: "dj" },
-  { id: "chat",          label: "Chat",            icon: "💭", curatableId: null },
+const WALL_TABS: TabDef[] = [
+  { id: "vision_board", label: "Vision Board", icon: "✨", curatableId: "vision_board" },
+  { id: "fridge", label: "Bookshelf", icon: "📚", curatableId: "fridge" },
 ];
+
+const ACTIVITY_TABS: TabDef[] = [
+  { id: "questions", label: "Questions", icon: "💬", curatableId: "questions" },
+  { id: "this_or_that", label: "This or That", icon: "⚖️", curatableId: "this_or_that" },
+  { id: "the_36", label: "The 36", icon: "🫶", curatableId: "the_36" },
+  { id: "2_truths", label: "2 Truths", icon: "🎭", curatableId: "2_truths" },
+  { id: "truth_or_dare", label: "Truth or Dare", icon: "🔥", curatableId: "truth_or_dare" },
+  { id: "watch", label: "Watch", icon: "📺", curatableId: "watch" },
+  { id: "dj", label: "DJ", icon: "🎵", curatableId: "dj" },
+  { id: "chat", label: "Chat", icon: "💭", curatableId: null },
+];
+
+const ALL_TABS: TabDef[] = [...WALL_TABS, ...ACTIVITY_TABS];
 
 /* ───────────────── RoomShell ───────────────── */
 
-function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; isHost: boolean; roomId: string }) {
+function RoomShell({
+  expiresAt,
+  onExpiresAtChange,
+  isHost,
+  roomId,
+  roomPackage,
+  curatedActivityIds,
+}: {
+  expiresAt: string | null;
+  onExpiresAtChange: (expiresAt: string) => void;
+  isHost: boolean;
+  roomId: string;
+  roomPackage: RoomPackage | null;
+  curatedActivityIds: CuratableActivityId[];
+}) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const customization = useRoomCustomization();
@@ -120,10 +153,18 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
   const isPersistent = room?.persistence === "persistent";
 
   const [tab, setTab] = useState<ActivityTabId>("questions");
+  const wallRoom = isSubscriptionPackage(roomPackage);
+
+  useEffect(() => {
+    if (wallRoom) {
+      setTab((current) => (current === "questions" ? "vision_board" : current));
+    }
+  }, [wallRoom]);
   const [trayExpanded, setTrayExpanded] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [ambianceOpen, setAmbianceOpen] = useState(false);
   const [ambianceOverride, setAmbianceOverride] = useState<AmbiancePresetId | null>(null);
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -138,31 +179,56 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
   const activeAmbiance = ambianceOverride ?? customization.ambiancePreset;
   const moodLabel = ambianceMeta(activeAmbiance).label;
 
-  // Timer
+  const planLabel = useMemo(() => {
+    if (isPersistent) return "Together";
+    if (roomPackage && isTryPackage(roomPackage)) return "Try";
+    if (roomPackage === "date_pack") return "Date Pack";
+    if (roomPackage === "long_pack") return "Long Pack";
+    return "Try";
+  }, [isPersistent, roomPackage]);
+
+  // Timer — critical warning at 5 minutes for session rooms.
   const timerModel = useMemo(() => {
-    if (isPersistent || !expiresAt) return { display: "∞", caption: "Open evening", lowTime: false, expired: false };
+    if (isPersistent || !expiresAt) {
+      return {
+        display: "∞",
+        caption: "Open evening",
+        criticalTime: false,
+        expired: false,
+      };
+    }
     const remaining = Math.max(0, Math.floor((new Date(expiresAt).getTime() - now) / 1000));
     const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
     const ss = String(remaining % 60).padStart(2, "0");
+    const criticalTime = remaining > 0 && remaining <= 300;
     return {
       display: `${mm}:${ss}`,
       caption: remaining <= 0
         ? "Window ended"
-        : remaining <= 180
-          ? "Almost time — land the moment"
+        : criticalTime
+          ? "5 minutes left — add more time"
           : "Time left together",
-      lowTime: remaining > 0 && remaining <= 180,
+      criticalTime,
       expired: remaining <= 0,
     };
   }, [isPersistent, expiresAt, now]);
 
   // Filter tabs by curation
-  const curated = useMemo(() => getRoomExperience(roomId), [roomId]);
+  const curated = useMemo(
+    () =>
+      curatedActivityIds.length
+        ? curatedActivityIds
+        : getRoomExperience(roomId),
+    [curatedActivityIds, roomId],
+  );
   const visibleTabs = useMemo(
-    () => ALL_TABS.filter((t) =>
-      t.curatableId === null || isActivityEnabled(t.curatableId, curated),
-    ),
-    [curated],
+    () => ALL_TABS.filter((t) => {
+      if (t.curatableId === "vision_board" || t.curatableId === "fridge") {
+        if (!wallRoom) return false;
+      }
+      return t.curatableId === null || isActivityEnabled(t.curatableId, curated, roomPackage);
+    }),
+    [curated, roomPackage, wallRoom],
   );
 
   // If current tab was hidden, fall back
@@ -187,6 +253,8 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
       <LiveRoomAmbianceBackdrop preset={activeAmbiance} />
       <div className="page-grain" aria-hidden />
 
+      <PinnedNoteGate enabled={wallRoom} />
+
       <KickedListener
         onKicked={() => {
           toast.message("You were removed from this room");
@@ -207,33 +275,57 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
             <p className="text-[10px] uppercase tracking-[0.26em] text-muted-foreground/90 truncate">
               <span className="text-muted-foreground/85">{moodLabel} lighting</span>
               <span className="text-muted-foreground/45"> · </span>
-              <span className="text-muted-foreground/70">{isPersistent ? "Together" : "Free"}</span>
+              <span className="text-muted-foreground/70">{planLabel}</span>
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {/* Timer */}
-          {isHost && (
-            <div className={cn(
-              "flex flex-col items-end gap-0.5 text-right",
-              timerModel.expired && "text-destructive",
-              timerModel.lowTime && "text-amber",
-            )}>
-              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground">
-                <Clock className="w-3 h-3 shrink-0" />
-                <span className={cn(
-                  "tabular-nums font-medium",
-                  !timerModel.expired && !timerModel.lowTime && "text-cream/90",
-                  timerModel.lowTime && "text-amber",
+          {!isPersistent && expiresAt && (
+            <div className="flex items-center gap-2 sm:gap-2.5">
+              <div
+                className={cn(
+                  "flex flex-col items-center justify-center gap-0.5 text-center",
                   timerModel.expired && "text-destructive",
-                )}>
-                  {timerModel.display}
-                </span>
+                )}
+              >
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs">
+                  <Clock
+                    className={cn(
+                      "w-3 h-3 shrink-0",
+                      timerModel.criticalTime ? "text-rose-400" : "text-muted-foreground",
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "tabular-nums",
+                      timerModel.criticalTime
+                        ? "font-bold text-rose-400 animate-timer-critical-blink"
+                        : "font-medium text-cream/90",
+                      timerModel.expired && "font-bold text-destructive",
+                    )}
+                  >
+                    {timerModel.display}
+                  </span>
+                </div>
+                {timerModel.caption && !timerModel.criticalTime && (
+                  <span
+                    className={cn(
+                      "hidden sm:inline text-[9px] uppercase tracking-[0.14em] whitespace-nowrap leading-tight",
+                      "text-muted-foreground/75",
+                    )}
+                  >
+                    {timerModel.caption}
+                  </span>
+                )}
               </div>
-              {timerModel.caption && (
-                <span className="hidden sm:inline text-[9px] uppercase tracking-[0.14em] text-muted-foreground/75 max-w-[11rem] leading-tight">
-                  {timerModel.caption}
-                </span>
+              {timerModel.criticalTime && (
+                <button
+                  type="button"
+                  onClick={() => setUpgradeOpen(true)}
+                  className="shrink-0 self-center rounded-full border border-rose-400/45 bg-rose-500/15 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-rose-300 whitespace-nowrap transition hover:bg-rose-500/25 hover:border-rose-400/60"
+                >
+                  Add More Time
+                </button>
               )}
             </div>
           )}
@@ -297,6 +389,12 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
             ))}
           </div>
           <div className="flex-1 min-h-0 overflow-auto relative">
+            <div className={tab === "vision_board" ? "h-full" : "hidden"}>
+              <VisionBoard />
+            </div>
+            <div className={tab === "fridge" ? "h-full" : "hidden"}>
+              <FridgeBookshelf />
+            </div>
             <div className={tab === "questions" ? "h-full" : "hidden"}>
               <QuestionDeck />
             </div>
@@ -355,6 +453,26 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
         onPick={(id) => setAmbianceOverride(id)}
       />
 
+      <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-card/95 text-cream sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif italic text-xl">Add more time</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Keep the evening going — add 15 minutes, 30 minutes, or a full hour.
+          </p>
+          <AddMoreTimeCheckout
+            roomId={roomId}
+            participantId={session.participantId}
+            canPay={session.canPersist}
+            onTimeAdded={(next) => {
+              onExpiresAtChange(next);
+              setUpgradeOpen(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+
       {/* ── Expired overlay ── */}
       {expired && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/90 backdrop-blur-md animate-fade-in pointer-events-auto">
@@ -362,9 +480,16 @@ function RoomShell({ expiresAt, isHost, roomId }: { expiresAt: string | null; is
             <Sparkles className="w-8 h-8 text-primary mx-auto mb-4 opacity-90" aria-hidden />
             <h2 className="font-serif italic text-cream text-2xl mb-3">Your window closed</h2>
             <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
-              Twenty minutes flies by — upgrade for a longer session next time.
+              Time&apos;s up — add more minutes to keep the date going.
             </p>
             <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                className="btn-primary w-full py-3 rounded-full"
+                onClick={() => setUpgradeOpen(true)}
+              >
+                Add more time
+              </button>
               <button
                 type="button"
                 className="btn-primary w-full py-3 rounded-full"
@@ -393,11 +518,20 @@ export default function LiveRoom() {
   const navigate = useNavigate();
   const [identity, setIdentity] = useState<RoomIdentity | null>(null);
   const [resolving, setResolving] = useState(true);
+  const [roomPackage, setRoomPackage] = useState<RoomPackage | null>(null);
+  const [curatedActivityIds, setCuratedActivityIds] = useState<CuratableActivityId[]>([]);
+  const [maxParticipants, setMaxParticipants] = useState(2);
 
   const slot = params.get("slot") || "a";
   const participantId = params.get("participant_id") || undefined;
   const urlName = params.get("name") || undefined;
-  const expiresAt = params.get("expires_at") || null;
+  const urlExpiresAt = params.get("expires_at") || null;
+  const timePurchased = params.get("time_purchased") === "1";
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(urlExpiresAt);
+
+  useEffect(() => {
+    setSessionExpiresAt(urlExpiresAt);
+  }, [urlExpiresAt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -431,7 +565,7 @@ export default function LiveRoom() {
           photoUrl: null,
         });
       } else {
-        navigate(`/auth?redirect=${encodeURIComponent(`/room/${roomId ?? ""}`)}`, { replace: true });
+        navigate(`/auth?next=${encodeURIComponent(`/room/${roomId ?? ""}`)}`, { replace: true });
         return;
       }
       setResolving(false);
@@ -441,13 +575,94 @@ export default function LiveRoom() {
     };
   }, [roomId, slot, participantId, urlName, navigate]);
 
+  useEffect(() => {
+    if (!roomId) return;
+    let cancelled = false;
+
+    const cached = getRoomPlan(roomId);
+    if (cached) {
+      setRoomPackage(cached.package);
+      setCuratedActivityIds(cached.curatedActivityIds);
+      if (cached.maxParticipants) {
+        setMaxParticipants(cached.maxParticipants);
+      }
+    }
+
+    void (async () => {
+      try {
+        const exp = await getRoomExperienceApi(roomId, participantId);
+        if (cancelled) return;
+        const plan = saveRoomPlanFromServer(roomId, exp);
+        setRoomPackage(plan.package);
+        setCuratedActivityIds(plan.curatedActivityIds);
+        if (plan.maxParticipants) {
+          setMaxParticipants(plan.maxParticipants);
+        }
+        if (exp.expires_at) {
+          setSessionExpiresAt(exp.expires_at);
+        }
+      } catch {
+        /* fall back to cached plan or empty until host data loads */
+      }
+    })();
+
+    const poll = window.setInterval(() => {
+      void getRoomExperienceApi(roomId, participantId)
+        .then((exp) => {
+          if (cancelled) return;
+          if (exp.expires_at) {
+            setSessionExpiresAt(exp.expires_at);
+          }
+        })
+        .catch(() => undefined);
+    }, 15_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(poll);
+    };
+  }, [roomId, participantId]);
+
+  useEffect(() => {
+    if (!roomId || !timePurchased) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const exp = await getRoomExperienceApi(roomId, participantId);
+        if (cancelled) return;
+        if (exp.expires_at) {
+          setSessionExpiresAt(exp.expires_at);
+          toast.success("Extra time added — enjoy your date.");
+        }
+      } catch {
+        /* webhook may still be processing */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId, participantId, timePurchased]);
+
   if (!roomId) return <Loading label="Reconnecting…" />;
   if (resolving || !identity) return <Loading label="Opening the door…" />;
 
   return (
-    <RoomSessionProvider roomId={roomId} identity={identity}>
+    <RoomSessionProvider
+      roomId={roomId}
+      identity={identity}
+      roomPackage={roomPackage}
+      curatedActivityIds={curatedActivityIds}
+      maxParticipants={maxParticipants}
+    >
       <RoomCustomizationProvider>
-        <RoomShell expiresAt={expiresAt} isHost={identity.isHost} roomId={roomId} />
+        <RoomShell
+          expiresAt={sessionExpiresAt}
+          onExpiresAtChange={setSessionExpiresAt}
+          isHost={identity.isHost}
+          roomId={roomId}
+          roomPackage={roomPackage}
+          curatedActivityIds={curatedActivityIds}
+        />
       </RoomCustomizationProvider>
     </RoomSessionProvider>
   );

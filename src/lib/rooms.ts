@@ -40,6 +40,8 @@ export type Room = {
   greeting_subtext: string | null;
   theme_color: string | null;
   background_id: string | null;
+  curated_activity_ids?: string[] | null;
+  max_participants?: number;
   created_at: string;
   /** Signed JWT — URL-bearer recap access. Embed in share URLs as
    *  `#k=<token>`. See backend services/rooms/invites.py. */
@@ -72,6 +74,9 @@ export type InviteCard = {
   participants: ParticipantInfo[];
   theme_color: string | null;
   background_id: string | null;
+  package: RoomPackage;
+  curated_activity_ids: string[];
+  max_participants?: number;
   /** Same URL-bearer recap-invite as Room.recap_invite_token; lets
    *  the lobby render a recap deep link with the token already
    *  attached. */
@@ -94,6 +99,7 @@ export type CreateRoomRequest = {
   connection_id?: string | null;
   greeting_headline?: string | null;
   greeting_subtext?: string | null;
+  curated_activity_ids?: string[];
 };
 
 export type JoinRoomRequest = {
@@ -109,6 +115,16 @@ export type JoinRoomResponse = {
   slot: string;
   livekit_room_name: string;
   expires_at: string | null;
+  package: RoomPackage;
+  curated_activity_ids: string[];
+  max_participants?: number;
+};
+
+export type RoomExperience = {
+  package: RoomPackage;
+  curated_activity_ids: string[];
+  expires_at?: string | null;
+  max_participants?: number;
 };
 
 export type LiveKitToken = {
@@ -134,6 +150,16 @@ export function getRoomByCode(code: string): Promise<InviteCard> {
 
 export function joinRoom(roomId: string, body: JoinRoomRequest): Promise<JoinRoomResponse> {
   return api.post<JoinRoomResponse>(`/v1/rooms/${roomId}/join`, body);
+}
+
+export function getRoomExperienceApi(
+  roomId: string,
+  participantId?: string,
+): Promise<RoomExperience> {
+  const qs = participantId
+    ? `?participant_id=${encodeURIComponent(participantId)}`
+    : "";
+  return api.get<RoomExperience>(`/v1/rooms/${roomId}/experience${qs}`);
 }
 
 export function startRoom(roomId: string): Promise<Room> {

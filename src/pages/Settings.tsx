@@ -15,6 +15,8 @@ import {
 import { authClient } from "@/lib/authClient";
 import { useQuery } from "@tanstack/react-query";
 import { getMe, getReferrals, updateMe, type UserMe } from "@/lib/users";
+import { getEntitlement, paymentRailLabel } from "@/lib/billing";
+import { redeemPromoCode } from "@/lib/admin";
 import {
   buildReferralShareMessage,
   buildReferralShareUrl,
@@ -88,6 +90,16 @@ export default function Settings() {
   const [countryOpen, setCountryOpen] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [signOutBusy, setSignOutBusy] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoBusy, setPromoBusy] = useState(false);
+
+  const session = authClient.getSession();
+
+  const { data: entitlement, refetch: refetchEntitlement } = useQuery({
+    queryKey: ["entitlement"],
+    queryFn: getEntitlement,
+    staleTime: 30_000,
+  });
 
   // Hydrate the page from the server profile once. After that the
   // user's typing wins so a stale refetch doesn't clobber edits.
@@ -278,6 +290,59 @@ export default function Settings() {
             </span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>
+          {entitlement && (
+            <>
+              <div className="ml-4 h-px bg-border/60" />
+              <div className="flex items-center px-4 py-3.5">
+                <span className="w-20 shrink-0 text-sm text-muted-foreground">Plan</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] text-cream">{entitlement.account_tier_label}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Pay via {paymentRailLabel(entitlement.payment_provider)}
+                    {entitlement.date_pack_remaining + entitlement.long_pack_remaining > 0
+                      ? ` · ${entitlement.remaining_passes} credit${entitlement.remaining_passes === 1 ? "" : "s"} left`
+                      : ""}
+                  </p>
+                </div>
+              </div>
+              <div className="ml-4 h-px bg-border/60" />
+              <form
+                className="flex items-center gap-2 px-4 py-3.5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void (async () => {
+                    if (!promoCode.trim()) return;
+                    setPromoBusy(true);
+                    try {
+                      const res = await redeemPromoCode(promoCode.trim());
+                      toast.success(res.message);
+                      setPromoCode("");
+                      void refetchEntitlement();
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : "Invalid code");
+                    } finally {
+                      setPromoBusy(false);
+                    }
+                  })();
+                }}
+              >
+                <span className="w-20 shrink-0 text-sm text-muted-foreground">Promo</span>
+                <input
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                  placeholder="Enter code"
+                  className="flex-1 min-w-0 bg-transparent text-[15px] text-cream placeholder:text-muted-foreground outline-none uppercase"
+                />
+                <button
+                  type="submit"
+                  disabled={promoBusy || !promoCode.trim()}
+                  className="text-xs font-medium text-rosegold disabled:opacity-40"
+                >
+                  Apply
+                </button>
+              </form>
+            </>
+          )}
         </div>
       </div>
 
@@ -294,6 +359,15 @@ export default function Settings() {
       </button>
 
       {me ? <InviteSection me={me} inviterName={displayName} /> : null}
+
+      {session?.user.is_admin && (
+        <Link
+          to="/admin"
+          className="mt-8 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-cream transition"
+        >
+          Platform admin →
+        </Link>
+      )}
 
       {/* Sign out — quiet red text link, not a primary CTA. */}
       <div className="mt-10 flex justify-center">

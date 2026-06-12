@@ -1,11 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Loader2, ChevronLeft, MailCheck } from "lucide-react";
+import { ArrowRight, Loader2, ChevronLeft, Mail, MailCheck } from "lucide-react";
 import { BRAND_NAME } from "@/lib/constants";
-import { authClient, authConfigured } from "@/lib/authClient";
+import {
+  authClient,
+  authConfigured,
+  fetchAuthConfig,
+  type AuthConfig,
+} from "@/lib/authClient";
 import { clearPendingReferral, getPendingReferral } from "@/lib/pendingReferral";
 import { toast } from "sonner";
 import { PageShell } from "@/components/PageShell";
+import { AppleIcon, GoogleIcon } from "@/components/icons/AuthProviderIcons";
+import { cn } from "@/lib/utils";
+
+const oauthBtnClass =
+  "focus-ring relative flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.10] bg-white/[0.04] py-3.5 text-sm font-medium text-cream transition-all duration-200 hover:bg-white/[0.08] hover:border-white/[0.18] hover:-translate-y-px sm:rounded-[1.15rem]";
 
 const REDIRECT_KEY = "post_auth_redirect";
 
@@ -30,21 +40,59 @@ export default function Auth() {
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"email" | "code">("email");
   const [loading, setLoading] = useState(false);
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
 
-  async function handleRequestOtp(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email.trim()) return;
-    if (!authConfigured()) {
-      toast.error("Sign-in isn't configured yet (missing API URL).");
-      return;
-    }
-    setLoading(true);
+  useEffect(() => {
+    void fetchAuthConfig().then(setAuthConfig);
+  }, []);
+
+  function stashRedirect() {
     try {
       sessionStorage.setItem(REDIRECT_KEY, intendedRedirect(searchParams));
     } catch {
       /* ignore */
     }
+  }
+
+  function ensureServerAuth(): boolean {
+    if (!authConfigured()) {
+      toast.error("Sign-in isn't configured yet (missing API URL).");
+      return false;
+    }
+    if (authConfig && !authConfig.jwt_configured) {
+      toast.error("Sign-in isn't configured on the server yet.");
+      return false;
+    }
+    return true;
+  }
+
+  function handleGoogle() {
+    if (!ensureServerAuth()) return;
+    if (authConfig && !authConfig.google_enabled) {
+      toast.error("Google sign-in isn't configured on the server yet.");
+      return;
+    }
+    stashRedirect();
+    authClient.signInWithGoogle();
+  }
+
+  function handleApple() {
+    if (!ensureServerAuth()) return;
+    if (authConfig && !authConfig.apple_enabled) {
+      toast.error("Apple sign-in isn't configured on the server yet.");
+      return;
+    }
+    stashRedirect();
+    authClient.signInWithApple();
+  }
+
+  async function handleRequestOtp(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    if (!ensureServerAuth()) return;
+    setLoading(true);
     try {
+      stashRedirect();
       await authClient.requestOtp(email.trim(), getPendingReferral());
       setStep("code");
     } catch (err) {
@@ -150,7 +198,10 @@ export default function Auth() {
                       Verifying…
                     </>
                   ) : (
-                    "Sign in"
+                    <>
+                      Sign in
+                      <ArrowRight className="h-4 w-4 opacity-90" aria-hidden />
+                    </>
                   )}
                 </button>
               </form>
@@ -180,18 +231,18 @@ export default function Auth() {
               <div className="space-y-3 mb-5">
                 <button
                   type="button"
-                  onClick={() => authClient.signInWithGoogle()}
-                  className="focus-ring flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.10] bg-white/[0.04] py-3.5 text-sm font-medium text-cream transition-all duration-200 hover:bg-white/[0.08] hover:border-white/[0.18] hover:-translate-y-px sm:rounded-[1.15rem]"
+                  onClick={handleGoogle}
+                  className={oauthBtnClass}
                 >
-                  <span aria-hidden className="text-base">G</span>
+                  <GoogleIcon className="h-5 w-5 shrink-0" />
                   Continue with Google
                 </button>
                 <button
                   type="button"
-                  onClick={() => authClient.signInWithApple()}
-                  className="focus-ring flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.10] bg-white/[0.04] py-3.5 text-sm font-medium text-cream transition-all duration-200 hover:bg-white/[0.08] hover:border-white/[0.18] hover:-translate-y-px sm:rounded-[1.15rem]"
+                  onClick={handleApple}
+                  className={oauthBtnClass}
                 >
-                  <span aria-hidden className="text-base"></span>
+                  <AppleIcon className="h-5 w-5 shrink-0 text-cream" />
                   Continue with Apple
                 </button>
               </div>
@@ -205,29 +256,38 @@ export default function Auth() {
                   <label htmlFor="auth-email" className="block text-sm text-muted-foreground/90">
                     Email
                   </label>
-                  <input
-                    id="auth-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="auth-input"
-                    required
-                    autoComplete="email"
-                  />
+                  <div className="relative">
+                    <Mail
+                      className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50"
+                      aria-hidden
+                    />
+                    <input
+                      id="auth-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className={cn("auth-input", "pl-11")}
+                      required
+                      autoComplete="email"
+                    />
+                  </div>
                 </div>
                 <button
                   type="submit"
                   disabled={loading || !email.trim()}
-                  className="btn-primary mt-1 flex w-full items-center justify-center gap-3 rounded-xl py-4 font-semibold text-primary-foreground shadow-[0_12px_40px_rgba(212,130,106,0.22)] disabled:cursor-not-allowed disabled:opacity-40 sm:rounded-[1.15rem]"
+                  className="btn-primary mt-1 flex w-full items-center justify-center gap-2.5 rounded-xl py-4 font-semibold text-primary-foreground shadow-[0_12px_40px_rgba(212,130,106,0.22)] disabled:cursor-not-allowed disabled:opacity-40 sm:rounded-[1.15rem]"
                 >
                   {loading ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                       Sending…
                     </>
                   ) : (
-                    "Send sign-in code"
+                    <>
+                      Send sign-in code
+                      <ArrowRight className="h-4 w-4 opacity-90" aria-hidden />
+                    </>
                   )}
                 </button>
               </form>

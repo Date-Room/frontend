@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { getRoomByCode, joinRoom, type InviteCard } from "@/lib/rooms";
+import { saveRoomPlanFromServer } from "@/lib/roomExperience";
 import { getMe, updateMe } from "@/lib/users";
 import { authClient } from "@/lib/authClient";
 import { resolveAmbiancePreset, ambianceMeta } from "@/lib/ambiance";
@@ -151,6 +152,10 @@ export default function Lobby() {
       if (res.expires_at && invite.persistence !== "persistent") {
         params.set("expires_at", res.expires_at);
       }
+      saveRoomPlanFromServer(res.room_id, {
+        package: res.package,
+        curated_activity_ids: res.curated_activity_ids,
+      });
       navigate(`/room/${res.room_id}?${params.toString()}`, { replace: true });
     } catch (err) {
       // Backend 403 "Persistent rooms require an account" → divert

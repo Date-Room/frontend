@@ -394,11 +394,12 @@ export function ActivityTray({
   // Chat) whose ids match their activity can't collide and break "back".
   const [catId, setCatId] = useState<string | null>(null);
   const [actId, setActId] = useState<string | null>(null);
-  const { isHost, roomId } = useRoomSession();
+  const { isHost, roomId, roomPackage, curatedActivityIds } = useRoomSession();
 
-  // Host's curated activity selection from the create flow (null when
-  // nothing was saved — legacy rooms / cross-device guests show all).
-  const curated = useMemo(() => getRoomExperience(roomId), [roomId]);
+  const curated = useMemo(
+    () => (curatedActivityIds.length ? curatedActivityIds : getRoomExperience(roomId)),
+    [curatedActivityIds, roomId],
+  );
 
   // Apply curation to each category: keep always-on activities + the
   // chosen ones, then drop categories that end up empty.
@@ -406,9 +407,11 @@ export function ActivityTray({
     () =>
       CATEGORIES.map((c) => ({
         ...c,
-        activities: c.activities.filter((a) => isActivityEnabled(a.id, curated)),
+        activities: c.activities.filter((a) =>
+          isActivityEnabled(a.id, curated, roomPackage),
+        ),
       })).filter((c) => c.activities.length > 0),
-    [curated],
+    [curated, roomPackage],
   );
 
   // Surface activity changes to the parent (mini-player visibility).

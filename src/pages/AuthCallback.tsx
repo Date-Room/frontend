@@ -77,10 +77,9 @@ export default function AuthCallback() {
 
     function go() {
       let dest = "/home";
-      // OAuth path carries the return target as `?next=`; magic-link path
-      // historically stashed it in sessionStorage. Honour both, with the
-      // URL param winning when present.
-      const nextParam = params.get("next");
+      // OAuth path carries the return target as `?next=` (or legacy
+      // `?redirect=`); magic-link path stashes it in sessionStorage.
+      const nextParam = params.get("next") ?? params.get("redirect");
       if (nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")) {
         dest = nextParam;
       } else {

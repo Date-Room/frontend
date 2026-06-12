@@ -16,6 +16,7 @@ import {
 import { BRAND_NAME } from "@/lib/constants";
 import { authClient } from "@/lib/authClient";
 import { getMe, type UserMe } from "@/lib/users";
+import { getEntitlement, getBillingConfig, type BillingConfig, type Entitlement } from "@/lib/billing";
 import {
   listMyRooms,
   getRoomByCode,
@@ -25,6 +26,7 @@ import {
   type ParticipantInfo,
 } from "@/lib/rooms";
 import { PageShell } from "@/components/PageShell";
+import { ProfilePlanSection } from "@/components/ProfilePlanSection";
 import { ShimmerSkeleton } from "@/components/ui/skeleton";
 import { UserAvatarImg } from "@/components/UserAvatarImg";
 import { cn } from "@/lib/utils";
@@ -117,6 +119,18 @@ export default function Home() {
     staleTime: 30_000,
     retry: 1,
     refetchOnWindowFocus: false,
+  });
+  const { data: entitlement, isLoading: entitlementLoading } = useQuery({
+    queryKey: ["entitlement"],
+    queryFn: getEntitlement,
+    staleTime: 30_000,
+    retry: 1,
+  });
+  const { data: billingConfig, isLoading: billingLoading } = useQuery({
+    queryKey: ["billing-config"],
+    queryFn: getBillingConfig,
+    staleTime: 30_000,
+    retry: 1,
   });
   const { data: rooms = [], isLoading: roomsLoading } = useQuery({
     queryKey: ["my-rooms"],
@@ -470,7 +484,15 @@ export default function Home() {
         )}
 
         {tab === "profile" && (
-          <ProfilePane me={me} initial={initial} onSettings={() => navigate("/settings")} onSignOut={handleSignOut} />
+          <ProfilePane
+            me={me}
+            entitlement={entitlement}
+            billingConfig={billingConfig}
+            billingLoading={entitlementLoading || billingLoading}
+            initial={initial}
+            onSettings={() => navigate("/settings")}
+            onSignOut={handleSignOut}
+          />
         )}
       </main>
 
@@ -796,37 +818,52 @@ function RoomsEmptyState({ query }: { query: string }) {
 
 function ProfilePane({
   me,
+  entitlement,
+  billingConfig,
+  billingLoading,
   initial,
   onSettings,
   onSignOut,
 }: {
   me: UserMe | undefined;
+  entitlement: Entitlement | undefined;
+  billingConfig: BillingConfig | undefined;
+  billingLoading: boolean;
   initial: string | undefined;
   onSettings: () => void;
   onSignOut: () => void;
 }) {
   return (
     <div className="mx-auto max-w-xl animate-float-up space-y-4 stagger-children">
-      <div className="editorial-card flex items-center gap-4 p-6">
-        <UserAvatarImg
-          src={me?.photo_url}
-          alt=""
-          className="h-16 w-16 rounded-full border-2 border-rosegold/20 object-cover"
-          fallback={
-            <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-rosegold/20 bg-gradient-to-br from-rosegold/30 to-romantic/30 font-serif text-2xl text-cream">
-              {initial}
-            </div>
-          }
-        />
-        <div className="min-w-0">
-          <p className="truncate text-lg font-medium text-cream">{me?.display_name || me?.email?.split("@")[0]}</p>
-          <p className="truncate text-xs text-muted-foreground">{me?.email}</p>
+      <div className="editorial-card p-6">
+        <div className="flex items-start gap-4">
+          <UserAvatarImg
+            src={me?.photo_url}
+            alt=""
+            className="h-16 w-16 shrink-0 rounded-full border-2 border-rosegold/20 object-cover"
+            fallback={
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 border-rosegold/20 bg-gradient-to-br from-rosegold/30 to-romantic/30 font-serif text-2xl text-cream">
+                {initial}
+              </div>
+            }
+          />
+          <div className="min-w-0 flex-1 pt-0.5">
+            <p className="truncate text-lg font-medium text-cream">
+              {me?.display_name || me?.email?.split("@")[0]}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">{me?.email}</p>
+          </div>
         </div>
       </div>
       <button type="button" onClick={onSettings} className="editorial-card hover-lift focus-ring flex w-full items-center gap-3 px-4 py-3.5">
         <User className="h-4 w-4 text-muted-foreground" />
         <span className="flex-1 text-left text-sm text-cream">Manage profile</span>
       </button>
+      <ProfilePlanSection
+        entitlement={entitlement}
+        billingConfig={billingConfig}
+        loading={billingLoading}
+      />
       <button type="button" onClick={onSignOut} className="editorial-card hover-lift focus-ring flex w-full items-center gap-3 px-4 py-3.5">
         <LogOut className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm text-cream">Sign out</span>

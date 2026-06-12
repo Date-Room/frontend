@@ -1,6 +1,6 @@
 import type { FocusEvent, RefObject } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -21,11 +21,20 @@ import { AMBIANCE_PRESETS } from "@/lib/ambiance";
 import type { AmbiancePresetId } from "@/lib/ambiance";
 import { ambianceMeta } from "@/lib/ambiance";
 import {
-  createCheckoutSession,
-  createPackCheckoutSession,
+  getBillingConfig,
   getEntitlement,
+  paymentRailLabel,
+  type BillingConfig,
+  type CheckoutReturnPaths,
   type Entitlement,
 } from "@/lib/billing";
+import { PaymentCheckout } from "@/components/PaymentCheckout";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { connectionIntentLabel, type ConnectionIntent } from "@/lib/connectionIntent";
 import { ApiError } from "@/lib/api";
 import { saveInvitedGuestName } from "@/lib/invitedGuest";
@@ -38,10 +47,11 @@ import {
   activityMeta,
   type CuratableActivityId,
 } from "@/lib/roomExperience";
-import { saveRoomExperience } from "@/lib/roomExperience";
+import { saveRoomPlanFromServer } from "@/lib/roomExperience";
+import { billingProductForTier, formatTierPrice, tierPricingMeta } from "@/lib/tierPricing";
 import { cn } from "@/lib/utils";
 
-type Plan = "try" | "date_pack" | "long_pack" | "together";
+type Plan = "try" | "date_pack" | "long_pack" | "together" | "crew";
 
 type PlanMeta = {
   id: Plan;
@@ -84,17 +94,38 @@ const PLANS: PlanMeta[] = [
   {
     id: "together",
     title: "Together",
-    desc: "A room that stays open. Monthly.",
+    desc: "Persistent room — vision board, bookshelf, watch party for up to 12.",
     icon: "🏠",
     persistence: "persistent",
     package: "subscription",
     priceHint: "Together subscription",
+  },
+  {
+    id: "crew",
+    title: "Crew",
+    desc: "Persistent room — vision board, bookshelf, group watch parties.",
+    icon: "🎬",
+    persistence: "persistent",
+    package: "subscription",
+    priceHint: "Crew subscription",
   },
 ];
 
 type Step = "plan" | "recipient" | "when" | "experience" | "greeting" | "confirm";
 const STEPS: Step[] = ["plan", "recipient", "when", "experience", "greeting", "confirm"];
 const STEP_LABELS = ["Plan", "Guest", "When", "Experience", "Lobby mood", "Review"] as const;
+const CREATE_CHECKOUT_STORAGE_KEY = "dateroom:create:checkout-plan";
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function stripeReturnPaths(plan: Plan): CheckoutReturnPaths {
+  return {
+    successPath: `/create?checkout=success&plan=${plan}&session_id={CHECKOUT_SESSION_ID}`,
+    cancelPath: `/create?checkout=cancel&plan=${plan}`,
+  };
+}
 
 const WIDE_LAYOUT_STEPS = new Set<Step>(["plan", "recipient", "when", "experience", "confirm"]);
 
@@ -145,6 +176,7 @@ function StepEyebrow({ stepIndex }: { stepIndex: number }) {
 
 export default function CreateRoom() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>("plan");
   const [selectedPlan, setSelectedPlan] = useState<Plan>("try");
@@ -152,6 +184,9 @@ export default function CreateRoom() {
     () => defaultCuratedForPackage("single_pass"),
   );
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
+  const [billingConfig, setBillingConfig] = useState<BillingConfig | null>(null);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentIntent, setPaymentIntent] = useState<"plan" | "confirm">("plan");
   const [recipientName, setRecipientName] = useState("");
   const [scheduledType, setScheduledType] = useState<"now" | "later">("now");
   const [scheduledDatePart, setScheduledDatePart] = useState("");
@@ -169,21 +204,32 @@ export default function CreateRoom() {
   const stepIndex = STEPS.indexOf(step);
   const progress = ((stepIndex + 1) / STEPS.length) * 100;
   const planMeta = PLANS.find((p) => p.id === selectedPlan) ?? PLANS[0];
+  const currentTier = (entitlement?.account_tier ??
+    billingConfig?.account_tier ??
+    "try") as Plan;
+  const currentTierLabel =
+    entitlement?.account_tier_label ?? billingConfig?.account_tier_label ?? "Try";
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const e = await getEntitlement();
-        if (!cancelled) setEntitlement(e);
+        const [e, cfg] = await Promise.all([getEntitlement(), getBillingConfig()]);
+        if (!cancelled) {
+          setEntitlement(e);
+          setBillingConfig(cfg);
+        }
       } catch {
         /* badges optional */
       }
     })();
     const onFocus = async () => {
       try {
-        const e = await getEntitlement();
-        if (!cancelled) setEntitlement(e);
+        const [e, cfg] = await Promise.all([getEntitlement(), getBillingConfig()]);
+        if (!cancelled) {
+          setEntitlement(e);
+          setBillingConfig(cfg);
+        }
       } catch {
         /* ignore */
       }
@@ -242,21 +288,26 @@ export default function CreateRoom() {
   }
 
   function purchaseRequired(plan: Plan, e: Entitlement | null): boolean {
-    if (e === null) return false;
+    if (plan === "try") return false;
+    if (e === null) return true;
     switch (plan) {
-      case "try":
-        return false;
       case "date_pack":
         return e.date_pack_remaining <= 0;
       case "long_pack":
         return e.long_pack_remaining <= 0;
       case "together":
         return !e.has_active_subscription;
+      case "crew":
+        return e.account_tier !== "crew";
     }
   }
 
+  function isCurrentPlan(plan: Plan): boolean {
+    return plan === currentTier;
+  }
+
   function badgeFor(plan: Plan): string | null {
-    if (entitlement === null) return null;
+    if (entitlement === null || isCurrentPlan(plan)) return null;
     switch (plan) {
       case "date_pack":
         return entitlement.date_pack_remaining > 0
@@ -266,9 +317,9 @@ export default function CreateRoom() {
         return entitlement.long_pack_remaining > 0
           ? `${entitlement.long_pack_remaining} left`
           : null;
-      case "together":
-        return entitlement.has_active_subscription ? "Active" : null;
       case "try":
+      case "together":
+      case "crew":
         return null;
     }
   }
@@ -278,6 +329,8 @@ export default function CreateRoom() {
     switch (selectedPlan) {
       case "together":
         return "Subscribe & create";
+      case "crew":
+        return "Subscribe to Crew & create";
       case "date_pack":
         return "Buy Date Pack & create";
       case "long_pack":
@@ -289,18 +342,171 @@ export default function CreateRoom() {
 
   function priceSummary(): string {
     if (purchaseRequired(selectedPlan, entitlement)) {
+      const rail = billingConfig
+        ? paymentRailLabel(billingConfig.payment_provider)
+        : "checkout";
       switch (selectedPlan) {
         case "together":
-          return "Stripe Checkout for Together, then room creation";
+          return `${rail} for Together, then room creation`;
+        case "crew":
+          return `${rail} for Crew, then room creation`;
         case "date_pack":
-          return "Buy Date Pack via Stripe, then create";
+          return `Buy Date Pack via ${rail}, then create`;
         case "long_pack":
-          return "Buy Long Pack via Stripe, then create";
+          return `Buy Long Pack via ${rail}, then create`;
         case "try":
           return planMeta.priceHint;
       }
     }
     return planMeta.priceHint;
+  }
+
+  function productForPlan(plan: Plan): "date_pack" | "long_pack" | "together" | "crew" {
+    if (plan === "long_pack") return "long_pack";
+    if (plan === "together") return "together";
+    if (plan === "crew") return "crew";
+    return "date_pack";
+  }
+
+  function paymentLabelForPlan(plan: Plan): string {
+    switch (plan) {
+      case "date_pack":
+        return "Pay for Date Pack";
+      case "long_pack":
+        return "Pay for Long Pack";
+      case "together":
+        return "Subscribe to Together";
+      case "crew":
+        return "Subscribe to Crew";
+      default:
+        return "Continue";
+    }
+  }
+
+  function paymentDialogTitle(plan: Plan): string {
+    const title = PLANS.find((p) => p.id === plan)?.title ?? "Upgrade";
+    const rail = billingConfig ? paymentRailLabel(billingConfig.payment_provider) : "checkout";
+    if (!billingConfig?.country_code) return `Upgrade to ${title}`;
+    return `Pay for ${title} with ${rail}`;
+  }
+
+  function handlePlanSelect(plan: Plan) {
+    const meta = PLANS.find((p) => p.id === plan) ?? PLANS[0];
+    setSelectedPlan(plan);
+    setCuratedActivities(defaultCuratedForPackage(meta.package));
+
+    if (entitlement === null) {
+      toast.message("Loading your account…");
+      return;
+    }
+
+    if (purchaseRequired(plan, entitlement)) {
+      if (!billingConfig) {
+        toast.error("Loading billing — try again in a moment.");
+        return;
+      }
+      sessionStorage.setItem(CREATE_CHECKOUT_STORAGE_KEY, plan);
+      setPaymentIntent("plan");
+      setPaymentOpen(true);
+      return;
+    }
+
+    next();
+  }
+
+  const refreshBilling = useCallback(async () => {
+    const [e, cfg] = await Promise.all([getEntitlement(), getBillingConfig()]);
+    setEntitlement(e);
+    setBillingConfig(cfg);
+    await queryClient.invalidateQueries({ queryKey: ["entitlement"] });
+    await queryClient.invalidateQueries({ queryKey: ["billing-config"] });
+  }, [queryClient]);
+
+  useEffect(() => {
+    const checkout = searchParams.get("checkout");
+    if (!checkout) return;
+
+    let cancelled = false;
+    void (async () => {
+      const planParam = searchParams.get("plan") as Plan | null;
+      const storedPlan = sessionStorage.getItem(CREATE_CHECKOUT_STORAGE_KEY) as Plan | null;
+      const plan = planParam ?? storedPlan;
+
+      if (plan && PLANS.some((p) => p.id === plan)) {
+        const meta = PLANS.find((p) => p.id === plan)!;
+        setSelectedPlan(plan);
+        setCuratedActivities(defaultCuratedForPackage(meta.package));
+      }
+
+      if (checkout === "success") {
+        await refreshBilling();
+        let e = await getEntitlement();
+        for (let i = 0; i < 6 && plan && purchaseRequired(plan, e); i += 1) {
+          await sleep(2000);
+          if (cancelled) return;
+          e = await getEntitlement();
+          setEntitlement(e);
+        }
+        if (!cancelled) {
+          setEntitlement(e);
+          toast.success("Payment received — your plan is upgraded.");
+          setStep("recipient");
+        }
+      } else if (checkout === "cancel") {
+        toast.message("Checkout cancelled — pick a plan when you're ready.");
+        setStep("plan");
+      }
+
+      sessionStorage.removeItem(CREATE_CHECKOUT_STORAGE_KEY);
+      setSearchParams({}, { replace: true });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, setSearchParams, refreshBilling]);
+
+  async function createRoomAfterPlan() {
+    const guestName = recipientName.trim();
+    if (!guestName) {
+      toast.error("Add their name.");
+      setStep("recipient");
+      throw new Error("missing guest");
+    }
+
+    let scheduledFor: string | null = null;
+    if (scheduledType === "later") {
+      if (!scheduledDateTime) {
+        toast.error("Pick a date and time.");
+        setStep("when");
+        throw new Error("missing schedule");
+      }
+      scheduledFor = scheduledDateTime.toISOString();
+    }
+
+    const room = await createRoom({
+      persistence: planMeta.persistence,
+      package: planMeta.package,
+      scheduled_for: scheduledFor,
+      greeting_headline: headline.trim() || null,
+      greeting_subtext: subtext.trim() || null,
+      curated_activity_ids: curatedActivities,
+    });
+
+    saveRoomPlanFromServer(room.id, {
+      package: room.package,
+      curated_activity_ids: room.curated_activity_ids ?? curatedActivities,
+    });
+
+    await updateRoom(room.id, { background_id: lobbyAmbiance });
+
+    saveInvitedGuestName(room.id, guestName);
+
+    await queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
+    await queryClient.invalidateQueries({ queryKey: ["invite-card", room.code] });
+    navigate(`/rooms/${room.id}/pre`, {
+      state: { guestName, connectionIntent },
+    });
   }
 
   async function handleCreate() {
@@ -311,54 +517,54 @@ export default function CreateRoom() {
       return;
     }
 
-    setCreating(true);
-    try {
-      if (purchaseRequired(selectedPlan, entitlement)) {
-        const { url } =
-          selectedPlan === "together"
-            ? await createCheckoutSession()
-            : await createPackCheckoutSession(
-                selectedPlan === "date_pack" ? "date_pack" : "long_pack",
-              );
-        window.location.href = url;
+    if (purchaseRequired(selectedPlan, entitlement)) {
+      if (!billingConfig) {
+        toast.error("Loading billing — try again in a moment.");
         return;
       }
+      sessionStorage.setItem(CREATE_CHECKOUT_STORAGE_KEY, selectedPlan);
+      setPaymentIntent("confirm");
+      setPaymentOpen(true);
+      return;
+    }
 
-      let scheduledFor: string | null = null;
-      if (scheduledType === "later") {
-        if (!scheduledDateTime) {
-          toast.error("Pick a date and time.");
-          setStep("when");
-          return;
-        }
-        scheduledFor = scheduledDateTime.toISOString();
-      }
-
-      const room = await createRoom({
-        persistence: planMeta.persistence,
-        package: planMeta.package,
-        scheduled_for: scheduledFor,
-        greeting_headline: headline.trim() || null,
-        greeting_subtext: subtext.trim() || null,
-      });
-
-      await updateRoom(room.id, { background_id: lobbyAmbiance });
-
-      saveInvitedGuestName(room.id, guestName);
-      saveRoomExperience(room.id, curatedActivities);
-
-      await queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
-      await queryClient.invalidateQueries({ queryKey: ["invite-card", room.code] });
-      navigate(`/rooms/${room.id}/pre`, {
-        state: { guestName, connectionIntent },
-      });
+    setCreating(true);
+    try {
+      await createRoomAfterPlan();
     } catch (e) {
+      if (e instanceof Error && e.message === "missing guest") return;
+      if (e instanceof Error && e.message === "missing schedule") return;
       if (e instanceof ApiError && e.status === 402) {
         toast.message("This room needs an active credit.");
         navigate("/paywall");
         return;
       }
       toast.error(e instanceof Error ? e.message : "Could not create room.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function handlePaymentComplete() {
+    setPaymentOpen(false);
+    try {
+      await refreshBilling();
+      if (paymentIntent === "confirm") {
+        setCreating(true);
+        await createRoomAfterPlan();
+      } else {
+        next();
+      }
+    } catch (e) {
+      if (e instanceof Error && (e.message === "missing guest" || e.message === "missing schedule")) {
+        return;
+      }
+      if (e instanceof ApiError && e.status === 402) {
+        toast.message("This room needs an active credit.");
+        navigate("/paywall");
+        return;
+      }
+      toast.error(e instanceof Error ? e.message : "Could not continue.");
     } finally {
       setCreating(false);
     }
@@ -449,26 +655,33 @@ export default function CreateRoom() {
             <h1 className="font-serif italic text-3xl md:text-4xl text-cream mb-3 tracking-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.35)]">
               Pick a plan
             </h1>
-            <p className="text-muted-foreground text-sm mb-8 md:mb-10 leading-relaxed max-w-2xl">
+            <p className="text-muted-foreground text-sm mb-4 md:mb-5 leading-relaxed max-w-2xl">
               Try a free session, spend a pack credit, or open a room that stays with you both.
             </p>
+            {entitlement || billingConfig ? (
+              <div className="mb-8 md:mb-10 inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-200">
+                <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Your plan · {currentTierLabel}
+              </div>
+            ) : (
+              <div className="mb-8 md:mb-10 h-7 w-36 animate-pulse rounded-full bg-white/[0.06]" aria-hidden />
+            )}
             <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
               {PLANS.map((opt) => {
                 const badge = badgeFor(opt.id);
+                const isCurrent = isCurrentPlan(opt.id);
                 return (
                   <button
                     key={opt.id}
                     type="button"
-                    onClick={() => {
-                      setSelectedPlan(opt.id);
-                      setCuratedActivities(defaultCuratedForPackage(opt.package));
-                      next();
-                    }}
+                    onClick={() => handlePlanSelect(opt.id)}
                     className={cn(
                       "h-full min-h-[10.5rem] w-full text-left rounded-[1.75rem] p-5 md:p-6 transition-all duration-300 border relative overflow-hidden group",
                       "bg-gradient-to-br from-card/90 via-card/45 to-transparent backdrop-blur-md",
-                      "border-white/[0.08] shadow-[0_14px_48px_rgba(0,0,0,0.28)]",
-                      "hover:border-primary/30 hover:shadow-[0_20px_56px_rgba(0,0,0,0.38)] hover:-translate-y-0.5 motion-reduce:hover:translate-y-0",
+                      "shadow-[0_14px_48px_rgba(0,0,0,0.28)]",
+                      isCurrent
+                        ? "border-primary/45 ring-1 ring-primary/25 shadow-[0_20px_56px_rgba(212,130,106,0.22)]"
+                        : "border-white/[0.08] hover:border-primary/30 hover:shadow-[0_20px_56px_rgba(0,0,0,0.38)] hover:-translate-y-0.5 motion-reduce:hover:translate-y-0",
                     )}
                   >
                     <div
@@ -483,17 +696,35 @@ export default function CreateRoom() {
                         <div className="min-w-0 flex-1 pt-0.5">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-cream font-semibold text-[15px] tracking-tight">{opt.title}</p>
+                            <span className="text-sm font-semibold tabular-nums text-primary">
+                              {formatTierPrice(
+                                opt.id,
+                                billingProductForTier(opt.id, billingConfig?.products),
+                              )}
+                            </span>
+                            {isCurrent ? (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/35 bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-emerald-200">
+                                <Check className="h-3 w-3" aria-hidden />
+                                Current plan
+                              </span>
+                            ) : null}
                             {badge ? (
                               <span className="rounded-full border border-rosegold/25 bg-rosegold/10 px-2 py-0.5 text-[10px] font-semibold text-rosegold">
                                 {badge}
                               </span>
                             ) : null}
                           </div>
-                          <p className="text-xs text-muted-foreground leading-relaxed mt-1.5">{opt.desc}</p>
+                          <p className="text-xs text-muted-foreground leading-relaxed mt-1.5">
+                            {opt.desc}
+                            {tierPricingMeta(opt.id).unit && opt.id !== "try"
+                              ? ` · ${tierPricingMeta(opt.id).unit}`
+                              : ""}
+                          </p>
                         </div>
                       </div>
                       <p className="mt-auto text-[11px] uppercase tracking-[0.22em] text-primary font-semibold opacity-90 flex items-center gap-1">
-                        Continue <ArrowRight className="w-3 h-3" aria-hidden />
+                        {isCurrent ? "Use this plan" : "Continue"}{" "}
+                        <ArrowRight className="w-3 h-3" aria-hidden />
                       </p>
                     </div>
                   </button>
@@ -1017,6 +1248,28 @@ export default function CreateRoom() {
           </div>
         )}
       </main>
+
+      <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
+        <DialogContent className="border-white/10 bg-card/95 text-cream sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif italic text-xl">
+              {paymentDialogTitle(selectedPlan)}
+            </DialogTitle>
+          </DialogHeader>
+          {billingConfig ? (
+            <PaymentCheckout
+              config={billingConfig}
+              product={productForPlan(selectedPlan)}
+              label={paymentLabelForPlan(selectedPlan)}
+              returnPaths={stripeReturnPaths(selectedPlan)}
+              onConfigRefresh={refreshBilling}
+              onComplete={handlePaymentComplete}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">Loading checkout…</p>
+          )}
+        </DialogContent>
+      </Dialog>
     </PageShell>
   );
 }

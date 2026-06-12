@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Play, Square } from "lucide-react";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
+import { isWatchPartyRoom, watchPartyLabel } from "@/lib/watchParty";
 import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/types/youtubeIframeApi";
 
 /**
@@ -272,6 +273,14 @@ export function WatchTogether() {
 
   return (
     <div className="flex flex-col h-full p-4 sm:p-6 gap-4">
+      {isWatchPartyRoom(room.maxParticipants) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-muted-foreground">
+          <span className="font-medium text-cream/90">{watchPartyLabel(room.maxParticipants)}</span>
+          <span>
+            {room.presence.length} in room · anyone can watch · host controls playback
+          </span>
+        </div>
+      )}
       <form onSubmit={submit} className="flex gap-2">
         <Input
           value={url}

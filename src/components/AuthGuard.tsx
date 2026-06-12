@@ -52,6 +52,7 @@ export const AuthGuard = ({
           isAuthPath ||
           path === "/profile/complete" ||
           path === "/settings" ||
+          path.startsWith("/admin") ||
           path.startsWith("/i/");
         if (!current.user.profile_complete && !exempt) {
           const after = `${path}${window.location.search}${window.location.hash}`;

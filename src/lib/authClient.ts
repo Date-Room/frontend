@@ -21,6 +21,7 @@ export type AuthUser = {
   profile_complete: boolean;
   email_verified_at: string | null;
   provider: string | null;
+  is_admin?: boolean;
 };
 
 export type Session = {
@@ -34,19 +35,19 @@ export type Session = {
 const STORAGE_KEY = "dr_auth_v1";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 
-/** Build a same-origin `next` path to round-trip through OAuth so the
- * user lands back where they started.
- * - /auth and /auth/callback aren't useful return targets — prefer
- *   their own `?next=` param if present, otherwise `/`.
- * - Anywhere else: round-trip the current path (incl. search + hash). */
+/** Build a same-origin return path to round-trip through OAuth.
+ * Accepts `?next=` (canonical) and `?redirect=` (legacy in-app links).
+ * Defaults to `/home` when on /auth without a target. */
 function currentNext(): string {
-  if (typeof window === "undefined") return "/";
+  if (typeof window === "undefined") return "/home";
   const { pathname, search, hash } = window.location;
   if (pathname === "/auth" || pathname === "/auth/callback") {
-    const inner = new URLSearchParams(search).get("next");
-    return inner && inner.startsWith("/") && !inner.startsWith("//") ? inner : "/";
+    const params = new URLSearchParams(search);
+    const raw = params.get("next") ?? params.get("redirect");
+    if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
+    return "/home";
   }
-  return `${pathname}${search}${hash}` || "/";
+  return `${pathname}${search}${hash}` || "/home";
 }
 
 type Listener = (s: Session | null) => void;
@@ -334,6 +335,32 @@ async function asError(response: Response, fallback: string): Promise<Error> {
 }
 
 export const authClient = new AuthClient();
+
+export type AuthConfig = {
+  jwt_configured: boolean;
+  email_enabled: boolean;
+  google_enabled: boolean;
+  apple_enabled: boolean;
+};
+
+let authConfigCache: AuthConfig | null = null;
+
+/** Public — which sign-in methods the backend can handle. */
+export async function fetchAuthConfig(): Promise<AuthConfig | null> {
+  if (!API_BASE) return null;
+  try {
+    const response = await fetch(`${API_BASE}/v1/auth/config`);
+    if (!response.ok) return null;
+    authConfigCache = (await response.json()) as AuthConfig;
+    return authConfigCache;
+  } catch {
+    return null;
+  }
+}
+
+export function getCachedAuthConfig(): AuthConfig | null {
+  return authConfigCache;
+}
 
 /** True when the API base URL is configured and we can call /v1/auth. */
 export function authConfigured(): boolean {

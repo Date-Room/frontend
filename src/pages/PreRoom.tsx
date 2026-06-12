@@ -39,6 +39,7 @@ import {
   type ParticipantInfo,
 } from "@/lib/rooms";
 import { getInvitedGuestName, saveInvitedGuestName } from "@/lib/invitedGuest";
+import { saveRoomPlanFromServer, defaultCuratedForPackage } from "@/lib/roomExperience";
 import { getMe } from "@/lib/users";
 import { RoomChannel, type PresenceState } from "@/lib/realtime/roomChannel";
 import { ShimmerSkeleton } from "@/components/ui/skeleton";
@@ -438,6 +439,11 @@ export default function PreRoom() {
         room.persistence === "persistent" || !room.expires_at
           ? ""
           : `&expires_at=${encodeURIComponent(room.expires_at)}`;
+      saveRoomPlanFromServer(room.id, {
+        package: room.package,
+        curated_activity_ids:
+          room.curated_activity_ids ?? defaultCuratedForPackage(room.package),
+      });
       navigate(`/room/${room.id}?slot=a${exp}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not start the session.");

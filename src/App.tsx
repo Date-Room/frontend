@@ -27,7 +27,14 @@ import NeedInvite from "./pages/NeedInvite";
 import Paywall from "./pages/Paywall";
 import ProfileComplete from "./pages/ProfileComplete";
 import ReferralLanding from "./pages/ReferralLanding";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminPromoCodes from "./pages/admin/AdminPromoCodes";
+import AdminRooms from "./pages/admin/AdminRooms";
+import AdminAudit from "./pages/admin/AdminAudit";
 import { AuthGuard } from "./components/AuthGuard";
+import { AdminGuard } from "./components/admin/AdminGuard";
+import { AdminLayout } from "./components/admin/AdminLayout";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
@@ -78,6 +85,24 @@ const App = () => {
             <Route path="/paywall" element={<AuthGuard><Paywall /></AuthGuard>} />
             <Route path="/profile/complete" element={<AuthGuard><ProfileComplete /></AuthGuard>} />
             <Route path="/settings" element={<AuthGuard><Settings /></AuthGuard>} />
+
+            {/* Platform admin */}
+            <Route
+              path="/admin"
+              element={
+                <AuthGuard>
+                  <AdminGuard>
+                    <AdminLayout />
+                  </AdminGuard>
+                </AuthGuard>
+              }
+            >
+              <Route index element={<AdminDashboard />} />
+              <Route path="users" element={<AdminUsers />} />
+              <Route path="promo" element={<AdminPromoCodes />} />
+              <Route path="rooms" element={<AdminRooms />} />
+              <Route path="audit" element={<AdminAudit />} />
+            </Route>
 
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />

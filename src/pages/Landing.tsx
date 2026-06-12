@@ -22,6 +22,7 @@ import {
   Instagram,
   Mail,
 } from "lucide-react";
+import { TIER_PRICING } from "@/lib/tierPricing";
 
 /**
  * Marketing landing — a faithful port of date-room-escape.lovable.app.
@@ -89,15 +90,15 @@ export default function Landing() {
             <p className="mt-8 max-w-xl text-lg leading-relaxed text-lpcream/85 md:text-xl">
               A private room you share with a six-digit code. No phone numbers. No awkward exchange. Just enough to know if it's worth meeting in real life.
             </p>
-  <p className="lp-serif mt-5 text-xl italic text-lppeachsoft md:text-2xl">Not a video call. A date.</p>
+            <p className="lp-serif mt-5 text-xl italic text-lppeachsoft md:text-2xl">Not a video call. A date.</p>
             <div className="mt-10 flex flex-wrap items-center gap-6">
-    <Link to={START} className="lp-btn">Create your room</Link>
-    <a href="#how" className="lp-link">See how it works</a>
-  </div>
-  <p className="mt-6 text-[15px] text-lpmuted">
+              <Link to={START} className="lp-btn">Create your room</Link>
+              <a href="#how" className="lp-link">See how it works</a>
+            </div>
+            <p className="mt-6 text-[15px] text-lpmuted">
               Got a code from your match?{" "}
               <Link to="/join" className="lp-link">Join a room</Link>
-  </p>
+            </p>
           </div>
         </div>
       </section>
@@ -311,17 +312,31 @@ export default function Landing() {
 
         <div className="mt-16 grid gap-5 md:grid-cols-3">
           {[
-            { name: "Try", price: "Free", unit: "one date · 20 min", desc: "Ad-supported.", cta: "Start free" },
-            { name: "Date Pack", price: "$5", unit: "three dates · 1 hour each", desc: "For the early matches.", cta: "Get the pack" },
-            { name: "Long Pack", price: "$10", unit: "five dates · 2 hours each", desc: "For the ones with potential.", cta: "Get the pack" },
+            { name: "Try", price: TIER_PRICING.try.priceLabel, unit: "one date · 20 min", desc: "Ad-supported.", cta: "Start free" },
+            { name: "Date Pack", price: TIER_PRICING.date_pack.priceLabel, unit: TIER_PRICING.date_pack.unit!, desc: "For the early matches.", cta: "Get the pack" },
+            { name: "Long Pack", price: TIER_PRICING.long_pack.priceLabel, unit: TIER_PRICING.long_pack.unit!, desc: "For the ones with potential.", cta: "Get the pack" },
           ].map((p) => (
             <PricingCard key={p.name} {...p} />
           ))}
         </div>
 
         <div className="mt-5 grid gap-5 md:grid-cols-2">
-          <PricingCard name="Together" price="$20" unit="/ month · for two" desc="A room that stays open. Custom walls. Unlimited everything." cta="Open Together" featured />
-          <PricingCard name="Crew" price="$25" unit="/ month · up to five" desc="Movie nights, game nights, book clubs, group hangs. Room for more chairs." cta="Open Crew" featured />
+          <PricingCard
+            name="Together"
+            price={TIER_PRICING.together.priceLabel}
+            unit={`${TIER_PRICING.together.priceSuffix ?? ""} · ${TIER_PRICING.together.unit}`}
+            desc="A room that stays open. Custom walls. Watch party for up to 12."
+            cta="Open Together"
+            featured
+          />
+          <PricingCard
+            name="Crew"
+            price={TIER_PRICING.crew.priceLabel}
+            unit={`${TIER_PRICING.crew.priceSuffix ?? ""} · ${TIER_PRICING.crew.unit}`}
+            desc="Movie nights, game nights, book clubs. Group watch party for 10+."
+            cta="Open Crew"
+            featured
+          />
         </div>
       </section>
 

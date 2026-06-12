@@ -1,35 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Check, Sparkles, Heart } from "lucide-react";
-import { toast } from "sonner";
 import { CardPage } from "@/components/CardPage";
-import { createCheckoutSession, getSubscriptionStatus } from "@/lib/billing";
+import { PaymentCheckout } from "@/components/PaymentCheckout";
+import {
+  getBillingConfig,
+  getSubscriptionStatus,
+  paymentRailLabel,
+} from "@/lib/billing";
 
 /**
- * Paywall — premium subscription pitch + Stripe Checkout handoff.
- *
- * Three states based on the GET /v1/billing/subscription response:
- *  - paywall_enabled=false → "everything's free right now" view, no
- *    checkout button.
- *  - paywall_enabled=true + entitled=true → "you're already in" view
- *    with manage-link affordance (future Stripe Customer Portal).
- *  - paywall_enabled=true + entitled=false → the pitch + CTA.
- *
- * On successful return from Stripe we re-query the subscription
- * endpoint until the webhook lands (Stripe's redirect can beat our
- * webhook by a second or two).
+ * Paywall — premium subscription pitch with location-aware checkout.
  */
 export default function Paywall() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [params] = useSearchParams();
   const isSuccess = params.get("status") === "success";
-  const [checkoutBusy, setCheckoutBusy] = useState(false);
 
   const {
     data: status,
-    isLoading,
+    isLoading: statusLoading,
     refetch,
   } = useQuery({
     queryKey: ["subscription-status"],
@@ -37,9 +29,12 @@ export default function Paywall() {
     staleTime: 10_000,
   });
 
-  // Post-success polling: hammer /subscription every 2s up to 5×
-  // until `entitled` flips true, so the user sees confirmation
-  // without a manual refresh.
+  const { data: config, isLoading: configLoading } = useQuery({
+    queryKey: ["billing-config"],
+    queryFn: getBillingConfig,
+    staleTime: 30_000,
+  });
+
   useEffect(() => {
     if (!isSuccess) return;
     if (status?.entitled) return;
@@ -47,24 +42,15 @@ export default function Paywall() {
     return () => window.clearTimeout(t);
   }, [isSuccess, status?.entitled, refetch]);
 
-  async function startCheckout() {
-    setCheckoutBusy(true);
-    try {
-      const { url } = await createCheckoutSession();
-      // Stash the marker for the post-success re-poll path.
-      queryClient.invalidateQueries({ queryKey: ["subscription-status"] });
-      window.location.assign(url);
-    } catch (e) {
-      toast.error(
-        e instanceof Error
-          ? e.message
-          : "Couldn't open Stripe — try again in a moment.",
-      );
-      setCheckoutBusy(false);
-    }
+  async function refreshBilling() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["subscription-status"] }),
+      queryClient.invalidateQueries({ queryKey: ["billing-config"] }),
+      queryClient.invalidateQueries({ queryKey: ["entitlement"] }),
+    ]);
   }
 
-  if (isLoading) {
+  if (statusLoading || configLoading || !status || !config) {
     return (
       <CardPage maxWidth="sm:max-w-md">
         <div className="flex justify-center py-16">
@@ -74,8 +60,8 @@ export default function Paywall() {
     );
   }
 
-  const open = status && !status.paywall_enabled;
-  const entitled = status?.entitled === true;
+  const open = !status.paywall_enabled;
+  const entitled = status.entitled === true;
 
   return (
     <CardPage
@@ -106,6 +92,14 @@ export default function Paywall() {
               ? "Your subscription unlocks persistent rooms, recap timelines, and every activity that ships."
               : "Persistent Our Rooms, ongoing recaps, and full access to every activity we ship — for the two of you."}
         </p>
+        {!open && (
+          <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground/80">
+            Account tier · {status.account_tier_label}
+            {!entitled && config.payment_provider
+              ? ` · Pay with ${paymentRailLabel(config.payment_provider)}`
+              : ""}
+          </p>
+        )}
       </header>
 
       {!open && !entitled && (
@@ -128,7 +122,7 @@ export default function Paywall() {
         </section>
       )}
 
-      {entitled && status?.subscription && (
+      {entitled && status.subscription && (
         <section className="editorial-card p-5 space-y-2 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Status</span>
@@ -145,20 +139,12 @@ export default function Paywall() {
 
       <div className="space-y-3">
         {!open && !entitled && (
-          <button
-            type="button"
-            onClick={startCheckout}
-            disabled={checkoutBusy}
-            className="btn-primary focus-ring w-full py-4 rounded-[1.15rem] font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {checkoutBusy ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Opening Stripe…
-              </>
-            ) : (
-              "Subscribe"
-            )}
-          </button>
+          <PaymentCheckout
+            config={config}
+            product="together"
+            label="Subscribe with Together"
+            onComplete={refreshBilling}
+          />
         )}
         {(open || entitled) && (
           <button
