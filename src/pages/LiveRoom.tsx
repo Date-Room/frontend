@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AddMoreTimeCheckout } from "@/components/AddMoreTimeCheckout";
@@ -26,8 +26,13 @@ import { RoomVideo } from "@/components/RoomVideo";
 import { ChatWithBoundary } from "@/components/Chat";
 import { WatchTogether } from "@/components/WatchTogether";
 import { VisionBoard } from "@/components/VisionBoard";
-import { FridgeBookshelf } from "@/components/FridgeBookshelf";
-import { PinnedNoteGate } from "@/components/PinnedNoteGate";
+import { FridgeNotes } from "@/components/FridgeNotes";
+import { Bookshelf } from "@/components/Bookshelf";
+import { WelcomeBackGate } from "@/components/WelcomeBackGate";
+import { LiveRoomTabBar } from "@/components/LiveRoomTabBar";
+import { PermanentRoomHome } from "@/components/PermanentRoomHome";
+import type { HomeFeatureId } from "@/components/PermanentRoomFeatureSheet";
+import type { PresenceState } from "@/lib/realtime/roomChannel";
 import { ThisOrThat } from "@/components/ThisOrThat";
 import { DJ } from "@/components/DJ";
 import { QuestionDeck } from "@/components/QuestionDeck";
@@ -86,7 +91,8 @@ function LiveRoomAmbianceBackdrop({ preset }: { preset: AmbiancePresetId }) {
 
 type ActivityTabId =
   | "vision_board"
-  | "fridge"
+  | "fridge_notes"
+  | "bookshelf"
   | "questions"
   | "this_or_that"
   | "the_36"
@@ -105,7 +111,8 @@ type TabDef = {
 
 const WALL_TABS: TabDef[] = [
   { id: "vision_board", label: "Vision Board", icon: "✨", curatableId: "vision_board" },
-  { id: "fridge", label: "Bookshelf", icon: "📚", curatableId: "fridge" },
+  { id: "fridge_notes", label: "Fridge", icon: "🧲", curatableId: null },
+  { id: "bookshelf", label: "Bookshelf", icon: "📚", curatableId: "fridge" },
 ];
 
 const ACTIVITY_TABS: TabDef[] = [
@@ -120,6 +127,38 @@ const ACTIVITY_TABS: TabDef[] = [
 ];
 
 const ALL_TABS: TabDef[] = [...WALL_TABS, ...ACTIVITY_TABS];
+
+function presenceSenderId(p: PresenceState): string {
+  return String(
+    (typeof p.user_id === "string" && p.user_id) ||
+      (typeof p.sender_id === "string" && p.sender_id) ||
+      "",
+  );
+}
+
+function partnerPresenceEntry(presence: PresenceState[], viewerId: string): PresenceState | undefined {
+  return presence.find((p) => {
+    const sid = presenceSenderId(p);
+    return Boolean(sid) && sid !== viewerId;
+  });
+}
+
+function partnerLightLabel(entry: PresenceState | undefined): string {
+  if (!entry) return "Your partner hasn't been in yet";
+  if (entry.is_in_call === true) return "They're in the room now";
+  const last = entry.last_seen;
+  if (typeof last === "string") {
+    const diff = Date.now() - new Date(last).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return "Their light is on now";
+    if (m < 60) return `Their light was on ${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `Their light was on ${h}h ago`;
+    const d = Math.floor(h / 24);
+    return `Their light was on ${d}d ago`;
+  }
+  return "Your partner is nearby";
+}
 
 /* ───────────────── RoomShell ───────────────── */
 
@@ -139,6 +178,7 @@ function RoomShell({
   curatedActivityIds: CuratableActivityId[];
 }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const customization = useRoomCustomization();
   const session = useRoomSession();
@@ -154,6 +194,57 @@ function RoomShell({
 
   const [tab, setTab] = useState<ActivityTabId>("questions");
   const wallRoom = isSubscriptionPackage(roomPackage);
+  const isPermanentRoom = isPersistent || wallRoom;
+
+  const [liveMode, setLiveMode] = useState(() => searchParams.get("live") === "1");
+
+  const partnerStatus = useMemo(
+    () => partnerLightLabel(partnerPresenceEntry(session.presence, session.senderId)),
+    [session.presence, session.senderId],
+  );
+
+  const enterLiveMode = useCallback(
+    (nextTab?: ActivityTabId) => {
+      if (nextTab) setTab(nextTab);
+      setLiveMode(true);
+      void session.channel.track({
+        sender_id: session.senderId,
+        user_id: session.senderId,
+        slot: session.slot,
+        name: session.displayName,
+        display_name: session.displayName,
+        photo_url: session.photoUrl ?? null,
+        is_host: session.isHost,
+        is_ready: true,
+        is_typing: false,
+        is_in_call: true,
+        last_seen: new Date().toISOString(),
+        participant_id: session.participantId ?? null,
+      });
+      void session.channel.broadcast("call_started", {
+        from: session.senderId,
+        at: new Date().toISOString(),
+      });
+    },
+    [session],
+  );
+
+  useEffect(() => {
+    if (!isPermanentRoom || liveMode) return;
+    const partner = partnerPresenceEntry(session.presence, session.senderId);
+    if (partner?.is_in_call === true) setLiveMode(true);
+  }, [isPermanentRoom, liveMode, session.presence, session.senderId]);
+
+  useEffect(() => {
+    if (!isPermanentRoom) return;
+    return session.channel.onBroadcast((e) => {
+      if (e.kind !== "call_started") return;
+      if (e.payload.from === session.senderId) return;
+      setLiveMode(true);
+    });
+  }, [isPermanentRoom, session.channel, session.senderId]);
+
+  const showAtHome = isPermanentRoom && !liveMode;
 
   useEffect(() => {
     if (wallRoom) {
@@ -223,13 +314,22 @@ function RoomShell({
   );
   const visibleTabs = useMemo(
     () => ALL_TABS.filter((t) => {
-      if (t.curatableId === "vision_board" || t.curatableId === "fridge") {
+      if (t.id === "fridge_notes") return wallRoom;
+      if (t.id === "bookshelf" || t.curatableId === "vision_board" || t.curatableId === "fridge") {
         if (!wallRoom) return false;
+        if (t.curatableId === null) return true;
+        return isActivityEnabled(t.curatableId, curated, roomPackage);
       }
       return t.curatableId === null || isActivityEnabled(t.curatableId, curated, roomPackage);
     }),
     [curated, roomPackage, wallRoom],
   );
+
+  const tabBarDividerBefore = useMemo(() => {
+    if (!wallRoom) return null;
+    const wallIds = new Set(WALL_TABS.map((t) => t.id));
+    return visibleTabs.find((t) => !wallIds.has(t.id))?.id ?? null;
+  }, [visibleTabs, wallRoom]);
 
   // If current tab was hidden, fall back
   useEffect(() => {
@@ -243,6 +343,86 @@ function RoomShell({
     background: customization.backgroundCss,
   };
 
+  if (showAtHome) {
+    return (
+      <PageShell
+        orbs={false}
+        vignette={false}
+        className="min-h-0 h-screen flex flex-col overflow-hidden"
+        style={shellStyle}
+      >
+        <LiveRoomAmbianceBackdrop preset={activeAmbiance} />
+        <div className="page-grain" aria-hidden />
+
+        <WelcomeBackGate enabled={wallRoom} />
+
+        <KickedListener
+          onKicked={() => {
+            toast.message("You were removed from this room");
+            void queryClient.invalidateQueries({ queryKey: ["recap", roomId] });
+            void queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
+            navigate("/home");
+          }}
+        />
+
+        <header className="relative z-30 flex shrink-0 items-center justify-between px-4 py-4 sm:px-6">
+          <div className="min-w-0">
+            <h1 className="font-serif text-2xl italic text-cream sm:text-3xl">Our Room</h1>
+          </div>
+          <button
+            onClick={() => setShowLeaveConfirm(true)}
+            className="text-xs uppercase tracking-[0.2em] text-muted-foreground transition hover:text-cream"
+          >
+            Leave
+          </button>
+        </header>
+
+        <PermanentRoomHome
+          partnerStatus={partnerStatus}
+          onCallIn={() => enterLiveMode("vision_board")}
+          extraTabs={visibleTabs
+            .filter(
+              (t) =>
+                !["vision_board", "fridge_notes", "bookshelf", "watch", "dj"].includes(t.id),
+            )
+            .map((t) => ({ id: t.id as HomeFeatureId, label: t.label, icon: t.icon }))}
+        />
+
+        {showLeaveConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in pointer-events-auto">
+            <div className="w-full max-w-sm mx-4 editorial-card p-8 text-center animate-scale-in">
+              <h2 className="font-serif italic text-cream text-xl mb-3">Leave the room?</h2>
+              <p className="text-sm text-muted-foreground mb-6">Your wall and notes stay here for next time.</p>
+              <div className="flex flex-col gap-3">
+                <button
+                  type="button"
+                  className="btn-primary w-full py-3 rounded-full"
+                  onClick={() => navigate("/home")}
+                >
+                  Leave
+                </button>
+                <button
+                  type="button"
+                  className="text-xs uppercase tracking-[0.22em] text-muted-foreground hover:text-cream transition py-2"
+                  onClick={() => setShowLeaveConfirm(false)}
+                >
+                  Stay
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <RoomAmbianceSheet
+          open={ambianceOpen}
+          onOpenChange={setAmbianceOpen}
+          current={activeAmbiance}
+          onPick={(id) => setAmbianceOverride(id)}
+        />
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell
       orbs={false}
@@ -253,7 +433,7 @@ function RoomShell({
       <LiveRoomAmbianceBackdrop preset={activeAmbiance} />
       <div className="page-grain" aria-hidden />
 
-      <PinnedNoteGate enabled={wallRoom} />
+      <WelcomeBackGate enabled={wallRoom} />
 
       <KickedListener
         onKicked={() => {
@@ -374,26 +554,21 @@ function RoomShell({
 
         {/* Tabbed activity panel */}
         <section className="flex-1 lg:basis-2/5 lg:flex-shrink-0 flex flex-col rounded-3xl glass overflow-hidden min-h-0 lg:min-h-[480px]">
-          <div className="sticky top-0 z-20 flex border-b border-border/30 glass-strong overflow-x-auto">
-            {visibleTabs.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                data-active={tab === t.id}
-                className="activity-tab"
-              >
-                <span className="sm:hidden">{t.icon}</span>
-                <span className="hidden sm:inline">{t.label}</span>
-              </button>
-            ))}
-          </div>
+          <LiveRoomTabBar
+            tabs={visibleTabs.map((t) => ({ id: t.id, label: t.label, icon: t.icon }))}
+            activeId={tab}
+            onChange={(id) => setTab(id as ActivityTabId)}
+            dividerBeforeId={tabBarDividerBefore}
+          />
           <div className="flex-1 min-h-0 overflow-auto relative">
             <div className={tab === "vision_board" ? "h-full" : "hidden"}>
               <VisionBoard />
             </div>
-            <div className={tab === "fridge" ? "h-full" : "hidden"}>
-              <FridgeBookshelf />
+            <div className={tab === "fridge_notes" ? "h-full" : "hidden"}>
+              <FridgeNotes active={tab === "fridge_notes"} />
+            </div>
+            <div className={tab === "bookshelf" ? "h-full" : "hidden"}>
+              <Bookshelf />
             </div>
             <div className={tab === "questions" ? "h-full" : "hidden"}>
               <QuestionDeck />

@@ -154,6 +154,7 @@ export class RoomActivitySession {
       event: recapEvent,
     });
     this.serverVersion = row.version;
+    this.emitState({ state: row.state, version: row.version });
   }
 
   sendReaction(kind: string, target: string | null = null): Promise<unknown> {

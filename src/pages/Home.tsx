@@ -11,6 +11,7 @@ import {
   Search,
   Timer,
   UserPlus,
+  Play,
   X,
 } from "lucide-react";
 import { BRAND_NAME } from "@/lib/constants";
@@ -247,6 +248,10 @@ export default function Home() {
   }
 
   function onTileTap(r: Room) {
+    if (r.persistence === "persistent") {
+      enterRoom(r);
+      return;
+    }
     const isHost = me ? r.host_id === me.id : false;
     if (isHost) {
       navigate(`/rooms/${r.id}/pre`);
@@ -594,8 +599,13 @@ function RoomTileRow({
             <p className="mt-0.5 h-3.5" />
           )}
         </div>
-        <div className="flex shrink-0 flex-col items-end">
-          {endsLine ? (
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          {isPersistent ? (
+            <span className="flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-primary ring-1 ring-primary/25">
+              <Play className="h-2.5 w-2.5" fill="currentColor" />
+              Enter room
+            </span>
+          ) : endsLine ? (
             <span className="flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground">
               <Timer className="h-3 w-3" strokeWidth={1.5} />
               {endsLine}
@@ -603,7 +613,7 @@ function RoomTileRow({
           ) : (
             <span className="h-3.5" />
           )}
-          <span className="mt-0.5 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+          <span className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
             {roleWord}
           </span>
         </div>

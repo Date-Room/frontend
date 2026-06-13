@@ -20,6 +20,7 @@ export type UseActivitySession = {
 export function useActivitySession(activityId: string): UseActivitySession {
   const room = useRoomSession();
   const sessionRef = useRef<RoomActivitySession | null>(null);
+  const [session, setSession] = useState<RoomActivitySession | null>(null);
   const [state, setState] = useState<Record<string, unknown> | null>(null);
   const [version, setVersion] = useState(0);
   const [ready, setReady] = useState(false);
@@ -28,6 +29,7 @@ export function useActivitySession(activityId: string): UseActivitySession {
     setReady(false);
     setState(null);
     setVersion(0);
+    setSession(null);
 
     const session = new RoomActivitySession(room.channel, {
       roomId: room.roomId,
@@ -37,6 +39,7 @@ export function useActivitySession(activityId: string): UseActivitySession {
       canPersist: room.canPersist,
     });
     sessionRef.current = session;
+    setSession(session);
 
     const offState = session.onState((s) => {
       setState(s.state);
@@ -56,8 +59,9 @@ export function useActivitySession(activityId: string): UseActivitySession {
       offState();
       session.dispose();
       sessionRef.current = null;
+      setSession(null);
     };
   }, [room.channel, room.roomId, room.senderId, room.participantId, room.canPersist, activityId]);
 
-  return { session: sessionRef.current, state, version, ready };
+  return { session, state, version, ready };
 }

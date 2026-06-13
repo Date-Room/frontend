@@ -3,7 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
-import { parsePinnedNote, shouldShowPinnedNote, type PinnedNoteState } from "@/lib/roomWalls";
+import {
+  greetingFridgeNote,
+  markPartnerNotesSeen,
+  parseFridgeNotes,
+  type FridgeNote,
+} from "@/lib/roomWalls";
 
 type Props = {
   enabled: boolean;
@@ -17,17 +22,19 @@ export function PinnedNoteGate({ enabled }: Props) {
   const room = useRoomSession();
   const { session, state: durable, ready } = useActivitySession("pinned_note");
 
-  const note = useMemo(() => parsePinnedNote(durable), [durable]);
-  const visible = enabled && ready && shouldShowPinnedNote(note, room.senderId);
+  const { notes } = useMemo(() => parseFridgeNotes(durable), [durable]);
+  const note = useMemo(
+    () => (enabled && ready ? greetingFridgeNote(notes, room.senderId) : null),
+    [enabled, ready, notes, room.senderId],
+  );
+  const visible = !!note && !!session;
 
   if (!visible || !note || !session) return null;
 
   async function dismiss() {
-    const next: PinnedNoteState = {
-      ...note!,
-      seen_by: [...new Set([...note!.seen_by, room.senderId])],
-    };
-    await session!.persist(next as unknown as Record<string, unknown>);
+    await session!.persist({
+      notes: markPartnerNotesSeen(notes, room.senderId),
+    } as unknown as Record<string, unknown>);
   }
 
   return (
@@ -69,7 +76,7 @@ export function PinnedNoteGate({ enabled }: Props) {
 export function PinNotePanel() {
   const room = useRoomSession();
   const { session, state: durable } = useActivitySession("pinned_note");
-  const note = useMemo(() => parsePinnedNote(durable), [durable]);
+  const { notes } = useMemo(() => parseFridgeNotes(durable), [durable]);
   const [text, setText] = useState("");
   const [emergency, setEmergency] = useState(true);
 
@@ -79,7 +86,8 @@ export function PinNotePanel() {
     e.preventDefault();
     const body = text.trim();
     if (!body) return;
-    const next = {
+    const newNote: FridgeNote = {
+      id: crypto.randomUUID(),
       text: body,
       pinned_by: room.senderId,
       pinned_by_name: room.displayName,
@@ -87,7 +95,7 @@ export function PinNotePanel() {
       emergency,
       seen_by: [room.senderId],
     };
-    await session!.persist(next as unknown as Record<string, unknown>, {
+    await session!.persist({ notes: [...notes, newNote] } as unknown as Record<string, unknown>, {
       event_type: "note_pinned",
       payload: { emergency },
     });
@@ -99,9 +107,9 @@ export function PinNotePanel() {
       <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
         Pin a note for them
       </p>
-      {note?.text && (
+      {notes.length > 0 && (
         <p className="text-xs text-muted-foreground/80">
-          Current note pinned by {note.pinned_by_name}. Pinning again replaces it.
+          {notes.length} note{notes.length === 1 ? "" : "s"} on the fridge — new ones are added, not replaced.
         </p>
       )}
       <Textarea

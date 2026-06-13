@@ -565,5 +565,522 @@
       radial-gradient(circle at 16% 88%, hsl(280 52% 44% / 0.38) 0%, transparent 48%),
       linear-gradient(185deg, hsl(292 42% 15% / 0.74), hsl(330 52% 10% / 0.7));
   }
+
+  /* Persistent-room wall tabs — Vision Board / Fridge / Bookshelf */
+  .wall-tab {
+    @apply shrink-0 px-4 py-3 text-sm text-muted-foreground transition-colors border-b-2 border-transparent;
+  }
+  .wall-tab[data-active="true"] {
+    @apply text-amber border-amber;
+  }
+  .wall-tab-bar {
+    @apply flex border-b border-white/[0.08] overflow-x-auto;
+  }
+
+  /* Live room activity tab bar — scrollable pills with overflow hints */
+  .live-room-tab-bar {
+    @apply relative shrink-0 border-b border-white/[0.08] bg-[#1a1410]/75 backdrop-blur-md;
+  }
+
+  .live-room-tab-scroll {
+    @apply overflow-x-auto overscroll-x-contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    scroll-behavior: smooth;
+  }
+
+  .live-room-tab-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .live-room-tab-track {
+    @apply flex min-w-max items-center gap-1.5 px-3 py-2.5 sm:gap-2 sm:px-4 sm:py-3;
+  }
+
+  .live-room-tab-item {
+    @apply inline-flex shrink-0 items-center gap-1.5;
+  }
+
+  .live-room-tab-divider {
+    @apply mx-1 h-5 w-px shrink-0 bg-white/[0.12] sm:mx-2;
+  }
+
+  .live-room-tab {
+    @apply inline-flex shrink-0 items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1.5 text-[11px] font-medium transition sm:px-3.5 sm:py-2 sm:text-xs;
+    scroll-snap-align: center;
+  }
+
+  .live-room-tab[data-active="true"] {
+    @apply border-amber/35 bg-amber/15 text-amber shadow-[0_0_20px_rgba(232,157,77,0.12)];
+  }
+
+  .live-room-tab[data-active="false"] {
+    @apply text-muted-foreground hover:border-white/10 hover:bg-white/[0.04] hover:text-cream;
+  }
+
+  .live-room-tab-icon {
+    @apply text-sm leading-none sm:text-base;
+  }
+
+  .live-room-tab-label {
+    @apply max-w-[7.5rem] truncate sm:max-w-none;
+  }
+
+  .live-room-tab-fade {
+    @apply pointer-events-none absolute top-0 z-[1] h-full w-8 opacity-0 transition-opacity duration-200 sm:w-10;
+  }
+
+  .live-room-tab-fade.is-visible {
+    @apply opacity-100;
+  }
+
+  .live-room-tab-fade-left {
+    left: 0;
+    background: linear-gradient(to right, rgba(26, 20, 16, 0.95) 20%, transparent);
+  }
+
+  .live-room-tab-fade-right {
+    right: 0;
+    background: linear-gradient(to left, rgba(26, 20, 16, 0.95) 20%, transparent);
+  }
+
+  .live-room-tab-chevron {
+    @apply absolute top-1/2 z-[2] flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-white/10 bg-[#1a1410]/90 text-cream/80 shadow-md backdrop-blur-sm transition hover:border-amber/30 hover:text-amber;
+  }
+
+  .live-room-tab-chevron-left {
+    left: 0.25rem;
+  }
+
+  .live-room-tab-chevron-right {
+    right: 0.25rem;
+  }
+
+  .live-room-tab-more-hint {
+    @apply pointer-events-none absolute bottom-1 right-3 z-[2] text-[9px] uppercase tracking-[0.18em] text-amber/70;
+  }
+  .wall-surface {
+    @apply flex flex-col h-full min-h-0 bg-[#1a1410]/60;
+  }
+  .wall-empty-copy {
+    @apply text-sm leading-relaxed text-muted-foreground/90 max-w-md mx-auto;
+  }
+  .wall-cta {
+    @apply rounded-full bg-amber px-8 py-2.5 text-sm font-semibold text-[#1a120c] transition hover:opacity-90;
+  }
+  .wall-kind-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition;
+  }
+  .wall-kind-chip[data-active="true"] {
+    @apply border-amber/50 bg-amber/15 text-cream;
+  }
+  .wall-kind-chip[data-active="false"] {
+    @apply border-white/10 text-muted-foreground hover:text-cream;
+  }
+
+  /* Couples bookshelf — wooden cabinet with spines & cases */
+  .bookshelf-cabinet {
+    @apply relative mx-auto w-full max-w-lg rounded-2xl p-4 sm:p-5;
+    background:
+      linear-gradient(165deg, rgba(62, 42, 28, 0.95) 0%, rgba(38, 26, 18, 0.98) 45%, rgba(28, 18, 12, 1) 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 220, 180, 0.12),
+      inset 0 -2px 8px rgba(0, 0, 0, 0.45),
+      0 24px 48px rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(120, 80, 50, 0.35);
+  }
+
+  .bookshelf-cabinet::before {
+    content: "";
+    @apply pointer-events-none absolute inset-0 rounded-2xl opacity-30;
+    background: repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 3px,
+      rgba(0, 0, 0, 0.04) 3px,
+      rgba(0, 0, 0, 0.04) 4px
+    );
+  }
+
+  .bookshelf-lamp-glow {
+    @apply pointer-events-none absolute -top-2 right-6 h-24 w-24 rounded-full opacity-40 blur-2xl;
+    background: radial-gradient(circle, rgba(232, 157, 77, 0.45), transparent 70%);
+  }
+
+  .bookshelf-row {
+    @apply relative mb-1 last:mb-0;
+  }
+
+  .bookshelf-plank {
+    @apply relative h-2.5 w-full rounded-sm;
+    background: linear-gradient(180deg, #8b6344 0%, #5c3d28 55%, #3d2818 100%);
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 220, 180, 0.25);
+  }
+
+  .bookshelf-cavity {
+    @apply relative flex min-h-[108px] items-end gap-1.5 overflow-x-auto px-2 pb-1 pt-6;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.15) 100%);
+    box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.45);
+  }
+
+  .book-spine {
+    @apply relative flex shrink-0 cursor-pointer flex-col justify-between rounded-sm px-1 py-2 transition-all duration-200;
+    width: 2.25rem;
+    min-height: 5.5rem;
+    max-height: 6.5rem;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    box-shadow:
+      2px 0 4px rgba(0, 0, 0, 0.35),
+      inset -1px 0 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .book-spine:hover {
+    transform: translateY(-4px) rotate(-1deg);
+    box-shadow:
+      2px 4px 12px rgba(0, 0, 0, 0.5),
+      inset -1px 0 0 rgba(255, 255, 255, 0.12);
+  }
+
+  .book-spine[data-selected="true"] {
+    transform: translateY(-6px) scale(1.04);
+    outline: 2px solid rgba(232, 157, 77, 0.65);
+    outline-offset: 2px;
+  }
+
+  .book-spine-title {
+    @apply text-[9px] font-semibold leading-tight tracking-wide text-cream/95;
+    max-height: 4.5rem;
+    overflow: hidden;
+  }
+
+  .shelf-link-tab {
+    @apply relative flex shrink-0 cursor-pointer flex-col items-center justify-end rounded-t-md border border-b-0 px-1 pb-1 pt-3 transition-all;
+    width: 1.75rem;
+    min-height: 4.5rem;
+    background: linear-gradient(180deg, rgba(232, 157, 77, 0.35), rgba(180, 120, 60, 0.2));
+    border-color: rgba(232, 157, 77, 0.45);
+    clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
+  }
+
+  .shelf-link-tab:hover {
+    transform: translateY(-3px);
+  }
+
+  .shelf-watch-case {
+    @apply relative flex shrink-0 cursor-pointer flex-col justify-end overflow-hidden rounded-md border transition-all;
+    width: 3.5rem;
+    height: 4.75rem;
+    border-color: rgba(255, 255, 255, 0.12);
+    background: linear-gradient(145deg, #1a1410, #0d0a08);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.45);
+  }
+
+  .shelf-watch-case:hover {
+    transform: translateY(-3px) rotate(-1deg);
+  }
+
+  .shelf-watch-poster {
+    @apply flex-1 w-full;
+    background: linear-gradient(145deg, rgba(49, 46, 129, 0.8), rgba(136, 52, 82, 0.5));
+  }
+
+  .shelf-partner-dot {
+    @apply absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber shadow-[0_0_6px_rgba(232,157,77,0.8)];
+  }
+
+  .bookshelf-detail {
+    @apply rounded-2xl border border-white/10 bg-[#14100d]/95 p-4 backdrop-blur-sm;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Couples fridge — warm kitchen door with post-it stickers */
+  .fridge-appliance {
+    @apply mx-auto w-full max-w-lg;
+  }
+
+  .fridge-body {
+    @apply rounded-2xl p-2;
+    background: linear-gradient(180deg, #3d3832 0%, #2a2622 100%);
+    box-shadow:
+      0 24px 48px rgba(0, 0, 0, 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .fridge-door {
+    @apply relative overflow-hidden rounded-xl;
+    background: linear-gradient(165deg, #faf8f4 0%, #ebe8e2 55%, #ddd8d0 100%);
+    border: 2px solid #c8c2b8;
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.85),
+      inset 0 -3px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  .fridge-door-top {
+    @apply flex items-center justify-between px-4 pb-1 pt-3;
+  }
+
+  .fridge-brand {
+    @apply text-[10px] font-semibold uppercase tracking-[0.28em];
+    color: rgba(42, 38, 32, 0.45);
+  }
+
+  .fridge-door-hint {
+    @apply text-[10px];
+    color: rgba(42, 38, 32, 0.35);
+  }
+
+  .fridge-handle {
+    @apply pointer-events-none absolute right-3 top-1/2 z-10 h-[42%] min-h-[7rem] w-3 -translate-y-1/2 rounded-full;
+    background: linear-gradient(90deg, #8a8580, #eceae6 42%, #9a9590);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .fridge-surface {
+    @apply relative mx-3 mb-3 mt-1 min-h-[300px] rounded-lg p-5 sm:min-h-[340px] sm:p-6;
+    background:
+      radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.5), transparent 45%),
+      linear-gradient(180deg, #f5f2ec 0%, #ebe6de 100%);
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  .fridge-surface-empty {
+    @apply flex items-center justify-center;
+  }
+
+  .fridge-notes-grid {
+    @apply flex flex-wrap content-start justify-center gap-5 sm:gap-6;
+  }
+
+  .fridge-empty-embedded {
+    @apply flex flex-col items-center justify-center px-4 py-6 text-center;
+  }
+
+  .fridge-empty-filter {
+    @apply py-12 text-center text-sm;
+    color: rgba(42, 38, 32, 0.45);
+  }
+
+  /* Draft composer — same paper as stuck notes */
+  .fridge-draft-wrap {
+    @apply flex justify-center py-1;
+  }
+
+  .fridge-draft-paper {
+    @apply w-full max-w-[10.5rem] px-3 pb-3 pt-7 sm:max-w-[11.5rem];
+    min-height: 10.5rem;
+  }
+
+  .fridge-draft-input {
+    @apply min-h-[7.5rem] w-full resize-none border-0 bg-transparent px-0 pb-0 pt-1 font-serif text-[13px] leading-snug focus-visible:ring-0 focus-visible:ring-offset-0;
+    color: #2a2018;
+  }
+
+  .fridge-draft-input::placeholder {
+    color: rgba(42, 32, 24, 0.38);
+  }
+
+  /* Sticky note paper — shared by draft, stuck notes, detail */
+  .fridge-sticky-paper {
+    @apply relative flex h-full w-full flex-col overflow-hidden rounded-sm;
+    box-shadow:
+      1px 2px 0 rgba(0, 0, 0, 0.07),
+      2px 5px 14px rgba(0, 0, 0, 0.14),
+      0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  }
+
+  .fridge-sticky-wrap {
+    @apply shrink-0 cursor-pointer border-0 bg-transparent p-0 transition duration-200;
+    width: 8.75rem;
+    height: 9.25rem;
+  }
+
+  .fridge-sticky-wrap:hover {
+    transform: translateY(-4px) rotate(var(--note-rot, 0deg)) scale(1.03);
+  }
+
+  .fridge-sticky-wrap-selected {
+    transform: translateY(-5px) rotate(var(--note-rot, 0deg)) scale(1.05);
+  }
+
+  .fridge-sticky-wrap-unread .fridge-sticky-paper {
+    box-shadow:
+      0 0 0 2px rgba(232, 157, 77, 0.55),
+      2px 5px 14px rgba(0, 0, 0, 0.14);
+  }
+
+  .fridge-sticky-wrap .fridge-sticky-paper {
+    @apply h-full w-full px-3 pb-2 pt-6;
+  }
+
+  .fridge-sticky-magnet {
+    @apply absolute left-1/2 top-1 z-10 h-3.5 w-3.5 -translate-x-1/2 rounded-full;
+    background: radial-gradient(circle at 35% 28%, #f0a050, #c2410c 72%);
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  }
+
+  .fridge-sticky-fold {
+    @apply pointer-events-none absolute bottom-0 right-0 h-4 w-4;
+    background: linear-gradient(135deg, transparent 45%, rgba(0, 0, 0, 0.07) 45%, rgba(0, 0, 0, 0.12) 100%);
+  }
+
+  .fridge-sticky-new {
+    @apply absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber;
+    box-shadow: 0 0 8px rgba(232, 157, 77, 0.9);
+  }
+
+  .fridge-sticky-text {
+    @apply line-clamp-6 flex-1 overflow-hidden font-serif text-[12px] leading-snug whitespace-pre-wrap break-words;
+    color: #2a2018;
+  }
+
+  .fridge-sticky-meta {
+    @apply mt-auto flex items-center justify-between pt-1 text-[8px] font-semibold uppercase tracking-wider;
+    color: rgba(42, 32, 24, 0.4);
+  }
+
+  .fridge-note-detail {
+    @apply rounded-2xl border border-white/10 bg-[#14100d]/90 p-5 backdrop-blur-sm;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  }
+
+  .fridge-detail-paper {
+    @apply relative px-5 pb-4 pt-8;
+    min-height: 11rem;
+    box-shadow:
+      1px 2px 0 rgba(0, 0, 0, 0.07),
+      4px 10px 24px rgba(0, 0, 0, 0.2);
+  }
+
+  .fridge-detail-text {
+    @apply font-serif text-base leading-relaxed whitespace-pre-wrap;
+    color: #2a2018;
+  }
+
+  .fridge-detail-meta {
+    @apply mt-4 text-[9px] uppercase tracking-wider;
+    color: rgba(42, 32, 24, 0.42);
+  }
+
+  /* Permanent room home — at-home surface before live call */
+  .perm-status-bar {
+    @apply flex items-center justify-between gap-3 rounded-2xl border border-white/[0.1] px-4 py-3;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(16px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .perm-call-btn {
+    @apply inline-flex items-center gap-2 rounded-full bg-amber px-4 py-2.5 text-sm font-semibold text-[#1a120c] shadow-[0_8px_28px_rgba(232,157,77,0.4)] transition hover:scale-[1.02];
+  }
+
+  .perm-wall-frame {
+    @apply overflow-hidden rounded-[1.25rem] border border-white/[0.12];
+    background: rgba(18, 14, 12, 0.55);
+    backdrop-filter: blur(20px);
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .perm-wall-header {
+    @apply flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3 sm:px-5;
+  }
+
+  .perm-wall-kicker {
+    @apply text-[10px] uppercase tracking-[0.24em] text-cream/45;
+  }
+
+  .perm-wall-title {
+    @apply mt-0.5 font-serif text-lg italic text-cream sm:text-xl;
+  }
+
+  .perm-wall-open {
+    @apply inline-flex items-center gap-0.5 text-[10px] uppercase tracking-wider text-amber/70;
+  }
+
+  .perm-wall-canvas {
+    @apply relative min-h-[260px] p-4 sm:min-h-[300px] sm:p-5;
+    background:
+      radial-gradient(circle at 20% 25%, rgba(212, 130, 106, 0.1), transparent 50%),
+      radial-gradient(circle at 80% 75%, rgba(120, 80, 200, 0.08), transparent 45%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
+  }
+
+  .perm-widget {
+    @apply rounded-2xl border border-white/[0.12] p-3;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(18px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .perm-more-panel {
+    @apply rounded-2xl border border-white/[0.08] p-4;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(12px);
+  }
+
+  .perm-more-label {
+    @apply mb-3 text-[10px] uppercase tracking-[0.22em] text-cream/40;
+  }
+
+  .perm-more-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-cream/80 transition hover:border-amber/30 hover:text-cream;
+  }
+
+  .perm-feature-overlay {
+    @apply fixed inset-0 z-[70] flex flex-col justify-end sm:items-center sm:justify-center sm:p-6;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(8px);
+  }
+
+  .perm-feature-sheet {
+    @apply flex max-h-[94vh] w-full flex-col overflow-hidden rounded-t-[1.5rem] border border-white/[0.1] sm:max-h-[88vh] sm:max-w-3xl sm:rounded-[1.5rem];
+    background: rgba(20, 16, 13, 0.94);
+    backdrop-filter: blur(24px);
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.55);
+  }
+
+  .perm-feature-header {
+    @apply flex shrink-0 items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3;
+  }
+
+  .perm-feature-body {
+    @apply min-h-0 flex-1 overflow-hidden;
+  }
+
+  .perm-fridge-note {
+    @apply relative mx-auto w-full max-w-[8.5rem] rounded-sm px-2.5 pb-2 pt-5;
+    background: linear-gradient(168deg, #fffef5 0%, #fef08a 48%, #fde047 100%);
+    box-shadow: 1px 2px 0 rgba(0, 0, 0, 0.06), 2px 4px 10px rgba(0, 0, 0, 0.12);
+  }
+
+  .perm-fridge-magnet {
+    @apply absolute left-1/2 top-0 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full;
+    background: radial-gradient(circle at 35% 28%, #f0a050, #c2410c 72%);
+  }
+
+  .perm-book-spine {
+    @apply w-3 rounded-sm;
+    background: linear-gradient(180deg, #c46a3a, #7a3b1f);
+    box-shadow: 1px 0 3px rgba(0, 0, 0, 0.25);
+  }
+
+  .perm-book-spine-alt {
+    background: linear-gradient(180deg, #4a6a8a, #2a4058);
+  }
+
+  .perm-watch-chip {
+    @apply flex h-12 w-20 items-center justify-center rounded-lg border border-white/10 bg-black/30;
+  }
+
+  .perm-dj-disc {
+    @apply mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-black/35;
+  }
 }
 
