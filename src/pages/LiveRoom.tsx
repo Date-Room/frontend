@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AddMoreTimeCheckout } from "@/components/AddMoreTimeCheckout";
@@ -10,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { isTryPackage, getRoomExperience, isActivityEnabled, getRoomPlan, saveRoomPlanFromServer, isSubscriptionPackage, type CuratableActivityId } from "@/lib/roomExperience";
 import { getRoomExperienceApi, listMyRooms, type Room, type RoomPackage } from "@/lib/rooms";
-import { LogOut, Clock, Maximize2, Minimize2, Sparkles } from "lucide-react";
+import { LogOut, Clock, Maximize2, Minimize2, Sparkles, ChevronLeft, Home } from "lucide-react";
 import { AmbientSceneStack } from "@/components/AmbientSceneStack";
 import type { AmbiancePresetId } from "@/lib/ambiance";
 import { ambianceMeta } from "@/lib/ambiance";
@@ -33,6 +34,11 @@ import { LiveRoomTabBar } from "@/components/LiveRoomTabBar";
 import { PermanentRoomHome } from "@/components/PermanentRoomHome";
 import type { HomeFeatureId } from "@/components/PermanentRoomFeatureSheet";
 import type { PresenceState } from "@/lib/realtime/roomChannel";
+import {
+  partnerDisplayName,
+  partnerLightLabel,
+  partnerPresenceEntry,
+} from "@/lib/partnerPresence";
 import { ThisOrThat } from "@/components/ThisOrThat";
 import { DJ } from "@/components/DJ";
 import { QuestionDeck } from "@/components/QuestionDeck";
@@ -128,38 +134,6 @@ const ACTIVITY_TABS: TabDef[] = [
 
 const ALL_TABS: TabDef[] = [...WALL_TABS, ...ACTIVITY_TABS];
 
-function presenceSenderId(p: PresenceState): string {
-  return String(
-    (typeof p.user_id === "string" && p.user_id) ||
-      (typeof p.sender_id === "string" && p.sender_id) ||
-      "",
-  );
-}
-
-function partnerPresenceEntry(presence: PresenceState[], viewerId: string): PresenceState | undefined {
-  return presence.find((p) => {
-    const sid = presenceSenderId(p);
-    return Boolean(sid) && sid !== viewerId;
-  });
-}
-
-function partnerLightLabel(entry: PresenceState | undefined): string {
-  if (!entry) return "Your partner hasn't been in yet";
-  if (entry.is_in_call === true) return "They're in the room now";
-  const last = entry.last_seen;
-  if (typeof last === "string") {
-    const diff = Date.now() - new Date(last).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 1) return "Their light is on now";
-    if (m < 60) return `Their light was on ${m}m ago`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `Their light was on ${h}h ago`;
-    const d = Math.floor(h / 24);
-    return `Their light was on ${d}d ago`;
-  }
-  return "Your partner is nearby";
-}
-
 /* ───────────────── RoomShell ───────────────── */
 
 function RoomShell({
@@ -178,7 +152,8 @@ function RoomShell({
   curatedActivityIds: CuratableActivityId[];
 }) {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { t, i18n } = useTranslation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const customization = useRoomCustomization();
   const session = useRoomSession();
@@ -197,16 +172,23 @@ function RoomShell({
   const isPermanentRoom = isPersistent || wallRoom;
 
   const [liveMode, setLiveMode] = useState(() => searchParams.get("live") === "1");
+  const userPrefersAtHomeRef = useRef(false);
 
   const partnerStatus = useMemo(
     () => partnerLightLabel(partnerPresenceEntry(session.presence, session.senderId)),
-    [session.presence, session.senderId],
+    [session.presence, session.senderId, i18n.language],
   );
 
   const enterLiveMode = useCallback(
     (nextTab?: ActivityTabId) => {
+      userPrefersAtHomeRef.current = false;
       if (nextTab) setTab(nextTab);
       setLiveMode(true);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("live", "1");
+        return next;
+      }, { replace: true });
       void session.channel.track({
         sender_id: session.senderId,
         user_id: session.senderId,
@@ -226,11 +208,35 @@ function RoomShell({
         at: new Date().toISOString(),
       });
     },
-    [session],
+    [session, setSearchParams],
   );
 
+  const exitLiveMode = useCallback(() => {
+    userPrefersAtHomeRef.current = true;
+    setLiveMode(false);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("live");
+      return next;
+    }, { replace: true });
+    void session.channel.track({
+      sender_id: session.senderId,
+      user_id: session.senderId,
+      slot: session.slot,
+      name: session.displayName,
+      display_name: session.displayName,
+      photo_url: session.photoUrl ?? null,
+      is_host: session.isHost,
+      is_ready: true,
+      is_typing: false,
+      is_in_call: false,
+      last_seen: new Date().toISOString(),
+      participant_id: session.participantId ?? null,
+    });
+  }, [session, setSearchParams]);
+
   useEffect(() => {
-    if (!isPermanentRoom || liveMode) return;
+    if (!isPermanentRoom || liveMode || userPrefersAtHomeRef.current) return;
     const partner = partnerPresenceEntry(session.presence, session.senderId);
     if (partner?.is_in_call === true) setLiveMode(true);
   }, [isPermanentRoom, liveMode, session.presence, session.senderId]);
@@ -240,11 +246,53 @@ function RoomShell({
     return session.channel.onBroadcast((e) => {
       if (e.kind !== "call_started") return;
       if (e.payload.from === session.senderId) return;
+      if (userPrefersAtHomeRef.current) return;
       setLiveMode(true);
     });
   }, [isPermanentRoom, session.channel, session.senderId]);
 
   const showAtHome = isPermanentRoom && !liveMode;
+
+  const partnerJoinBaselineRef = useRef<{ hadPartner: boolean; partnerInCall: boolean } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!showAtHome) {
+      partnerJoinBaselineRef.current = null;
+      return;
+    }
+
+    const partner = partnerPresenceEntry(session.presence, session.senderId);
+    const hadPartner = Boolean(partner);
+    const partnerInCall = partner?.is_in_call === true;
+
+    if (partnerJoinBaselineRef.current === null) {
+      partnerJoinBaselineRef.current = { hadPartner, partnerInCall };
+      return;
+    }
+
+    const prev = partnerJoinBaselineRef.current;
+    const name = partnerDisplayName(partner);
+
+    if (!prev.hadPartner && hadPartner) {
+      toast(t("room.partnerJoinedRoom", { name }), {
+        description: t("room.partnerJoinedRoomDesc"),
+        duration: 5000,
+        position: "top-center",
+        className: "perm-partner-join-toast",
+      });
+    } else if (prev.hadPartner && hadPartner && !prev.partnerInCall && partnerInCall) {
+      toast(t("room.partnerJoinedCall", { name }), {
+        description: t("room.partnerJoinedCallDesc"),
+        duration: 5000,
+        position: "top-center",
+        className: "perm-partner-join-toast",
+      });
+    }
+
+    partnerJoinBaselineRef.current = { hadPartner, partnerInCall };
+  }, [showAtHome, session.presence, session.senderId, t]);
 
   useEffect(() => {
     if (wallRoom) {
@@ -358,7 +406,7 @@ function RoomShell({
 
         <KickedListener
           onKicked={() => {
-            toast.message("You were removed from this room");
+            toast.message(t("errors.removedFromRoom"));
             void queryClient.invalidateQueries({ queryKey: ["recap", roomId] });
             void queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
             navigate("/home");
@@ -367,13 +415,13 @@ function RoomShell({
 
         <header className="relative z-30 flex shrink-0 items-center justify-between px-4 py-4 sm:px-6">
           <div className="min-w-0">
-            <h1 className="font-serif text-2xl italic text-cream sm:text-3xl">Our Room</h1>
+            <h1 className="font-serif text-2xl italic text-cream sm:text-3xl">{t("common.ourRoom")}</h1>
           </div>
           <button
             onClick={() => setShowLeaveConfirm(true)}
             className="text-xs uppercase tracking-[0.2em] text-muted-foreground transition hover:text-cream"
           >
-            Leave
+            {t("common.leave")}
           </button>
         </header>
 
@@ -391,22 +439,22 @@ function RoomShell({
         {showLeaveConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in pointer-events-auto">
             <div className="w-full max-w-sm mx-4 editorial-card p-8 text-center animate-scale-in">
-              <h2 className="font-serif italic text-cream text-xl mb-3">Leave the room?</h2>
-              <p className="text-sm text-muted-foreground mb-6">Your wall and notes stay here for next time.</p>
+              <h2 className="font-serif italic text-cream text-xl mb-3">{t("room.leaveConfirmTitle")}</h2>
+              <p className="text-sm text-muted-foreground mb-6">{t("room.leaveConfirmBody")}</p>
               <div className="flex flex-col gap-3">
                 <button
                   type="button"
                   className="btn-primary w-full py-3 rounded-full"
                   onClick={() => navigate("/home")}
                 >
-                  Leave
+                  {t("common.leave")}
                 </button>
                 <button
                   type="button"
                   className="text-xs uppercase tracking-[0.22em] text-muted-foreground hover:text-cream transition py-2"
                   onClick={() => setShowLeaveConfirm(false)}
                 >
-                  Stay
+                  {t("room.stay")}
                 </button>
               </div>
             </div>
@@ -447,6 +495,18 @@ function RoomShell({
       {/* ── Header — metadata strip ── */}
       <header className="flex items-center justify-between px-4 sm:px-6 py-3 glass-subtle z-30 shrink-0">
         <div className="flex items-center gap-3 min-w-0">
+          {isPermanentRoom && (
+            <button
+              type="button"
+              onClick={exitLiveMode}
+              className="flex shrink-0 items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground transition hover:border-amber/30 hover:bg-white/[0.08] hover:text-cream"
+              aria-label={t("room.backToHome")}
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              <Home className="h-3.5 w-3.5 text-amber" />
+              <span className="hidden sm:inline">{t("room.backToHome")}</span>
+            </button>
+          )}
           <span className="w-1.5 h-1.5 rounded-full bg-rosegold animate-pulse-glow shrink-0" />
           <div className="min-w-0">
             <h1 className="font-serif italic text-cream text-lg sm:text-xl tracking-wide truncate">

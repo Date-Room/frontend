@@ -47,6 +47,8 @@ import {
 } from "@/components/ui/command";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { COUNTRIES, countryByCode, flagFor, type Country } from "@/lib/countries";
 
 const MAX_PHOTO_BYTES = 750 * 1024;
@@ -75,6 +77,7 @@ const MAX_PHOTO_BYTES = 750 * 1024;
  */
 export default function Settings() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const photoInputRef = useRef<HTMLInputElement>(null);
 
   const [me, setMe] = useState<UserMe | null>(null);
@@ -200,7 +203,7 @@ export default function Settings() {
   const country = countryByCode(countryCode);
 
   return (
-    <CardPage title="Profile" onBack={() => navigate("/home")} maxWidth="sm:max-w-xl md:max-w-2xl">
+    <CardPage title={t("settings.title")} onBack={() => navigate("/home")} maxWidth="sm:max-w-xl md:max-w-2xl">
       <input
         ref={photoInputRef}
         type="file"
@@ -217,7 +220,7 @@ export default function Settings() {
           block. Hidden on mobile (single-column already reads cleanly
           without one). */}
       <p className="hidden md:block px-1 pb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-        Account
+        {t("settings.account")}
       </p>
 
       {/* ─── Avatar + email ─── */}
@@ -239,7 +242,7 @@ export default function Settings() {
             type="button"
             onClick={() => photoInputRef.current?.click()}
             disabled={uploading}
-            aria-label="Change profile photo"
+            aria-label={t("settings.changePhoto")}
             className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition hover:scale-105 disabled:opacity-50"
           >
             {uploading ? (
@@ -250,25 +253,30 @@ export default function Settings() {
           </button>
         </div>
         <p className="mt-2 truncate text-sm font-medium text-cream">
-          {displayName || "Set a name"}
+          {displayName || t("settings.setAName")}
         </p>
         <p className="truncate text-xs text-muted-foreground">{me?.email}</p>
+      </div>
+
+      {/* ─── Language ─── */}
+      <div className="mt-8">
+        <LanguageSwitcher />
       </div>
 
       {/* ─── Settings group: Name + Country ─── */}
       <div className="mt-8 space-y-2">
         <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Details
+          {t("settings.details")}
         </p>
         <div className="overflow-hidden rounded-2xl border border-border bg-card/40">
           {/* Name row */}
           <div className="flex items-center px-4 py-3">
-            <span className="w-20 shrink-0 text-sm text-muted-foreground">Name</span>
+            <span className="w-20 shrink-0 text-sm text-muted-foreground">{t("settings.name")}</span>
             <input
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               maxLength={40}
-              placeholder="How they see you"
+              placeholder={t("settings.namePlaceholder")}
               className="flex-1 bg-transparent text-[15px] text-cream placeholder:text-muted-foreground/60 focus:outline-none"
             />
           </div>
@@ -279,14 +287,14 @@ export default function Settings() {
             onClick={() => setCountryOpen(true)}
             className="flex w-full items-center px-4 py-3.5 text-left transition hover:bg-white/[0.025]"
           >
-            <span className="w-20 shrink-0 text-sm text-muted-foreground">Country</span>
+            <span className="w-20 shrink-0 text-sm text-muted-foreground">{t("settings.country")}</span>
             {country && (
               <span className="mr-2 text-lg" aria-hidden>
                 {flagFor(country.code)}
               </span>
             )}
             <span className={cn("flex-1 text-[15px]", country ? "text-cream" : "text-muted-foreground")}>
-              {country?.name ?? "Tap to pick"}
+              {country?.name ?? t("settings.tapToPick")}
             </span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>

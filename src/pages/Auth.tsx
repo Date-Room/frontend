@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, Loader2, ChevronLeft, Mail, MailCheck } from "lucide-react";
-import { BRAND_NAME } from "@/lib/constants";
 import {
   authClient,
   authConfigured,
@@ -11,6 +11,7 @@ import {
 import { clearPendingReferral, getPendingReferral } from "@/lib/pendingReferral";
 import { toast } from "sonner";
 import { PageShell } from "@/components/PageShell";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { AppleIcon, GoogleIcon } from "@/components/icons/AuthProviderIcons";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +35,7 @@ function intendedRedirect(params: URLSearchParams): string {
  * on a phone instead of this browser) fall back to the code path here.
  */
 export default function Auth() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
@@ -56,11 +58,11 @@ export default function Auth() {
 
   function ensureServerAuth(): boolean {
     if (!authConfigured()) {
-      toast.error("Sign-in isn't configured yet (missing API URL).");
+      toast.error(t("auth.notConfigured"));
       return false;
     }
     if (authConfig && !authConfig.jwt_configured) {
-      toast.error("Sign-in isn't configured on the server yet.");
+      toast.error(t("auth.serverNotConfigured"));
       return false;
     }
     return true;
@@ -69,7 +71,7 @@ export default function Auth() {
   function handleGoogle() {
     if (!ensureServerAuth()) return;
     if (authConfig && !authConfig.google_enabled) {
-      toast.error("Google sign-in isn't configured on the server yet.");
+      toast.error(t("auth.googleNotConfigured"));
       return;
     }
     stashRedirect();
@@ -79,7 +81,7 @@ export default function Auth() {
   function handleApple() {
     if (!ensureServerAuth()) return;
     if (authConfig && !authConfig.apple_enabled) {
-      toast.error("Apple sign-in isn't configured on the server yet.");
+      toast.error(t("auth.appleNotConfigured"));
       return;
     }
     stashRedirect();
@@ -96,7 +98,7 @@ export default function Auth() {
       await authClient.requestOtp(email.trim(), getPendingReferral());
       setStep("code");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not send the code.");
+      toast.error(err instanceof Error ? err.message : t("auth.couldNotSendCode"));
     } finally {
       setLoading(false);
     }
@@ -122,7 +124,7 @@ export default function Auth() {
       }
       navigate(dest, { replace: true });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Code is incorrect.");
+      toast.error(err instanceof Error ? err.message : t("auth.invalidCode"));
     } finally {
       setLoading(false);
     }
@@ -161,18 +163,17 @@ export default function Auth() {
               <div className="text-center space-y-1.5">
                 <MailCheck className="mx-auto h-10 w-10 text-rosegold" aria-hidden />
                 <h1 className="font-serif text-3xl italic leading-tight tracking-tight text-cream">
-                  Check your email
+                  {t("auth.checkEmail")}
                 </h1>
                 <p className="mx-auto max-w-md text-sm font-light leading-relaxed text-muted-foreground">
-                  We sent a 6-digit code to <span className="text-cream">{email.trim()}</span>.
-                  Type it below — or tap the link in the email if you're on this device.
+                  {t("auth.codeSubtitle", { email: email.trim() })}
                 </p>
               </div>
 
               <form onSubmit={handleVerifyCode} className="space-y-4">
                 <div className="space-y-1.5">
                   <label htmlFor="auth-code" className="block text-sm text-muted-foreground/90">
-                    6-digit code
+                    {t("auth.codePlaceholder")}
                   </label>
                   <input
                     id="auth-code"
@@ -199,7 +200,7 @@ export default function Auth() {
                     </>
                   ) : (
                     <>
-                      Sign in
+                      {t("auth.signIn")}
                       <ArrowRight className="h-4 w-4 opacity-90" aria-hidden />
                     </>
                   )}
@@ -221,10 +222,10 @@ export default function Auth() {
             <>
               <div className="mb-6 space-y-1.5 text-center sm:mb-7">
                 <h1 className="font-serif text-3xl italic leading-tight tracking-tight text-cream">
-                  Welcome to {BRAND_NAME}
+                  {t("auth.signInTitle")}
                 </h1>
                 <p className="mx-auto max-w-md text-sm font-light leading-relaxed text-muted-foreground">
-                  Virtual date rooms for two.
+                  {t("auth.signInSubtitle")}
                 </p>
               </div>
 
@@ -235,7 +236,7 @@ export default function Auth() {
                   className={oauthBtnClass}
                 >
                   <GoogleIcon className="h-5 w-5 shrink-0" />
-                  Continue with Google
+                  {t("auth.continueWithGoogle")}
                 </button>
                 <button
                   type="button"
@@ -243,7 +244,7 @@ export default function Auth() {
                   className={oauthBtnClass}
                 >
                   <AppleIcon className="h-5 w-5 shrink-0 text-cream" />
-                  Continue with Apple
+                  {t("auth.continueWithApple")}
                 </button>
               </div>
 
@@ -254,7 +255,7 @@ export default function Auth() {
               <form onSubmit={handleRequestOtp} className="space-y-4">
                 <div className="space-y-1.5">
                   <label htmlFor="auth-email" className="block text-sm text-muted-foreground/90">
-                    Email
+                    {t("auth.email")}
                   </label>
                   <div className="relative">
                     <Mail
@@ -266,7 +267,7 @@ export default function Auth() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
+                      placeholder={t("auth.emailPlaceholder")}
                       className={cn("auth-input", "pl-11")}
                       required
                       autoComplete="email"
@@ -285,7 +286,7 @@ export default function Auth() {
                     </>
                   ) : (
                     <>
-                      Send sign-in code
+                      {t("auth.sendCode")}
                       <ArrowRight className="h-4 w-4 opacity-90" aria-hidden />
                     </>
                   )}
@@ -299,10 +300,13 @@ export default function Auth() {
           By continuing you confirm you are 18 or older.
         </p>
         <p className="mt-2 text-center text-[10px] tracking-[0.25em] uppercase text-muted-foreground/40">
-          <Link to="/privacy" className="hover:text-cream transition-colors">Privacy</Link>
+          <Link to="/privacy" className="hover:text-cream transition-colors">{t("nav.privacy")}</Link>
           <span className="mx-2 opacity-60" aria-hidden>·</span>
-          <Link to="/terms" className="hover:text-cream transition-colors">Terms</Link>
+          <Link to="/terms" className="hover:text-cream transition-colors">{t("nav.terms")}</Link>
         </p>
+        <div className="mt-6 flex justify-center">
+          <LanguageSwitcher variant="row" />
+        </div>
       </div>
     </PageShell>
   );

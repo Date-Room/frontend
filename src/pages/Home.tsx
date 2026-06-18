@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { Link, useNavigate } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import {
   Plus,
@@ -37,11 +38,18 @@ const ENDED_STATES = new Set<RoomStateName>(["ended", "grace", "sub_lapsed"]);
 
 type Tab = "history" | "rooms" | "profile";
 
-const TABS: { id: Tab; label: string; icon: typeof Heart }[] = [
-  { id: "rooms", label: "Rooms", icon: Heart },
-  { id: "history", label: "Recap", icon: History },
-  { id: "profile", label: "Profile", icon: User },
-];
+function useHomeTabs() {
+  const { t } = useTranslation();
+  return useMemo(
+    () =>
+      [
+        { id: "rooms" as const, label: t("home.rooms"), icon: Heart },
+        { id: "history" as const, label: t("home.recap"), icon: History },
+        { id: "profile" as const, label: t("home.profile"), icon: User },
+      ],
+    [t],
+  );
+}
 
 // 25h retention ceiling for Recap entries. After this they get swept
 // from local storage and dropped from the UI — mirrors mobile.
@@ -112,6 +120,8 @@ function tileSearchHay(r: Room, card: InviteCard | undefined, isHost: boolean): 
 
 export default function Home() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const tabs = useHomeTabs();
   const [tab, setTab] = useState<Tab>("rooms");
 
   const { data: me } = useQuery({
@@ -291,29 +301,29 @@ export default function Home() {
             style={{ opacity: compactT, transition: "opacity 160ms ease-out" }}
             aria-hidden={compactT < 0.5}
           >
-            {tab === "history" ? "Recap" : tab === "profile" ? "Profile" : "Rooms"}
+            {tab === "history" ? t("home.recap") : tab === "profile" ? t("home.profile") : t("home.rooms")}
           </div>
 
           {/* Desktop tab nav */}
           <nav className="ml-8 hidden items-center gap-1 lg:flex">
-            {TABS.map((t) => (
+            {tabs.map((item) => (
               <button
-                key={t.id}
+                key={item.id}
                 type="button"
-                onClick={() => setTab(t.id)}
-                aria-pressed={tab === t.id}
+                onClick={() => setTab(item.id)}
+                aria-pressed={tab === item.id}
                 className={cn(
                   "focus-ring relative rounded-full px-4 py-2 text-sm font-medium transition-colors",
-                  tab === t.id ? "text-primary" : "text-muted-foreground hover:text-cream",
+                  tab === item.id ? "text-primary" : "text-muted-foreground hover:text-cream",
                 )}
               >
-                {tab === t.id && (
+                {tab === item.id && (
                   <span
                     className="absolute inset-0 -z-10 rounded-full bg-primary/15 shadow-[inset_0_0_0_1px_rgba(212,130,106,0.18)]"
                     aria-hidden
                   />
                 )}
-                {t.label}
+                {item.label}
               </button>
             ))}
           </nav>
@@ -504,27 +514,27 @@ export default function Home() {
       {/* Bottom nav — mobile only. */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 glass-subtle backdrop-blur-xl border-t border-white/[0.06] lg:hidden">
         <div className="mx-auto flex h-[calc(4rem+env(safe-area-inset-bottom))] max-w-2xl px-6 pb-[env(safe-area-inset-bottom)]">
-          {TABS.map((t) => (
+          {tabs.map((item) => (
             <button
-              key={t.id}
+              key={item.id}
               type="button"
-              onClick={() => setTab(t.id)}
-              aria-pressed={tab === t.id}
-              aria-label={t.label}
+              onClick={() => setTab(item.id)}
+              aria-pressed={tab === item.id}
+              aria-label={item.label}
               className={cn(
                 "focus-ring relative flex flex-1 flex-col items-center justify-center gap-1 transition-colors",
-                tab === t.id ? "text-primary" : "text-muted-foreground hover:text-cream",
+                tab === item.id ? "text-primary" : "text-muted-foreground hover:text-cream",
               )}
             >
-              {tab === t.id && (
+              {tab === item.id && (
                 <span className="absolute top-2 h-0.5 w-6 rounded-full bg-primary/80" aria-hidden />
               )}
-              <t.icon
+              <item.icon
                 className="h-5 w-5 transition-transform duration-200"
-                fill={tab === t.id && t.id !== "history" ? "currentColor" : "none"}
-                style={{ transform: tab === t.id ? "scale(1.06)" : "scale(1)" }}
+                fill={tab === item.id && item.id !== "history" ? "currentColor" : "none"}
+                style={{ transform: tab === item.id ? "scale(1.06)" : "scale(1)" }}
               />
-              <span className="text-[10px] uppercase tracking-[0.18em]">{t.label}</span>
+              <span className="text-[10px] uppercase tracking-[0.18em]">{item.label}</span>
             </button>
           ))}
         </div>
