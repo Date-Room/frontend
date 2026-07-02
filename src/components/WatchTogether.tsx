@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Play, Square } from "lucide-react";
+import { Clock, Play, Square } from "lucide-react";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
-import { isWatchPartyRoom, watchPartyLabel } from "@/lib/watchParty";
+import {
+  addWatchHistory,
+  loadWatchHistory,
+  type WatchHistoryEntry,
+  youtubeWatchUrl,
+} from "@/lib/watchHistory";
 import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/types/youtubeIframeApi";
 
 /**
@@ -48,6 +54,7 @@ function loadYT() {
 }
 
 export function WatchTogether() {
+  const { t } = useTranslation();
   const room = useRoomSession();
   const { session, state: durable } = useActivitySession("watch");
   const userId = room.senderId;
@@ -55,8 +62,13 @@ export function WatchTogether() {
   const dVideo = typeof durable?.video_id === "string" ? (durable.video_id as string) : null;
   const dPlaying = durable?.playing === true;
   const dTs = typeof durable?.timestamp_seconds === "number" ? (durable.timestamp_seconds as number) : 0;
+  const lastController =
+    typeof durable?.last_controller === "string" ? (durable.last_controller as string) : null;
+  const lastControllerRef = useRef(lastController);
+  lastControllerRef.current = lastController;
 
   const [url, setUrl] = useState("");
+  const [history, setHistory] = useState<WatchHistoryEntry[]>(() => loadWatchHistory());
   const playerRef = useRef<YoutubeIframeApiPlayer | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dTsRef = useRef(dTs);
@@ -71,6 +83,23 @@ export function WatchTogether() {
   };
   const isSuppressed = () => Date.now() < suppressUntilRef.current;
   const isControllerRef = useRef(false);
+
+  function playerIsPlaying(p: YoutubeIframeApiPlayer | null): boolean {
+    const PS = window.YT?.PlayerState;
+    if (!p?.getPlayerState || !PS) return false;
+    return p.getPlayerState() === PS.PLAYING;
+  }
+
+  function driftCorrect(p: YoutubeIframeApiPlayer, ts: number, tolerance = 1.5) {
+    const localTime = p.getCurrentTime?.() ?? 0;
+    if (Math.abs(ts - localTime) <= tolerance) return;
+    suppress(2000);
+    try {
+      p.seekTo(ts, false);
+    } catch {
+      void 0;
+    }
+  }
 
   const [videoId, setVideoId] = useState<string | null>(dVideo);
   const [playing, setPlaying] = useState<boolean>(dPlaying);
@@ -89,11 +118,17 @@ export function WatchTogether() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dVideo]);
   useEffect(() => {
-    if (dPlaying !== playing) setPlaying(dPlaying);
+    if (dPlaying === playing) return;
+    // Ignore stale durable pauses while we're the active controller and still playing.
+    if (lastController === userId && playing && !dPlaying) return;
+    setPlaying(dPlaying);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dPlaying]);
+  }, [dPlaying, lastController, userId]);
 
   const shouldMount = Boolean(videoId);
+  const weLeadPlayback = lastController === userId || lastController === null;
+  const weLeadPlaybackRef = useRef(weLeadPlayback);
+  weLeadPlaybackRef.current = weLeadPlayback;
 
   useEffect(() => {
     if (!shouldMount || !containerRef.current) return;
@@ -112,6 +147,8 @@ export function WatchTogether() {
             try {
               const p = playerRef.current;
               if (!p) return;
+              // Late joiners catch up locally — don't echo a play/pause burst to the room.
+              suppress(3000);
               p.mute?.();
               if (dTsRef.current) p.seekTo(dTsRef.current, true);
               if (playing) p.playVideo?.();
@@ -125,10 +162,14 @@ export function WatchTogether() {
             const PS = yt.PlayerState;
             const time = playerRef.current?.getCurrentTime?.() ?? 0;
             if (e.data === PS.PLAYING) {
+              const leader = lastControllerRef.current;
+              if (!weLeadPlaybackRef.current && leader && leader !== userId) return;
               isControllerRef.current = true;
               void session?.sendEvent("play", { timestamp_seconds: time });
               persistWatch({ video_id: videoId, playing: true, timestamp_seconds: time });
             } else if (e.data === PS.PAUSED) {
+              const leader = lastControllerRef.current;
+              if (!weLeadPlaybackRef.current && leader && leader !== userId) return;
               isControllerRef.current = true;
               void session?.sendEvent("pause", { timestamp_seconds: time });
               persistWatch({ video_id: videoId, playing: false, timestamp_seconds: time });
@@ -154,10 +195,16 @@ export function WatchTogether() {
   useEffect(() => {
     const p = playerRef.current;
     if (!p || isSuppressed()) return;
-    suppress(500);
     try {
-      if (playing) p.playVideo?.();
-      else p.pauseVideo?.();
+      if (playing) {
+        if (!playerIsPlaying(p)) {
+          suppress(500);
+          p.playVideo?.();
+        }
+      } else if (playerIsPlaying(p)) {
+        suppress(500);
+        p.pauseVideo?.();
+      }
     } catch {
       void 0;
     }
@@ -188,8 +235,15 @@ export function WatchTogether() {
       const p = playerRef.current;
 
       if (e.type === "load") {
-        suppress(5000);
         const v = typeof e.payload.video_id === "string" ? e.payload.video_id : null;
+        const ts = typeof e.payload.timestamp_seconds === "number" ? e.payload.timestamp_seconds : 0;
+        if (v && v === videoId && p) {
+          suppress(3000);
+          setPlaying(true);
+          driftCorrect(p, ts);
+          return;
+        }
+        suppress(5000);
         setVideoId(v);
         setPlaying(true);
         // Persist on partner's behalf — keeps the chosen video alive
@@ -198,54 +252,52 @@ export function WatchTogether() {
         // need durable writes (they fire many times a second).
         if (room.canPersist) {
           persistWatch(
-            { video_id: v, playing: true, timestamp_seconds: 0 },
+            { video_id: v, playing: true, timestamp_seconds: ts },
             v ? { event_type: "queued_video", payload: { text: `youtu.be/${v}` } } : undefined,
           );
         }
         return;
       }
       if (e.type === "play") {
+        const leader = lastControllerRef.current === userId;
+        if (leader && videoId && playerIsPlaying(p ?? null)) {
+          if (p && ts != null) driftCorrect(p, ts);
+          return;
+        }
         setPlaying(true);
         if (p?.playVideo) {
           suppress(5000);
           try {
-            if (ts != null) p.seekTo(ts, false);
-            p.playVideo();
+            if (ts != null) driftCorrect(p, ts, 0.5);
+            if (!playerIsPlaying(p)) p.playVideo();
           } catch {
             void 0;
           }
         }
       } else if (e.type === "pause") {
+        const leader = lastControllerRef.current === userId;
+        if (leader && videoId && playerIsPlaying(p ?? null)) {
+          return;
+        }
         setPlaying(false);
         if (p?.pauseVideo) {
           suppress(2000);
           try {
             p.pauseVideo();
-            if (ts != null) p.seekTo(ts, false);
+            if (ts != null) driftCorrect(p, ts, 0.5);
           } catch {
             void 0;
           }
         }
       } else if (e.type === "seek" || e.type === "tick") {
         if (p?.getCurrentTime && ts != null) {
-          const localTime = p.getCurrentTime() ?? 0;
-          if (Math.abs(ts - localTime) > 1.5) {
-            suppress(2000);
-            try {
-              p.seekTo(ts, false);
-            } catch {
-              void 0;
-            }
-          }
+          driftCorrect(p, ts);
         }
       }
     });
-  }, [session, userId]);
+  }, [session, userId, videoId, room.canPersist]);
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const id = extractId(url.trim());
-    if (!id) return;
+  function queueVideo(id: string, sourceUrl?: string) {
     isControllerRef.current = true;
     setVideoId(id);
     setPlaying(true);
@@ -254,7 +306,19 @@ export function WatchTogether() {
       { video_id: id, playing: true, timestamp_seconds: 0 },
       { event_type: "queued_video", payload: { text: `youtu.be/${id}` } },
     );
+    setHistory(addWatchHistory(sourceUrl ?? youtubeWatchUrl(id), id));
+  }
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const id = extractId(url.trim());
+    if (!id) return;
+    queueVideo(id, url.trim());
     setUrl("");
+  };
+
+  const playFromHistory = (entry: WatchHistoryEntry) => {
+    queueVideo(entry.videoId, entry.url);
   };
 
   const stopVideo = () => {
@@ -273,19 +337,11 @@ export function WatchTogether() {
 
   return (
     <div className="flex flex-col h-full p-4 sm:p-6 gap-4">
-      {isWatchPartyRoom(room.maxParticipants) && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-muted-foreground">
-          <span className="font-medium text-cream/90">{watchPartyLabel(room.maxParticipants)}</span>
-          <span>
-            {room.presence.length} in room · anyone can watch · host controls playback
-          </span>
-        </div>
-      )}
       <form onSubmit={submit} className="flex gap-2">
         <Input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="Paste a YouTube URL…"
+          placeholder={t("room.watchUrlPlaceholder")}
           className="focus-ring bg-secondary/60 border-white/[0.10] focus-visible:border-primary/40"
         />
         <Button
@@ -293,12 +349,47 @@ export function WatchTogether() {
           className="focus-ring rounded-full text-primary-foreground hover:opacity-90 transition-all hover:-translate-y-px"
           style={{ backgroundColor: "var(--room-accent)" }}
         >
-          Play
+          {t("room.watchPlay")}
         </Button>
       </form>
 
+      {history.length > 0 && (
+        <div className="space-y-2">
+          <p className="flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            {t("room.watchHistory")}
+          </p>
+          <ul className="max-h-36 overflow-y-auto rounded-xl border border-white/[0.08] bg-white/[0.03] divide-y divide-white/[0.06]">
+            {history.map((entry) => (
+              <li key={`${entry.videoId}-${entry.addedAt}`}>
+                <button
+                  type="button"
+                  onClick={() => playFromHistory(entry)}
+                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-white/[0.04]"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/40 text-muted-foreground">
+                    <Play className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-cream/90">
+                      {entry.url.replace(/^https?:\/\//, "")}
+                    </span>
+                    <span className="block text-[11px] text-muted-foreground">
+                      {new Date(entry.addedAt).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <p className="text-xs text-muted-foreground italic px-1">
-        Hover the video to play, pause, or unmute. Each of you controls your own volume.
+        {t("room.watchVolumeHint")}
       </p>
 
       <div className="flex-1 rounded-2xl overflow-hidden bg-black border border-white/[0.08] shadow-[0_22px_60px_-22px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.04)] relative">

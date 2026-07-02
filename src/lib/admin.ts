@@ -125,6 +125,10 @@ export function createPromoCode(body: Record<string, unknown>) {
   return api.post<PromoCode>("/v1/admin/promo-codes", body);
 }
 
+export function generatePromoCodes(body: Record<string, unknown>) {
+  return api.post<{ items: PromoCode[] }>("/v1/admin/promo-codes/generate", body);
+}
+
 export function updatePromoCode(id: string, body: Record<string, unknown>) {
   return api.patch<PromoCode>(`/v1/admin/promo-codes/${id}`, body);
 }

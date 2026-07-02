@@ -89,12 +89,15 @@ function StickyNote({
       )}
       style={{ transform: `rotate(${rot}deg)`, ["--note-rot" as string]: `${rot}deg` }}
     >
+      <span className="fridge-sticky-cast" aria-hidden />
       <div
         className="fridge-sticky-paper"
         style={{ background: notePalette(note.id, mine) }}
       >
         <span className="fridge-sticky-magnet" aria-hidden />
+        <span className="fridge-sticky-tape" aria-hidden />
         <span className="fridge-sticky-fold" aria-hidden />
+        <span className="fridge-sticky-lines" aria-hidden />
         {unread && !mine && <span className="fridge-sticky-new" aria-label="Unread" />}
         <p className="fridge-sticky-text">{note.text}</p>
         <div className="fridge-sticky-meta">
@@ -116,16 +119,27 @@ function FridgeAppliance({
   return (
     <div className="fridge-appliance">
       <div className="fridge-body">
+        <div className="fridge-crown" aria-hidden />
+        <div className="fridge-freezer">
+          <div className="fridge-freezer-face">
+            <span className="fridge-freezer-handle" aria-hidden />
+            <span className="fridge-freezer-badge" aria-hidden />
+          </div>
+        </div>
+        <div className="fridge-seam" aria-hidden />
         <div className="fridge-door">
           <div className="fridge-door-top">
             <span className="fridge-brand">Our fridge</span>
             <span className="fridge-door-hint">tap a note to read</span>
           </div>
-          <div className="fridge-handle" aria-hidden />
-          <div className={cn("fridge-surface", empty && "fridge-surface-empty")}>
-            {children}
+          <div className="fridge-door-panel">
+            <div className="fridge-handle" aria-hidden />
+            <div className={cn("fridge-surface", empty && "fridge-surface-empty")}>
+              {children}
+            </div>
           </div>
         </div>
+        <div className="fridge-toe-kick" aria-hidden />
       </div>
     </div>
   );
@@ -153,7 +167,9 @@ function NoteDetail({
         style={{ background: notePalette(note.id, mine), transform: `rotate(${rotationDeg(note.id)}deg)` }}
       >
         <span className="fridge-sticky-magnet" aria-hidden />
+        <span className="fridge-sticky-tape" aria-hidden />
         <span className="fridge-sticky-fold" aria-hidden />
+        <span className="fridge-sticky-lines" aria-hidden />
         <p className="fridge-detail-text">{note.text}</p>
         <p className="fridge-detail-meta">
           {mine ? "From you" : `From ${note.pinned_by_name}`}
@@ -390,7 +406,9 @@ export function FridgeNotes({ active = true }: Props) {
               style={{ background: NOTE_PALETTES_MINE[0] }}
             >
               <span className="fridge-sticky-magnet" aria-hidden />
+              <span className="fridge-sticky-tape" aria-hidden />
               <span className="fridge-sticky-fold" aria-hidden />
+              <span className="fridge-sticky-lines" aria-hidden />
               <Textarea
                 ref={textareaRef}
                 value={text}

@@ -11,6 +11,7 @@ import "@livekit/components-styles";
 import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff } from "lucide-react";
 import { getInvitedGuestName } from "@/lib/invitedGuest";
 import { livekitToken } from "@/lib/rooms";
+import { cn } from "@/lib/utils";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import type { PresenceState } from "@/lib/realtime/roomChannel";
 
@@ -198,10 +199,12 @@ function Tile({
   participant,
   isLocal,
   label,
+  compact = false,
 }: {
   participant?: ReturnType<typeof useTracks>[number];
   isLocal?: boolean;
   label: string;
+  compact?: boolean;
 }) {
   const cameraOff = !participant || participant.publication?.isMuted;
   return (
@@ -209,7 +212,10 @@ function Tile({
       style={{ boxShadow: "0 12px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)" }}
     >
       {cameraOff || !participant ? (
-        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground font-serif italic text-xl sm:text-2xl">
+        <div className={cn(
+          "absolute inset-0 flex items-center justify-center text-muted-foreground font-serif italic",
+          compact ? "text-xs px-2 text-center" : "text-xl sm:text-2xl",
+        )}>
           {participant ? "camera off" : "waiting for them…"}
         </div>
       ) : (
@@ -230,7 +236,10 @@ function Tile({
           />
         </>
       )}
-      <span className="absolute bottom-2.5 left-3 text-[10px] sm:text-xs uppercase tracking-[0.2em] text-cream/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">
+      <span className={cn(
+        "absolute bottom-2 left-2 uppercase tracking-[0.2em] text-cream/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]",
+        compact ? "text-[8px]" : "bottom-2.5 left-3 text-[10px] sm:text-xs",
+      )}>
         {label}
       </span>
     </div>
@@ -247,7 +256,7 @@ function gridClass(count: number): string {
 }
 
 /** Adaptive video grid with controls row. Supports 1-N participants. */
-function Stage({ onLeave }: { onLeave: () => void }) {
+function Stage({ onLeave, compact = false }: { onLeave: () => void; compact?: boolean }) {
   const room = useRoomSession();
   const cameraTracks = useTracks([Track.Source.Camera], { onlySubscribed: false });
   const local = cameraTracks.find((t) => t.participant.isLocal);
@@ -318,60 +327,76 @@ function Stage({ onLeave }: { onLeave: () => void }) {
       )}
 
       {/* Adaptive grid — fills available space, aspect ratio set by row height */}
-      <div className={`flex-1 min-h-0 grid gap-2 sm:gap-3 ${gridClass(tileCount)} auto-rows-fr`}>
+      <div className={cn(
+        "flex-1 min-h-0 grid auto-rows-fr",
+        compact ? "grid-cols-2 gap-1" : `gap-2 sm:gap-3 ${gridClass(tileCount)}`,
+      )}>
         <div ref={selfWrapRef} className="min-h-0">
-          <Tile participant={local} isLocal label="you" />
+          <Tile participant={local} isLocal label="you" compact={compact} />
         </div>
         {remotes.length === 0 ? (
           <div ref={partnerWrapRef} className="min-h-0">
-            <Tile label="waiting for them…" />
+            <Tile label="waiting for them…" compact={compact} />
           </div>
         ) : (
           remotes.map((p, i) => (
             <div key={p.participant.identity} ref={i === 0 ? partnerWrapRef : undefined} className="min-h-0">
-              <Tile participant={p} label={p.participant.name || partnerDisplay.name} />
+              <Tile participant={p} label={p.participant.name || partnerDisplay.name} compact={compact} />
             </div>
           ))
         )}
       </div>
 
       {/* Controls row */}
-      <div className="flex items-center justify-center gap-3 py-2 shrink-0">
+      <div className={cn(
+        "flex items-center justify-center shrink-0",
+        compact ? "gap-1.5 py-1" : "gap-3 py-2",
+      )}>
         <button
           onClick={() => void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
           aria-label={isMicrophoneEnabled ? "Mute" : "Unmute"}
-          className="h-11 w-11 rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center justify-center transition"
+          className={cn(
+            "rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center justify-center transition",
+            compact ? "h-8 w-8" : "h-11 w-11",
+          )}
         >
-          {isMicrophoneEnabled ? <Mic className="w-4 h-4 text-cream" /> : <MicOff className="w-4 h-4 text-rose" />}
+          {isMicrophoneEnabled ? <Mic className={cn("text-cream", compact ? "w-3.5 h-3.5" : "w-4 h-4")} /> : <MicOff className={cn("text-rose", compact ? "w-3.5 h-3.5" : "w-4 h-4")} />}
         </button>
         <button
           onClick={() => void localParticipant.setCameraEnabled(!isCameraEnabled)}
           aria-label={isCameraEnabled ? "Camera off" : "Camera on"}
-          className="h-11 w-11 rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center justify-center transition"
+          className={cn(
+            "rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center justify-center transition",
+            compact ? "h-8 w-8" : "h-11 w-11",
+          )}
         >
-          {isCameraEnabled ? <Video className="w-4 h-4 text-cream" /> : <VideoOff className="w-4 h-4 text-rose" />}
+          {isCameraEnabled ? <Video className={cn("text-cream", compact ? "w-3.5 h-3.5" : "w-4 h-4")} /> : <VideoOff className={cn("text-rose", compact ? "w-3.5 h-3.5" : "w-4 h-4")} />}
         </button>
-        <button
-          onClick={startCapture}
-          disabled={countdown != null}
-          className="h-11 px-5 rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center gap-2 transition disabled:opacity-50"
-        >
-          <Camera className="w-4 h-4 text-amber" />
-          <span className="text-sm text-cream">Capture moment</span>
-        </button>
-        <button
-          onClick={onLeave}
-          className="h-11 px-5 rounded-full bg-destructive/80 hover:bg-destructive flex items-center gap-2 transition"
-        >
-          <PhoneOff className="w-4 h-4" />
-          <span className="text-sm text-cream">Leave</span>
-        </button>
+        {!compact && (
+          <>
+            <button
+              onClick={startCapture}
+              disabled={countdown != null}
+              className="h-11 px-5 rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center gap-2 transition disabled:opacity-50"
+            >
+              <Camera className="w-4 h-4 text-amber" />
+              <span className="text-sm text-cream">Capture moment</span>
+            </button>
+            <button
+              onClick={onLeave}
+              className="h-11 px-5 rounded-full bg-destructive/80 hover:bg-destructive flex items-center gap-2 transition"
+            >
+              <PhoneOff className="w-4 h-4" />
+              <span className="text-sm text-cream">Leave</span>
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-export function RoomVideo({ onLeave }: { onLeave?: () => void } = {}) {
+export function RoomVideo({ onLeave, compact = false }: { onLeave?: () => void; compact?: boolean } = {}) {
   const room = useRoomSession();
   const [conn, setConn] = useState<{ token: string; url: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -410,7 +435,7 @@ export function RoomVideo({ onLeave }: { onLeave?: () => void } = {}) {
 
   return (
     <LiveKitRoom token={conn.token} serverUrl={conn.url} connect audio video data-lk-theme="default" className="h-full w-full">
-      <Stage onLeave={onLeave ?? (() => {})} />
+      <Stage onLeave={onLeave ?? (() => {})} compact={compact} />
       <RoomAudioRenderer />
     </LiveKitRoom>
   );

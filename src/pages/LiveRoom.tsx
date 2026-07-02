@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { isTryPackage, getRoomExperience, isActivityEnabled, getRoomPlan, saveRoomPlanFromServer, isSubscriptionPackage, type CuratableActivityId } from "@/lib/roomExperience";
+import { isWatchPartyRoom } from "@/lib/watchParty";
 import { getRoomExperienceApi, listMyRooms, type Room, type RoomPackage } from "@/lib/rooms";
 import { LogOut, Clock, Maximize2, Minimize2, Sparkles, ChevronLeft, Home } from "lucide-react";
 import { AmbientSceneStack } from "@/components/AmbientSceneStack";
@@ -38,6 +39,7 @@ import {
   partnerDisplayName,
   partnerLightLabel,
   partnerPresenceEntry,
+  presenceSenderId,
 } from "@/lib/partnerPresence";
 import { ThisOrThat } from "@/components/ThisOrThat";
 import { DJ } from "@/components/DJ";
@@ -237,9 +239,11 @@ function RoomShell({
 
   useEffect(() => {
     if (!isPermanentRoom || liveMode || userPrefersAtHomeRef.current) return;
+    // Don't yank the user out of a focused activity when the partner joins.
+    if (tab === "watch") return;
     const partner = partnerPresenceEntry(session.presence, session.senderId);
     if (partner?.is_in_call === true) setLiveMode(true);
-  }, [isPermanentRoom, liveMode, session.presence, session.senderId]);
+  }, [isPermanentRoom, liveMode, session.presence, session.senderId, tab]);
 
   useEffect(() => {
     if (!isPermanentRoom) return;
@@ -247,25 +251,46 @@ function RoomShell({
       if (e.kind !== "call_started") return;
       if (e.payload.from === session.senderId) return;
       if (userPrefersAtHomeRef.current) return;
+      if (tab === "watch") return;
       setLiveMode(true);
     });
-  }, [isPermanentRoom, session.channel, session.senderId]);
+  }, [isPermanentRoom, session.channel, session.senderId, tab]);
 
   const showAtHome = isPermanentRoom && !liveMode;
 
   const partnerJoinBaselineRef = useRef<{ hadPartner: boolean; partnerInCall: boolean } | null>(
     null,
   );
+  const knownOthersRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!showAtHome) {
-      partnerJoinBaselineRef.current = null;
-      return;
-    }
-
     const partner = partnerPresenceEntry(session.presence, session.senderId);
     const hadPartner = Boolean(partner);
     const partnerInCall = partner?.is_in_call === true;
+    const onWatch = tab === "watch";
+
+    const others = new Set(
+      session.presence
+        .map((p) => presenceSenderId(p))
+        .filter((id) => id && id !== session.senderId),
+    );
+    if (knownOthersRef.current.size === 0) {
+      knownOthersRef.current = others;
+    } else if (onWatch && isWatchPartyRoom(session.maxParticipants)) {
+      for (const id of others) {
+        if (!knownOthersRef.current.has(id)) {
+          const entry = session.presence.find((p) => presenceSenderId(p) === id);
+          const name = partnerDisplayName(entry);
+          toast(t("room.partnerJoinedWatch", { name }), {
+            description: t("room.partnerJoinedWatchDesc"),
+            duration: 4000,
+            position: "top-center",
+            className: "perm-partner-join-toast",
+          });
+        }
+      }
+    }
+    knownOthersRef.current = others;
 
     if (partnerJoinBaselineRef.current === null) {
       partnerJoinBaselineRef.current = { hadPartner, partnerInCall };
@@ -276,23 +301,23 @@ function RoomShell({
     const name = partnerDisplayName(partner);
 
     if (!prev.hadPartner && hadPartner) {
-      toast(t("room.partnerJoinedRoom", { name }), {
-        description: t("room.partnerJoinedRoomDesc"),
-        duration: 5000,
+      toast(t(onWatch ? "room.partnerJoinedWatch" : "room.partnerJoinedRoom", { name }), {
+        description: t(onWatch ? "room.partnerJoinedWatchDesc" : "room.partnerJoinedRoomDesc"),
+        duration: onWatch ? 4000 : 5000,
         position: "top-center",
         className: "perm-partner-join-toast",
       });
     } else if (prev.hadPartner && hadPartner && !prev.partnerInCall && partnerInCall) {
-      toast(t("room.partnerJoinedCall", { name }), {
-        description: t("room.partnerJoinedCallDesc"),
-        duration: 5000,
+      toast(t(onWatch ? "room.partnerJoinedWatch" : "room.partnerJoinedCall", { name }), {
+        description: t(onWatch ? "room.partnerJoinedWatchDesc" : "room.partnerJoinedCallDesc"),
+        duration: onWatch ? 4000 : 5000,
         position: "top-center",
         className: "perm-partner-join-toast",
       });
     }
 
     partnerJoinBaselineRef.current = { hadPartner, partnerInCall };
-  }, [showAtHome, session.presence, session.senderId, t]);
+  }, [session.presence, session.senderId, session.maxParticipants, tab, t]);
 
   useEffect(() => {
     if (wallRoom) {
@@ -300,6 +325,7 @@ function RoomShell({
     }
   }, [wallRoom]);
   const [trayExpanded, setTrayExpanded] = useState(false);
+  const [videoMinimized, setVideoMinimized] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [ambianceOpen, setAmbianceOpen] = useState(false);
   const [ambianceOverride, setAmbianceOverride] = useState<AmbiancePresetId | null>(null);
@@ -385,6 +411,22 @@ function RoomShell({
       setTab(visibleTabs[0]?.id ?? "chat");
     }
   }, [visibleTabs, tab]);
+
+  const watching = tab === "watch";
+  const videoInPip = videoMinimized || (trayExpanded && watching);
+
+  useEffect(() => {
+    if (!watching) setVideoMinimized(false);
+  }, [watching]);
+
+  function toggleVideoPanel() {
+    if (watching) {
+      setVideoMinimized((v) => !v);
+      setTrayExpanded(false);
+      return;
+    }
+    setTrayExpanded((v) => !v);
+  }
 
   const shellStyle: React.CSSProperties = {
     ...roomAccentStyle(customization.theme),
@@ -592,28 +634,78 @@ function RoomShell({
         "flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 p-3 sm:p-4 min-h-0 z-10",
         expired && "opacity-60 pointer-events-none",
       )}>
-        {/* Video section */}
+        {/* Video section — inline split or floating PiP while watching */}
         <section className={cn(
-          "lg:basis-3/5 lg:flex-shrink-0 h-[40vh] lg:h-auto rounded-3xl glass p-3 sm:p-4 relative flex-col",
-          trayExpanded ? "hidden lg:flex" : "flex",
+          "flex flex-col relative",
+          videoInPip
+            ? "fixed bottom-4 left-4 z-30 w-[min(300px,38vw)] h-[min(240px,30vh)] rounded-2xl glass p-2 shadow-2xl pointer-events-auto"
+            : cn(
+                "lg:basis-3/5 lg:flex-shrink-0 h-[40vh] lg:h-auto rounded-3xl glass p-3 sm:p-4",
+                trayExpanded && !watching ? "hidden lg:flex" : "flex",
+              ),
         )}>
-          <RoomVideo onLeave={() => setShowLeaveConfirm(true)} />
-          <button
-            type="button"
-            aria-label={trayExpanded ? "Expand video area" : "Show activity tray"}
-            onClick={() => setTrayExpanded(!trayExpanded)}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-secondary/60 flex items-center justify-center lg:hidden z-20 pointer-events-auto"
-          >
-            {trayExpanded ? (
-              <Maximize2 className="w-3.5 h-3.5 text-cream" />
-            ) : (
+          <RoomVideo
+            compact={videoInPip}
+            onLeave={() => setShowLeaveConfirm(true)}
+          />
+          {watching && !videoInPip && (
+            <button
+              type="button"
+              aria-label={t("room.minimizeVideo")}
+              onClick={() => setVideoMinimized(true)}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-secondary/70 border border-border/40 hidden lg:flex items-center justify-center z-20 pointer-events-auto hover:bg-secondary transition"
+            >
               <Minimize2 className="w-3.5 h-3.5 text-cream" />
-            )}
-          </button>
+            </button>
+          )}
+          {videoInPip && (
+            <button
+              type="button"
+              aria-label={t("room.restoreVideo")}
+              onClick={() => {
+                setVideoMinimized(false);
+                setTrayExpanded(false);
+              }}
+              className="absolute top-2 right-2 w-7 h-7 rounded-full bg-secondary/80 border border-border/40 flex items-center justify-center z-20 pointer-events-auto hover:bg-secondary transition"
+            >
+              <Maximize2 className="w-3 h-3 text-cream" />
+            </button>
+          )}
+          {!watching && (
+            <button
+              type="button"
+              aria-label={trayExpanded ? t("room.restoreVideo") : t("room.showActivities")}
+              onClick={toggleVideoPanel}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-secondary/60 flex items-center justify-center lg:hidden z-20 pointer-events-auto"
+            >
+              {trayExpanded ? (
+                <Maximize2 className="w-3.5 h-3.5 text-cream" />
+              ) : (
+                <Minimize2 className="w-3.5 h-3.5 text-cream" />
+              )}
+            </button>
+          )}
+          {watching && (
+            <button
+              type="button"
+              aria-label={videoInPip ? t("room.restoreVideo") : t("room.minimizeVideo")}
+              onClick={toggleVideoPanel}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-secondary/70 border border-border/40 flex items-center justify-center lg:hidden z-20 pointer-events-auto hover:bg-secondary transition"
+            >
+              {videoInPip ? (
+                <Maximize2 className="w-3.5 h-3.5 text-cream" />
+              ) : (
+                <Minimize2 className="w-3.5 h-3.5 text-cream" />
+              )}
+            </button>
+          )}
         </section>
 
         {/* Tabbed activity panel */}
-        <section className="flex-1 lg:basis-2/5 lg:flex-shrink-0 flex flex-col rounded-3xl glass overflow-hidden min-h-0 lg:min-h-[480px]">
+        <section className={cn(
+          "flex-1 flex flex-col rounded-3xl glass overflow-hidden min-h-0",
+          videoInPip ? "w-full" : "lg:basis-2/5 lg:flex-shrink-0 lg:min-h-[480px]",
+        )}>
           <LiveRoomTabBar
             tabs={visibleTabs.map((t) => ({ id: t.id, label: t.label, icon: t.icon }))}
             activeId={tab}

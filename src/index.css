@@ -796,71 +796,170 @@
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
   }
 
-  /* Couples fridge — warm kitchen door with post-it stickers */
+  /* Couples fridge — stainless kitchen appliance with magnetic post-its */
   .fridge-appliance {
-    @apply mx-auto w-full max-w-lg;
+    @apply mx-auto w-full max-w-md px-1;
+    filter: drop-shadow(0 28px 40px rgba(0, 0, 0, 0.55));
   }
 
   .fridge-body {
-    @apply rounded-2xl p-2;
-    background: linear-gradient(180deg, #3d3832 0%, #2a2622 100%);
+    @apply relative overflow-hidden rounded-[1.35rem] p-[0.45rem];
+    background:
+      linear-gradient(145deg, #4a4f56 0%, #2f3338 38%, #23262a 100%);
     box-shadow:
-      0 24px 48px rgba(0, 0, 0, 0.45),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      inset 0 1px 0 rgba(255, 255, 255, 0.14),
+      inset 0 -2px 6px rgba(0, 0, 0, 0.45),
+      0 2px 0 #1a1c1f;
+  }
+
+  .fridge-crown {
+    @apply pointer-events-none absolute inset-x-6 top-0 h-2 rounded-b-full opacity-70;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent);
+  }
+
+  .fridge-freezer {
+    @apply relative mb-1 rounded-t-[1rem] px-2 pt-2;
+  }
+
+  .fridge-freezer-face {
+    @apply relative h-[4.25rem] overflow-hidden rounded-t-[0.85rem] border border-white/10;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.03) 0,
+        rgba(255, 255, 255, 0.03) 1px,
+        transparent 1px,
+        transparent 5px
+      ),
+      linear-gradient(165deg, #e8eaee 0%, #c5c9d0 42%, #a8adb6 100%);
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.75),
+      inset 0 -3px 10px rgba(0, 0, 0, 0.12);
+  }
+
+  .fridge-freezer-handle {
+    @apply absolute right-3 top-1/2 h-[58%] w-2.5 -translate-y-1/2 rounded-full;
+    background: linear-gradient(90deg, #6b7078, #f4f5f7 45%, #7d828a);
+    box-shadow:
+      2px 0 6px rgba(0, 0, 0, 0.22),
+      inset -1px 0 0 rgba(0, 0, 0, 0.15);
+  }
+
+  .fridge-freezer-badge {
+    @apply absolute left-4 top-1/2 h-7 w-7 -translate-y-1/2 rounded-full border border-white/30;
+    background: radial-gradient(circle at 35% 30%, #4a90c8, #1e4a72 70%);
+    box-shadow:
+      inset 0 1px 2px rgba(255, 255, 255, 0.45),
+      0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .fridge-seam {
+    @apply mx-2 mb-1 h-[3px] rounded-full;
+    background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.55), transparent);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08);
   }
 
   .fridge-door {
-    @apply relative overflow-hidden rounded-xl;
-    background: linear-gradient(165deg, #faf8f4 0%, #ebe8e2 55%, #ddd8d0 100%);
-    border: 2px solid #c8c2b8;
-    box-shadow:
-      inset 0 2px 0 rgba(255, 255, 255, 0.85),
-      inset 0 -3px 8px rgba(0, 0, 0, 0.06);
+    @apply relative overflow-hidden rounded-b-[1rem] px-2 pb-2;
   }
 
   .fridge-door-top {
-    @apply flex items-center justify-between px-4 pb-1 pt-3;
+    @apply relative z-[2] flex items-center justify-between px-3 pb-1 pt-2;
   }
 
   .fridge-brand {
-    @apply text-[10px] font-semibold uppercase tracking-[0.28em];
-    color: rgba(42, 38, 32, 0.45);
+    @apply text-[9px] font-bold uppercase tracking-[0.32em];
+    color: rgba(255, 255, 255, 0.42);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
   }
 
   .fridge-door-hint {
-    @apply text-[10px];
-    color: rgba(42, 38, 32, 0.35);
+    @apply text-[9px] italic;
+    color: rgba(255, 255, 255, 0.28);
+  }
+
+  .fridge-door-panel {
+    @apply relative overflow-hidden rounded-[0.85rem] border border-white/10;
+    background:
+      repeating-linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.025) 0,
+        rgba(255, 255, 255, 0.025) 1px,
+        transparent 1px,
+        transparent 6px
+      ),
+      linear-gradient(168deg, #eceff3 0%, #d4d9e0 48%, #b8bec8 100%);
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.82),
+      inset 0 -4px 14px rgba(0, 0, 0, 0.1),
+      0 8px 18px rgba(0, 0, 0, 0.18);
   }
 
   .fridge-handle {
-    @apply pointer-events-none absolute right-3 top-1/2 z-10 h-[42%] min-h-[7rem] w-3 -translate-y-1/2 rounded-full;
-    background: linear-gradient(90deg, #8a8580, #eceae6 42%, #9a9590);
-    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+    @apply pointer-events-none absolute right-2.5 top-1/2 z-20 h-[52%] min-h-[8.5rem] w-3 -translate-y-1/2 rounded-full;
+    background: linear-gradient(90deg, #5f646c 0%, #eef0f3 38%, #9aa0a8 72%, #6a7078 100%);
+    box-shadow:
+      3px 0 10px rgba(0, 0, 0, 0.2),
+      inset -1px 0 2px rgba(0, 0, 0, 0.18),
+      inset 1px 0 1px rgba(255, 255, 255, 0.55);
+  }
+
+  .fridge-handle::after {
+    content: "";
+    @apply absolute left-1/2 top-1/2 h-[72%] w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.05));
   }
 
   .fridge-surface {
-    @apply relative mx-3 mb-3 mt-1 min-h-[300px] rounded-lg p-5 sm:min-h-[340px] sm:p-6;
+    @apply relative mx-2 mb-2 mt-2 min-h-[300px] rounded-lg p-5 sm:min-h-[340px] sm:p-6;
     background:
-      radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.5), transparent 45%),
-      linear-gradient(180deg, #f5f2ec 0%, #ebe6de 100%);
-    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.06);
-    border: 1px solid rgba(0, 0, 0, 0.05);
+      radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.65), transparent 42%),
+      radial-gradient(circle at 82% 88%, rgba(0, 0, 0, 0.04), transparent 35%),
+      repeating-radial-gradient(
+        circle at center,
+        rgba(0, 0, 0, 0.018) 0,
+        rgba(0, 0, 0, 0.018) 1px,
+        transparent 1px,
+        transparent 14px
+      ),
+      linear-gradient(180deg, #f8f6f1 0%, #ebe7df 55%, #e0dbd2 100%);
+    box-shadow:
+      inset 0 2px 10px rgba(0, 0, 0, 0.07),
+      inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(120, 110, 98, 0.12);
+  }
+
+  .fridge-surface::before {
+    content: "";
+    @apply pointer-events-none absolute inset-0 rounded-lg opacity-40;
+    background: linear-gradient(
+      125deg,
+      transparent 40%,
+      rgba(255, 255, 255, 0.35) 48%,
+      transparent 56%
+    );
   }
 
   .fridge-surface-empty {
     @apply flex items-center justify-center;
   }
 
+  .fridge-toe-kick {
+    @apply mx-1 mt-1 h-2 rounded-b-[0.65rem];
+    background: linear-gradient(180deg, #1e2024, #121316);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
   .fridge-notes-grid {
-    @apply flex flex-wrap content-start justify-center gap-5 sm:gap-6;
+    @apply relative z-[1] flex flex-wrap content-start justify-center gap-5 sm:gap-6;
   }
 
   .fridge-empty-embedded {
-    @apply flex flex-col items-center justify-center px-4 py-6 text-center;
+    @apply relative z-[1] flex flex-col items-center justify-center px-4 py-6 text-center;
   }
 
   .fridge-empty-filter {
-    @apply py-12 text-center text-sm;
+    @apply relative z-[1] py-12 text-center text-sm;
     color: rgba(42, 38, 32, 0.45);
   }
 
@@ -870,12 +969,12 @@
   }
 
   .fridge-draft-paper {
-    @apply w-full max-w-[10.5rem] px-3 pb-3 pt-7 sm:max-w-[11.5rem];
-    min-height: 10.5rem;
+    @apply w-full max-w-[10.75rem] px-3 pb-3 pt-8 sm:max-w-[11.75rem];
+    min-height: 11rem;
   }
 
   .fridge-draft-input {
-    @apply min-h-[7.5rem] w-full resize-none border-0 bg-transparent px-0 pb-0 pt-1 font-serif text-[13px] leading-snug focus-visible:ring-0 focus-visible:ring-offset-0;
+    @apply relative z-[1] min-h-[7.5rem] w-full resize-none border-0 bg-transparent px-0 pb-0 pt-1 font-serif text-[13px] leading-snug focus-visible:ring-0 focus-visible:ring-offset-0;
     color: #2a2018;
   }
 
@@ -883,65 +982,128 @@
     color: rgba(42, 32, 24, 0.38);
   }
 
-  /* Sticky note paper — shared by draft, stuck notes, detail */
-  .fridge-sticky-paper {
-    @apply relative flex h-full w-full flex-col overflow-hidden rounded-sm;
-    box-shadow:
-      1px 2px 0 rgba(0, 0, 0, 0.07),
-      2px 5px 14px rgba(0, 0, 0, 0.14),
-      0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  /* Sticky note — layered paper with magnet, tape, curl */
+  .fridge-sticky-wrap {
+    @apply relative shrink-0 cursor-pointer border-0 bg-transparent p-0 transition duration-200;
+    width: 9.25rem;
+    height: 9.75rem;
   }
 
-  .fridge-sticky-wrap {
-    @apply shrink-0 cursor-pointer border-0 bg-transparent p-0 transition duration-200;
-    width: 8.75rem;
-    height: 9.25rem;
+  .fridge-sticky-cast {
+    @apply absolute inset-x-3 bottom-1 h-3 rounded-[50%];
+    background: radial-gradient(ellipse, rgba(0, 0, 0, 0.28), transparent 72%);
+    transform: scaleY(0.55);
+    filter: blur(2px);
+  }
+
+  .fridge-sticky-paper {
+    @apply relative flex h-full w-full flex-col overflow-hidden;
+    border-radius: 2px 2px 2px 1px;
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.65) inset,
+      1px 2px 0 rgba(0, 0, 0, 0.06),
+      2px 4px 0 rgba(0, 0, 0, 0.04),
+      3px 8px 16px rgba(0, 0, 0, 0.16);
+    transform: translateY(-1px);
+  }
+
+  .fridge-sticky-wrap:hover .fridge-sticky-paper {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.7) inset,
+      2px 5px 0 rgba(0, 0, 0, 0.05),
+      4px 12px 22px rgba(0, 0, 0, 0.22);
   }
 
   .fridge-sticky-wrap:hover {
-    transform: translateY(-4px) rotate(var(--note-rot, 0deg)) scale(1.03);
+    transform: translateY(-5px) rotate(var(--note-rot, 0deg)) scale(1.03);
   }
 
   .fridge-sticky-wrap-selected {
-    transform: translateY(-5px) rotate(var(--note-rot, 0deg)) scale(1.05);
+    transform: translateY(-6px) rotate(var(--note-rot, 0deg)) scale(1.05);
   }
 
   .fridge-sticky-wrap-unread .fridge-sticky-paper {
     box-shadow:
-      0 0 0 2px rgba(232, 157, 77, 0.55),
-      2px 5px 14px rgba(0, 0, 0, 0.14);
+      0 0 0 2px rgba(232, 157, 77, 0.6),
+      0 1px 0 rgba(255, 255, 255, 0.65) inset,
+      3px 8px 16px rgba(0, 0, 0, 0.16);
   }
 
   .fridge-sticky-wrap .fridge-sticky-paper {
-    @apply h-full w-full px-3 pb-2 pt-6;
+    @apply h-full w-full px-3 pb-2 pt-7;
+  }
+
+  .fridge-sticky-lines {
+    @apply pointer-events-none absolute inset-x-2 top-8 bottom-8 opacity-[0.14];
+    background: repeating-linear-gradient(
+      180deg,
+      transparent,
+      transparent 17px,
+      rgba(42, 32, 24, 0.22) 17px,
+      rgba(42, 32, 24, 0.22) 18px
+    );
   }
 
   .fridge-sticky-magnet {
-    @apply absolute left-1/2 top-1 z-10 h-3.5 w-3.5 -translate-x-1/2 rounded-full;
-    background: radial-gradient(circle at 35% 28%, #f0a050, #c2410c 72%);
+    @apply absolute left-1/2 top-1.5 z-10 h-4 w-4 -translate-x-1/2 rounded-full;
+    background:
+      radial-gradient(circle at 32% 26%, #ffb07a, #e85d26 52%, #9a3412 100%);
     box-shadow:
-      0 2px 4px rgba(0, 0, 0, 0.35),
-      inset 0 1px 0 rgba(255, 255, 255, 0.4);
+      0 3px 5px rgba(0, 0, 0, 0.35),
+      inset 0 1px 1px rgba(255, 255, 255, 0.55),
+      inset 0 -2px 3px rgba(0, 0, 0, 0.2);
+  }
+
+  .fridge-sticky-magnet::after {
+    content: "";
+    @apply absolute inset-[3px] rounded-full;
+    background: radial-gradient(circle at 40% 35%, rgba(255, 255, 255, 0.45), transparent 55%);
+  }
+
+  .fridge-sticky-tape {
+    @apply pointer-events-none absolute -right-1 top-3 z-[5] h-5 w-8 rotate-[32deg] opacity-80;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 248, 220, 0.92),
+      rgba(245, 230, 190, 0.78)
+    );
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+    clip-path: polygon(6% 0, 94% 0, 100% 100%, 0 100%);
   }
 
   .fridge-sticky-fold {
-    @apply pointer-events-none absolute bottom-0 right-0 h-4 w-4;
-    background: linear-gradient(135deg, transparent 45%, rgba(0, 0, 0, 0.07) 45%, rgba(0, 0, 0, 0.12) 100%);
+    @apply pointer-events-none absolute bottom-0 right-0 z-[2] h-5 w-5;
+    background:
+      linear-gradient(
+        135deg,
+        transparent 42%,
+        rgba(0, 0, 0, 0.04) 42%,
+        rgba(0, 0, 0, 0.1) 100%
+      );
+    box-shadow: -1px -1px 0 rgba(255, 255, 255, 0.35) inset;
+  }
+
+  .fridge-sticky-fold::after {
+    content: "";
+    @apply absolute bottom-0 right-0 h-full w-full;
+    background: linear-gradient(315deg, rgba(255, 255, 255, 0.55) 0%, rgba(0, 0, 0, 0.08) 100%);
+    clip-path: polygon(100% 0, 0 100%, 100% 100%);
   }
 
   .fridge-sticky-new {
-    @apply absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber;
-    box-shadow: 0 0 8px rgba(232, 157, 77, 0.9);
+    @apply absolute right-1.5 top-1.5 z-20 h-2.5 w-2.5 rounded-full bg-amber;
+    box-shadow: 0 0 10px rgba(232, 157, 77, 0.95);
   }
 
   .fridge-sticky-text {
-    @apply line-clamp-6 flex-1 overflow-hidden font-serif text-[12px] leading-snug whitespace-pre-wrap break-words;
+    @apply relative z-[1] line-clamp-6 flex-1 overflow-hidden font-serif text-[12px] leading-snug whitespace-pre-wrap break-words;
     color: #2a2018;
+    text-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.35);
   }
 
   .fridge-sticky-meta {
-    @apply mt-auto flex items-center justify-between pt-1 text-[8px] font-semibold uppercase tracking-wider;
-    color: rgba(42, 32, 24, 0.4);
+    @apply relative z-[1] mt-auto flex items-center justify-between border-t border-black/[0.06] pt-1.5 text-[8px] font-semibold uppercase tracking-wider;
+    color: rgba(42, 32, 24, 0.42);
   }
 
   .fridge-note-detail {
@@ -950,11 +1112,13 @@
   }
 
   .fridge-detail-paper {
-    @apply relative px-5 pb-4 pt-8;
-    min-height: 11rem;
+    @apply relative px-5 pb-4 pt-9;
+    min-height: 11.5rem;
+    border-radius: 2px;
     box-shadow:
-      1px 2px 0 rgba(0, 0, 0, 0.07),
-      4px 10px 24px rgba(0, 0, 0, 0.2);
+      0 1px 0 rgba(255, 255, 255, 0.65) inset,
+      2px 6px 0 rgba(0, 0, 0, 0.05),
+      6px 14px 28px rgba(0, 0, 0, 0.22);
   }
 
   .fridge-detail-text {

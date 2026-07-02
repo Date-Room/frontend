@@ -180,6 +180,9 @@ export default function CreateRoom() {
   const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>("plan");
   const [selectedPlan, setSelectedPlan] = useState<Plan>("try");
+  const [planStepSkipped, setPlanStepSkipped] = useState(false);
+  const [planGateResolved, setPlanGateResolved] = useState(false);
+  const autoSkipAppliedRef = useRef(false);
   const [curatedActivities, setCuratedActivities] = useState<CuratableActivityId[]>(
     () => defaultCuratedForPackage("single_pass"),
   );
@@ -267,9 +270,45 @@ export default function CreateRoom() {
   }
 
   function handleBack() {
+    if (step === "recipient" && planStepSkipped) {
+      navigate("/home");
+      return;
+    }
     if (stepIndex === 0) navigate("/home");
     else prev();
   }
+
+  function applyPlan(plan: Plan) {
+    const meta = PLANS.find((p) => p.id === plan) ?? PLANS[0];
+    setSelectedPlan(plan);
+    setCuratedActivities(defaultCuratedForPackage(meta.package));
+  }
+
+  /** Skip plan picker when the user's current tier is already usable. */
+  useEffect(() => {
+    if (searchParams.get("checkout")) {
+      setPlanGateResolved(true);
+      return;
+    }
+    if (entitlement === null && billingConfig === null) return;
+
+    const tier = currentTier;
+    if (!PLANS.some((p) => p.id === tier)) {
+      autoSkipAppliedRef.current = true;
+      setPlanGateResolved(true);
+      return;
+    }
+
+    if (!autoSkipAppliedRef.current) {
+      autoSkipAppliedRef.current = true;
+      if (!purchaseRequired(tier, entitlement)) {
+        applyPlan(tier);
+        setPlanStepSkipped(true);
+        setStep((s) => (s === "plan" ? "recipient" : s));
+      }
+    }
+    setPlanGateResolved(true);
+  }, [entitlement, billingConfig, currentTier, searchParams]);
 
   const availableActivityIds = useMemo(
     () => new Set(availableActivityIdsForPackage(planMeta.package)),
@@ -391,9 +430,7 @@ export default function CreateRoom() {
   }
 
   function handlePlanSelect(plan: Plan) {
-    const meta = PLANS.find((p) => p.id === plan) ?? PLANS[0];
-    setSelectedPlan(plan);
-    setCuratedActivities(defaultCuratedForPackage(meta.package));
+    applyPlan(plan);
 
     if (entitlement === null) {
       toast.message("Loading your account…");
@@ -411,6 +448,7 @@ export default function CreateRoom() {
       return;
     }
 
+    setPlanStepSkipped(false);
     next();
   }
 
@@ -454,6 +492,9 @@ export default function CreateRoom() {
         }
       } else if (checkout === "cancel") {
         toast.message("Checkout cancelled — pick a plan when you're ready.");
+        autoSkipAppliedRef.current = false;
+        setPlanStepSkipped(false);
+        setPlanGateResolved(true);
         setStep("plan");
       }
 
@@ -651,6 +692,12 @@ export default function CreateRoom() {
       >
         {step === "plan" && (
           <div>
+            {!planGateResolved ? (
+              <div className="flex justify-center py-20">
+                <Loader2 className="w-7 h-7 text-primary animate-spin" aria-label="Loading your plan" />
+              </div>
+            ) : (
+            <>
             <StepEyebrow stepIndex={stepIndex} />
             <h1 className="font-serif italic text-3xl md:text-4xl text-cream mb-3 tracking-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.35)]">
               Pick a plan
@@ -731,12 +778,20 @@ export default function CreateRoom() {
                 );
               })}
             </div>
+            </>
+            )}
           </div>
         )}
 
         {step === "recipient" && (
           <div>
             <StepEyebrow stepIndex={stepIndex} />
+            {planStepSkipped ? (
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-200">
+                <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Your plan · {currentTierLabel}
+              </div>
+            ) : null}
             <h1 className="font-serif italic text-3xl md:text-4xl text-cream mb-3 tracking-tight">
               Who&apos;s joining you?
             </h1>

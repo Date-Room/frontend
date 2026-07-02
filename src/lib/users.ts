@@ -24,6 +24,7 @@ export type UserUpdate = {
   photo_url?: string | null;
   country?: string | null;
   date_of_birth?: string | null;
+  confirm_adult?: boolean;
 };
 
 export function getMe(): Promise<UserMe> {

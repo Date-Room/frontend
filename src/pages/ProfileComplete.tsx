@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { Loader2, Camera, User as UserIcon, Calendar } from "lucide-react";
+import { Loader2, Camera, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import { CardPage } from "@/components/CardPage";
 import { UserAvatarImg } from "@/components/UserAvatarImg";
@@ -19,14 +19,6 @@ function readFileAsDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(new Error("Could not read file."));
     reader.readAsDataURL(file);
   });
-}
-
-/** Today − 18y, ISO date string (yyyy-mm-dd). The DOB input's `max`
- *  attribute prevents picking anything more recent. */
-function eighteenYearsAgoIso(): string {
-  const d = new Date();
-  d.setFullYear(d.getFullYear() - 18);
-  return d.toISOString().slice(0, 10);
 }
 
 /**
@@ -49,7 +41,7 @@ export default function ProfileComplete() {
 
   const [me, setMe] = useState<UserMe | null>(null);
   const [displayName, setDisplayName] = useState("");
-  const [dob, setDob] = useState<string>("");
+  const [confirmAdult, setConfirmAdult] = useState(false);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -94,10 +86,7 @@ export default function ProfileComplete() {
   }
 
   const canSubmit =
-    !busy &&
-    displayName.trim().length >= 1 &&
-    dob.length === 10 &&
-    new Date(dob) <= new Date(eighteenYearsAgoIso());
+    !busy && displayName.trim().length >= 1 && confirmAdult;
 
   async function handleSave() {
     setBusy(true);
@@ -105,7 +94,7 @@ export default function ProfileComplete() {
       await updateMe({
         display_name: displayName.trim(),
         photo_url: photoUrl ?? null,
-        date_of_birth: new Date(dob + "T00:00:00Z").toISOString(),
+        confirm_adult: true,
       });
       // Sync the cached session.user so AuthGuard's profile_complete
       // check stops routing us back here AND so the freshly-saved
@@ -201,26 +190,19 @@ export default function ProfileComplete() {
         />
       </section>
 
-      {/* DOB */}
-      <section className="space-y-1.5">
-        <label
-          htmlFor="pc-dob"
-          className="flex items-center gap-2 text-[11px] uppercase tracking-[0.28em] text-muted-foreground"
-        >
-          <Calendar className="h-3 w-3" /> Date of birth
+      {/* Age confirmation */}
+      <section>
+        <label className="flex items-start gap-3 cursor-pointer group">
+          <input
+            type="checkbox"
+            checked={confirmAdult}
+            onChange={(e) => setConfirmAdult(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-rosegold/30 bg-transparent text-rosegold focus-ring"
+          />
+          <span className="text-sm text-muted-foreground leading-relaxed group-hover:text-cream/90 transition-colors">
+            I confirm I am 18 years of age or older.
+          </span>
         </label>
-        <input
-          id="pc-dob"
-          type="date"
-          value={dob}
-          onChange={(e) => setDob(e.target.value)}
-          max={eighteenYearsAgoIso()}
-          className="auth-input focus-ring tabular-nums"
-          required
-        />
-        <p className="text-[11px] text-muted-foreground/70">
-          You must be 18 or older to use DateRoom.
-        </p>
       </section>
 
       <button

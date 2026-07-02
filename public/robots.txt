@@ -1,5 +1,20 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /home
+Disallow: /settings
+Disallow: /room/
+Disallow: /rooms/
+Disallow: /our-room/
+Disallow: /profile/
+
 User-agent: Googlebot
 Allow: /
+Allow: /privacy
+Allow: /terms
+Allow: /support
+Allow: /join
+Allow: /auth
 
 User-agent: Bingbot
 Allow: /
@@ -10,5 +25,4 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
-User-agent: *
-Allow: /
+Sitemap: https://dateroom.io/sitemap.xml

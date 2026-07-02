@@ -22,6 +22,12 @@ import {
   type FridgeItemKind,
   type FridgeState,
 } from "@/lib/roomWalls";
+import {
+  fallbackLinkTitle,
+  fetchLinkPreview,
+  isBookUrl,
+  isHttpUrl,
+} from "@/lib/linkPreview";
 import { cn } from "@/lib/utils";
 
 const KIND_TABS: { id: FridgeItemKind; label: string; icon: typeof BookOpen }[] = [
@@ -300,6 +306,7 @@ export function Bookshelf() {
   const [noteOpen, setNoteOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
 
   const focusAdd = () => {
@@ -334,20 +341,41 @@ export function Bookshelf() {
 
     let title = raw;
     let url: string | undefined;
-    if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    let itemKind = kind;
+    let resolvedAuthor = kind === "book" && author.trim() ? author.trim() : undefined;
+
+    if (isHttpUrl(raw)) {
       url = raw;
-      try {
-        title = new URL(raw).hostname.replace(/^www\./, "");
-      } catch {
-        title = raw;
+      setResolving(true);
+      const preview = await fetchLinkPreview(raw);
+      setResolving(false);
+
+      if (preview?.title) {
+        title = preview.title;
+        if (preview.author && !resolvedAuthor) {
+          resolvedAuthor = preview.author;
+        }
+        if (preview.is_book || isBookUrl(raw)) {
+          itemKind = "book";
+        } else if (kind === "watch") {
+          itemKind = "watch";
+        } else {
+          itemKind = "link";
+        }
+      } else {
+        title = fallbackLinkTitle(raw);
+        if (isBookUrl(raw)) {
+          itemKind = "book";
+          toast.message("Couldn't read the page title — edit the name after adding if needed.");
+        }
       }
     }
 
     const item: FridgeItem = {
       id: crypto.randomUUID(),
-      kind,
+      kind: itemKind,
       title,
-      author: kind === "book" && author.trim() ? author.trim() : undefined,
+      author: resolvedAuthor,
       url,
       note: note.trim() || undefined,
       status: "todo",
@@ -362,7 +390,12 @@ export function Bookshelf() {
       setAuthor("");
       setNote("");
       setNoteOpen(false);
-      toast.success("Placed on the shelf — add another?");
+      if (itemKind === "book" && itemKind !== kind) {
+        setKind("book");
+      }
+      toast.success(
+        itemKind === "book" ? `"${title}" added to the shelf` : "Placed on the shelf — add another?",
+      );
       focusAdd();
     }
   }
@@ -436,11 +469,15 @@ export function Bookshelf() {
             )}
             <button
               type="submit"
-              disabled={!input.trim() || saving}
+              disabled={!input.trim() || saving || resolving}
               className="wall-cta inline-flex shrink-0 items-center justify-center gap-1.5 px-5 py-2.5"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Add
+              {saving || resolving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+              {resolving ? "Reading link…" : "Add"}
             </button>
           </form>
 
@@ -553,14 +590,18 @@ export function Bookshelf() {
                   {(item) => {
                     const fromPartner = !!item.added_by && item.added_by !== room.senderId;
                     const selectedItem = selectedId === item.id;
+                    const displayKind =
+                      item.kind === "link" && item.url && isBookUrl(item.url) ? "book" : item.kind;
+                    const displayItem =
+                      displayKind !== item.kind ? { ...item, kind: displayKind as FridgeItemKind } : item;
                     const props = {
-                      item,
+                      item: displayItem,
                       selected: selectedItem,
                       fromPartner,
                       onSelect: () => setSelectedId(selectedItem ? null : item.id),
                     };
-                    if (item.kind === "link") return <LinkTab {...props} />;
-                    if (item.kind === "watch") return <WatchCase {...props} />;
+                    if (displayKind === "link") return <LinkTab {...props} />;
+                    if (displayKind === "watch") return <WatchCase {...props} />;
                     return <BookSpine {...props} />;
                   }}
                 </ShelfRow>

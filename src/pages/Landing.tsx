@@ -23,6 +23,8 @@ import {
   Mail,
 } from "lucide-react";
 import { TIER_PRICING } from "@/lib/tierPricing";
+import { SeoHead } from "@/components/SeoHead";
+import { LANDING_JSON_LD, LANDING_SEO } from "@/lib/seo";
 
 /**
  * Marketing landing — a faithful port of date-room-escape.lovable.app.
@@ -50,6 +52,15 @@ function Eyebrow({ children }: { children: ReactNode }) {
 export default function Landing() {
   return (
     <div id="top" className="lp min-h-screen bg-lpbg text-lpcream">
+      <SeoHead
+        title={LANDING_SEO.title}
+        description={LANDING_SEO.description}
+        canonical={LANDING_SEO.canonical}
+        ogImage={LANDING_SEO.ogImage}
+        ogImageAlt={LANDING_SEO.ogImageAlt}
+        themeColor={LANDING_SEO.themeColor}
+        jsonLd={LANDING_JSON_LD}
+      />
       {/* Banner */}
       <a href="#couples" className="block w-full border-b border-lpborder/40 bg-[oklch(0.13_0.01_40)]">
         <div className="mx-auto max-w-7xl px-6 py-2.5 text-center text-[13px] text-lpmuted">
