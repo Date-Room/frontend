@@ -2,6 +2,7 @@
 
 export type YoutubeIframeApiPlayer = {
   destroy?: () => void;
+  setSize?: (width: number, height: number) => void;
   setVolume?: (volume: number) => void;
   getVideoData?: () => { video_id?: string };
   loadVideoById?: (videoId: string) => void;

@@ -78,7 +78,21 @@ export function WatchTogether() {
   const [url, setUrl] = useState("");
   const [history, setHistory] = useState<WatchHistoryEntry[]>(() => loadWatchHistory());
   const playerRef = useRef<YoutubeIframeApiPlayer | null>(null);
+  const playerShellRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  function syncPlayerSize() {
+    const shell = playerShellRef.current;
+    const p = playerRef.current;
+    if (!shell || !p?.setSize) return;
+    const { width, height } = shell.getBoundingClientRect();
+    if (width < 1 || height < 1) return;
+    try {
+      p.setSize(Math.round(width), Math.round(height));
+    } catch {
+      void 0;
+    }
+  }
   const dTsRef = useRef(dTs);
   dTsRef.current = dTs;
 
@@ -145,9 +159,13 @@ export function WatchTogether() {
       if (cancelled || !containerRef.current || playerRef.current) return;
       const yt = window.YT;
       if (!yt) return;
+      const shell = playerShellRef.current;
+      const rect = shell?.getBoundingClientRect();
+      const w = rect && rect.width > 0 ? Math.round(rect.width) : 640;
+      const h = rect && rect.height > 0 ? Math.round(rect.height) : 360;
       playerRef.current = new yt.Player(containerRef.current, {
-        width: "100%",
-        height: "100%",
+        width: w,
+        height: h,
         videoId: videoId ?? undefined,
         playerVars: { rel: 0, modestbranding: 1, playsinline: 1, controls: 1, mute: 1 },
         events: {
@@ -155,6 +173,7 @@ export function WatchTogether() {
             try {
               const p = playerRef.current;
               if (!p) return;
+              syncPlayerSize();
               // Late joiners catch up locally — don't echo a play/pause burst to the room.
               suppress(3000);
               p.mute?.();
@@ -196,6 +215,15 @@ export function WatchTogether() {
       playerRef.current = null;
       isControllerRef.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldMount, videoId]);
+
+  useEffect(() => {
+    const shell = playerShellRef.current;
+    if (!shell || !shouldMount) return;
+    const ro = new ResizeObserver(() => syncPlayerSize());
+    ro.observe(shell);
+    return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shouldMount, videoId]);
 
@@ -344,7 +372,7 @@ export function WatchTogether() {
   };
 
   return (
-    <div className="flex flex-col h-full p-4 sm:p-6 gap-4">
+    <div className="flex flex-col h-full p-4 sm:p-5 gap-3">
       <form onSubmit={submit} className="flex gap-2">
         <Input
           value={url}
@@ -414,17 +442,33 @@ export function WatchTogether() {
         </p>
 
         <div className="flex-1 min-h-0 flex items-center justify-center w-full">
-          <div className="relative w-full max-h-full aspect-video rounded-2xl overflow-hidden bg-black border border-white/[0.08] shadow-[0_22px_60px_-22px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <div
+            ref={playerShellRef}
+            className="relative mx-auto h-[clamp(320px,min(62vh,100%),720px)] max-h-full w-auto max-w-full aspect-video rounded-2xl overflow-hidden bg-black border border-white/[0.08] shadow-[0_22px_60px_-22px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.04)]"
+          >
             {shouldMount && (
               <div
                 ref={containerRef}
-                className="absolute inset-0 [&_iframe]:absolute [&_iframe]:inset-0 [&_iframe]:h-full [&_iframe]:w-full"
+                className="absolute inset-0 overflow-hidden [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full"
               />
             )}
             {!videoId && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
                 <div className="text-3xl opacity-40">▶</div>
                 <p className="font-serif italic text-sm">paste a link to begin</p>
+              </div>
+            )}
+            {videoId && (
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-2 bg-gradient-to-t from-black/70 via-black/25 to-transparent p-3 pt-10">
+                <Button
+                  type="button"
+                  onClick={stopVideo}
+                  variant="outline"
+                  size="sm"
+                  className="pointer-events-auto rounded-full border-white/20 bg-black/50 text-cream hover:bg-black/70"
+                >
+                  <Square className="w-3.5 h-3.5 mr-1" /> Stop
+                </Button>
               </div>
             )}
           </div>
@@ -454,19 +498,6 @@ export function WatchTogether() {
         </Button>
       )}
 
-      {videoId && (
-        <div className="flex items-center gap-3 px-2">
-          <Button
-            type="button"
-            onClick={stopVideo}
-            variant="outline"
-            size="sm"
-            className="rounded-full border-border bg-secondary hover:bg-muted"
-          >
-            <Square className="w-3.5 h-3.5 mr-1" /> Stop
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
