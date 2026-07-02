@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Clock, Play, Square } from "lucide-react";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
@@ -344,34 +352,39 @@ export function WatchTogether() {
           placeholder={t("room.watchUrlPlaceholder")}
           className="focus-ring bg-secondary/60 border-white/[0.10] focus-visible:border-primary/40"
         />
-        <Button
-          type="submit"
-          className="focus-ring rounded-full text-primary-foreground hover:opacity-90 transition-all hover:-translate-y-px"
-          style={{ backgroundColor: "var(--room-accent)" }}
-        >
-          {t("room.watchPlay")}
-        </Button>
-      </form>
-
-      {history.length > 0 && (
-        <div className="space-y-2">
-          <p className="flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            {t("room.watchHistory")}
-          </p>
-          <ul className="max-h-36 overflow-y-auto rounded-xl border border-white/[0.08] bg-white/[0.03] divide-y divide-white/[0.06]">
-            {history.map((entry) => (
-              <li key={`${entry.videoId}-${entry.addedAt}`}>
-                <button
-                  type="button"
-                  onClick={() => playFromHistory(entry)}
-                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition hover:bg-white/[0.04]"
+        {history.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="focus-ring shrink-0 rounded-full border-white/[0.10] bg-secondary/60 hover:bg-white/[0.06] relative"
+                aria-label={t("room.watchHistory")}
+              >
+                <Clock className="h-4 w-4" />
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                  {history.length}
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72 max-h-64 overflow-y-auto">
+              <DropdownMenuLabel className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                {t("room.watchHistory")}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {history.map((entry) => (
+                <DropdownMenuItem
+                  key={`${entry.videoId}-${entry.addedAt}`}
+                  className="cursor-pointer gap-3 py-2.5"
+                  onSelect={() => playFromHistory(entry)}
                 >
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/40 text-muted-foreground">
                     <Play className="h-3.5 w-3.5" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm text-cream/90">
+                    <span className="block truncate text-sm">
                       {entry.url.replace(/^https?:\/\//, "")}
                     </span>
                     <span className="block text-[11px] text-muted-foreground">
@@ -381,29 +394,41 @@ export function WatchTogether() {
                       })}
                     </span>
                   </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        <Button
+          type="submit"
+          className="focus-ring shrink-0 rounded-full text-primary-foreground hover:opacity-90 transition-all hover:-translate-y-px"
+          style={{ backgroundColor: "var(--room-accent)" }}
+        >
+          {t("room.watchPlay")}
+        </Button>
+      </form>
+
+      <div className="flex-1 min-h-0 flex flex-col gap-2">
+        <p className="shrink-0 text-xs text-muted-foreground italic px-1">
+          {t("room.watchVolumeHint")}
+        </p>
+
+        <div className="flex-1 min-h-0 flex items-center justify-center w-full">
+          <div className="relative w-full max-h-full aspect-video rounded-2xl overflow-hidden bg-black border border-white/[0.08] shadow-[0_22px_60px_-22px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.04)]">
+            {shouldMount && (
+              <div
+                ref={containerRef}
+                className="absolute inset-0 [&_iframe]:absolute [&_iframe]:inset-0 [&_iframe]:h-full [&_iframe]:w-full"
+              />
+            )}
+            {!videoId && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                <div className="text-3xl opacity-40">▶</div>
+                <p className="font-serif italic text-sm">paste a link to begin</p>
+              </div>
+            )}
+          </div>
         </div>
-      )}
-
-      <p className="text-xs text-muted-foreground italic px-1">
-        {t("room.watchVolumeHint")}
-      </p>
-
-      <div className="flex-1 rounded-2xl overflow-hidden bg-black border border-white/[0.08] shadow-[0_22px_60px_-22px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.04)] relative">
-        {shouldMount && (
-          <div className="w-full h-full min-h-[240px] aspect-video">
-            <div ref={containerRef} className="w-full h-full" />
-          </div>
-        )}
-        {!videoId && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-            <div className="text-3xl opacity-40">▶</div>
-            <p className="font-serif italic text-sm">paste a link to begin</p>
-          </div>
-        )}
       </div>
 
       {videoId && dPlaying && !playing && (
