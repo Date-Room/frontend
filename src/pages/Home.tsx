@@ -592,6 +592,18 @@ function RoomTileRow({
   const endsLine = isPersistent ? null : expiryLabel(room.expires_at);
   const roleWord = isHost ? "Host" : "Guest";
 
+  // Subtle room-type label — Together/Crew for persistent, the pack tier
+  // otherwise. Shown muted so it reads as a quiet tag, not a badge.
+  const typeLabel = isPersistent
+    ? (room.max_participants ?? 2) > 2
+      ? "Crew"
+      : "Together"
+    : room.package === "date_pack"
+      ? "Date Pack"
+      : room.package === "long_pack"
+        ? "Long Pack"
+        : "Try";
+
   return (
     <button
       type="button"
@@ -612,11 +624,22 @@ function RoomTileRow({
           <p className="truncate text-[15px] font-semibold leading-tight text-cream">
             {title}
           </p>
-          {withLine ? (
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">{withLine}</p>
-          ) : (
-            <p className="mt-0.5 h-3.5" />
-          )}
+          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span
+              className={cn(
+                "shrink-0 text-[10px] font-medium uppercase tracking-[0.12em]",
+                isPersistent ? "text-primary/75" : "text-muted-foreground/65",
+              )}
+            >
+              {typeLabel}
+            </span>
+            {withLine ? (
+              <>
+                <span className="shrink-0 text-muted-foreground/35">·</span>
+                <span className="truncate">{withLine}</span>
+              </>
+            ) : null}
+          </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-0.5">
           {isPersistent ? (
