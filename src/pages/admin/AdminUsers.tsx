@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  getAdminUser,
   grantUserProduct,
   listAdminUsers,
   revokeUserSubscription,
@@ -15,8 +16,8 @@ import { cn } from "@/lib/utils";
 const GRANTS = [
   { id: "date_pack", label: "Date Pack" },
   { id: "long_pack", label: "Long Pack" },
-  { id: "together", label: "Together (30d)" },
-  { id: "crew", label: "Crew (30d)" },
+  { id: "together", label: "Together +1" },
+  { id: "crew", label: "Crew +1" },
 ] as const;
 
 export default function AdminUsers() {
@@ -29,12 +30,25 @@ export default function AdminUsers() {
     queryFn: () => listAdminUsers({ search: search || undefined }),
   });
 
+  // Full inventory for the selected user — plans are additive, so we show
+  // every owned plan/credit rather than a single "tier".
+  const { data: detail } = useQuery({
+    queryKey: ["admin-user", selected?.id],
+    queryFn: () => getAdminUser(selected!.id),
+    enabled: !!selected,
+  });
+
+  function refreshUser() {
+    void qc.invalidateQueries({ queryKey: ["admin-users"] });
+    void qc.invalidateQueries({ queryKey: ["admin-user", selected?.id] });
+  }
+
   async function grant(product: string) {
     if (!selected) return;
     try {
       await grantUserProduct(selected.id, { product, note: "admin portal grant" });
       toast.success(`Granted ${product} to ${selected.email}`);
-      void qc.invalidateQueries({ queryKey: ["admin-users"] });
+      refreshUser();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Grant failed");
     }
@@ -45,7 +59,7 @@ export default function AdminUsers() {
     try {
       await revokeUserSubscription(selected.id);
       toast.success("Subscription revoked");
-      void qc.invalidateQueries({ queryKey: ["admin-users"] });
+      refreshUser();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Revoke failed");
     }
@@ -133,8 +147,32 @@ export default function AdminUsers() {
                 <p className="text-sm text-slate-500">{selected.email}</p>
                 <p className="text-xs text-slate-600 mt-1 font-mono">{selected.id}</p>
               </div>
+
               <div className="space-y-2">
-                <p className="text-xs uppercase tracking-wider text-slate-500">Grant tier</p>
+                <p className="text-xs uppercase tracking-wider text-slate-500">Owned plans (all additive)</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {[
+                    { label: "Date Pack", value: `${detail?.date_pack_remaining ?? 0}` },
+                    { label: "Long Pack", value: `${detail?.long_pack_remaining ?? 0}` },
+                    { label: "Together", value: `${detail?.together_remaining ?? 0}` },
+                    { label: "Crew", value: `${detail?.crew_remaining ?? 0}` },
+                  ].map((row) => (
+                    <div
+                      key={row.label}
+                      className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2"
+                    >
+                      <span className="text-slate-400">{row.label}</span>
+                      <span className="font-semibold tabular-nums text-slate-100">×{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+                {detail?.has_active_subscription && (
+                  <p className="text-xs text-emerald-400">Active paid subscription</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-wider text-slate-500">Grant plan (stacks — never replaces)</p>
                 <div className="grid grid-cols-2 gap-2">
                   {GRANTS.map((g) => (
                     <Button

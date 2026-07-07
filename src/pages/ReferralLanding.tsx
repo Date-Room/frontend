@@ -34,7 +34,7 @@ export default function ReferralLanding() {
         <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-rosegold/30 bg-rosegold/10 px-4 py-1.5 text-xs uppercase tracking-widest text-rosegold">
           <Sparkles className="h-3 w-3" /> Invitation
         </div>
-        <h1 className="text-4xl font-serif italic text-cream md:text-5xl">
+        <h1 className="text-4xl font-serif font-semibold text-cream md:text-5xl">
           A friend invited you to DateRoom.
         </h1>
         <p className="mt-5 text-base leading-relaxed text-cream/80">

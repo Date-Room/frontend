@@ -91,7 +91,7 @@ export function LegalShell({
             />
             {eyebrow}
           </p>
-          <h1 className="font-serif italic text-3xl md:text-4xl lg:text-[2.75rem] text-cream mb-3 tracking-tight">
+          <h1 className="font-serif font-semibold text-3xl md:text-4xl lg:text-[2.75rem] text-cream mb-3 tracking-tight">
             {title}
           </h1>
           <p className="text-sm text-muted-foreground leading-relaxed">{intro}</p>
@@ -174,7 +174,7 @@ export function LegalShell({
                 <p className="text-[10px] uppercase tracking-[0.32em] text-muted-foreground/70 mb-2 tabular-nums">
                   {String(i + 1).padStart(2, "0")}
                 </p>
-                <h2 className="font-serif italic text-cream text-xl md:text-2xl tracking-tight mb-4">
+                <h2 className="font-serif font-semibold text-cream text-xl md:text-2xl tracking-tight mb-4">
                   {s.title}
                 </h2>
                 <div className="space-y-3 text-muted-foreground">{s.body}</div>

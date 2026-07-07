@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { type ReactNode, type ComponentType } from "react";
 import {
   ArrowRight,
@@ -25,6 +26,7 @@ import {
 import { TIER_PRICING } from "@/lib/tierPricing";
 import { SeoHead } from "@/components/SeoHead";
 import { LANDING_JSON_LD, LANDING_SEO } from "@/lib/seo";
+import { LandingLanguageMenu } from "@/components/LandingLanguageMenu";
 
 /**
  * Marketing landing — a faithful port of date-room-escape.lovable.app.
@@ -50,6 +52,10 @@ function Eyebrow({ children }: { children: ReactNode }) {
 }
 
 export default function Landing() {
+  const { t } = useTranslation();
+  const steps = t("landing.how.steps", { returnObjects: true }) as Array<{ t: string; d: string }>;
+  const insideCards = t("landing.inside.cards", { returnObjects: true }) as Array<{ t: string; d: string }>;
+  const trust = t("landing.trust", { returnObjects: true }) as string[];
   return (
     <div id="top" className="lp min-h-screen bg-lpbg text-lpcream">
       <SeoHead
@@ -64,7 +70,7 @@ export default function Landing() {
       {/* Banner */}
       <a href="#couples" className="block w-full border-b border-lpborder/40 bg-[oklch(0.13_0.01_40)]">
         <div className="mx-auto max-w-7xl px-6 py-2.5 text-center text-[13px] text-lpmuted">
-          Already have your people? Meet the room that stays open{" "}
+          {t("landing.banner")}{" "}
           <ArrowRight className="ml-1 -mt-0.5 inline h-3.5 w-3.5 text-lppeach" />
         </div>
       </a>
@@ -74,17 +80,16 @@ export default function Landing() {
         <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-8 px-6">
           <Wordmark />
           <ul className="hidden items-center gap-8 text-sm text-lpmuted md:flex">
-            <li><a href="#how" className="transition hover:text-lpcream">How it works</a></li>
-            <li><a href="#inside" className="transition hover:text-lpcream">Inside the room</a></li>
-            <li><a href="#couples" className="transition hover:text-lpcream">For couples</a></li>
-            <li><a href="#friends" className="transition hover:text-lpcream">For friends</a></li>
-            <li><a href="#pricing" className="transition hover:text-lpcream">Pricing</a></li>
+            <li><a href="#how" className="transition hover:text-lpcream">{t("landing.nav.how")}</a></li>
+            <li><a href="#inside" className="transition hover:text-lpcream">{t("landing.nav.inside")}</a></li>
+            <li><a href="#pricing" className="transition hover:text-lpcream">{t("landing.nav.pricing")}</a></li>
           </ul>
-          <div className="flex items-center gap-3 sm:gap-5">
+          <div className="flex items-center gap-3">
+            <LandingLanguageMenu className="hidden sm:block" iconOnly />
             <Link to="/join" className="hidden text-sm text-lpmuted transition-colors hover:text-lpcream sm:inline">
-              Join a room
+              {t("landing.nav.join")}
             </Link>
-            <Link to={START} className="lp-btn !px-5 !py-2.5 text-sm">Create a room</Link>
+            <Link to={START} className="lp-btn !px-5 !py-2.5 text-sm">{t("landing.nav.login")}</Link>
           </div>
         </nav>
       </header>
@@ -94,21 +99,21 @@ export default function Landing() {
         <img src="/lov/hero-candlelit.jpg" alt="Candlelit dinner table with a tablet showing a video date" width={1920} height={1280} className="absolute inset-0 h-full w-full object-cover" />
         <div className="relative z-10 mx-auto max-w-7xl px-6 pb-32 pt-28 md:pb-38 md:pt-30">
           <div className="max-w-2xl text-left">
-            <Eyebrow>Before the phone number</Eyebrow>
-            <h1 className="lp-display mt-6 text-5xl text-lpcream md:text-7xl lg:text-8xl">
-              Date them before<br />you date them.
+            <Eyebrow>{t("landing.hero.eyebrow")}</Eyebrow>
+            <h1 className="lp-display mt-6 whitespace-pre-line text-5xl text-lpcream md:text-7xl lg:text-8xl">
+              {t("landing.hero.title")}
             </h1>
             <p className="mt-8 max-w-xl text-lg leading-relaxed text-lpcream/85 md:text-xl">
-              A private room you share with a six-digit code. No phone numbers. No awkward exchange. Just enough to know if it's worth meeting in real life.
+              {t("landing.hero.subtitle")}
             </p>
-            <p className="lp-serif mt-5 text-xl italic text-lppeachsoft md:text-2xl">Not a video call. A date.</p>
+            <p className="lp-serif mt-5 text-xl italic text-lppeachsoft md:text-2xl">{t("landing.hero.tagline")}</p>
             <div className="mt-10 flex flex-wrap items-center gap-6">
-              <Link to={START} className="lp-btn">Create your room</Link>
-              <a href="#how" className="lp-link">See how it works</a>
+              <Link to={START} className="lp-btn">{t("landing.hero.create")}</Link>
+              <a href="#how" className="lp-link">{t("landing.hero.seeHow")}</a>
             </div>
             <p className="mt-6 text-[15px] text-lpmuted">
-              Got a code from your match?{" "}
-              <Link to="/join" className="lp-link">Join a room</Link>
+              {t("landing.hero.gotCode")}{" "}
+              <Link to="/join" className="lp-link">{t("landing.hero.join")}</Link>
             </p>
           </div>
         </div>
@@ -117,15 +122,15 @@ export default function Landing() {
       {/* Section 2 — Why this exists */}
       <section className="mx-auto grid max-w-7xl items-center gap-10 px-6 py-16 md:grid-cols-2 md:py-7">
         <div>
-          <Eyebrow>Why this exists</Eyebrow>
-          <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">
-            Dating got expensive.<br />In every sense.
+          <Eyebrow>{t("landing.why.eyebrow")}</Eyebrow>
+          <h2 className="lp-display mt-5 whitespace-pre-line text-4xl text-lpcream md:text-6xl">
+            {t("landing.why.title")}
           </h2>
           <p className="mt-8 text-lg leading-relaxed text-lpmuted">
-            First dates now cost a hundred bucks before the second drink. And the price of being wrong is higher: a number you can't take back, texts that won't stop, a stranger who knows where to find you.
+            {t("landing.why.p1")}
           </p>
           <p className="mt-5 text-lg leading-relaxed text-lpmuted">
-            There should be a step between matching and meeting. A safer one. There wasn't. Now there is.
+            {t("landing.why.p2")}
           </p>
         </div>
         <div className="relative">
@@ -144,8 +149,8 @@ export default function Landing() {
       <section id="how" className="border-t border-lpborder/40 bg-[oklch(0.14_0.012_40)]">
         <div className="mx-auto max-w-7xl px-6 py-28 md:py-36">
           <div className="mx-auto max-w-3xl text-center">
-            <Eyebrow>How it works</Eyebrow>
-            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">Three steps. Nothing to download.</h2>
+            <Eyebrow>{t("landing.how.eyebrow")}</Eyebrow>
+            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">{t("landing.how.title")}</h2>
           </div>
 
           {/* Room mockup */}
@@ -157,7 +162,7 @@ export default function Landing() {
                 <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.70_0.14_140)]" />
               </div>
               <div className="font-mono tracking-[0.3em] text-lpcream/80">DATE ROOM</div>
-              <div className="text-[11px] uppercase tracking-widest text-lppeach">live</div>
+              <div className="text-[11px] uppercase tracking-widest text-lppeach">{t("landing.how.live")}</div>
             </div>
 
             <div className="mt-5 grid grid-cols-2 gap-4">
@@ -179,13 +184,9 @@ export default function Landing() {
           </div>
 
           <div className="mt-20 grid gap-10 md:grid-cols-3">
-            {[
-              { n: "01", t: "Create the room.", d: "A six-digit code lands in your hand. Add an optional PIN if you want extra cover." },
-              { n: "02", t: "Share the code.", d: "Drop it in any DM. The other side opens it on the app or in any browser." },
-              { n: "03", t: "Open the door.", d: "Twenty minutes, an hour, whatever you booked. The room dissolves when you're done." },
-            ].map((s) => (
-              <div key={s.n}>
-                <div className="lp-serif text-3xl italic text-lppeach">{s.n}</div>
+            {steps.map((s, i) => (
+              <div key={i}>
+                <div className="lp-serif text-3xl italic text-lppeach">{`0${i + 1}`}</div>
                 <h3 className="lp-display mt-3 text-2xl text-lpcream">{s.t}</h3>
                 <p className="mt-3 leading-relaxed text-lpmuted">{s.d}</p>
               </div>
@@ -197,24 +198,16 @@ export default function Landing() {
       {/* Section 4 — Inside the room */}
       <section id="inside" className="mx-auto max-w-7xl px-6 py-28 md:py-36">
         <div className="max-w-3xl">
-          <Eyebrow>Why this beats FaceTime</Eyebrow>
+          <Eyebrow>{t("landing.inside.eyebrow")}</Eyebrow>
           <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">
-            Built for the part of dating that's actually hard: the first hour.
+            {t("landing.inside.title")}
           </h2>
-          <p className="mt-6 text-lg text-lpmuted">Awkward silences kill chemistry. The room comes with things to do.</p>
+          <p className="mt-6 text-lg text-lpmuted">{t("landing.inside.subtitle")}</p>
         </div>
 
         <div className="mt-16 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { Icon: MessageCircleQuestion, t: "The Deck", d: "Real questions, not small talk. Two hundred and fifty prompts that get past the weather." },
-            { Icon: Play, t: "Watch Together", d: "A YouTube clip, a stand-up set, a trailer. Synced down to the second." },
-            { Icon: Music2, t: "Synced DJ", d: "Play her the song. Play him the song back. Watch each other react." },
-            { Icon: Zap, t: "This or That", d: "Rapid-fire choices. The fastest way to find out you both hate camping." },
-            { Icon: Camera, t: "Capture", d: "A photo of the two of you, taken at the same moment from two cities. The only thing you keep." },
-            { Icon: Flame, t: "Truth or Dare", d: "Couple-safe by default. Tiered, so you choose how brave the room gets." },
-            { Icon: HelpCircle, t: "Two Truths and a Lie", d: "The classic. Now with a partner who can't quite read your face through the candlelight." },
-            { Icon: MoreHorizontal, t: "More coming", d: "Karaoke, the 36 Questions, Couple's Trivia, Draw and Guess. The next wave." },
-          ].map((card, i) => {
+          {[MessageCircleQuestion, Play, Music2, Zap, Camera, Flame, HelpCircle, MoreHorizontal].map((Icon, i) => {
+            const card = { Icon, t: insideCards[i]?.t ?? "", d: insideCards[i]?.d ?? "" };
             const bgImages = [
               '/hero-virtual-date-rose-petals.png',
               '/image.png',
@@ -227,7 +220,7 @@ export default function Landing() {
             ];
             return (
               <article
-                key={card.t}
+                key={i}
                 className="group relative overflow-hidden rounded-2xl border border-lpborder p-6 transition-all duration-500 ease-in-out hover:scale-[1.03] hover:border-lppeach/40 hover:shadow-lg hover:shadow-lppeach/10"
                 style={{
                   backgroundImage: `url(${bgImages[i % bgImages.length]})`,
@@ -265,13 +258,13 @@ export default function Landing() {
         <img src="/lov/phone-code.jpg" alt="A phone showing a 6-digit code by candlelight" width={1280} height={1280} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         <div className="relative z-10 mx-auto max-w-7xl px-6 py-28 md:py-40">
           <div className="max-w-2xl">
-            <Eyebrow>Why this works</Eyebrow>
-            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">One room. Every app.</h2>
+            <Eyebrow>{t("landing.oneRoom.eyebrow")}</Eyebrow>
+            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">{t("landing.oneRoom.title")}</h2>
             <p className="mt-8 text-lg leading-relaxed text-lpcream/85">
-              Most daters keep three or four apps open at once. Tinder, Bumble, Hinge, all running at the same time. None of them will ever build a room that works across the others. DateRoom does.
+              {t("landing.oneRoom.p1")}
             </p>
             <p className="mt-5 text-lg leading-relaxed text-lpcream/85">
-              The room is yours. Drop the code in whichever DM matters tonight. The next match opens the same room. You bring the room. Matches come to it.
+              {t("landing.oneRoom.p2")}
             </p>
             <div className="mt-10 flex gap-3 text-xs uppercase tracking-[0.25em] text-lpmuted">
               <span className="rounded-full border border-lpborder/60 px-3 py-1.5">Tinder</span>
@@ -288,12 +281,12 @@ export default function Landing() {
         <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, oklch(0.18 0.02 50 / 0.92) 0%, oklch(0.18 0.02 50 / 0.55) 60%, transparent 100%)" }} />
         <div className="relative z-10 mx-auto max-w-7xl px-6 py-28 md:py-40">
           <div className="max-w-xl">
-            <Eyebrow>Already yours?</Eyebrow>
-            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">A room that stays open.</h2>
+            <Eyebrow>{t("landing.couples.eyebrow")}</Eyebrow>
+            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">{t("landing.couples.title")}</h2>
             <p className="mt-8 text-lg leading-relaxed text-lpcream/85">
-              When you live in different cities. When one of you is on the road. When you live in the same house but the kids are everywhere. Keep a room. Pin a vision board. Leave each other notes. Watch a movie at the same time from two time zones. Make the walls yours. It stays open as long as you want it to.
+              {t("landing.couples.body")}
             </p>
-            <Link to={START} className="lp-btn mt-10">Open a Together room</Link>
+            <Link to={START} className="lp-btn mt-10">{t("landing.couples.cta")}</Link>
           </div>
         </div>
       </section>
@@ -304,12 +297,12 @@ export default function Landing() {
         <div className="absolute inset-0" style={{ background: "linear-gradient(270deg, oklch(0.18 0.02 50 / 0.92) 0%, oklch(0.18 0.02 50 / 0.55) 60%, transparent 100%)" }} />
         <div className="relative z-10 mx-auto flex max-w-7xl justify-end px-6 py-28 md:py-40">
           <div className="max-w-xl">
-            <Eyebrow>Or bring the group</Eyebrow>
-            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">Closer than the group chat.</h2>
+            <Eyebrow>{t("landing.friends.eyebrow")}</Eyebrow>
+            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">{t("landing.friends.title")}</h2>
             <p className="mt-8 text-lg leading-relaxed text-lpcream/85">
-              Best friends in three different cities. Sisters in different countries. The book club that lives across time zones. Up to five of you in one room. Watch a movie at the same time. Play the deck. Argue about whose turn it is on the DJ. The group chat, but you can actually see each other.
+              {t("landing.friends.body")}
             </p>
-            <Link to={START} className="lp-btn mt-10">Open a room with friends</Link>
+            <Link to={START} className="lp-btn mt-10">{t("landing.friends.cta")}</Link>
           </div>
         </div>
       </section>
@@ -317,15 +310,15 @@ export default function Landing() {
       {/* Section 8 — Pricing */}
       <section id="pricing" className="mx-auto max-w-7xl px-6 py-28 md:py-36">
         <div className="mx-auto max-w-3xl text-center">
-          <Eyebrow>Pricing</Eyebrow>
-          <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">Pick the room that fits.</h2>
+          <Eyebrow>{t("landing.pricing.eyebrow")}</Eyebrow>
+          <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">{t("landing.pricing.title")}</h2>
         </div>
 
         <div className="mt-16 grid gap-5 md:grid-cols-3">
           {[
-            { name: "Try", price: TIER_PRICING.try.priceLabel, unit: "one date · 20 min", desc: "Ad-supported.", cta: "Start free" },
-            { name: "Date Pack", price: TIER_PRICING.date_pack.priceLabel, unit: TIER_PRICING.date_pack.unit!, desc: "For the early matches.", cta: "Get the pack" },
-            { name: "Long Pack", price: TIER_PRICING.long_pack.priceLabel, unit: TIER_PRICING.long_pack.unit!, desc: "For the ones with potential.", cta: "Get the pack" },
+            { name: t("landing.pricing.tryName"), price: TIER_PRICING.try.priceLabel, unit: t("landing.pricing.tryUnit"), desc: t("landing.pricing.tryDesc"), cta: t("landing.pricing.tryCta") },
+            { name: t("landing.pricing.datePackName"), price: TIER_PRICING.date_pack.priceLabel, unit: TIER_PRICING.date_pack.unit!, desc: t("landing.pricing.datePackDesc"), cta: t("landing.pricing.datePackCta") },
+            { name: t("landing.pricing.longPackName"), price: TIER_PRICING.long_pack.priceLabel, unit: TIER_PRICING.long_pack.unit!, desc: t("landing.pricing.longPackDesc"), cta: t("landing.pricing.longPackCta") },
           ].map((p) => (
             <PricingCard key={p.name} {...p} />
           ))}
@@ -333,19 +326,19 @@ export default function Landing() {
 
         <div className="mt-5 grid gap-5 md:grid-cols-2">
           <PricingCard
-            name="Together"
+            name={t("landing.pricing.togetherName")}
             price={TIER_PRICING.together.priceLabel}
             unit={`${TIER_PRICING.together.priceSuffix ?? ""} · ${TIER_PRICING.together.unit}`}
-            desc="A room that stays open. Custom walls. Watch party for up to 12."
-            cta="Open Together"
+            desc={t("landing.pricing.togetherDesc")}
+            cta={t("landing.pricing.togetherCta")}
             featured
           />
           <PricingCard
-            name="Crew"
+            name={t("landing.pricing.crewName")}
             price={TIER_PRICING.crew.priceLabel}
             unit={`${TIER_PRICING.crew.priceSuffix ?? ""} · ${TIER_PRICING.crew.unit}`}
-            desc="Movie nights, game nights, book clubs. Group watch party for 10+."
-            cta="Open Crew"
+            desc={t("landing.pricing.crewDesc")}
+            cta={t("landing.pricing.crewCta")}
             featured
           />
         </div>
@@ -353,11 +346,11 @@ export default function Landing() {
 
       {/* Section 9 — App badges */}
       <section className="mx-auto max-w-7xl px-6 pb-20 text-center">
-        <p className="lp-serif text-2xl italic text-lpcream">Coming soon to your pocket.</p>
+        <p className="lp-serif text-2xl italic text-lpcream">{t("landing.badges.tagline")}</p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
           {[
-            { top: "Coming soon on", bot: "App Store" },
-            { top: "Coming soon on", bot: "Google Play" },
+            { top: t("landing.badges.comingSoon"), bot: "App Store" },
+            { top: t("landing.badges.comingSoon"), bot: "Google Play" },
           ].map((b) => (
             <div key={b.bot} className="flex cursor-not-allowed items-center gap-3 rounded-xl border border-lpborder bg-lpcard/60 px-6 py-3 text-left opacity-70">
               <Sparkles className="h-6 w-6 text-lpmuted" />
@@ -373,15 +366,10 @@ export default function Landing() {
       {/* Section 10 — Trust strip */}
       <section className="border-y border-lpborder/40 bg-[oklch(0.14_0.012_40)]">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-10 gap-y-4 px-6 py-8 text-sm text-lpcream/85">
-          {[
-            { Icon: ShieldCheck, t: "Date safer." },
-            { Icon: PhoneOff, t: "No phone numbers exchanged." },
-            { Icon: KeyRound, t: "Code plus optional PIN." },
-            { Icon: Lock, t: "End-to-end encrypted." },
-          ].map(({ Icon, t }) => (
-            <div key={t} className="flex items-center gap-2.5">
+          {[ShieldCheck, PhoneOff, KeyRound, Lock].map((Icon, i) => (
+            <div key={i} className="flex items-center gap-2.5">
               <Icon className="h-4 w-4 text-lppeach" />
-              <span>{t}</span>
+              <span>{trust[i]}</span>
             </div>
           ))}
         </div>
@@ -391,12 +379,12 @@ export default function Landing() {
       <section id="cta" className="lp-vignette relative overflow-hidden">
         <img src="/lov/final-door.jpg" alt="An open door with warm light spilling into a dark room" width={1920} height={1080} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         <div className="relative z-10 mx-auto max-w-3xl px-6 py-36 text-center md:py-48">
-          <h2 className="lp-display text-5xl text-lpcream md:text-7xl">Open the door.</h2>
-          <p className="mt-8 text-lg text-lpcream/85">Two minutes to make a room. The next move is theirs.</p>
+          <h2 className="lp-display text-5xl text-lpcream md:text-7xl">{t("landing.finalCta.title")}</h2>
+          <p className="mt-8 text-lg text-lpcream/85">{t("landing.finalCta.subtitle")}</p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-6">
-            <Link to={START} className="lp-btn">Create an account</Link>
-            <Link to="/join" className="lp-link">Join a room</Link>
-            <a href="#pricing" className="lp-link">View pricing plans</a>
+            <Link to={START} className="lp-btn">{t("landing.finalCta.create")}</Link>
+            <Link to="/join" className="lp-link">{t("landing.finalCta.join")}</Link>
+            <a href="#pricing" className="lp-link">{t("landing.finalCta.pricing")}</a>
           </div>
         </div>
       </section>
@@ -407,21 +395,31 @@ export default function Landing() {
           <div>
             <Wordmark size="text-2xl" />
             <p className="mt-5 max-w-sm text-sm leading-relaxed text-lpmuted">
-              We're on a mission to bring intentionality and safety to the part of dating no one designed: the space between a match and a meeting.
+              {t("landing.footer.mission")}
             </p>
-            <p className="lp-serif mt-5 italic text-lppeachsoft">The room before the phone number.</p>
+            <p className="lp-serif mt-5 italic text-lppeachsoft">{t("landing.footer.tagline")}</p>
           </div>
 
-          <FooterCol title="Product" links={["Features", "Pricing", "How it works"]} />
           <FooterCol
-            title="Company"
-            links={["About us", "Privacy", "Terms"]}
+            title={t("landing.footer.product")}
+            links={[t("landing.footer.productFeatures"), t("landing.footer.productPricing"), t("landing.footer.productHow")]}
+          />
+          <FooterCol
+            title={t("landing.footer.company")}
+            links={[t("landing.footer.companyAbout"), t("landing.footer.companyPrivacy"), t("landing.footer.companyTerms")]}
             hrefs={[undefined, "/privacy", "/terms"]}
           />
-          <FooterCol title="Connect" links={["Twitter", "Instagram", "Contact"]} icons={[Twitter, Instagram, Mail]} />
+          <FooterCol
+            title={t("landing.footer.connect")}
+            links={["Twitter", "Instagram", t("landing.footer.connectContact")]}
+            icons={[Twitter, Instagram, Mail]}
+          />
         </div>
         <div className="border-t border-lpborder/40">
-          <div className="mx-auto max-w-7xl px-6 py-6 text-xs text-lpmuted">© DateRoom, {new Date().getFullYear()}.</div>
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-6 text-xs text-lpmuted">
+            <span>{t("landing.footer.copyright", { year: new Date().getFullYear() })}</span>
+            <LandingLanguageMenu align="up" />
+          </div>
         </div>
       </footer>
     </div>

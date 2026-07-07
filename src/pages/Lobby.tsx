@@ -5,8 +5,7 @@ import { getRoomByCode, joinRoom, type InviteCard } from "@/lib/rooms";
 import { saveRoomPlanFromServer } from "@/lib/roomExperience";
 import { getMe, updateMe } from "@/lib/users";
 import { authClient } from "@/lib/authClient";
-import { resolveAmbiancePreset, ambianceMeta } from "@/lib/ambiance";
-import type { AmbiancePresetId } from "@/lib/ambiance";
+import { resolveLobbyMood, ambianceMeta, PLAIN_MOOD, type LobbyMood } from "@/lib/ambiance";
 import { PageShell } from "@/components/PageShell";
 import { AmbientSceneStack } from "@/components/AmbientSceneStack";
 import { toast } from "sonner";
@@ -88,8 +87,8 @@ export default function Lobby() {
     })();
   }, []);
 
-  const ambientPreset: AmbiancePresetId = useMemo(
-    () => resolveAmbiancePreset(invite?.background_id ?? undefined),
+  const ambientPreset: LobbyMood = useMemo(
+    () => resolveLobbyMood(invite?.background_id ?? undefined),
     [invite],
   );
 
@@ -195,7 +194,7 @@ export default function Lobby() {
     return (
       <PageShell className="flex flex-col items-center justify-center px-6 py-16 text-center">
         <div className="max-w-md relative z-10 animate-fade-in rounded-[1.75rem] border border-white/[0.08] bg-card/40 backdrop-blur-xl p-8 shadow-[0_24px_70px_rgba(0,0,0,0.35)] ring-1 ring-white/[0.06] space-y-6">
-          <h1 className="font-serif italic text-cream text-3xl mb-1">This date has ended</h1>
+          <h1 className="font-serif font-semibold text-cream text-3xl mb-1">This date has ended</h1>
           <p className="text-muted-foreground leading-relaxed">
             Relive how it went — the recap is still here for a little while.
           </p>
@@ -231,7 +230,7 @@ export default function Lobby() {
     return (
       <PageShell className="flex flex-col items-center justify-center px-6 py-16 text-center">
         <div className="max-w-md relative z-10 animate-fade-in rounded-[1.75rem] border border-white/[0.08] bg-card/40 backdrop-blur-xl p-8 shadow-[0_24px_70px_rgba(0,0,0,0.35)] ring-1 ring-white/[0.06]">
-          <h1 className="font-serif italic text-cream text-3xl mb-3">Hmm</h1>
+          <h1 className="font-serif font-semibold text-cream text-3xl mb-3">Hmm</h1>
           <p className="text-muted-foreground leading-relaxed">{error}</p>
         </div>
       </PageShell>
@@ -255,7 +254,7 @@ export default function Lobby() {
     return (
       <PageShell className="flex flex-col items-center justify-center px-6 py-16 text-center">
         <div className="max-w-md relative z-10 animate-fade-in rounded-[1.75rem] border border-white/[0.08] bg-card/40 backdrop-blur-xl p-8 shadow-[0_24px_70px_rgba(0,0,0,0.35)] ring-1 ring-white/[0.06]">
-          <h1 className="font-serif italic text-cream text-3xl mb-3">The evening&apos;s over</h1>
+          <h1 className="font-serif font-semibold text-cream text-3xl mb-3">The evening&apos;s over</h1>
           <p className="text-muted-foreground leading-relaxed">This invite has expired. Ask the host for a new one.</p>
         </div>
       </PageShell>
@@ -300,7 +299,7 @@ export default function Lobby() {
             >
               {invite.greeting_headline && (
                 <h1
-                  className="font-serif italic text-cream text-2xl sm:text-4xl leading-snug"
+                  className="font-serif font-semibold text-cream text-2xl sm:text-4xl leading-snug"
                   style={{ textShadow: "0 2px 24px rgba(0,0,0,0.6)" }}
                 >
                   {invite.greeting_headline}
@@ -386,7 +385,10 @@ export default function Lobby() {
               )}
 
               <p className="max-w-xs text-[10px] uppercase tracking-[0.22em] text-cream/40">
-                {ambianceMeta(ambientPreset).label} lighting · matches your live date room
+                {ambientPreset === PLAIN_MOOD
+                  ? "Plain lobby"
+                  : `${ambianceMeta(ambientPreset).label} lighting`}{" "}
+                · matches your live date room
               </p>
             </div>
           </div>

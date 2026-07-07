@@ -29,7 +29,7 @@ export default function Support() {
           Support
         </p>
 
-        <h1 className="font-serif italic text-3xl md:text-4xl text-cream mb-3 tracking-tight">
+        <h1 className="font-serif font-semibold text-3xl md:text-4xl text-cream mb-3 tracking-tight">
           How can we help?
         </h1>
         <p className="text-sm text-muted-foreground mb-10 leading-relaxed">

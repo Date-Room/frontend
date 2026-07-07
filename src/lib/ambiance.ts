@@ -12,6 +12,12 @@ export const AMBIANCE_PRESETS = [
 
 export type AmbiancePresetId = (typeof AMBIANCE_PRESETS)[number]["id"];
 
+/** Explicit "no themed background" — renders a plain, neutral room. */
+export const PLAIN_MOOD = "plain" as const;
+
+/** A room mood is either one of the photo presets or the plain (no image) look. */
+export type LobbyMood = AmbiancePresetId | typeof PLAIN_MOOD;
+
 const PRESET_IDS = new Set<string>(AMBIANCE_PRESETS.map((p) => p.id));
 
 export function isAmbiancePresetId(value: unknown): value is AmbiancePresetId {
@@ -20,6 +26,12 @@ export function isAmbiancePresetId(value: unknown): value is AmbiancePresetId {
 
 export function resolveAmbiancePreset(value: unknown): AmbiancePresetId {
   return isAmbiancePresetId(value) ? value : "candlelit";
+}
+
+/** Resolve a stored `background_id` to a mood, preserving the explicit plain
+ *  choice. Unknown/legacy values fall back to the default candlelit preset. */
+export function resolveLobbyMood(value: unknown): LobbyMood {
+  return value === PLAIN_MOOD ? PLAIN_MOOD : resolveAmbiancePreset(value);
 }
 
 export function ambianceMeta(id: AmbiancePresetId): (typeof AMBIANCE_PRESETS)[number] {

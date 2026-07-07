@@ -1,7 +1,9 @@
 import {
   isAmbiancePresetId,
   resolveAmbiancePreset,
+  resolveLobbyMood,
   type AmbiancePresetId,
+  type LobbyMood,
 } from "@/lib/ambiance";
 
 /** Create-room / lobby moods are stored in `background_id` when the
@@ -17,4 +19,12 @@ export function resolveAmbianceFromBackgroundId(
   id: string | null | undefined,
 ): AmbiancePresetId {
   return resolveAmbiancePreset(ambianceFromBackgroundId(id));
+}
+
+/** Resolves to a room mood, preserving an explicit "plain" (no background)
+ *  choice; legacy/unknown slugs fall back to candlelit. */
+export function resolveMoodFromBackgroundId(
+  id: string | null | undefined,
+): LobbyMood {
+  return resolveLobbyMood(id);
 }

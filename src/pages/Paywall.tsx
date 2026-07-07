@@ -78,7 +78,7 @@ export default function Paywall() {
             <Sparkles className="h-7 w-7 text-amber" aria-hidden />
           )}
         </div>
-        <h2 className="font-serif italic text-cream text-2xl sm:text-3xl">
+        <h2 className="font-serif font-semibold text-cream text-2xl sm:text-3xl">
           {open
             ? "Everything's open right now"
             : entitled

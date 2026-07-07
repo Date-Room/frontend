@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import {
   Plus,
@@ -122,7 +122,14 @@ export default function Home() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const tabs = useHomeTabs();
-  const [tab, setTab] = useState<Tab>("rooms");
+  const [searchParams] = useSearchParams();
+  const initialTab: Tab =
+    searchParams.get("tab") === "profile"
+      ? "profile"
+      : searchParams.get("tab") === "history"
+        ? "history"
+        : "rooms";
+  const [tab, setTab] = useState<Tab>(initialTab);
 
   const { data: me } = useQuery({
     queryKey: ["me"],

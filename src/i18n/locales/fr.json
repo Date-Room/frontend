@@ -135,5 +135,159 @@
   "errors": {
     "removedFromRoom": "Vous avez été retiré de cette salle",
     "extraTimeAdded": "Temps supplémentaire ajouté — profitez de votre rendez-vous."
+  },
+  "landing": {
+    "banner": "Vous avez déjà vos proches ? Découvrez la salle qui reste ouverte",
+    "nav": {
+      "how": "Comment ça marche",
+      "inside": "Dans la salle",
+      "pricing": "Tarifs",
+      "join": "Rejoindre une salle",
+      "login": "Se connecter"
+    },
+    "hero": {
+      "eyebrow": "Avant le numéro de téléphone",
+      "title": "Rencontrez-les avant\nde les rencontrer.",
+      "subtitle": "Une salle privée que vous partagez avec un code à six chiffres. Aucun numéro de téléphone. Aucun échange gênant. Juste assez pour savoir si ça vaut le coup de se voir en vrai.",
+      "tagline": "Pas un appel vidéo. Un rendez-vous.",
+      "create": "Créez votre salle",
+      "seeHow": "Voir comment ça marche",
+      "gotCode": "Un code de votre match ?",
+      "join": "Rejoindre une salle"
+    },
+    "why": {
+      "eyebrow": "Pourquoi DateRoom existe",
+      "title": "Les rencontres coûtent cher.\nÀ tous les niveaux.",
+      "p1": "Un premier rendez-vous coûte désormais cent euros avant même le deuxième verre. Et le prix de l'erreur est encore plus élevé : un numéro que vous ne pouvez pas reprendre, des messages qui ne s'arrêtent jamais, un inconnu qui sait où vous trouver.",
+      "p2": "Il devrait exister une étape entre le match et la rencontre. Une plus sûre. Elle n'existait pas. Maintenant, si."
+    },
+    "how": {
+      "eyebrow": "Comment ça marche",
+      "title": "Trois étapes. Rien à télécharger.",
+      "live": "en direct",
+      "steps": [
+        {
+          "t": "Créez la salle.",
+          "d": "Un code à six chiffres atterrit dans votre main. Ajoutez un PIN facultatif pour plus de discrétion."
+        },
+        {
+          "t": "Partagez le code.",
+          "d": "Glissez-le dans n'importe quel DM. L'autre l'ouvre sur l'application ou dans n'importe quel navigateur."
+        },
+        {
+          "t": "Ouvrez la porte.",
+          "d": "Vingt minutes, une heure, la durée que vous avez réservée. La salle se dissout quand vous avez terminé."
+        }
+      ]
+    },
+    "inside": {
+      "eyebrow": "Pourquoi c'est mieux que FaceTime",
+      "title": "Conçu pour la partie des rencontres qui est vraiment difficile : la première heure.",
+      "subtitle": "Les silences gênants tuent l'alchimie. La salle vient avec de quoi s'occuper.",
+      "cards": [
+        {
+          "t": "Le Jeu de cartes",
+          "d": "De vraies questions, pas des banalités. Deux cent cinquante amorces qui vont au-delà de la météo."
+        },
+        {
+          "t": "Regarder ensemble",
+          "d": "Un extrait YouTube, un sketch, une bande-annonce. Synchronisé à la seconde près."
+        },
+        {
+          "t": "DJ synchronisé",
+          "d": "Passez-lui la chanson. Qu'elle vous en passe une en retour. Regardez-vous réagir."
+        },
+        {
+          "t": "Ceci ou cela",
+          "d": "Des choix à toute vitesse. Le moyen le plus rapide de découvrir que vous détestez le camping tous les deux."
+        },
+        {
+          "t": "Instantané",
+          "d": "Une photo de vous deux, prise au même instant depuis deux villes. La seule chose que vous gardez."
+        },
+        {
+          "t": "Action ou vérité",
+          "d": "Sans risque pour les couples par défaut. Par paliers, pour que vous choisissiez jusqu'où la salle ose aller."
+        },
+        {
+          "t": "Deux vérités et un mensonge",
+          "d": "Le grand classique. Avec cette fois un partenaire qui n'arrive pas tout à fait à lire votre visage à la lueur des bougies."
+        },
+        {
+          "t": "Bientôt d'autres",
+          "d": "Karaoké, les 36 questions, Quiz du couple, Dessiner c'est gagner. La prochaine vague."
+        }
+      ]
+    },
+    "oneRoom": {
+      "eyebrow": "Pourquoi ça marche",
+      "title": "Une salle. Toutes les applis.",
+      "p1": "La plupart des célibataires gardent trois ou quatre applis ouvertes en même temps. Tinder, Bumble, Hinge, toutes en marche à la fois. Aucune d'elles ne construira jamais une salle qui fonctionne avec les autres. DateRoom, si.",
+      "p2": "La salle est à vous. Glissez le code dans le DM qui compte ce soir. Le prochain match ouvre la même salle. Vous apportez la salle. Les matchs viennent à elle."
+    },
+    "couples": {
+      "eyebrow": "Déjà à vous ?",
+      "title": "Une salle qui reste ouverte.",
+      "body": "Quand vous vivez dans des villes différentes. Quand l'un de vous est en déplacement. Quand vous vivez sous le même toit mais que les enfants sont partout. Gardez une salle. Épinglez un tableau de vision. Laissez-vous des mots. Regardez un film en même temps depuis deux fuseaux horaires. Faites des murs les vôtres. Elle reste ouverte aussi longtemps que vous le voulez.",
+      "cta": "Ouvrir une salle À deux"
+    },
+    "friends": {
+      "eyebrow": "Ou réunissez le groupe",
+      "title": "Plus proches que la boucle de groupe.",
+      "body": "Des meilleurs amis dans trois villes différentes. Des sœurs dans des pays différents. Le club de lecture éparpillé sur plusieurs fuseaux horaires. Jusqu'à cinq dans une même salle. Regardez un film en même temps. Jouez au jeu de cartes. Chamaillez-vous pour savoir à qui le tour au DJ. La boucle de groupe, mais où vous pouvez enfin vous voir.",
+      "cta": "Ouvrir une salle entre amis"
+    },
+    "pricing": {
+      "eyebrow": "Tarifs",
+      "title": "Choisissez la salle qui vous convient.",
+      "tryUnit": "un rendez-vous · 20 min",
+      "tryName": "Essai",
+      "tryDesc": "Avec publicité.",
+      "tryCta": "Commencer gratuitement",
+      "datePackName": "Pack Rendez-vous",
+      "datePackDesc": "Pour les premiers matchs.",
+      "datePackCta": "Obtenir le pack",
+      "longPackName": "Pack Long",
+      "longPackDesc": "Pour ceux qui ont du potentiel.",
+      "longPackCta": "Obtenir le pack",
+      "togetherName": "À deux",
+      "togetherDesc": "Une salle qui reste ouverte. Murs personnalisés. Soirée cinéma jusqu'à 12 personnes.",
+      "togetherCta": "Ouvrir À deux",
+      "crewName": "Bande",
+      "crewDesc": "Soirées cinéma, soirées jeux, clubs de lecture. Soirée cinéma de groupe pour 10 personnes et plus.",
+      "crewCta": "Ouvrir Bande"
+    },
+    "badges": {
+      "tagline": "Bientôt dans votre poche.",
+      "comingSoon": "Bientôt disponible sur"
+    },
+    "trust": [
+      "Des rencontres plus sûres.",
+      "Aucun numéro de téléphone échangé.",
+      "Code plus PIN facultatif.",
+      "Chiffré de bout en bout."
+    ],
+    "finalCta": {
+      "title": "Ouvrez la porte.",
+      "subtitle": "Deux minutes pour créer une salle. Le prochain geste leur revient.",
+      "create": "Créer un compte",
+      "join": "Rejoindre une salle",
+      "pricing": "Voir les forfaits"
+    },
+    "footer": {
+      "mission": "Notre mission : apporter intention et sécurité à cette partie des rencontres que personne n'a jamais conçue : l'espace entre un match et une rencontre.",
+      "tagline": "La salle avant le numéro de téléphone.",
+      "product": "Produit",
+      "productFeatures": "Fonctionnalités",
+      "productPricing": "Tarifs",
+      "productHow": "Comment ça marche",
+      "company": "Entreprise",
+      "companyAbout": "À propos",
+      "companyPrivacy": "Confidentialité",
+      "companyTerms": "Conditions",
+      "connect": "Nous suivre",
+      "connectContact": "Contact",
+      "copyright": "© DateRoom, {{year}}."
+    }
   }
 }

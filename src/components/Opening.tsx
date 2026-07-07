@@ -14,7 +14,7 @@ export function Opening({ name, onEnter }: { name: string; onEnter: () => void }
         />
 
         <div className="space-y-3 max-w-sm">
-          <h1 className="font-serif italic text-cream text-3xl sm:text-4xl leading-snug">
+          <h1 className="font-serif font-semibold text-cream text-3xl sm:text-4xl leading-snug">
             Welcome, {name}
           </h1>
           <p className="text-muted-foreground text-sm leading-relaxed">

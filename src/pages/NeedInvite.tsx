@@ -26,7 +26,7 @@ export default function NeedInvite() {
           <div className="absolute -inset-4 bg-rosegold/20 rounded-full blur-2xl opacity-20 animate-pulse" />
         </div>
 
-        <h1 className="font-serif italic text-cream text-3xl sm:text-4xl mb-4 tracking-tight">
+        <h1 className="font-serif font-semibold text-cream text-3xl sm:text-4xl mb-4 tracking-tight">
           A private space
         </h1>
 

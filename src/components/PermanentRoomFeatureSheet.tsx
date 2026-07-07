@@ -64,7 +64,7 @@ export function PermanentRoomFeatureSheet({ feature, onClose }: Props) {
             <ArrowLeft className="h-4 w-4" />
             Back to room
           </button>
-          <p className="font-serif italic text-cream text-lg">{FEATURE_TITLES[feature]}</p>
+          <p className="font-serif font-semibold text-cream text-lg">{FEATURE_TITLES[feature]}</p>
           <span className="w-16" aria-hidden />
         </header>
         <div className="perm-feature-body wall-surface">

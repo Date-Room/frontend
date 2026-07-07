@@ -14,8 +14,8 @@ import { isWatchPartyRoom } from "@/lib/watchParty";
 import { getRoomExperienceApi, listMyRooms, type Room, type RoomPackage } from "@/lib/rooms";
 import { LogOut, Clock, Maximize2, Minimize2, Sparkles, ChevronLeft, Home } from "lucide-react";
 import { AmbientSceneStack } from "@/components/AmbientSceneStack";
-import type { AmbiancePresetId } from "@/lib/ambiance";
-import { ambianceMeta } from "@/lib/ambiance";
+import type { LobbyMood } from "@/lib/ambiance";
+import { ambianceMeta, PLAIN_MOOD } from "@/lib/ambiance";
 import { RoomAmbianceSheet } from "@/components/RoomAmbianceSheet";
 import { PageShell } from "@/components/PageShell";
 import { RoomSessionProvider, useRoomSession, type RoomIdentity } from "@/context/RoomSessionContext";
@@ -25,6 +25,7 @@ import {
   useRoomCustomization,
 } from "@/context/RoomCustomizationContext";
 import { RoomVideo } from "@/components/RoomVideo";
+import { TogetherCall } from "@/components/TogetherCall";
 import { ChatWithBoundary } from "@/components/Chat";
 import { WatchTogether } from "@/components/WatchTogether";
 import { VisionBoard } from "@/components/VisionBoard";
@@ -80,7 +81,7 @@ function KickedListener({ onKicked }: { onKicked: () => void }) {
   return null;
 }
 
-function LiveRoomAmbianceBackdrop({ preset }: { preset: AmbiancePresetId }) {
+function LiveRoomAmbianceBackdrop({ preset }: { preset: LobbyMood }) {
   return (
     <>
       <AmbientSceneStack ambiance={preset} positionClassName="fixed inset-0 z-[1]" />
@@ -328,7 +329,7 @@ function RoomShell({
   const [videoMinimized, setVideoMinimized] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [ambianceOpen, setAmbianceOpen] = useState(false);
-  const [ambianceOverride, setAmbianceOverride] = useState<AmbiancePresetId | null>(null);
+  const [ambianceOverride, setAmbianceOverride] = useState<LobbyMood | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const [now, setNow] = useState(Date.now());
@@ -342,7 +343,7 @@ function RoomShell({
     : false;
 
   const activeAmbiance = ambianceOverride ?? customization.ambiancePreset;
-  const moodLabel = ambianceMeta(activeAmbiance).label;
+  const moodLabel = activeAmbiance === PLAIN_MOOD ? "Plain" : ambianceMeta(activeAmbiance).label;
 
   const planLabel = useMemo(() => {
     if (isPersistent) return "Together";
@@ -481,7 +482,7 @@ function RoomShell({
         {showLeaveConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in pointer-events-auto">
             <div className="w-full max-w-sm mx-4 editorial-card p-8 text-center animate-scale-in">
-              <h2 className="font-serif italic text-cream text-xl mb-3">{t("room.leaveConfirmTitle")}</h2>
+              <h2 className="font-serif font-semibold text-cream text-xl mb-3">{t("room.leaveConfirmTitle")}</h2>
               <p className="text-sm text-muted-foreground mb-6">{t("room.leaveConfirmBody")}</p>
               <div className="flex flex-col gap-3">
                 <button
@@ -512,6 +513,52 @@ function RoomShell({
       </PageShell>
     );
   }
+
+  const activityTabs = (
+    <>
+      <LiveRoomTabBar
+        tabs={visibleTabs.map((tb) => ({ id: tb.id, label: tb.label, icon: tb.icon }))}
+        activeId={tab}
+        onChange={(id) => setTab(id as ActivityTabId)}
+        dividerBeforeId={tabBarDividerBefore}
+      />
+      <div className="flex-1 min-h-0 overflow-auto relative">
+        <div className={tab === "vision_board" ? "h-full" : "hidden"}>
+          <VisionBoard />
+        </div>
+        <div className={tab === "fridge_notes" ? "h-full" : "hidden"}>
+          <FridgeNotes active={tab === "fridge_notes"} />
+        </div>
+        <div className={tab === "bookshelf" ? "h-full" : "hidden"}>
+          <Bookshelf />
+        </div>
+        <div className={tab === "questions" ? "h-full" : "hidden"}>
+          <QuestionDeck />
+        </div>
+        <div className={tab === "this_or_that" ? "h-full" : "hidden"}>
+          <ThisOrThat />
+        </div>
+        <div className={tab === "the_36" ? "h-full" : "hidden"}>
+          <The36 />
+        </div>
+        <div className={tab === "2_truths" ? "h-full" : "hidden"}>
+          <TwoTruths />
+        </div>
+        <div className={tab === "truth_or_dare" ? "h-full" : "hidden"}>
+          <TruthOrDare />
+        </div>
+        <div className={tab === "watch" ? "h-full" : "hidden"}>
+          <WatchTogether />
+        </div>
+        <div className={tab === "dj" ? "h-full" : "hidden"}>
+          <DJ watchActive={tab === "watch"} />
+        </div>
+        <div className={tab === "chat" ? "h-full" : "hidden"}>
+          <ChatWithBoundary />
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <PageShell
@@ -629,125 +676,98 @@ function RoomShell({
         </div>
       </header>
 
-      {/* ── Main — 60/40 split: video | tabs ── */}
-      <main className={cn(
-        "flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 p-3 sm:p-4 min-h-0 z-10",
-        expired && "opacity-60 pointer-events-none",
-      )}>
-        {/* Video section — inline split or floating PiP while watching */}
-        <section className={cn(
-          "flex flex-col relative",
-          videoInPip
-            ? "fixed bottom-4 left-4 z-30 w-[min(300px,38vw)] h-[min(240px,30vh)] rounded-2xl glass p-2 shadow-2xl pointer-events-auto"
-            : cn(
-                "lg:basis-3/5 lg:flex-shrink-0 h-[40vh] lg:h-auto rounded-3xl glass p-3 sm:p-4",
-                trayExpanded && !watching ? "hidden lg:flex" : "flex",
-              ),
-        )}>
-          <RoomVideo
-            compact={videoInPip}
+      {/* ── Main ── */}
+      <main
+        className={cn(
+          "flex-1 flex flex-col min-h-0 z-10",
+          expired && "opacity-60 pointer-events-none",
+        )}
+      >
+        {isPersistent ? (
+          /* Together room: activities are primary; call floats as a draggable
+             PiP (default) → full-screen with activities below → bubble. */
+          <TogetherCall
+            activityPanel={activityTabs}
             onLeave={() => setShowLeaveConfirm(true)}
           />
-          {watching && !videoInPip && (
-            <button
-              type="button"
-              aria-label={t("room.minimizeVideo")}
-              onClick={() => setVideoMinimized(true)}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-secondary/70 border border-border/40 hidden lg:flex items-center justify-center z-20 pointer-events-auto hover:bg-secondary transition"
-            >
-              <Minimize2 className="w-3.5 h-3.5 text-cream" />
-            </button>
-          )}
-          {videoInPip && (
-            <button
-              type="button"
-              aria-label={t("room.restoreVideo")}
-              onClick={() => {
-                setVideoMinimized(false);
-                setTrayExpanded(false);
-              }}
-              className="absolute top-2 right-2 w-7 h-7 rounded-full bg-secondary/80 border border-border/40 flex items-center justify-center z-20 pointer-events-auto hover:bg-secondary transition"
-            >
-              <Maximize2 className="w-3 h-3 text-cream" />
-            </button>
-          )}
-          {!watching && (
-            <button
-              type="button"
-              aria-label={trayExpanded ? t("room.restoreVideo") : t("room.showActivities")}
-              onClick={toggleVideoPanel}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-secondary/60 flex items-center justify-center lg:hidden z-20 pointer-events-auto"
-            >
-              {trayExpanded ? (
-                <Maximize2 className="w-3.5 h-3.5 text-cream" />
-              ) : (
-                <Minimize2 className="w-3.5 h-3.5 text-cream" />
+        ) : (
+          /* Session room: 60/40 split, with the video floating to a PiP while
+             watching together. */
+          <div className="flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 p-3 sm:p-4 min-h-0">
+            <section
+              className={cn(
+                "flex flex-col relative",
+                videoInPip
+                  ? "fixed bottom-4 left-4 z-30 w-[min(300px,38vw)] h-[min(240px,30vh)] rounded-2xl glass p-2 shadow-2xl pointer-events-auto"
+                  : cn(
+                      "lg:basis-3/5 lg:flex-shrink-0 h-[40vh] lg:h-auto rounded-3xl glass p-3 sm:p-4",
+                      trayExpanded && !watching ? "hidden lg:flex" : "flex",
+                    ),
               )}
-            </button>
-          )}
-          {watching && (
-            <button
-              type="button"
-              aria-label={videoInPip ? t("room.restoreVideo") : t("room.minimizeVideo")}
-              onClick={toggleVideoPanel}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-secondary/70 border border-border/40 flex items-center justify-center lg:hidden z-20 pointer-events-auto hover:bg-secondary transition"
             >
-              {videoInPip ? (
-                <Maximize2 className="w-3.5 h-3.5 text-cream" />
-              ) : (
-                <Minimize2 className="w-3.5 h-3.5 text-cream" />
+              <RoomVideo compact={videoInPip} onLeave={() => setShowLeaveConfirm(true)} />
+              {watching && !videoInPip && (
+                <button
+                  type="button"
+                  aria-label={t("room.minimizeVideo")}
+                  onClick={() => setVideoMinimized(true)}
+                  className="absolute top-3 right-3 w-8 h-8 rounded-full bg-secondary/70 border border-border/40 hidden lg:flex items-center justify-center z-20 pointer-events-auto hover:bg-secondary transition"
+                >
+                  <Minimize2 className="w-3.5 h-3.5 text-cream" />
+                </button>
               )}
-            </button>
-          )}
-        </section>
-
-        {/* Tabbed activity panel */}
-        <section className={cn(
-          "flex-1 flex flex-col rounded-3xl glass overflow-hidden min-h-0",
-          videoInPip ? "w-full" : "lg:basis-2/5 lg:flex-shrink-0 lg:min-h-[480px]",
-        )}>
-          <LiveRoomTabBar
-            tabs={visibleTabs.map((t) => ({ id: t.id, label: t.label, icon: t.icon }))}
-            activeId={tab}
-            onChange={(id) => setTab(id as ActivityTabId)}
-            dividerBeforeId={tabBarDividerBefore}
-          />
-          <div className="flex-1 min-h-0 overflow-auto relative">
-            <div className={tab === "vision_board" ? "h-full" : "hidden"}>
-              <VisionBoard />
-            </div>
-            <div className={tab === "fridge_notes" ? "h-full" : "hidden"}>
-              <FridgeNotes active={tab === "fridge_notes"} />
-            </div>
-            <div className={tab === "bookshelf" ? "h-full" : "hidden"}>
-              <Bookshelf />
-            </div>
-            <div className={tab === "questions" ? "h-full" : "hidden"}>
-              <QuestionDeck />
-            </div>
-            <div className={tab === "this_or_that" ? "h-full" : "hidden"}>
-              <ThisOrThat />
-            </div>
-            <div className={tab === "the_36" ? "h-full" : "hidden"}>
-              <The36 />
-            </div>
-            <div className={tab === "2_truths" ? "h-full" : "hidden"}>
-              <TwoTruths />
-            </div>
-            <div className={tab === "truth_or_dare" ? "h-full" : "hidden"}>
-              <TruthOrDare />
-            </div>
-            <div className={tab === "watch" ? "h-full" : "hidden"}>
-              <WatchTogether />
-            </div>
-            <div className={tab === "dj" ? "h-full" : "hidden"}>
-              <DJ watchActive={tab === "watch"} />
-            </div>
-            <div className={tab === "chat" ? "h-full" : "hidden"}>
-              <ChatWithBoundary />
-            </div>
+              {videoInPip && (
+                <button
+                  type="button"
+                  aria-label={t("room.restoreVideo")}
+                  onClick={() => {
+                    setVideoMinimized(false);
+                    setTrayExpanded(false);
+                  }}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-secondary/80 border border-border/40 flex items-center justify-center z-20 pointer-events-auto hover:bg-secondary transition"
+                >
+                  <Maximize2 className="w-3 h-3 text-cream" />
+                </button>
+              )}
+              {!watching && (
+                <button
+                  type="button"
+                  aria-label={trayExpanded ? t("room.restoreVideo") : t("room.showActivities")}
+                  onClick={toggleVideoPanel}
+                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-secondary/60 flex items-center justify-center lg:hidden z-20 pointer-events-auto"
+                >
+                  {trayExpanded ? (
+                    <Maximize2 className="w-3.5 h-3.5 text-cream" />
+                  ) : (
+                    <Minimize2 className="w-3.5 h-3.5 text-cream" />
+                  )}
+                </button>
+              )}
+              {watching && (
+                <button
+                  type="button"
+                  aria-label={videoInPip ? t("room.restoreVideo") : t("room.minimizeVideo")}
+                  onClick={toggleVideoPanel}
+                  className="absolute top-3 right-3 w-8 h-8 rounded-full bg-secondary/70 border border-border/40 flex items-center justify-center lg:hidden z-20 pointer-events-auto hover:bg-secondary transition"
+                >
+                  {videoInPip ? (
+                    <Maximize2 className="w-3.5 h-3.5 text-cream" />
+                  ) : (
+                    <Minimize2 className="w-3.5 h-3.5 text-cream" />
+                  )}
+                </button>
+              )}
+            </section>
+            <section
+              className={cn(
+                "flex-1 flex flex-col rounded-3xl glass overflow-hidden min-h-0",
+                videoInPip ? "w-full" : "lg:basis-2/5 lg:flex-shrink-0 lg:min-h-[480px]",
+              )}
+            >
+              {activityTabs}
+            </section>
           </div>
-        </section>
+        )}
       </main>
 
       {/* ── Leave confirm modal ── */}
@@ -783,7 +803,7 @@ function RoomShell({
       <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-card/95 text-cream sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-serif italic text-xl">Add more time</DialogTitle>
+            <DialogTitle className="font-serif font-semibold text-xl">Add more time</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             Keep the evening going — add 15 minutes, 30 minutes, or a full hour.
@@ -805,7 +825,7 @@ function RoomShell({
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/90 backdrop-blur-md animate-fade-in pointer-events-auto">
           <div className="w-full max-w-md mx-4 editorial-card p-8 text-center animate-scale-in">
             <Sparkles className="w-8 h-8 text-primary mx-auto mb-4 opacity-90" aria-hidden />
-            <h2 className="font-serif italic text-cream text-2xl mb-3">Your window closed</h2>
+            <h2 className="font-serif font-semibold text-cream text-2xl mb-3">Your window closed</h2>
             <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
               Time&apos;s up — add more minutes to keep the date going.
             </p>

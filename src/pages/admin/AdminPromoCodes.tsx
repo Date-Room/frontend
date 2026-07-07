@@ -29,6 +29,8 @@ type BenefitForm = {
   kind: PromoKind;
   tier_product: string;
   subscription_days: number;
+  /** Together/Crew grants are counted rooms (credits), not days. */
+  pass_units: number;
   percent_off: number;
   max_redemptions: number;
   max_per_user: number;
@@ -80,6 +82,7 @@ const DEFAULT_BENEFIT: BenefitForm = {
   kind: "tier_grant",
   tier_product: "together",
   subscription_days: 30,
+  pass_units: 1,
   percent_off: 20,
   max_redemptions: 1,
   max_per_user: 1,
@@ -149,11 +152,14 @@ function benefitPayload(form: BenefitForm) {
     tier_product:
       form.kind === "tier_grant" || form.kind === "percent_off" ? form.tier_product : null,
     percent_off: form.kind === "percent_off" ? form.percent_off : null,
-    subscription_days:
+    // Together/Crew grants are counted rooms (credits) now — send pass_units,
+    // not subscription_days.
+    pass_units:
       form.kind === "tier_grant" &&
       (form.tier_product === "together" || form.tier_product === "crew")
-        ? form.subscription_days
+        ? form.pass_units
         : null,
+    subscription_days: null,
     max_redemptions: form.max_redemptions,
     max_per_user: form.max_per_user,
   };
@@ -237,19 +243,19 @@ function BenefitFields({
       {(form.tier_product === "together" || form.tier_product === "crew") &&
         form.kind === "tier_grant" && (
           <div>
-            <Label className="admin-field-label" htmlFor={`${idPrefix}-days`}>
-              Subscription days
+            <Label className="admin-field-label" htmlFor={`${idPrefix}-rooms`}>
+              Rooms (credits)
             </Label>
             <Input
-              id={`${idPrefix}-days`}
+              id={`${idPrefix}-rooms`}
               type="number"
               min={1}
-              max={365}
-              value={form.subscription_days}
+              max={20}
+              value={form.pass_units}
               onChange={(e) =>
                 setForm({
                   ...form,
-                  subscription_days: Math.min(365, Math.max(1, Number(e.target.value) || 30)),
+                  pass_units: Math.min(20, Math.max(1, Number(e.target.value) || 1)),
                 })
               }
               className="mt-1.5 admin-input"

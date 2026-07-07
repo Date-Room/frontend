@@ -406,15 +406,16 @@
 .bg-rosegold { background-color: #D4826A; }
 
 /* ── Lovable-parity landing page (ported from date-room-escape.lovable.app) ──
-   Cormorant Garamond display + Inter body over the warm candlelit palette.
+   Typography standardised to match the in-app design: Playfair Display for
+   serif/display headings + DM Sans body (same as the Rooms page).
    Helper classes are lp-prefixed to avoid colliding with app utilities. */
 .lp {
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family: "DM Sans", system-ui, -apple-system, sans-serif;
   background: #120c09;
   color: #f3eadd;
 }
 .lp-serif {
-  font-family: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
 }
 .lp-eyebrow {
   font-size: 0.72rem;
@@ -424,7 +425,7 @@
   font-weight: 500;
 }
 .lp-display {
-  font-family: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+  font-family: "Playfair Display", Georgia, serif;
   font-style: italic;
   font-weight: 500;
   letter-spacing: -0.01em;

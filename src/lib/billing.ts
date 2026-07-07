@@ -33,6 +33,8 @@ export type Entitlement = {
   remaining_passes: number;
   date_pack_remaining: number;
   long_pack_remaining: number;
+  together_remaining?: number;
+  crew_remaining?: number;
   account_tier: AccountTier;
   account_tier_label: string;
   watch_party_enabled?: boolean;

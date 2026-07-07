@@ -150,7 +150,7 @@ export default function AuthCallback() {
         <div className="w-2 h-2 rounded-full bg-rosegold mx-auto mb-4 animate-pulse-glow" />
         {failed ? (
           <div className="space-y-3 max-w-md">
-            <h1 className="font-serif italic text-cream text-2xl">Sign-in didn't complete</h1>
+            <h1 className="font-serif font-semibold text-cream text-2xl">Sign-in didn't complete</h1>
             <p className="text-muted-foreground text-sm">{failed}</p>
             <Link
               to="/auth"

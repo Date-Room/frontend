@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
-import type { AmbiancePresetId } from "@/lib/ambiance";
-import { resolveAmbiancePreset, ambianceMeta } from "@/lib/ambiance";
+import type { LobbyMood } from "@/lib/ambiance";
+import { PLAIN_MOOD, resolveAmbiancePreset, ambianceMeta } from "@/lib/ambiance";
 import { AmbientSceneStack } from "@/components/AmbientSceneStack";
 
 /** Decorative countdown for preview only — illustrates lobby layout. */
@@ -17,7 +17,7 @@ type LobbyGreetingPreviewProps = {
   /** Mirrors focused editor field — highlights matching preview block */
   highlightField?: "headline" | "subtext" | null;
   /** Matches live-room mood presets — drives background art + color grade */
-  ambiance?: AmbiancePresetId | null;
+  ambiance?: LobbyMood | null;
   className?: string;
 };
 
@@ -40,12 +40,12 @@ export function LobbyGreetingPreview({
   const hasHeadline = h.length > 0;
   const hasSubtext = s.length > 0;
 
-  const ambiance = resolveAmbiancePreset(ambianceProp);
+  const isPlain = ambianceProp === PLAIN_MOOD;
 
   const focusRing =
     "rounded-xl shadow-[0_0_28px_rgba(212,175,130,0.28)] ring-2 ring-[hsl(35_52%_62%/0.55)]";
 
-  const moodLabel = ambianceMeta(ambiance).label;
+  const moodLabel = isPlain ? "Plain" : ambianceMeta(resolveAmbiancePreset(ambianceProp)).label;
 
   return (
     <div

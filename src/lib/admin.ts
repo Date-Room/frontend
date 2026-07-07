@@ -30,6 +30,8 @@ export type AdminUserRow = {
 export type AdminUserDetail = AdminUserRow & {
   date_pack_remaining: number;
   long_pack_remaining: number;
+  together_remaining: number;
+  crew_remaining: number;
   has_active_subscription: boolean;
   referral_code: string;
   stripe_customer_id: string | null;

@@ -409,7 +409,7 @@ export default function Recap() {
       >
         <DialogContent className="border-white/10 bg-card/95 text-cream sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-serif italic text-xl">{upgradeTitle}</DialogTitle>
+            <DialogTitle className="font-serif font-semibold text-xl">{upgradeTitle}</DialogTitle>
           </DialogHeader>
 
           {!upgradeProduct ? (

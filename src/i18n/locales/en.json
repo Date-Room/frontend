@@ -135,5 +135,126 @@
   "errors": {
     "removedFromRoom": "You were removed from this room",
     "extraTimeAdded": "Extra time added — enjoy your date."
+  },
+  "landing": {
+    "banner": "Already have your people? Meet the room that stays open",
+    "nav": {
+      "how": "How it works",
+      "inside": "Inside the room",
+      "pricing": "Pricing",
+      "join": "Join a room",
+      "login": "Log in"
+    },
+    "hero": {
+      "eyebrow": "Before the phone number",
+      "title": "Date them before\nyou date them.",
+      "subtitle": "A private room you share with a six-digit code. No phone numbers. No awkward exchange. Just enough to know if it's worth meeting in real life.",
+      "tagline": "Not a video call. A date.",
+      "create": "Create your room",
+      "seeHow": "See how it works",
+      "gotCode": "Got a code from your match?",
+      "join": "Join a room"
+    },
+    "why": {
+      "eyebrow": "Why this exists",
+      "title": "Dating got expensive.\nIn every sense.",
+      "p1": "First dates now cost a hundred bucks before the second drink. And the price of being wrong is higher: a number you can't take back, texts that won't stop, a stranger who knows where to find you.",
+      "p2": "There should be a step between matching and meeting. A safer one. There wasn't. Now there is."
+    },
+    "how": {
+      "eyebrow": "How it works",
+      "title": "Three steps. Nothing to download.",
+      "live": "live",
+      "steps": [
+        { "t": "Create the room.", "d": "A six-digit code lands in your hand. Add an optional PIN if you want extra cover." },
+        { "t": "Share the code.", "d": "Drop it in any DM. The other side opens it on the app or in any browser." },
+        { "t": "Open the door.", "d": "Twenty minutes, an hour, whatever you booked. The room dissolves when you're done." }
+      ]
+    },
+    "inside": {
+      "eyebrow": "Why this beats FaceTime",
+      "title": "Built for the part of dating that's actually hard: the first hour.",
+      "subtitle": "Awkward silences kill chemistry. The room comes with things to do.",
+      "cards": [
+        { "t": "The Deck", "d": "Real questions, not small talk. Two hundred and fifty prompts that get past the weather." },
+        { "t": "Watch Together", "d": "A YouTube clip, a stand-up set, a trailer. Synced down to the second." },
+        { "t": "Synced DJ", "d": "Play her the song. Play him the song back. Watch each other react." },
+        { "t": "This or That", "d": "Rapid-fire choices. The fastest way to find out you both hate camping." },
+        { "t": "Capture", "d": "A photo of the two of you, taken at the same moment from two cities. The only thing you keep." },
+        { "t": "Truth or Dare", "d": "Couple-safe by default. Tiered, so you choose how brave the room gets." },
+        { "t": "Two Truths and a Lie", "d": "The classic. Now with a partner who can't quite read your face through the candlelight." },
+        { "t": "More coming", "d": "Karaoke, the 36 Questions, Couple's Trivia, Draw and Guess. The next wave." }
+      ]
+    },
+    "oneRoom": {
+      "eyebrow": "Why this works",
+      "title": "One room. Every app.",
+      "p1": "Most daters keep three or four apps open at once. Tinder, Bumble, Hinge, all running at the same time. None of them will ever build a room that works across the others. DateRoom does.",
+      "p2": "The room is yours. Drop the code in whichever DM matters tonight. The next match opens the same room. You bring the room. Matches come to it."
+    },
+    "couples": {
+      "eyebrow": "Already yours?",
+      "title": "A room that stays open.",
+      "body": "When you live in different cities. When one of you is on the road. When you live in the same house but the kids are everywhere. Keep a room. Pin a vision board. Leave each other notes. Watch a movie at the same time from two time zones. Make the walls yours. It stays open as long as you want it to.",
+      "cta": "Open a Together room"
+    },
+    "friends": {
+      "eyebrow": "Or bring the group",
+      "title": "Closer than the group chat.",
+      "body": "Best friends in three different cities. Sisters in different countries. The book club that lives across time zones. Up to five of you in one room. Watch a movie at the same time. Play the deck. Argue about whose turn it is on the DJ. The group chat, but you can actually see each other.",
+      "cta": "Open a room with friends"
+    },
+    "pricing": {
+      "eyebrow": "Pricing",
+      "title": "Pick the room that fits.",
+      "tryUnit": "one date · 20 min",
+      "tryName": "Try",
+      "tryDesc": "Ad-supported.",
+      "tryCta": "Start free",
+      "datePackName": "Date Pack",
+      "datePackDesc": "For the early matches.",
+      "datePackCta": "Get the pack",
+      "longPackName": "Long Pack",
+      "longPackDesc": "For the ones with potential.",
+      "longPackCta": "Get the pack",
+      "togetherName": "Together",
+      "togetherDesc": "A room that stays open. Custom walls. Watch party for up to 12.",
+      "togetherCta": "Open Together",
+      "crewName": "Crew",
+      "crewDesc": "Movie nights, game nights, book clubs. Group watch party for 10+.",
+      "crewCta": "Open Crew"
+    },
+    "badges": {
+      "tagline": "Coming soon to your pocket.",
+      "comingSoon": "Coming soon on"
+    },
+    "trust": [
+      "Date safer.",
+      "No phone numbers exchanged.",
+      "Code plus optional PIN.",
+      "End-to-end encrypted."
+    ],
+    "finalCta": {
+      "title": "Open the door.",
+      "subtitle": "Two minutes to make a room. The next move is theirs.",
+      "create": "Create an account",
+      "join": "Join a room",
+      "pricing": "View pricing plans"
+    },
+    "footer": {
+      "mission": "We're on a mission to bring intentionality and safety to the part of dating no one designed: the space between a match and a meeting.",
+      "tagline": "The room before the phone number.",
+      "product": "Product",
+      "productFeatures": "Features",
+      "productPricing": "Pricing",
+      "productHow": "How it works",
+      "company": "Company",
+      "companyAbout": "About us",
+      "companyPrivacy": "Privacy",
+      "companyTerms": "Terms",
+      "connect": "Connect",
+      "connectContact": "Contact",
+      "copyright": "© DateRoom, {{year}}."
+    }
   }
 }

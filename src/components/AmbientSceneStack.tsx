@@ -1,11 +1,11 @@
 import { cn } from "@/lib/utils";
-import type { AmbiancePresetId } from "@/lib/ambiance";
-import { resolveAmbiancePreset } from "@/lib/ambiance";
+import type { LobbyMood } from "@/lib/ambiance";
+import { PLAIN_MOOD, resolveAmbiancePreset } from "@/lib/ambiance";
 import { LOBBY_PREVIEW_SCENES } from "@/lib/lobbyPreviewScenes";
 
 type AmbientSceneStackProps = {
   /** Room mood from create-flow selection or persisted background_id */
-  ambiance?: AmbiancePresetId | null;
+  ambiance?: LobbyMood | null;
   /** Wrapper positioning — e.g. `fixed inset-0 z-[1]` (full viewport) or `absolute inset-0` (nested frame) */
   positionClassName: string;
   /** Passed through to `<img>` (e.g. animation variants) */
@@ -26,6 +26,17 @@ export function AmbientSceneStack({
   kenBurns = true,
   loading = "eager",
 }: AmbientSceneStackProps) {
+  // Plain mood: no photography — a quiet, neutral gradient so the room reads
+  // clean/default rather than themed.
+  if (ambiance === PLAIN_MOOD) {
+    return (
+      <div className={cn("pointer-events-none overflow-hidden", positionClassName)} aria-hidden>
+        <div className="absolute inset-0 bg-background" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] via-transparent to-black/30" />
+      </div>
+    );
+  }
+
   const preset = resolveAmbiancePreset(ambiance);
   const scene = LOBBY_PREVIEW_SCENES[preset];
   const [r, g, b] = scene.centerRgb;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, Sparkles } from "lucide-react";
+import { ChevronDown, Plus, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PaymentCheckout } from "@/components/PaymentCheckout";
 import {
@@ -70,51 +70,6 @@ const TIER_OPTIONS: TierOption[] = [
   },
 ];
 
-function planDetail(entitlement: Entitlement | undefined): string {
-  if (!entitlement) return "Loading your plan…";
-  if (entitlement.has_active_subscription) {
-    if (entitlement.account_tier === "crew") return "Crew subscription active · watch party";
-    return "Together subscription active · watch party";
-  }
-  if (entitlement.remaining_passes > 0) {
-    const parts: string[] = [];
-    if (entitlement.date_pack_remaining > 0) {
-      parts.push(`${entitlement.date_pack_remaining} Date Pack`);
-    }
-    if (entitlement.long_pack_remaining > 0) {
-      parts.push(`${entitlement.long_pack_remaining} Long Pack`);
-    }
-    return `${parts.join(" · ")} credit${entitlement.remaining_passes === 1 ? "" : "s"} left`;
-  }
-  return "Free sessions only";
-}
-
-function tierRank(tier: AccountTier): number {
-  switch (tier) {
-    case "try":
-      return 0;
-    case "date_pack":
-      return 1;
-    case "long_pack":
-      return 2;
-    case "together":
-    case "crew":
-      return 3;
-  }
-}
-
-function upgradeLabel(currentTier: AccountTier, option: TierOption): string {
-  if (!option.product) return "";
-  if (currentTier === option.id && (option.id === "together" || option.id === "crew")) return "Renew";
-  if (currentTier === option.id) return "Add more";
-  if (tierRank(option.id) > tierRank(currentTier)) return "Upgrade";
-  return "Get";
-}
-
-/** Paid tiers are always purchasable — credits stack and upgrades apply. */
-function canUpgradeTo(option: TierOption, paywallOpen: boolean): boolean {
-  return Boolean(option.product) && !paywallOpen;
-}
 
 export function ProfilePlanSection({
   entitlement,
@@ -127,10 +82,59 @@ export function ProfilePlanSection({
 }) {
   const queryClient = useQueryClient();
   const [upgradeProduct, setUpgradeProduct] = useState<BillableProduct | null>(null);
+  const [buyOpen, setBuyOpen] = useState(false);
 
-  const currentTier = entitlement?.account_tier ?? billingConfig?.account_tier ?? "try";
-  const currentLabel = entitlement?.account_tier_label ?? billingConfig?.account_tier_label ?? "Try";
   const paywallOpen = billingConfig && !billingConfig.paywall_enabled;
+
+  // Plans the user owns right now — packages/credits they've bought (and the
+  // free Try session), each with how many are left. A user can own several at
+  // once, so this is a list, not a single "current tier".
+  type OwnedPlan = { emoji: string; title: string; detail: string; count: number | null };
+  const ownedPlans: OwnedPlan[] = [];
+  if (entitlement) {
+    ownedPlans.push({ emoji: "🕯️", title: "Try", detail: "20-min session", count: null });
+    if (entitlement.date_pack_remaining > 0) {
+      ownedPlans.push({
+        emoji: "💌",
+        title: "Date Pack",
+        detail: "1 hour each",
+        count: entitlement.date_pack_remaining,
+      });
+    }
+    if (entitlement.long_pack_remaining > 0) {
+      ownedPlans.push({
+        emoji: "🌙",
+        title: "Long Pack",
+        detail: "2 hours each",
+        count: entitlement.long_pack_remaining,
+      });
+    }
+    if (entitlement.has_active_subscription) {
+      ownedPlans.push({
+        emoji: entitlement.account_tier === "crew" ? "🎬" : "🏠",
+        title: entitlement.account_tier === "crew" ? "Crew" : "Together",
+        detail: "Subscription active",
+        count: null,
+      });
+    } else {
+      if ((entitlement.together_remaining ?? 0) > 0) {
+        ownedPlans.push({
+          emoji: "🏠",
+          title: "Together",
+          detail: "Persistent room",
+          count: entitlement.together_remaining ?? 0,
+        });
+      }
+      if ((entitlement.crew_remaining ?? 0) > 0) {
+        ownedPlans.push({
+          emoji: "🎬",
+          title: "Crew",
+          detail: "Persistent group room",
+          count: entitlement.crew_remaining ?? 0,
+        });
+      }
+    }
+  }
 
   async function refreshBilling() {
     await Promise.all([
@@ -158,93 +162,117 @@ export function ProfilePlanSection({
   return (
     <>
       <section className="editorial-card overflow-hidden">
-        <div className="border-b border-white/[0.06] px-4 py-3.5">
+        <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-3.5">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" aria-hidden />
-            <p className="text-sm font-medium text-cream">Your plan</p>
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span
-              className={cn(
-                "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]",
-                currentTier === "together" || currentTier === "crew"
-                  ? "border-emerald-400/35 bg-emerald-400/10 text-emerald-200"
-                  : currentTier === "try"
-                    ? "border-white/15 bg-white/[0.04] text-muted-foreground"
-                    : "border-primary/35 bg-primary/12 text-primary",
-              )}
-            >
-              {loading ? "…" : currentLabel}
-            </span>
-            <span className="text-xs text-muted-foreground">{planDetail(entitlement)}</span>
+            <p className="text-sm font-medium text-cream">Plans you own</p>
           </div>
           {billingConfig && !paywallOpen && (
-            <p className="mt-2 text-[11px] text-muted-foreground">
+            <span className="text-[11px] text-muted-foreground">
               Pay with {paymentRailLabel(billingConfig.payment_provider)}
-              {billingConfig.country_code ? ` · ${billingConfig.country_code}` : ""}
-            </p>
+            </span>
           )}
         </div>
+
+        {ownedPlans.length > 0 && (
+          <ul className="divide-y divide-white/[0.06] border-b border-white/[0.06]">
+            {ownedPlans.map((p) => (
+              <li key={p.title} className="flex items-center gap-3 px-4 py-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg ring-1 ring-primary/20">
+                  {p.emoji}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-cream">{p.title}</p>
+                  <p className="text-xs text-muted-foreground">{p.detail}</p>
+                </div>
+                {p.count !== null ? (
+                  <span className="shrink-0 text-sm font-semibold tabular-nums text-cream">
+                    ×{p.count}
+                  </span>
+                ) : (
+                  <span className="shrink-0 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                    {p.title === "Try" ? "Free" : "Active"}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
 
         {paywallOpen ? (
           <div className="px-4 py-4 text-sm text-muted-foreground">
             Everything&apos;s open during early access — no upgrade needed right now.
           </div>
         ) : (
-          <ul className="divide-y divide-white/[0.06]">
-            {TIER_OPTIONS.map((option) => {
-              const isCurrent = currentTier === option.id;
-              const meta = billingProductForTier(option.id, billingConfig?.products);
-              const price = formatTierPrice(option.id, meta);
-              const unit = tierPricingMeta(option.id).unit;
-              const showUpgrade = canUpgradeTo(option, Boolean(paywallOpen));
-
-              return (
-                <li key={option.id} className="px-4 py-3.5">
-                  <div className="flex items-start gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg ring-1 ring-primary/20">
-                      {option.emoji}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-medium text-cream">{option.title}</p>
-                        <span className="text-sm font-semibold tabular-nums text-primary">
-                          {price}
-                        </span>
-                        {isCurrent && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-200">
-                            <Check className="h-3 w-3" aria-hidden />
-                            Current
+          <>
+            <button
+              type="button"
+              onClick={() => setBuyOpen((v) => !v)}
+              aria-expanded={buyOpen}
+              className="focus-ring flex w-full items-center justify-center gap-2 border-t border-white/[0.06] bg-primary/[0.08] px-4 py-4 text-sm font-semibold text-primary transition-colors hover:bg-primary/[0.14]"
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+              Buy a plan
+              <ChevronDown
+                className={cn("h-4 w-4 transition-transform duration-200", buyOpen && "rotate-180")}
+                aria-hidden
+              />
+            </button>
+            <div
+              className={cn(
+                "grid transition-[grid-template-rows] duration-300 ease-out",
+                buyOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+              )}
+            >
+              <div className="overflow-hidden">
+                <ul className="divide-y divide-white/[0.06] border-t border-white/[0.06]">
+                  {TIER_OPTIONS.filter((o) => o.product).map((option) => {
+                    const meta = billingProductForTier(option.id, billingConfig?.products);
+                    const price = formatTierPrice(option.id, meta);
+                    const unit = tierPricingMeta(option.id).unit;
+                    return (
+                      <li key={option.id} className="px-4 py-3.5">
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg ring-1 ring-primary/20">
+                            {option.emoji}
                           </span>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                        {option.desc}
-                        {unit && option.id !== "try" ? ` · ${unit}` : ""}
-                      </p>
-                    </div>
-                    {showUpgrade && option.product && (
-                      <button
-                        type="button"
-                        onClick={() => setUpgradeProduct(option.product)}
-                        disabled={loading}
-                        className="shrink-0 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary transition hover:bg-primary/15 disabled:opacity-40"
-                      >
-                        {upgradeLabel(currentTier, option)}
-                      </button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium text-cream">{option.title}</p>
+                              <span className="text-sm font-semibold tabular-nums text-primary">
+                                {price}
+                              </span>
+                            </div>
+                            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                              {option.desc}
+                              {unit && option.id !== "try" ? ` · ${unit}` : ""}
+                            </p>
+                          </div>
+                          {option.product && (
+                            <button
+                              type="button"
+                              onClick={() => setUpgradeProduct(option.product)}
+                              disabled={loading}
+                              className="shrink-0 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary transition hover:bg-primary/15 disabled:opacity-40"
+                            >
+                              Buy
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+          </>
         )}
       </section>
 
       <Dialog open={upgradeProduct !== null} onOpenChange={(open) => !open && setUpgradeProduct(null)}>
         <DialogContent className="border-white/10 bg-card/95 text-cream sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-serif italic text-xl">{upgradeTitle}</DialogTitle>
+            <DialogTitle className="font-serif font-semibold text-xl">{upgradeTitle}</DialogTitle>
           </DialogHeader>
           {checkoutBlocked ? (
             <div className="space-y-4 text-sm text-muted-foreground">

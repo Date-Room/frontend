@@ -4,8 +4,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { AMBIANCE_PRESETS, type AmbiancePresetId } from "@/lib/ambiance";
+import { AMBIANCE_PRESETS, PLAIN_MOOD, type LobbyMood } from "@/lib/ambiance";
 import { cn } from "@/lib/utils";
+
+const MOOD_OPTIONS: { id: LobbyMood; emoji: string; label: string; hint: string }[] = [
+  ...AMBIANCE_PRESETS.map((p) => ({ id: p.id as LobbyMood, emoji: p.emoji, label: p.label, hint: p.hint })),
+  { id: PLAIN_MOOD, emoji: "⬜", label: "Plain", hint: "No background" },
+];
 
 export function RoomAmbianceSheet({
   open,
@@ -15,8 +20,8 @@ export function RoomAmbianceSheet({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  current: AmbiancePresetId;
-  onPick: (id: AmbiancePresetId) => void;
+  current: LobbyMood;
+  onPick: (id: LobbyMood) => void;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -25,7 +30,7 @@ export function RoomAmbianceSheet({
           <SheetTitle className="font-serif text-cream">Set the mood</SheetTitle>
         </SheetHeader>
         <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {AMBIANCE_PRESETS.map((p) => (
+          {MOOD_OPTIONS.map((p) => (
             <button
               key={p.id}
               type="button"

@@ -22,8 +22,8 @@
 import { createContext, useContext, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRoomByCode, listMyRooms, type InviteCard } from "@/lib/rooms";
-import type { AmbiancePresetId } from "@/lib/ambiance";
-import { resolveAmbianceFromBackgroundId } from "@/lib/roomAmbiance";
+import type { LobbyMood } from "@/lib/ambiance";
+import { resolveMoodFromBackgroundId } from "@/lib/roomAmbiance";
 import { themeForId, type RoomThemePalette } from "@/lib/roomTheme";
 import { useRoomSession } from "@/context/RoomSessionContext";
 
@@ -35,8 +35,8 @@ export type RoomCustomization = {
   /** Raw stored slug — null when nothing's picked. */
   themeId: string | null;
   backgroundId: string | null;
-  /** Lobby / live-room mood from the create wizard (photo + CSS wash). */
-  ambiancePreset: AmbiancePresetId;
+  /** Lobby / live-room mood from the create wizard (photo + CSS wash, or plain). */
+  ambiancePreset: LobbyMood;
 };
 
 /** Default DateRoom theme — returned when a component reads the hook
@@ -127,7 +127,7 @@ export function RoomCustomizationProvider({
 
   const themeId = card?.theme_color ?? roomRow?.theme_color ?? null;
   const backgroundId = card?.background_id ?? roomRow?.background_id ?? null;
-  const ambiancePreset = resolveAmbianceFromBackgroundId(backgroundId);
+  const ambiancePreset = resolveMoodFromBackgroundId(backgroundId);
 
   const value = useMemo<RoomCustomization>(() => {
     return {
