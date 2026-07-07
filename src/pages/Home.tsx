@@ -428,14 +428,13 @@ export default function Home() {
               ) : visibleAliveRooms.length === 0 ? (
                 <RoomsEmptyState query={q} />
               ) : (
-                <ul className="overflow-hidden rounded-2xl border border-white/[0.05] bg-card/30">
-                  {visibleAliveRooms.map((r, i) => (
+                <ul className="grid gap-2.5 lg:grid-cols-2">
+                  {visibleAliveRooms.map((r) => (
                     <li key={r.id}>
                       <RoomTileRow
                         room={r}
                         card={cardByRoomId[r.id]}
                         me={me}
-                        isLast={i === visibleAliveRooms.length - 1}
                         onTap={() => onTileTap(r)}
                       />
                     </li>
@@ -570,13 +569,11 @@ function RoomTileRow({
   room,
   card,
   me,
-  isLast,
   onTap,
 }: {
   room: Room;
   card: InviteCard | undefined;
   me: UserMe | undefined;
-  isLast: boolean;
   onTap: () => void;
 }) {
   const isHost = me?.id ? room.host_id === me.id : false;
@@ -607,10 +604,7 @@ function RoomTileRow({
     <button
       type="button"
       onClick={onTap}
-      className={cn(
-        "focus-ring group flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-white/[0.025]",
-        !isLast && "border-b border-white/[0.05]",
-      )}
+      className="focus-ring group flex h-full w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-card/30 px-3.5 py-3.5 text-left transition-colors hover:border-white/[0.1] hover:bg-white/[0.04]"
     >
       <DuoAvatar
         meName={me?.display_name ?? ""}
@@ -815,14 +809,11 @@ function DuoCircle({
 
 function RoomsSkeletonList() {
   return (
-    <ul className="overflow-hidden rounded-2xl border border-white/[0.05] bg-card/30">
-      {[0, 1, 2, 3].map((i, _, arr) => (
+    <ul className="grid gap-2.5 lg:grid-cols-2">
+      {[0, 1, 2, 3].map((i) => (
         <li
           key={i}
-          className={cn(
-            "flex items-center gap-3 px-3 py-3",
-            i < arr.length - 1 && "border-b border-white/[0.05]",
-          )}
+          className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-card/30 px-3.5 py-3.5"
         >
           <div className="relative h-12 w-[60px] shrink-0">
             <ShimmerSkeleton circle={36} className="absolute left-0 top-1 ring-2 ring-background" />
