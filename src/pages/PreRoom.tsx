@@ -14,6 +14,7 @@ import {
   UserMinus,
   KeyRound,
   Sparkles,
+  RefreshCw,
   Mic,
   MicOff,
   Video,
@@ -36,6 +37,7 @@ import {
   kickParticipant,
   rotateRoomPin,
   updateRoom,
+  renewRoom,
   requestRoomDestroyOtp,
   confirmRoomDestroy,
   type Room,
@@ -472,6 +474,24 @@ export default function PreRoom() {
 
   const currentMood: LobbyMood = resolveLobbyMood(room?.background_id ?? undefined);
 
+  async function onRenew() {
+    if (!room) return;
+    try {
+      await renewRoom(room.id);
+      await queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
+      await queryClient.invalidateQueries({ queryKey: ["entitlement"] });
+      toast.success("Room renewed — 30 more days.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Couldn't renew the room.";
+      if (/subscription|credit|402/i.test(msg)) {
+        toast.message("No Together credits left — buy one to renew.");
+        navigate("/home?tab=profile");
+        return;
+      }
+      toast.error(msg);
+    }
+  }
+
   async function onPickTheme(id: LobbyMood) {
     if (!room) return;
     try {
@@ -578,6 +598,11 @@ export default function PreRoom() {
               <DropdownMenuItem onClick={() => void onRotatePin()} className="gap-2">
                 <KeyRound className="h-4 w-4" /> Rotate PIN
               </DropdownMenuItem>
+              {room.persistence === "persistent" && (
+                <DropdownMenuItem onClick={() => void onRenew()} className="gap-2">
+                  <RefreshCw className="h-4 w-4" /> Renew (30 days)
+                </DropdownMenuItem>
+              )}
               {room.persistence === "persistent" && (
                 <DropdownMenuItem onClick={() => setThemeOpen(true)} className="gap-2">
                   <Sparkles className="h-4 w-4" /> Change theme

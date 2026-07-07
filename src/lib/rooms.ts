@@ -203,6 +203,12 @@ export function kickParticipant(roomId: string, participantId: string): Promise<
   return api.delete<void>(`/v1/rooms/${roomId}/participants/${participantId}`);
 }
 
+/** Host-only — extend a credit-based persistent room by 30 days (spends a
+ * Together/Crew credit; 402 when none, so the caller can route to purchase). */
+export function renewRoom(roomId: string): Promise<Room> {
+  return api.post<Room>(`/v1/rooms/${roomId}/renew`);
+}
+
 export function updateRoom(
   roomId: string,
   patch: { theme_color?: string | null; background_id?: string | null },
