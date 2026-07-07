@@ -54,7 +54,14 @@ function sleep(ms: number): Promise<void> {
 }
 
 function canPromoteWithoutPayment(entitlement: Entitlement | undefined): boolean {
-  return entitlement?.has_active_subscription === true;
+  if (!entitlement) return false;
+  // An active subscription OR an owned Together/Crew credit lets the user make
+  // the room forever without a new purchase — spend what they already have.
+  return (
+    entitlement.has_active_subscription === true ||
+    (entitlement.together_remaining ?? 0) > 0 ||
+    (entitlement.crew_remaining ?? 0) > 0
+  );
 }
 
 function stripeReturnPaths(roomId: string, product: BillableProduct) {
