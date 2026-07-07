@@ -592,12 +592,11 @@ function RoomTileRow({
   const endsLine = isPersistent ? null : expiryLabel(room.expires_at);
   const roleWord = isHost ? "Host" : "Guest";
 
-  // Subtle room-type label — Together/Crew for persistent, the pack tier
-  // otherwise. Shown muted so it reads as a quiet tag, not a badge.
+  // Subtle room-type label. Persistent rooms are all "Together" — Crew is an
+  // account tier, not a room type, and isn't distinguishable on the room
+  // itself (both use the subscription package with a 12-seat capacity).
   const typeLabel = isPersistent
-    ? (room.max_participants ?? 2) > 2
-      ? "Crew"
-      : "Together"
+    ? "Together"
     : room.package === "date_pack"
       ? "Date Pack"
       : room.package === "long_pack"
