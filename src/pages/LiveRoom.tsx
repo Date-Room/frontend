@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -25,7 +25,7 @@ import {
   useRoomCustomization,
 } from "@/context/RoomCustomizationContext";
 import { RoomVideo } from "@/components/RoomVideo";
-import { TogetherCall } from "@/components/TogetherCall";
+import { RoomCanvas, type CanvasItem } from "@/components/RoomCanvas";
 import { ChatWithBoundary } from "@/components/Chat";
 import { WatchTogether } from "@/components/WatchTogether";
 import { VisionBoard } from "@/components/VisionBoard";
@@ -560,6 +560,42 @@ function RoomShell({
     </>
   );
 
+  // Together-room "desktop" — each activity/wall is a free-floating window.
+  const canvasItems: CanvasItem[] = visibleTabs.map((tb) => ({
+    id: tb.id,
+    title: tb.label,
+    icon: tb.icon,
+    isWall: WALL_TABS.some((w) => w.id === tb.id),
+  }));
+  const renderRoomActivity = (id: string): ReactNode => {
+    switch (id as ActivityTabId) {
+      case "vision_board":
+        return <VisionBoard />;
+      case "fridge_notes":
+        return <FridgeNotes active />;
+      case "bookshelf":
+        return <Bookshelf />;
+      case "questions":
+        return <QuestionDeck />;
+      case "this_or_that":
+        return <ThisOrThat />;
+      case "the_36":
+        return <The36 />;
+      case "2_truths":
+        return <TwoTruths />;
+      case "truth_or_dare":
+        return <TruthOrDare />;
+      case "watch":
+        return <WatchTogether />;
+      case "dj":
+        return <DJ watchActive={false} />;
+      case "chat":
+        return <ChatWithBoundary />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <PageShell
       orbs={false}
@@ -684,10 +720,12 @@ function RoomShell({
         )}
       >
         {isPersistent ? (
-          /* Together room: activities are primary; call floats as a draggable
-             PiP (default) → full-screen with activities below → bubble. */
-          <TogetherCall
-            activityPanel={activityTabs}
+          /* Together room: a free-floating window "desktop" — activities/walls
+             and the call are draggable, resizable windows. */
+          <RoomCanvas
+            roomId={roomId}
+            items={canvasItems}
+            renderContent={renderRoomActivity}
             onLeave={() => setShowLeaveConfirm(true)}
           />
         ) : (
