@@ -182,6 +182,16 @@ export function deleteRoom(roomId: string): Promise<void> {
   return api.delete<void>(`/v1/rooms/${roomId}`);
 }
 
+/** Email the host a code required to destroy the room (paid rooms are hard to delete). */
+export function requestRoomDestroyOtp(roomId: string): Promise<void> {
+  return api.post<void>(`/v1/rooms/${roomId}/destroy/request`, {});
+}
+
+/** Verify the emailed code and permanently destroy the room. */
+export function confirmRoomDestroy(roomId: string, code: string): Promise<void> {
+  return api.post<void>(`/v1/rooms/${roomId}/destroy/confirm`, { code });
+}
+
 /** Host-only — rotate the room PIN. Returns the updated room (so the
  * caller's share UI immediately reflects the new value). */
 export function rotateRoomPin(roomId: string): Promise<Room> {

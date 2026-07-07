@@ -13,6 +13,7 @@ import {
   MoreVertical,
   UserMinus,
   KeyRound,
+  Sparkles,
   Mic,
   MicOff,
   Video,
@@ -31,13 +32,24 @@ import { cn } from "@/lib/utils";
 import {
   listMyRooms,
   startRoom,
-  deleteRoom,
   getRoomByCode,
   kickParticipant,
   rotateRoomPin,
+  updateRoom,
+  requestRoomDestroyOtp,
+  confirmRoomDestroy,
   type Room,
   type ParticipantInfo,
 } from "@/lib/rooms";
+import { RoomAmbianceSheet } from "@/components/RoomAmbianceSheet";
+import { resolveLobbyMood, type LobbyMood } from "@/lib/ambiance";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { getInvitedGuestName, saveInvitedGuestName } from "@/lib/invitedGuest";
 import { saveRoomPlanFromServer, defaultCuratedForPackage } from "@/lib/roomExperience";
 import { getMe } from "@/lib/users";
@@ -116,6 +128,11 @@ export default function PreRoom() {
   const queryClient = useQueryClient();
   const [starting, setStarting] = useState(false);
   const [copiedKey, setCopiedKey] = useState<CopiedKey>(null);
+  const [themeOpen, setThemeOpen] = useState(false);
+  const [destroyOpen, setDestroyOpen] = useState(false);
+  const [destroyStep, setDestroyStep] = useState<"request" | "code">("request");
+  const [destroyCode, setDestroyCode] = useState("");
+  const [destroyBusy, setDestroyBusy] = useState(false);
 
   const [cameraEnabled, setCameraEnabled] = useState(() => {
     try {
@@ -451,15 +468,44 @@ export default function PreRoom() {
     }
   }
 
-  async function destroy() {
+  const currentMood: LobbyMood = resolveLobbyMood(room?.background_id ?? undefined);
+
+  async function onPickTheme(id: LobbyMood) {
     if (!room) return;
-    if (!window.confirm("Destroy this room? This permanently deletes it and everything in it.")) return;
     try {
-      await deleteRoom(room.id);
+      await updateRoom(room.id, { background_id: id });
+      await queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
+      toast.success("Theme updated.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't change the theme.");
+    }
+  }
+
+  async function sendDestroyCode() {
+    if (!room) return;
+    setDestroyBusy(true);
+    try {
+      await requestRoomDestroyOtp(room.id);
+      setDestroyStep("code");
+      toast.success("Confirmation code sent to your email.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't send the code.");
+    } finally {
+      setDestroyBusy(false);
+    }
+  }
+
+  async function confirmDestroy() {
+    if (!room || destroyCode.trim().length < 4) return;
+    setDestroyBusy(true);
+    try {
+      await confirmRoomDestroy(room.id, destroyCode.trim());
       toast.success("Room destroyed.");
       navigate("/home");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not destroy the room.");
+    } finally {
+      setDestroyBusy(false);
     }
   }
 
@@ -531,10 +577,19 @@ export default function PreRoom() {
                 <KeyRound className="h-4 w-4" /> Rotate PIN
               </DropdownMenuItem>
               {room.persistence === "persistent" && (
+                <DropdownMenuItem onClick={() => setThemeOpen(true)} className="gap-2">
+                  <Sparkles className="h-4 w-4" /> Change theme
+                </DropdownMenuItem>
+              )}
+              {room.persistence === "persistent" && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onClick={destroy}
+                    onClick={() => {
+                      setDestroyStep("request");
+                      setDestroyCode("");
+                      setDestroyOpen(true);
+                    }}
                     className="gap-2 text-destructive focus:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" /> Destroy room
@@ -738,6 +793,68 @@ export default function PreRoom() {
         </div>
       </main>
 
+      <RoomAmbianceSheet
+        open={themeOpen}
+        onOpenChange={setThemeOpen}
+        current={currentMood}
+        onPick={(id) => void onPickTheme(id)}
+      />
+
+      <Dialog open={destroyOpen} onOpenChange={(o) => !destroyBusy && setDestroyOpen(o)}>
+        <DialogContent className="border-white/10 bg-card/95 text-cream sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-xl font-semibold">Destroy this room?</DialogTitle>
+          </DialogHeader>
+          {destroyStep === "request" ? (
+            <div className="space-y-5">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                This permanently deletes the room and everything in it — vision board, notes,
+                captures, recap. It can&apos;t be undone. To confirm, we&apos;ll email a code to
+                your address.
+              </p>
+              <button
+                type="button"
+                onClick={() => void sendDestroyCode()}
+                disabled={destroyBusy}
+                className="w-full rounded-[1.15rem] bg-destructive py-3.5 text-sm font-semibold text-cream transition hover:bg-destructive/80 disabled:opacity-50"
+              >
+                {destroyBusy ? "Sending…" : "Email me a code"}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Enter the 6-digit code we emailed you to permanently destroy this room.
+              </p>
+              <Input
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={destroyCode}
+                onChange={(e) => setDestroyCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="000000"
+                className="text-center text-lg tracking-[0.4em] tabular-nums"
+              />
+              <button
+                type="button"
+                onClick={() => void confirmDestroy()}
+                disabled={destroyBusy || destroyCode.trim().length < 6}
+                className="w-full rounded-[1.15rem] bg-destructive py-3.5 text-sm font-semibold text-cream transition hover:bg-destructive/80 disabled:opacity-50"
+              >
+                {destroyBusy ? "Destroying…" : "Destroy room permanently"}
+              </button>
+              <button
+                type="button"
+                onClick={() => void sendDestroyCode()}
+                disabled={destroyBusy}
+                className="w-full text-center text-xs text-muted-foreground transition hover:text-cream disabled:opacity-50"
+              >
+                Resend code
+              </button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </PreRoomShell>
   );
 }

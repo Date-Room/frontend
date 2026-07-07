@@ -265,8 +265,10 @@ export default function Home() {
   }
 
   function onTileTap(r: Room) {
+    // Persistent (Together) rooms always open the pre-room first — camera
+    // preview + host management (rotate PIN, theme, destroy) before entering.
     if (r.persistence === "persistent") {
-      enterRoom(r);
+      navigate(`/rooms/${r.id}/pre`);
       return;
     }
     const isHost = me ? r.host_id === me.id : false;
