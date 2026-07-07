@@ -330,6 +330,8 @@ export default function PreRoom() {
   // presence-derived path stays as a safety net for guests.
   const kickableGuest = useMemo<{ participantId: string; name: string } | null>(() => {
     if (!me) return null;
+    // Persistent-room members are tied to their accounts and can't be removed.
+    if (room?.persistence === "persistent") return null;
     if (card) {
       for (const p of card.participants as ParticipantInfo[]) {
         if (p.user_id && p.user_id === me.id) continue; // skip self
@@ -346,7 +348,7 @@ export default function PreRoom() {
       return { participantId: pid, name: name ?? "Guest" };
     }
     return null;
-  }, [card, presence, me]);
+  }, [card, presence, me, room?.persistence]);
 
   async function onKickPartner() {
     if (!room || !kickableGuest) return;
