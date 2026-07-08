@@ -28,6 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Pin,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
@@ -50,7 +51,7 @@ const CATEGORIES: { id: string; label: string; icon: LucideIcon; itemIds: string
     id: "room",
     label: "Room",
     icon: DoorOpen,
-    itemIds: ["vision_board", "fridge_notes", "bookshelf"],
+    itemIds: ["vision_board", "fridge_notes", "bookshelf", "room_details"],
   },
   {
     id: "games",
@@ -77,6 +78,7 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   watch: PlayCircle,
   dj: Headphones,
   chat: MessageCircle,
+  room_details: Settings,
 };
 
 /** One-line taglines for the drilled-in list rows — mirror the mobile menu. */
@@ -92,6 +94,7 @@ const ITEM_TAGLINES: Record<string, string> = {
   watch: "Sync up something to watch.",
   dj: "Take turns picking the soundtrack.",
   chat: "Side chat while you play.",
+  room_details: "Invite, theme & background.",
 };
 
 export type StageItem = {
@@ -345,20 +348,20 @@ export function RoomStage({
           <button
             type="button"
             onClick={onCallIn}
-            className="group flex w-full items-center gap-3 rounded-2xl bg-primary px-4 py-3 text-left text-primary-foreground shadow-[0_12px_34px_-10px_hsl(var(--primary)/0.55)] transition hover:brightness-105 active:scale-[0.99]"
+            className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-cream backdrop-blur-md transition hover:border-primary/30 hover:bg-white/[0.07] active:scale-[0.99]"
           >
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/10">
-              <Video className="h-5 w-5" />
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+              <Video className="h-[18px] w-[18px]" />
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[15px] font-semibold leading-tight">
                 {partnerPresent ? "Join the call" : "Start the call"}
               </span>
-              <span className="block truncate text-xs leading-tight text-primary-foreground/70">
+              <span className="block truncate text-xs leading-tight text-muted-foreground">
                 {partnerStatus}
               </span>
             </span>
-            <ChevronRight className="h-5 w-5 shrink-0 opacity-60 transition group-hover:translate-x-0.5" />
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
           </button>
         )}
 

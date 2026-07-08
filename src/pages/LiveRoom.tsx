@@ -44,6 +44,7 @@ import {
 import { ThisOrThat } from "@/components/ThisOrThat";
 import { DJ } from "@/components/DJ";
 import { MusicLibrary } from "@/components/MusicRoom";
+import { RoomSettings } from "@/components/RoomSettings";
 import { QuestionDeck } from "@/components/QuestionDeck";
 import { The36 } from "@/components/The36";
 import { TwoTruths } from "@/components/TwoTruths";
@@ -442,13 +443,18 @@ function RoomShell({
   };
 
   // Together-room stage — one big surface that mounts the chosen activity.
-  const canvasItems: StageItem[] = visibleTabs.map((tb) => ({
-    id: tb.id,
-    title: tb.label,
-    icon: tb.icon,
-    isWall: WALL_TABS.some((w) => w.id === tb.id),
-  }));
+  const canvasItems: StageItem[] = [
+    ...visibleTabs.map((tb) => ({
+      id: tb.id,
+      title: tb.label,
+      icon: tb.icon,
+      isWall: WALL_TABS.some((w) => w.id === tb.id),
+    })),
+    // Room info + customization, reachable from the Room menu.
+    { id: "room_details", title: "Room info", icon: "⚙️", isWall: false },
+  ];
   const renderRoomActivity = (id: string): ReactNode => {
+    if (id === "room_details") return <RoomSettings />;
     switch (id as ActivityTabId) {
       case "vision_board":
         return <VisionBoard />;

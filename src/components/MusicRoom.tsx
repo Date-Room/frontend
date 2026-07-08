@@ -909,10 +909,11 @@ function LibraryRow({
 export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
   const m = useMusicRoom();
   const [dismissed, setDismissed] = useState(false);
-  // A new track re-opens the bar after a manual close.
+  // Close stops playback; the bar stays hidden until playback starts again
+  // (keying off `playing` avoids videoId churn re-opening it mid-shuffle).
   useEffect(() => {
-    if (m.videoId) setDismissed(false);
-  }, [m.videoId]);
+    if (m.playing) setDismissed(false);
+  }, [m.playing]);
   if (!m.hasContent || dismissed) return null;
   const pct = m.duration > 0 ? Math.min(100, (m.position / m.duration) * 100) : 0;
 
