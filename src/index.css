@@ -33,6 +33,8 @@
     --ring: 33 76% 62%;
     --radius: 1.5rem;
     --champagne: 38 72% 72%;
+    /* Brand amber (#F5A623) as HSL channels — themed rooms override this. */
+    --amber: 37 91% 55%;
   }
 }
 
@@ -71,6 +73,7 @@
     --border: 35 12% 86%;
     --input: 35 12% 86%;
     --ring: 33 74% 50%;
+    --amber: 37 88% 46%;
   }
 }
 
@@ -107,7 +110,7 @@
 
   .btn-primary {
     @apply px-8 py-4 rounded-full bg-primary text-primary-foreground font-medium transition-all duration-300 
-           hover:scale-105 hover:shadow-[0_0_30px_rgba(232,166,83,0.3)] active:scale-95;
+           hover:scale-105 hover:shadow-[0_0_30px_hsl(var(--primary)/0.3)] active:scale-95;
   }
 
   .btn-secondary {
@@ -123,14 +126,14 @@
   /* Gentle lift on hover for tappable cards. */
   .hover-lift {
     @apply transition-all duration-300 ease-out
-           hover:-translate-y-0.5 hover:shadow-[0_22px_60px_-22px_rgba(232,166,83,0.28)];
+           hover:-translate-y-0.5 hover:shadow-[0_22px_60px_-22px_hsl(var(--primary)/0.28)];
   }
 
   /* Stronger lift for hero CTAs / paywall tiles — same easing as
      hover-lift so motion stays consistent across surfaces. */
   .hover-lift-strong {
     @apply transition-all duration-300 ease-out
-           hover:-translate-y-1 hover:shadow-[0_28px_72px_-22px_rgba(232,166,83,0.38)];
+           hover:-translate-y-1 hover:shadow-[0_28px_72px_-22px_hsl(var(--primary)/0.38)];
   }
 
   /* Reusable focus ring — consistent across inputs, buttons, links. */
@@ -203,7 +206,7 @@
   }
 
   .ember-glow {
-    background: radial-gradient(ellipse at 50% 50%, rgba(232,166,83,0.12) 0%, transparent 70%);
+    background: radial-gradient(ellipse at 50% 50%, hsl(var(--primary)/0.12) 0%, transparent 70%);
     pointer-events: none;
   }
 
@@ -237,7 +240,7 @@
   .auth-mode-switch {
     @apply mt-2 inline-flex min-h-[2.75rem] items-center justify-center rounded-full border border-primary/55
            bg-primary/20 px-6 py-2 text-sm font-semibold tracking-wide text-cream
-           shadow-[0_0_24px_rgba(232,166,83,0.22)] transition-colors duration-200
+           shadow-[0_0_24px_hsl(var(--primary)/0.22)] transition-colors duration-200
            hover:border-primary hover:bg-primary/30 hover:text-cream
            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2
            focus-visible:ring-offset-[hsl(250_18%_8%)];
@@ -310,6 +313,26 @@
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position: 200% 0; }
+}
+
+/* Now-playing equalizer bars. */
+@keyframes eq-bar {
+  0%, 100% { transform: scaleY(0.35); }
+  50%      { transform: scaleY(1); }
+}
+
+/* Stage "received a new activity" — a subtle Apple-style swell + settle with
+   a whisper of overshoot, so swapping the staged item feels acknowledged. */
+@keyframes stage-swell {
+  0%   { opacity: 0.55; transform: scale(0.985); }
+  55%  { opacity: 1;    transform: scale(1.012); }
+  100% { opacity: 1;    transform: scale(1); }
+}
+.animate-stage-swell {
+  animation: stage-swell 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-stage-swell { animation: none; }
 }
 
 /* Mobile-parity shimmer sweep — accent-tinted band passes left→right
@@ -614,7 +637,7 @@
   }
 
   .live-room-tab[data-active="true"] {
-    @apply border-amber/35 bg-amber/15 text-amber shadow-[0_0_20px_rgba(232,157,77,0.12)];
+    @apply border-amber/35 bg-amber/15 text-amber shadow-[0_0_20px_hsl(var(--primary)/0.12)];
   }
 
   .live-room-tab[data-active="false"] {
@@ -707,7 +730,7 @@
 
   .bookshelf-lamp-glow {
     @apply pointer-events-none absolute -top-2 right-6 h-24 w-24 rounded-full opacity-40 blur-2xl;
-    background: radial-gradient(circle, rgba(232, 157, 77, 0.45), transparent 70%);
+    background: radial-gradient(circle, hsl(var(--primary)/0.45), transparent 70%);
   }
 
   .bookshelf-row {
@@ -749,7 +772,7 @@
 
   .book-spine[data-selected="true"] {
     transform: translateY(-6px) scale(1.04);
-    outline: 2px solid rgba(232, 157, 77, 0.65);
+    outline: 2px solid hsl(var(--primary)/0.65);
     outline-offset: 2px;
   }
 
@@ -763,8 +786,8 @@
     @apply relative flex shrink-0 cursor-pointer flex-col items-center justify-end rounded-t-md border border-b-0 px-1 pb-1 pt-3 transition-all;
     width: 1.75rem;
     min-height: 4.5rem;
-    background: linear-gradient(180deg, rgba(232, 157, 77, 0.35), rgba(180, 120, 60, 0.2));
-    border-color: rgba(232, 157, 77, 0.45);
+    background: linear-gradient(180deg, hsl(var(--primary)/0.35), rgba(180, 120, 60, 0.2));
+    border-color: hsl(var(--primary)/0.45);
     clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%);
   }
 
@@ -791,7 +814,7 @@
   }
 
   .shelf-partner-dot {
-    @apply absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber shadow-[0_0_6px_rgba(232,157,77,0.8)];
+    @apply absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-amber shadow-[0_0_6px_hsl(var(--primary)/0.8)];
   }
 
   .bookshelf-detail {
@@ -1027,7 +1050,7 @@
 
   .fridge-sticky-wrap-unread .fridge-sticky-paper {
     box-shadow:
-      0 0 0 2px rgba(232, 157, 77, 0.6),
+      0 0 0 2px hsl(var(--primary)/0.6),
       0 1px 0 rgba(255, 255, 255, 0.65) inset,
       3px 8px 16px rgba(0, 0, 0, 0.16);
   }
@@ -1095,7 +1118,7 @@
 
   .fridge-sticky-new {
     @apply absolute right-1.5 top-1.5 z-20 h-2.5 w-2.5 rounded-full bg-amber;
-    box-shadow: 0 0 10px rgba(232, 157, 77, 0.95);
+    box-shadow: 0 0 10px hsl(var(--primary)/0.95);
   }
 
   .fridge-sticky-text {
@@ -1143,7 +1166,7 @@
   }
 
   .perm-call-btn {
-    @apply inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-[#1a120c] shadow-[0_8px_28px_rgba(232,166,83,0.4)] transition hover:scale-[1.02];
+    @apply inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-[#1a120c] shadow-[0_8px_28px_hsl(var(--primary)/0.4)] transition hover:scale-[1.02];
   }
 
   .perm-partner-join-toast {
@@ -1187,7 +1210,7 @@
   .perm-wall-canvas {
     @apply relative min-h-[260px] p-4 sm:min-h-[300px] sm:p-5;
     background:
-      radial-gradient(circle at 20% 25%, rgba(232,166,83, 0.1), transparent 50%),
+      radial-gradient(circle at 20% 25%, hsl(var(--primary)/0.1), transparent 50%),
       radial-gradient(circle at 80% 75%, rgba(120, 80, 200, 0.08), transparent 45%),
       linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
   }

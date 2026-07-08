@@ -23,7 +23,7 @@ import {
   PlayCircle,
   Headphones,
   MessageCircle,
-  Home,
+  DoorOpen,
   Gamepad2,
   ChevronLeft,
   ChevronRight,
@@ -31,6 +31,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
+import { MusicPlayerBar, MusicRoomProvider } from "@/components/MusicRoom";
 import { useActivitySession } from "@/hooks/useActivitySession";
 import {
   parseFridgeNotes,
@@ -48,7 +49,7 @@ const CATEGORIES: { id: string; label: string; icon: LucideIcon; itemIds: string
   {
     id: "room",
     label: "Room",
-    icon: Home,
+    icon: DoorOpen,
     itemIds: ["vision_board", "fridge_notes", "bookshelf"],
   },
   {
@@ -58,7 +59,7 @@ const CATEGORIES: { id: string; label: string; icon: LucideIcon; itemIds: string
     itemIds: ["questions", "this_or_that", "the_36", "2_truths", "truth_or_dare"],
   },
   { id: "watch", label: "Watch", icon: PlayCircle, itemIds: ["watch"] },
-  { id: "music", label: "DJ", icon: Headphones, itemIds: ["dj"] },
+  { id: "music", label: "Music", icon: Headphones, itemIds: ["dj"] },
   { id: "chat", label: "Chat", icon: MessageCircle, itemIds: ["chat"] },
 ];
 
@@ -121,6 +122,7 @@ export function RoomStage({
   items,
   renderContent,
   partnerStatus,
+  partnerPresent = false,
   callActive,
   onCallIn,
   onLeaveCall,
@@ -129,6 +131,7 @@ export function RoomStage({
   items: StageItem[];
   renderContent: (id: string) => ReactNode;
   partnerStatus: string;
+  partnerPresent?: boolean;
   callActive: boolean;
   onCallIn: () => void;
   onLeaveCall: () => void;
@@ -319,23 +322,45 @@ export function RoomStage({
     () => parseFridgeNotes(fridgeState).notes.filter((n) => n.stage_pinned),
     [fridgeState],
   );
+  // Whether the bottom music bar is showing, so the launcher lifts above it.
+  const { state: djState } = useActivitySession("dj");
+  const musicActive =
+    Boolean(djState?.now_playing) || (Array.isArray(djState?.queue) && djState.queue.length > 0);
 
   return (
+    <MusicRoomProvider watchActive={staged === "watch"}>
     <main className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-28 pt-2 sm:px-6">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-        {/* Status bar — partner presence + call. */}
-        <div className="perm-status-bar">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-primary shadow-[0_0_10px_rgba(232,166,83,0.65)]" />
-            <p className="truncate text-sm text-cream/80">{partnerStatus}</p>
+        {/* Call initiator (mobile-style): a full-width CTA whose title reflects
+            whether the partner's already here, with their status underneath.
+            While a call is live it collapses to a slim presence bar. */}
+        {callActive ? (
+          <div className="perm-status-bar">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="h-2 w-2 shrink-0 rounded-full bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.65)]" />
+              <p className="truncate text-sm text-cream/80">{partnerStatus}</p>
+            </div>
           </div>
-          {!callActive && (
-            <button type="button" onClick={onCallIn} className="perm-call-btn shrink-0">
-              <Video className="h-4 w-4" />
-              Call them in
-            </button>
-          )}
-        </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onCallIn}
+            className="group flex w-full items-center gap-3 rounded-2xl bg-primary px-4 py-3 text-left text-primary-foreground shadow-[0_12px_34px_-10px_hsl(var(--primary)/0.55)] transition hover:brightness-105 active:scale-[0.99]"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/10">
+              <Video className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[15px] font-semibold leading-tight">
+                {partnerPresent ? "Join the call" : "Start the call"}
+              </span>
+              <span className="block truncate text-xs leading-tight text-primary-foreground/70">
+                {partnerStatus}
+              </span>
+            </span>
+            <ChevronRight className="h-5 w-5 shrink-0 opacity-60 transition group-hover:translate-x-0.5" />
+          </button>
+        )}
 
         {/* Stage — Vision-Board-sized card that mounts the chosen activity. */}
         <section className="perm-wall-frame flex flex-col overflow-hidden !p-0">
@@ -349,7 +374,10 @@ export function RoomStage({
               {stagedItem?.title ?? "Stage"}
             </span>
           </div>
-          <div className="h-[clamp(400px,58vh,680px)] min-h-0 overflow-hidden">
+          <div
+            key={staged}
+            className="animate-stage-swell h-[clamp(400px,58vh,680px)] min-h-0 overflow-hidden"
+          >
             {staged ? renderContent(staged) : null}
           </div>
         </section>
@@ -360,18 +388,29 @@ export function RoomStage({
       {menuOpen && (
         <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} aria-hidden />
       )}
-      <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-3">
+      <div
+        className={cn(
+          "pointer-events-none fixed inset-x-0 z-40 flex justify-center px-3 transition-[bottom] duration-300",
+          musicActive ? "bottom-[80px]" : "bottom-4",
+        )}
+      >
         <div className="relative">
           <div
             className={cn(
               "absolute bottom-full left-1/2 mb-3 w-[min(26rem,92vw)] -translate-x-1/2 overflow-hidden rounded-3xl border border-white/10 bg-card/90 shadow-[0_24px_64px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-all duration-300 ease-out",
-              menuOpen
-                ? "pointer-events-auto translate-y-0 opacity-100"
-                : "pointer-events-none translate-y-3 opacity-0",
+              menuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
             )}
             style={{ height: menuOpen ? panelH : 0 }}
           >
-            <div ref={panelRef} className="p-3.5">
+            {/* Content scales up from the bottom as the tray grows, so the
+                whole menu (icons included) opens as one motion. */}
+            <div
+              ref={panelRef}
+              className={cn(
+                "origin-bottom p-3.5 transition-transform duration-300 ease-out",
+                menuOpen ? "scale-100" : "scale-90",
+              )}
+            >
               {activeCat ? (
                 /* Level 2 — the category's activities as a list (mobile style). */
                 <>
@@ -425,6 +464,9 @@ export function RoomStage({
         </div>
       </div>
 
+      {/* Full-width music player, pinned to the very bottom under the tray. */}
+      <MusicPlayerBar onOpenList={() => commitStage("dj")} />
+
       {/* Pinned vision cards & fridge notes — floated around the room, freely
           draggable, popped out of the stage. */}
       {pinnedVisions.map((item, i) => (
@@ -438,7 +480,7 @@ export function RoomStage({
           and edge-resizable (aspect-locked) between full and 2/3 size. */}
       {callActive && (
         <div
-          className="fixed z-40 select-none rounded-2xl glass p-1 shadow-[0_20px_56px_rgba(0,0,0,0.55)] touch-none"
+          className="group fixed z-40 select-none rounded-2xl glass p-1 shadow-[0_20px_56px_rgba(0,0,0,0.55)] touch-none"
           style={pos ? { left: pos.x, top: pos.y, width: curW, height: curH } : undefined}
         >
           <div
@@ -452,7 +494,7 @@ export function RoomStage({
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => setPortrait((v) => !v)}
             aria-label="Rotate call"
-            className="absolute right-2 top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-cream backdrop-blur transition hover:bg-black/70"
+            className="absolute right-2 top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-cream opacity-0 backdrop-blur transition duration-200 hover:bg-black/70 group-hover:opacity-100"
           >
             <RotateCw className="h-3.5 w-3.5" />
           </button>
@@ -473,6 +515,7 @@ export function RoomStage({
         </div>
       )}
     </main>
+    </MusicRoomProvider>
   );
 }
 
@@ -496,11 +539,11 @@ function MenuTile({
       title={label}
       className="group flex w-[3.5rem] flex-col items-center gap-1.5"
     >
-      {/* iOS-home-screen squircle app icon — uniform amber gradient + a single
-          dark lucide icon (matches the mobile menu; no multicolor emoji). */}
+      {/* iOS-home-screen squircle app icon — flat solid fill + a single dark
+          lucide icon (matches the mobile menu; no gradient/glow). */}
       <span
         className={cn(
-          "relative flex aspect-square w-full items-center justify-center rounded-[26%] bg-gradient-to-br from-primary/90 to-primary/60 shadow-[0_4px_12px_rgba(232,166,83,0.3)] transition duration-150 group-hover:brightness-110 group-active:scale-90",
+          "relative flex aspect-square w-full items-center justify-center rounded-[26%] bg-primary transition duration-150 group-hover:brightness-105 group-active:scale-90",
           active && "ring-2 ring-cream/85 ring-offset-2 ring-offset-card",
         )}
       >

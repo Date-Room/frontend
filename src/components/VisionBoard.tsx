@@ -358,7 +358,7 @@ function VisionCard({
     >
       <div className="relative">
         <span
-          className="absolute -top-1.5 left-1/2 z-10 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-amber shadow-[0_0_10px_rgba(232,157,77,0.7)]"
+          className="absolute -top-1.5 left-1/2 z-10 h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-amber shadow-[0_0_10px_hsl(var(--primary)/0.7)]"
           aria-hidden
         />
         {media === "pdf" && (
@@ -795,10 +795,9 @@ export function VisionBoard() {
       toast.message(`Only ${MAX_STAGE_PINS} dreams can sit on the stage — unpin one first.`);
       return;
     }
-    const ok = await persist(
-      { items: items.map((i) => (i.id === item.id ? { ...i, pinned: willPin } : i)) },
-      false,
-    );
+    const ok = await persist({
+      items: items.map((i) => (i.id === item.id ? { ...i, pinned: willPin } : i)),
+    });
     if (ok) toast.success(willPin ? "Pinned to the room" : "Unpinned");
   }
 
@@ -1107,7 +1106,7 @@ export function VisionBoard() {
         <button
           type="button"
           onClick={openAdd}
-          className="absolute bottom-6 right-4 z-20 flex items-center gap-2 rounded-full bg-amber px-4 py-2.5 text-sm font-semibold text-[#1a120c] shadow-[0_8px_32px_rgba(232,157,77,0.45)] transition hover:scale-[1.02]"
+          className="absolute bottom-6 right-4 z-20 flex items-center gap-2 rounded-full bg-amber px-4 py-2.5 text-sm font-semibold text-[#1a120c] shadow-[0_8px_32px_hsl(var(--primary)/0.45)] transition hover:scale-[1.02]"
         >
           <Plus className="h-4 w-4" />
           Pin another

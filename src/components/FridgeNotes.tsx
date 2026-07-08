@@ -351,6 +351,10 @@ export function FridgeNotes({ active = true }: Props) {
         toast.error("Sign in to leave notes on the fridge.");
         return false;
       }
+      // Optimistic — hold the change locally so rapid successive edits build on
+      // each other (avoids a stale write clobbering a prior one) until the
+      // durable state echoes back.
+      setLocalNotes(next.notes);
       setSaving(true);
       try {
         await session.persist(next as unknown as Record<string, unknown>, {
@@ -621,7 +625,7 @@ export function FridgeNotes({ active = true }: Props) {
           <button
             type="button"
             onClick={focusAdd}
-            className="absolute bottom-4 right-4 z-10 flex items-center gap-2 rounded-full bg-amber px-4 py-2.5 text-sm font-semibold text-[#1a120c] shadow-[0_8px_32px_rgba(232,157,77,0.45)] transition hover:scale-[1.02]"
+            className="absolute bottom-4 right-4 z-10 flex items-center gap-2 rounded-full bg-amber px-4 py-2.5 text-sm font-semibold text-[#1a120c] shadow-[0_8px_32px_hsl(var(--primary)/0.45)] transition hover:scale-[1.02]"
           >
             <Plus className="h-4 w-4" />
             Another note

@@ -6,7 +6,7 @@ import { LOBBY_PREVIEW_SCENES } from "@/lib/lobbyPreviewScenes";
 
 /** Faded-in resting opacity for the photo — kept low so the scene reads as a
  *  soft wash behind the room chrome rather than busy foreground art. */
-const SCENE_OPACITY = 0.55;
+const SCENE_OPACITY = 0.32;
 
 type AmbientSceneStackProps = {
   /** Room mood from create-flow selection or persisted background_id */
@@ -99,7 +99,7 @@ function SceneLayer({
         alt=""
         aria-hidden
         className={cn(
-          "absolute inset-0 h-full w-full object-cover transition-opacity duration-[900ms] ease-out",
+          "absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-out",
           kenBurns && "animate-ken-burns motion-reduce:animate-none",
           imgClassName,
         )}

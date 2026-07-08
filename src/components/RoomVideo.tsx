@@ -5,11 +5,12 @@ import {
   VideoTrack,
   useTracks,
   useLocalParticipant,
+  useIsSpeaking,
 } from "@livekit/components-react";
 import { Track, DisconnectReason } from "livekit-client";
 import { toast } from "sonner";
 import "@livekit/components-styles";
-import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Maximize2, Minimize2, Minus } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Maximize2, Minimize2, Minus, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getInvitedGuestName } from "@/lib/invitedGuest";
 import { livekitToken } from "@/lib/rooms";
@@ -196,6 +197,47 @@ const BEAUTY_CSS = [
   "blur(0.3px)",       // subtle skin smoothing
 ].join(" ");
 
+/** Camera-off placeholder — the person's initial in a disc with a ring that
+ *  pulses while they're speaking, so the call still feels alive. */
+function SpeakingAvatar({
+  trackRef,
+  label,
+}: {
+  trackRef: ReturnType<typeof useTracks>[number];
+  label: string;
+}) {
+  const speaking = useIsSpeaking(trackRef.participant);
+  const initial = (label || "?").trim().charAt(0).toUpperCase() || "?";
+  return (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <div className="relative flex items-center justify-center">
+        {/* Reverberating rings — appear only while speaking. */}
+        <span
+          className={cn(
+            "absolute rounded-full transition-opacity duration-300",
+            speaking ? "opacity-100 animate-ping" : "opacity-0",
+          )}
+          style={{
+            width: "6rem",
+            height: "6rem",
+            background: "color-mix(in srgb, var(--room-accent) 22%, transparent)",
+          }}
+          aria-hidden
+        />
+        <span
+          className="relative flex h-[clamp(2.75rem,26%,4.5rem)] w-[clamp(2.75rem,26%,4.5rem)] items-center justify-center rounded-full font-serif text-[clamp(1.1rem,1.4vw,1.9rem)] text-primary-foreground transition-shadow duration-200"
+          style={{
+            backgroundColor: "var(--room-accent)",
+            boxShadow: speaking ? "0 0 0 6px color-mix(in srgb, var(--room-accent) 30%, transparent)" : "none",
+          }}
+        >
+          {initial}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function Tile({
   participant,
   isLocal,
@@ -211,9 +253,13 @@ function Tile({
       style={{ boxShadow: "0 12px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)" }}
     >
       {cameraOff || !participant ? (
-        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground font-serif italic text-xl sm:text-2xl">
-          {participant ? "camera off" : "waiting for them…"}
-        </div>
+        participant ? (
+          <SpeakingAvatar trackRef={participant} label={label} />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground font-serif italic text-xl sm:text-2xl">
+            waiting for them…
+          </div>
+        )
       ) : (
         <>
           <VideoTrack
@@ -262,6 +308,8 @@ type CallControls = {
   onMinimize?: () => void;
   /** pip → collapse to a small bubble */
   onCollapse?: () => void;
+  /** pip → rotate portrait/landscape (rendered in the hover controls) */
+  onRotate?: () => void;
 };
 
 function Stage({
@@ -272,6 +320,7 @@ function Stage({
   onExpand,
   onMinimize,
   onCollapse,
+  onRotate,
 }: { onLeave: () => void } & CallControls) {
   // Both the together-room PiP (variant="pip") and the session watch mini-view
   // (compact) render the small, single-tile, compact-controls layout.
@@ -545,6 +594,7 @@ export function RoomVideo({
   onExpand,
   onMinimize,
   onCollapse,
+  onRotate,
 }: { onLeave?: () => void } & CallControls = {}) {
   const room = useRoomSession();
   const [conn, setConn] = useState<{ token: string; url: string } | null>(null);
@@ -608,6 +658,7 @@ export function RoomVideo({
         onExpand={onExpand}
         onMinimize={onMinimize}
         onCollapse={onCollapse}
+        onRotate={onRotate}
       />
       <RoomAudioRenderer />
     </LiveKitRoom>

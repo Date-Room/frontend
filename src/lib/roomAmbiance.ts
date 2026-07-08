@@ -32,13 +32,56 @@ export function resolveMoodFromBackgroundId(
   return ambianceFromBackgroundId(id) ?? PLAIN_MOOD;
 }
 
-/** CSS-var overrides that tint the room's `--room-accent` to match the chosen
- *  background's signature colour. Returns `{}` for plain (no background), so
- *  the room keeps its theme/brand accent. Spread after `roomAccentStyle`. */
+/** RGB (0–255) → HSL, hue in deg, sat/lum in %. */
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  const rn = r / 255;
+  const gn = g / 255;
+  const bn = b / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
+  const l = (max + min) / 2;
+  const d = max - min;
+  let h = 0;
+  let s = 0;
+  if (d !== 0) {
+    s = d / (1 - Math.abs(2 * l - 1));
+    switch (max) {
+      case rn:
+        h = ((gn - bn) / d) % 6;
+        break;
+      case gn:
+        h = (bn - rn) / d + 2;
+        break;
+      default:
+        h = (rn - gn) / d + 4;
+    }
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return [h, s * 100, l * 100];
+}
+
+/** CSS-var overrides that tint the room's palette to match the chosen
+ *  background's signature colour — the accent AND `--primary`/`--ring`, so
+ *  every control (menu tiles, buttons, rings) follows the background. Returns
+ *  `{}` for plain (no background) so the room keeps its brand amber. Spread
+ *  after `roomAccentStyle`. */
 export function ambianceAccentStyle(mood: LobbyMood): Record<string, string> {
   if (mood === PLAIN_MOOD) return {};
   const [r, g, b] = LOBBY_PREVIEW_SCENES[resolveAmbiancePreset(mood)].accentRgb;
+  const [h, s, l] = rgbToHsl(r, g, b);
+  // Normalise into a control-friendly band so any scene colour reads as a
+  // vivid, legible button/fill (dark text sits on it).
+  const S = Math.min(92, Math.max(58, s));
+  const L = Math.min(66, Math.max(52, l));
+  const primary = `${Math.round(h)} ${Math.round(S)}% ${Math.round(L)}%`;
   return {
+    "--primary": primary,
+    "--ring": primary,
+    "--primary-foreground": "24 30% 10%",
+    // Retint the `amber` token too, so activity chrome (which uses amber, not
+    // primary) follows the background as well.
+    "--amber": primary,
     "--room-accent": `rgb(${r}, ${g}, ${b})`,
     "--room-accent-soft": `rgba(${r}, ${g}, ${b}, 0.14)`,
   };

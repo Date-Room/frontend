@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
  * the cross-platform sync keeps working.
  */
 
-type DjTrack = {
+export type DjTrack = {
   id: string;
   title: string;
   added_by: string;
@@ -43,7 +43,7 @@ type DjTrack = {
   video_id: string | null;
 };
 
-function extractId(url: string): string | null {
+export function extractId(url: string): string | null {
   try {
     const u = new URL(url);
     const shortId = u.hostname.includes("youtu.be") ? u.pathname.split("/").filter(Boolean)[0] : null;
@@ -57,7 +57,7 @@ function extractId(url: string): string | null {
 }
 
 let ytApiPromise: Promise<void> | null = null;
-function loadYT() {
+export function loadYT() {
   if (ytApiPromise) return ytApiPromise;
   ytApiPromise = new Promise((res) => {
     if (window.YT?.Player) return res();
@@ -73,9 +73,9 @@ function loadYT() {
   return ytApiPromise;
 }
 
-type OEmbed = { title: string; author_name: string; thumbnail_url: string };
+export type OEmbed = { title: string; author_name: string; thumbnail_url: string };
 const oembedCache = new Map<string, OEmbed>();
-async function fetchOEmbed(videoId: string): Promise<OEmbed | null> {
+export async function fetchOEmbed(videoId: string): Promise<OEmbed | null> {
   if (oembedCache.has(videoId)) return oembedCache.get(videoId)!;
   try {
     const r = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
@@ -746,7 +746,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
 
 /* ─────────────────────── Transport row ─────────────────────── */
 
-function TransportRow({
+export function TransportRow({
   playing,
   enabled,
   canSkip,
@@ -809,7 +809,7 @@ function TransportRow({
 
 /* ─────────────────────── Footer card ─────────────────────── */
 
-function DjFooter({
+export function DjFooter({
   hasDj,
   isDj,
   djName,

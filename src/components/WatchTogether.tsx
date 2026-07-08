@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Clock, Play, Square } from "lucide-react";
+import { Clock, Pause, Play, Square } from "lucide-react";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
 import {
@@ -125,6 +125,25 @@ export function WatchTogether() {
 
   const [videoId, setVideoId] = useState<string | null>(dVideo);
   const [playing, setPlaying] = useState<boolean>(dPlaying);
+  const [videoTitle, setVideoTitle] = useState<string | null>(null);
+
+  // Pull the title from the player (no native title bar since controls are off).
+  // getVideoData can be empty right after ready, so retry a few times.
+  const captureTitle = useCallback(() => {
+    let tries = 0;
+    const grab = () => {
+      const data = (
+        playerRef.current as { getVideoData?: () => { title?: string } } | null
+      )?.getVideoData?.();
+      const title = data?.title?.trim();
+      if (title) {
+        setVideoTitle(title);
+      } else if (tries++ < 5) {
+        window.setTimeout(grab, 400);
+      }
+    };
+    grab();
+  }, []);
 
   function persistWatch(
     next: { video_id: string | null; playing: boolean; timestamp_seconds: number },
@@ -167,7 +186,17 @@ export function WatchTogether() {
         width: w,
         height: h,
         videoId: videoId ?? undefined,
-        playerVars: { rel: 0, modestbranding: 1, playsinline: 1, controls: 1, mute: 1 },
+        // No native chrome — DateRoom drives playback so the two sides stay
+        // in sync. A transparent overlay blocks YouTube's hover/click too.
+        playerVars: {
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          mute: 1,
+        },
         events: {
           onReady: () => {
             try {
@@ -180,6 +209,7 @@ export function WatchTogether() {
               if (dTsRef.current) p.seekTo(dTsRef.current, true);
               if (playing) p.playVideo?.();
               else p.pauseVideo?.();
+              captureTitle();
             } catch {
               void 0;
             }
@@ -357,6 +387,26 @@ export function WatchTogether() {
     queueVideo(entry.videoId, entry.url);
   };
 
+  // DateRoom-driven play/pause (the iframe's own controls are off). Broadcasts
+  // + persists so the partner stays in sync.
+  const togglePlayback = () => {
+    const p = playerRef.current;
+    if (!p || !videoId) return;
+    const next = !playing;
+    isControllerRef.current = true;
+    suppress(600);
+    try {
+      const time = p.getCurrentTime?.() ?? 0;
+      if (next) p.playVideo?.();
+      else p.pauseVideo?.();
+      void session?.sendEvent(next ? "play" : "pause", { timestamp_seconds: time });
+      persistWatch({ video_id: videoId, playing: next, timestamp_seconds: time });
+    } catch {
+      void 0;
+    }
+    setPlaying(next);
+  };
+
   const stopVideo = () => {
     const p = playerRef.current;
     suppress(400);
@@ -452,14 +502,43 @@ export function WatchTogether() {
                 className="absolute inset-0 overflow-hidden [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full"
               />
             )}
+            {/* Transparent shield — swallows YouTube's own hover/click/scrub so
+                playback is only driven by DateRoom controls (keeps sync clean).
+                Clicking it toggles our synced play/pause. */}
+            {videoId && (
+              <button
+                type="button"
+                onClick={togglePlayback}
+                aria-label={playing ? "Pause" : "Play"}
+                className="absolute inset-0 z-[5] cursor-pointer"
+              />
+            )}
             {!videoId && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
                 <div className="text-3xl opacity-40">▶</div>
                 <p className="font-serif italic text-sm">paste a link to begin</p>
               </div>
             )}
+            {/* Our own title bar (native chrome is off). */}
+            {videoId && videoTitle && (
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 via-black/25 to-transparent p-3 pb-8">
+                <p className="truncate text-sm font-medium text-cream drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)]">
+                  {videoTitle}
+                </p>
+              </div>
+            )}
             {videoId && (
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-2 bg-gradient-to-t from-black/70 via-black/25 to-transparent p-3 pt-10">
+                <Button
+                  type="button"
+                  onClick={togglePlayback}
+                  variant="outline"
+                  size="sm"
+                  className="pointer-events-auto rounded-full border-white/20 bg-black/50 text-cream hover:bg-black/70"
+                >
+                  {playing ? <Pause className="w-3.5 h-3.5 mr-1" /> : <Play className="w-3.5 h-3.5 mr-1" />}
+                  {playing ? "Pause" : "Play"}
+                </Button>
                 <Button
                   type="button"
                   onClick={stopVideo}

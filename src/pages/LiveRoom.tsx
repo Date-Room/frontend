@@ -43,6 +43,7 @@ import {
 } from "@/lib/partnerPresence";
 import { ThisOrThat } from "@/components/ThisOrThat";
 import { DJ } from "@/components/DJ";
+import { MusicLibrary } from "@/components/MusicRoom";
 import { QuestionDeck } from "@/components/QuestionDeck";
 import { The36 } from "@/components/The36";
 import { TwoTruths } from "@/components/TwoTruths";
@@ -50,6 +51,7 @@ import { TruthOrDare } from "@/components/TruthOrDare";
 import { toast } from "sonner";
 import { authClient } from "@/lib/authClient";
 import { DATE_NAME } from "@/lib/room";
+import { BRAND_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 function Loading({ label }: { label: string }) {
@@ -130,7 +132,7 @@ const ACTIVITY_TABS: TabDef[] = [
   { id: "2_truths", label: "2 Truths", icon: "🎭", curatableId: "2_truths" },
   { id: "truth_or_dare", label: "Truth or Dare", icon: "🔥", curatableId: "truth_or_dare" },
   { id: "watch", label: "Watch", icon: "📺", curatableId: "watch" },
-  { id: "dj", label: "DJ", icon: "🎵", curatableId: "dj" },
+  { id: "dj", label: "Music", icon: "🎵", curatableId: "dj" },
   { id: "chat", label: "Chat", icon: "💭", curatableId: null },
 ];
 
@@ -179,6 +181,10 @@ function RoomShell({
   const partnerStatus = useMemo(
     () => partnerLightLabel(partnerPresenceEntry(session.presence, session.senderId)),
     [session.presence, session.senderId, i18n.language],
+  );
+  const partnerPresent = useMemo(
+    () => Boolean(partnerPresenceEntry(session.presence, session.senderId)),
+    [session.presence, session.senderId],
   );
 
   const enterLiveMode = useCallback(
@@ -463,7 +469,9 @@ function RoomShell({
       case "watch":
         return <WatchTogether />;
       case "dj":
-        return <DJ watchActive={false} />;
+        // Persistent room: the stage is the library; the player lives in the
+        // bottom bar (MusicRoomProvider in RoomStage owns the engine).
+        return <MusicLibrary />;
       case "chat":
         return <ChatWithBoundary />;
       default:
@@ -510,6 +518,7 @@ function RoomShell({
           items={canvasItems}
           renderContent={renderRoomActivity}
           partnerStatus={partnerStatus}
+          partnerPresent={partnerPresent}
           callActive={liveMode}
           onCallIn={() => enterLiveMode("vision_board")}
           onLeaveCall={exitLiveMode}
@@ -635,8 +644,8 @@ function RoomShell({
           )}
           <span className="w-1.5 h-1.5 rounded-full bg-rosegold animate-pulse-glow shrink-0" />
           <div className="min-w-0">
-            <h1 className="font-serif italic text-cream text-lg sm:text-xl tracking-wide truncate">
-              {DATE_NAME || "Our Room"}
+            <h1 className="font-serif italic text-cream text-base sm:text-lg tracking-wide truncate">
+              {DATE_NAME || BRAND_NAME}
             </h1>
             <p className="text-[10px] uppercase tracking-[0.26em] text-muted-foreground/90 truncate">
               <span className="text-muted-foreground/85">{moodLabel} lighting</span>

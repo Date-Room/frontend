@@ -19,10 +19,10 @@
  * values: `bg-[var(--room-accent)]`, `border-[var(--room-accent)]/40`,
  * etc.
  */
-import { createContext, useContext, useEffect, useMemo } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getRoomByCode, listMyRooms, type InviteCard } from "@/lib/rooms";
-import type { LobbyMood } from "@/lib/ambiance";
+import { PLAIN_MOOD, type LobbyMood } from "@/lib/ambiance";
 import { resolveMoodFromBackgroundId } from "@/lib/roomAmbiance";
 import { themeForId, type RoomThemePalette } from "@/lib/roomTheme";
 import { useRoomSession } from "@/context/RoomSessionContext";
@@ -80,10 +80,16 @@ export function RoomCustomizationProvider({
   // signed-in users (cheap, cached, host always has it). Guests don't
   // have it — the value just stays undefined and we fall back to scanning
   // the existing query cache for an InviteCard that happens to be there.
-  const { data: rooms } = useQuery({
+  // Timestamp this room entry. We only trust customization data fetched
+  // *after* this — never the stale cache — so a background changed before
+  // rejoining can't flash the old scene.
+  const enteredAt = useRef(Date.now());
+
+  const { data: rooms, dataUpdatedAt: roomsUpdatedAt } = useQuery({
     queryKey: ["my-rooms"],
     queryFn: listMyRooms,
-    staleTime: 5_000,
+    staleTime: 0,
+    refetchOnMount: "always",
     enabled: session.canPersist,
     retry: false,
   });
@@ -99,11 +105,12 @@ export function RoomCustomizationProvider({
     return undefined;
   }, [rooms, session.roomId, queryClient]);
 
-  const { data: card } = useQuery({
+  const { data: card, dataUpdatedAt: cardUpdatedAt } = useQuery({
     queryKey: ["invite-card", roomCode],
     queryFn: () => (roomCode ? getRoomByCode(roomCode) : Promise.reject("no code")),
     enabled: !!roomCode,
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchOnMount: "always",
     refetchOnWindowFocus: false,
   });
 
@@ -127,7 +134,16 @@ export function RoomCustomizationProvider({
 
   const themeId = card?.theme_color ?? roomRow?.theme_color ?? null;
   const backgroundId = card?.background_id ?? roomRow?.background_id ?? null;
-  const ambiancePreset = resolveMoodFromBackgroundId(backgroundId);
+
+  // Only reveal a background once we have data that landed *this* entry.
+  // Until then (and if nothing has refetched yet) stay plain, so the room
+  // opens with no background and eases the correct one in once it arrives.
+  const freshUpdatedAt = Math.max(
+    card ? cardUpdatedAt : 0,
+    roomRow ? roomsUpdatedAt : 0,
+  );
+  const bgReady = freshUpdatedAt >= enteredAt.current;
+  const ambiancePreset = bgReady ? resolveMoodFromBackgroundId(backgroundId) : PLAIN_MOOD;
 
   const value = useMemo<RoomCustomization>(() => {
     return {
