@@ -328,7 +328,8 @@ export function RoomStage({
   // Whether the bottom music bar is showing, so the launcher lifts above it.
   const { state: djState } = useActivitySession("dj");
   const musicActive =
-    Boolean(djState?.now_playing) || (Array.isArray(djState?.queue) && djState.queue.length > 0);
+    djState?.closed !== true &&
+    (Boolean(djState?.now_playing) || (Array.isArray(djState?.queue) && djState.queue.length > 0));
 
   return (
     <MusicRoomProvider watchActive={staged === "watch"}>

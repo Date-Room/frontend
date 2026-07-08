@@ -71,6 +71,8 @@ type MusicCtxValue = {
   removeTrack: (id: string) => void;
   reorderTracks: (from: number, to: number) => void;
   clearQueue: () => void;
+  close: () => void;
+  closed: boolean;
   hasContent: boolean;
 };
 
@@ -113,6 +115,9 @@ export function MusicRoomProvider({
   const upcomingCount = currentIdx >= 0 ? tracks.length - currentIdx - 1 : tracks.length;
   const playing = durable?.playing === true;
   const silence = durable?.silence === true;
+  // Player dismissed (shared + persisted). The list is kept; only "Clear list"
+  // empties it. Any play action re-opens (persistDj resets closed to false).
+  const closed = durable?.closed === true;
   const repeat: RepeatMode =
     durable?.repeat === "all" || durable?.repeat === "one" ? durable.repeat : "none";
   const videoId = nowPlaying?.video_id ?? null;
@@ -169,6 +174,7 @@ export function MusicRoomProvider({
           last_controller: userId,
           silence,
           repeat,
+          closed: false,
           ...patch,
         },
         recapEvent,
@@ -524,6 +530,19 @@ export function MusicRoomProvider({
     persistDj({ now_playing: null, playing: false, timestamp_seconds: 0, queue: tracks });
   }, [persistDj, tracks]);
 
+  // Close = dismiss the player for both people (bar hides, launcher drops back,
+  // survives refresh) but KEEP the list — only "Clear list" empties it. Suppress
+  // so the pause echo from onStateChange can't flip `closed` back to false.
+  const close = useCallback(() => {
+    suppress(4000);
+    try {
+      playerRef.current?.pauseVideo?.();
+    } catch {
+      /* ignore */
+    }
+    persistDj({ closed: true, playing: false });
+  }, [persistDj]);
+
   const enableAudio = useCallback(() => {
     try {
       playerRef.current?.unMute?.();
@@ -663,6 +682,8 @@ export function MusicRoomProvider({
     removeTrack,
     reorderTracks,
     clearQueue,
+    close,
+    closed,
     hasContent: Boolean(nowPlaying) || tracks.length > 0,
   };
 
@@ -711,8 +732,8 @@ export function MusicLibrary() {
   };
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto p-4 sm:p-6">
-      <form onSubmit={submit} className="space-y-1">
+    <div className="flex h-full flex-col gap-6 overflow-y-auto p-5 sm:p-6">
+      <form onSubmit={submit} className="space-y-2.5">
         <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Add a song
         </p>
@@ -908,17 +929,11 @@ function LibraryRow({
 
 export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
   const m = useMusicRoom();
-  const [dismissed, setDismissed] = useState(false);
-  // Close stops playback; the bar stays hidden until playback starts again
-  // (keying off `playing` avoids videoId churn re-opening it mid-shuffle).
-  useEffect(() => {
-    if (m.playing) setDismissed(false);
-  }, [m.playing]);
-  if (!m.hasContent || dismissed) return null;
+  if (!m.hasContent || m.closed) return null;
   const pct = m.duration > 0 ? Math.min(100, (m.position / m.duration) * 100) : 0;
 
   return (
-    <div className="pointer-events-auto fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-card/70 backdrop-blur-2xl">
+    <div className="pointer-events-auto fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-card/60 backdrop-blur-sm">
       {/* Edge-to-edge progress / seek bar */}
       <button
         type="button"
@@ -1057,10 +1072,7 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
           state stays and a new song reopens it. */}
       <button
         type="button"
-        onClick={() => {
-          m.stop();
-          setDismissed(true);
-        }}
+        onClick={m.close}
         aria-label="Close player"
         className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition hover:text-cream"
       >

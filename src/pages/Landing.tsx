@@ -27,6 +27,7 @@ import { TIER_PRICING } from "@/lib/tierPricing";
 import { SeoHead } from "@/components/SeoHead";
 import { LANDING_JSON_LD, LANDING_SEO } from "@/lib/seo";
 import { LandingLanguageMenu } from "@/components/LandingLanguageMenu";
+import { LandingJoinMenu } from "@/components/LandingJoinMenu";
 
 /**
  * Marketing landing — a faithful port of date-room-escape.lovable.app.
@@ -86,9 +87,7 @@ export default function Landing() {
           </ul>
           <div className="flex items-center gap-3">
             <LandingLanguageMenu className="hidden sm:block" iconOnly />
-            <Link to="/join" className="hidden text-sm text-lpmuted transition-colors hover:text-lpcream sm:inline">
-              {t("landing.nav.join")}
-            </Link>
+            <LandingJoinMenu className="hidden sm:block" />
             <Link to={START} className="lp-btn !px-5 !py-2.5 text-sm">{t("landing.nav.login")}</Link>
           </div>
         </nav>

@@ -451,159 +451,102 @@ function VisionCard({
 }
 
 type DreamFormProps = {
-  title: string;
   caption: string;
   setCaption: (v: string) => void;
-  photoMode: PhotoMode;
-  setPhotoMode: (v: PhotoMode) => void;
   imageUrl: string;
   setImageUrl: (v: string) => void;
   uploadDataUrl: string;
-  setUploadDataUrl: (v: string) => void;
   uploadMediaType: VisionMediaType | null;
-  uploadFilename: string;
-  shapePreset: ShapePreset;
-  setShapePreset: (v: ShapePreset) => void;
   canPin: boolean;
   saving: boolean;
   submitLabel: string;
   onSubmit: (e?: React.FormEvent) => void;
   onFilePick: (file: File | null) => void;
   fileRef: React.RefObject<HTMLInputElement | null>;
-  showStarters?: boolean;
-  onStarter?: (starter: { caption: string; shape: ShapePreset }) => void;
 };
 
+/** Minimal add/edit form: a caption, an optional photo/PDF (device or link),
+ *  and one button. No shapes/starters/mode tabs — kept deliberately simple. */
 function DreamForm({
-  title,
   caption,
   setCaption,
-  photoMode,
-  setPhotoMode,
   imageUrl,
   setImageUrl,
   uploadDataUrl,
   uploadMediaType,
-  uploadFilename,
-  shapePreset,
-  setShapePreset,
   canPin,
   saving,
   submitLabel,
   onSubmit,
   onFilePick,
   fileRef,
-  showStarters,
-  onStarter,
 }: DreamFormProps) {
+  const [showLink, setShowLink] = useState(Boolean(imageUrl));
+  const hasPhoto = Boolean(uploadDataUrl);
   return (
-    <div className="space-y-4">
-      <p className="text-base font-medium text-amber">{title}</p>
+    <form onSubmit={(e) => void onSubmit(e)} className="space-y-3">
+      <Input
+        value={caption}
+        onChange={(e) => setCaption(e.target.value)}
+        placeholder="Name this dream…"
+        className="bg-secondary/50 border-white/10 text-base"
+      />
 
-      {showStarters && onStarter && (
-        <div className="flex flex-wrap gap-2">
-          {DREAM_STARTERS.map((d) => (
-            <button
-              key={d.caption}
-              type="button"
-              disabled={saving}
-              onClick={() => onStarter(d)}
-              className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-cream/80 transition hover:border-amber/40 hover:text-cream"
-            >
-              <Sparkles className="mr-1 inline h-3 w-3 text-amber" />
-              {d.caption}
-            </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*,application/pdf,.pdf"
+        className="hidden"
+        onChange={(e) => onFilePick(e.target.files?.[0] ?? null)}
+      />
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-3 text-sm text-muted-foreground transition hover:border-primary/40 hover:text-cream"
+        >
+          <ImagePlus className="h-4 w-4" />
+          {hasPhoto ? (uploadMediaType === "pdf" ? "PDF added — replace" : "Photo added — replace") : "Add a photo or PDF"}
+        </button>
+        {hasPhoto &&
+          (uploadMediaType === "pdf" ? (
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-white/10">
+              <FileText className="h-5 w-5 text-primary" />
+            </div>
+          ) : (
+            <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
+              <img src={uploadDataUrl} alt="" className="h-full w-full object-cover" />
+            </div>
           ))}
-        </div>
+      </div>
+
+      {showLink ? (
+        <Input
+          value={imageUrl}
+          onChange={(e) => setImageUrl(e.target.value)}
+          placeholder="Paste an image or PDF link…"
+          className="bg-secondary/50 border-white/10"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowLink(true)}
+          className="px-1 text-xs text-muted-foreground transition hover:text-cream"
+        >
+          or paste a link
+        </button>
       )}
 
-      <form onSubmit={(e) => void onSubmit(e)} className="space-y-3">
-        <Input
-          value={caption}
-          onChange={(e) => setCaption(e.target.value)}
-          placeholder="A porch like this one…"
-          className="bg-secondary/50 border-white/10 text-base"
-        />
-
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setPhotoMode("upload")} className="wall-kind-chip" data-active={photoMode === "upload"}>
-            <Upload className="h-3.5 w-3.5" />
-            Upload file
-          </button>
-          <button type="button" onClick={() => setPhotoMode("link")} className="wall-kind-chip" data-active={photoMode === "link"}>
-            <ImagePlus className="h-3.5 w-3.5" />
-            Paste link
-          </button>
-        </div>
-
-        {photoMode === "upload" ? (
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*,application/pdf,.pdf"
-              className="hidden"
-              onChange={(e) => onFilePick(e.target.files?.[0] ?? null)}
-            />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-3 text-sm text-muted-foreground hover:border-amber/30 hover:text-cream"
-            >
-              {uploadDataUrl
-                ? uploadMediaType === "pdf"
-                  ? "PDF chosen — tap to replace"
-                  : "Photo chosen — tap to replace"
-                : "Choose a photo or PDF from your device"}
-            </button>
-            {uploadDataUrl && uploadMediaType === "image" && (
-              <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
-                <img src={uploadDataUrl} alt="" className="h-full w-full object-cover" />
-              </div>
-            )}
-            {uploadDataUrl && uploadMediaType === "pdf" && (
-              <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-lg bg-amber/15 ring-1 ring-white/10">
-                <FileText className="h-5 w-5 text-amber" />
-                <span className="mt-0.5 text-[8px] text-cream/70">PDF</span>
-              </div>
-            )}
-            {uploadFilename && (
-              <p className="text-xs text-muted-foreground truncate max-w-[200px]">{uploadFilename}</p>
-            )}
-          </div>
-        ) : (
-          <Input
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://… photo or PDF link (optional)"
-            className="bg-secondary/50 border-white/10"
-          />
-        )}
-
-        <div className="flex flex-wrap gap-2">
-          {(Object.keys(SHAPE_PRESETS) as ShapePreset[]).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setShapePreset(s)}
-              className="wall-kind-chip"
-              data-active={shapePreset === s}
-            >
-              {s === "rect" ? "Rectangle" : s === "circle" ? "Circle" : s === "wide" ? "Wide" : "Tall"}
-            </button>
-          ))}
-        </div>
-
-        <button
-          type="submit"
-          className="wall-cta inline-flex w-full items-center justify-center gap-2 sm:w-auto"
-          disabled={!canPin || saving}
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {submitLabel}
-        </button>
-      </form>
-    </div>
+      <button
+        type="submit"
+        disabled={!canPin || saving}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+        style={{ backgroundColor: "var(--room-accent)" }}
+      >
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+        {submitLabel}
+      </button>
+    </form>
   );
 }
 
@@ -1008,27 +951,18 @@ export function VisionBoard() {
       {mode === "add" && room.canPersist && (
         <div className="border-b border-white/[0.06] p-4 shrink-0">
           <DreamForm
-            title="What are you dreaming about?"
             caption={caption}
             setCaption={setCaption}
-            photoMode={photoMode}
-            setPhotoMode={setPhotoMode}
             imageUrl={imageUrl}
             setImageUrl={setImageUrl}
             uploadDataUrl={uploadDataUrl}
-            setUploadDataUrl={setUploadDataUrl}
             uploadMediaType={uploadMediaType}
-            uploadFilename={uploadFilename}
-            shapePreset={shapePreset}
-            setShapePreset={setShapePreset}
             canPin={!!canPin}
             saving={saving}
-            submitLabel="Pin to the board"
+            submitLabel="Add to board"
             onSubmit={addItem}
             onFilePick={onFilePick}
             fileRef={fileRef}
-            showStarters
-            onStarter={(d) => void addItem(undefined, d)}
           />
         </div>
       )}
@@ -1036,19 +970,12 @@ export function VisionBoard() {
       {mode === "edit" && editingItem && room.canPersist && (
         <div className="border-b border-white/[0.06] p-4 shrink-0">
           <DreamForm
-            title={`Editing “${editingItem.caption || editingItem.filename || "your dream"}”`}
             caption={caption}
             setCaption={setCaption}
-            photoMode={photoMode}
-            setPhotoMode={setPhotoMode}
             imageUrl={imageUrl}
             setImageUrl={setImageUrl}
             uploadDataUrl={uploadDataUrl}
-            setUploadDataUrl={setUploadDataUrl}
             uploadMediaType={uploadMediaType}
-            uploadFilename={uploadFilename}
-            shapePreset={shapePreset}
-            setShapePreset={setShapePreset}
             canPin={!!canPin}
             saving={saving}
             submitLabel="Save changes"

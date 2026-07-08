@@ -108,7 +108,7 @@ export default function JoinByCode() {
  * The wrapper is the tap target — tapping anywhere refocuses the
  * hidden input so the keyboard pops up reliably on mobile.
  */
-function SlotInput({
+export function SlotInput({
   label,
   length,
   value,
