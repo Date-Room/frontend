@@ -1,7 +1,12 @@
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { LobbyMood } from "@/lib/ambiance";
 import { PLAIN_MOOD, resolveAmbiancePreset } from "@/lib/ambiance";
 import { LOBBY_PREVIEW_SCENES } from "@/lib/lobbyPreviewScenes";
+
+/** Faded-in resting opacity for the photo — kept low so the scene reads as a
+ *  soft wash behind the room chrome rather than busy foreground art. */
+const SCENE_OPACITY = 0.55;
 
 type AmbientSceneStackProps = {
   /** Room mood from create-flow selection or persisted background_id */
@@ -43,22 +48,14 @@ export function AmbientSceneStack({
   const vo = scene.centerVignetteOpacity;
 
   return (
-    <div className={cn("pointer-events-none relative overflow-hidden", positionClassName)} aria-hidden>
-      <img
-        key={scene.src}
-        src={scene.src}
-        alt=""
-        aria-hidden
-        className={cn(
-          "absolute inset-0 h-full w-full object-cover transition-opacity duration-500",
-          kenBurns && "animate-ken-burns motion-reduce:animate-none",
-          imgClassName,
-        )}
-        style={{ objectPosition: scene.objectPosition }}
-        referrerPolicy="strict-origin-when-cross-origin"
-        decoding="async"
-        loading={loading}
-      />
+    <SceneLayer
+      key={preset}
+      scene={scene}
+      positionClassName={positionClassName}
+      imgClassName={imgClassName}
+      kenBurns={kenBurns}
+      loading={loading}
+    >
       <div
         className="absolute inset-0"
         style={{
@@ -70,6 +67,49 @@ export function AmbientSceneStack({
       />
       {scene.accentL ? <div className={cn("absolute inset-0", scene.accentL)} /> : null}
       {scene.accentR ? <div className={cn("absolute inset-0", scene.accentR)} /> : null}
+    </SceneLayer>
+  );
+}
+
+/** Renders the photo + grade layers, fading the image in on load (and on every
+ *  scene change, since the parent keys this by preset). */
+function SceneLayer({
+  scene,
+  positionClassName,
+  imgClassName,
+  kenBurns,
+  loading,
+  children,
+}: {
+  scene: (typeof LOBBY_PREVIEW_SCENES)[keyof typeof LOBBY_PREVIEW_SCENES];
+  positionClassName: string;
+  imgClassName?: string;
+  kenBurns: boolean;
+  loading: "eager" | "lazy";
+  children: React.ReactNode;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  // Reset when the source changes so a swapped scene fades in cleanly.
+  useEffect(() => setLoaded(false), [scene.src]);
+
+  return (
+    <div className={cn("pointer-events-none relative overflow-hidden", positionClassName)} aria-hidden>
+      <img
+        src={scene.src}
+        alt=""
+        aria-hidden
+        className={cn(
+          "absolute inset-0 h-full w-full object-cover transition-opacity duration-[900ms] ease-out",
+          kenBurns && "animate-ken-burns motion-reduce:animate-none",
+          imgClassName,
+        )}
+        style={{ objectPosition: scene.objectPosition, opacity: loaded ? SCENE_OPACITY : 0 }}
+        referrerPolicy="strict-origin-when-cross-origin"
+        decoding="async"
+        loading={loading}
+        onLoad={() => setLoaded(true)}
+      />
+      {children}
     </div>
   );
 }

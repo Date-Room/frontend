@@ -83,7 +83,7 @@ export function WelcomeBackGate({ enabled }: Props) {
             </p>
             <div className="relative mx-auto max-w-sm">
               <span
-                className="absolute -top-2 left-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full bg-rosegold shadow-[0_0_12px_rgba(212,130,106,0.6)]"
+                className="absolute -top-2 left-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full bg-rosegold shadow-[0_0_12px_rgba(232,166,83,0.6)]"
                 aria-hidden
               />
               <div className="rounded-2xl bg-[#F5E6D3] px-6 py-8 text-left shadow-[0_24px_60px_rgba(0,0,0,0.45)]">

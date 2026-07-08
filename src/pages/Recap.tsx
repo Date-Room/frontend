@@ -394,7 +394,7 @@ export default function Recap() {
           type="button"
           disabled={promoting}
           onClick={() => void handleMakeForever()}
-          className="mb-4 w-full rounded-[1.5rem] border border-primary/30 bg-gradient-to-br from-primary/[0.12] to-transparent shadow-[0_22px_60px_-20px_rgba(212,130,106,0.35)] flex items-center gap-4 p-5 focus-ring hover-lift-strong disabled:opacity-60 disabled:cursor-wait"
+          className="mb-4 w-full rounded-[1.5rem] border border-primary/30 bg-gradient-to-br from-primary/[0.12] to-transparent shadow-[0_22px_60px_-20px_rgba(232,166,83,0.35)] flex items-center gap-4 p-5 focus-ring hover-lift-strong disabled:opacity-60 disabled:cursor-wait"
         >
           <div className="w-10 h-10 rounded-xl bg-rosegold/15 border border-rosegold/25 flex items-center justify-center">
             {promoting ? <Loader2 className="w-5 h-5 text-rosegold animate-spin" /> : <Sparkles className="w-5 h-5 text-rosegold" />}

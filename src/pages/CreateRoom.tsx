@@ -601,7 +601,7 @@ export default function CreateRoom() {
           <div className="h-1 flex-1 bg-black/30">
             <div className="h-full rounded-full bg-border/40 overflow-hidden">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-primary via-primary/90 to-champagne transition-[width] duration-500 ease-out shadow-[0_0_16px_rgba(212,130,106,0.35)]"
+                className="h-full rounded-full bg-gradient-to-r from-primary via-primary/90 to-champagne transition-[width] duration-500 ease-out shadow-[0_0_16px_rgba(232,166,83,0.35)]"
                 style={{ width: `${progress}%` }}
               />
             </div>

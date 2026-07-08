@@ -24,6 +24,8 @@ export type VisionBoardItem = {
   filename?: string;
   added_by?: string;
   added_by_name?: string;
+  /** Pinned onto the room stage — pops out as a draggable card (max 2). */
+  pinned?: boolean;
 };
 
 export type VisionBoardState = {
@@ -59,6 +61,8 @@ export type FridgeNote = {
   pinned_at: string;
   emergency?: boolean;
   seen_by: string[];
+  /** Stuck onto the room stage — pops out as a draggable note (max 2). */
+  stage_pinned?: boolean;
 };
 
 export type FridgeNotesState = {
@@ -138,6 +142,7 @@ export function parseVisionBoard(raw: Record<string, unknown> | null): VisionBoa
       filename: typeof x.filename === "string" ? x.filename : undefined,
       added_by: typeof x.added_by === "string" ? x.added_by : undefined,
       added_by_name: typeof x.added_by_name === "string" ? x.added_by_name : undefined,
+      pinned: x.pinned === true,
     }))
     .filter((x) => x.image_url.trim() || x.caption.trim());
   return { items };
@@ -175,6 +180,7 @@ function parseFridgeNoteEntry(x: Record<string, unknown>): FridgeNote | null {
     pinned_at: String(x.pinned_at ?? new Date().toISOString()),
     emergency: x.emergency === true,
     seen_by: Array.isArray(x.seen_by) ? x.seen_by.map(String) : [],
+    stage_pinned: x.stage_pinned === true,
   };
 }
 

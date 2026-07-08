@@ -328,7 +328,7 @@ export default function Home() {
               >
                 {tab === item.id && (
                   <span
-                    className="absolute inset-0 -z-10 rounded-full bg-primary/15 shadow-[inset_0_0_0_1px_rgba(212,130,106,0.18)]"
+                    className="absolute inset-0 -z-10 rounded-full bg-primary/15 shadow-[inset_0_0_0_1px_rgba(232,166,83,0.18)]"
                     aria-hidden
                   />
                 )}
@@ -413,7 +413,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => navigate("/create")}
-                className="btn-primary focus-ring flex items-center justify-center gap-3 rounded-[1.35rem] py-4 shadow-[0_12px_48px_rgba(212,130,106,0.28)] sm:flex-1"
+                className="btn-primary focus-ring flex items-center justify-center gap-3 rounded-[1.35rem] py-4 shadow-[0_12px_48px_rgba(232,166,83,0.28)] sm:flex-1"
               >
                 <Plus className="h-5 w-5" strokeWidth={2.25} />
                 <span className="font-medium tracking-wide">Create a new room</span>

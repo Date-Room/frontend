@@ -184,7 +184,7 @@ function TonightPanel({ connection }: { connection: Connection }) {
         type="button"
         onClick={openRoomNow}
         disabled={busy}
-        className="focus-ring group w-full text-left rounded-[1.5rem] p-6 border border-primary/30 bg-gradient-to-br from-primary/[0.10] to-transparent shadow-[0_22px_60px_-20px_rgba(212,130,106,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] hover-lift-strong disabled:opacity-60 disabled:cursor-wait"
+        className="focus-ring group w-full text-left rounded-[1.5rem] p-6 border border-primary/30 bg-gradient-to-br from-primary/[0.10] to-transparent shadow-[0_22px_60px_-20px_rgba(232,166,83,0.35),inset_0_1px_0_rgba(255,255,255,0.06)] hover-lift-strong disabled:opacity-60 disabled:cursor-wait"
       >
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-rosegold/15 border border-rosegold/25 flex items-center justify-center ring-1 ring-rosegold/20">

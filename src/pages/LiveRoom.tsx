@@ -16,6 +16,7 @@ import { LogOut, Clock, Maximize2, Minimize2, Sparkles, ChevronLeft, Home } from
 import { AmbientSceneStack } from "@/components/AmbientSceneStack";
 import type { LobbyMood } from "@/lib/ambiance";
 import { ambianceMeta, PLAIN_MOOD } from "@/lib/ambiance";
+import { ambianceAccentStyle } from "@/lib/roomAmbiance";
 import { RoomAmbianceSheet } from "@/components/RoomAmbianceSheet";
 import { PageShell } from "@/components/PageShell";
 import { RoomSessionProvider, useRoomSession, type RoomIdentity } from "@/context/RoomSessionContext";
@@ -25,7 +26,7 @@ import {
   useRoomCustomization,
 } from "@/context/RoomCustomizationContext";
 import { RoomVideo } from "@/components/RoomVideo";
-import { RoomCanvas, type CanvasItem } from "@/components/RoomCanvas";
+import { RoomStage, type StageItem } from "@/components/RoomStage";
 import { ChatWithBoundary } from "@/components/Chat";
 import { WatchTogether } from "@/components/WatchTogether";
 import { VisionBoard } from "@/components/VisionBoard";
@@ -33,8 +34,6 @@ import { FridgeNotes } from "@/components/FridgeNotes";
 import { Bookshelf } from "@/components/Bookshelf";
 import { WelcomeBackGate } from "@/components/WelcomeBackGate";
 import { LiveRoomTabBar } from "@/components/LiveRoomTabBar";
-import { PermanentRoomHome } from "@/components/PermanentRoomHome";
-import type { HomeFeatureId } from "@/components/PermanentRoomFeatureSheet";
 import type { PresenceState } from "@/lib/realtime/roomChannel";
 import {
   partnerDisplayName,
@@ -257,7 +256,6 @@ function RoomShell({
     });
   }, [isPermanentRoom, session.channel, session.senderId, tab]);
 
-  const showAtHome = isPermanentRoom && !liveMode;
 
   const partnerJoinBaselineRef = useRef<{ hadPartner: boolean; partnerInCall: boolean } | null>(
     null,
@@ -431,10 +429,49 @@ function RoomShell({
 
   const shellStyle: React.CSSProperties = {
     ...roomAccentStyle(customization.theme),
+    // When a background is chosen, tint the room accent to match it; plain
+    // rooms keep the theme/brand accent.
+    ...ambianceAccentStyle(activeAmbiance),
     background: customization.backgroundCss,
   };
 
-  if (showAtHome) {
+  // Together-room stage — one big surface that mounts the chosen activity.
+  const canvasItems: StageItem[] = visibleTabs.map((tb) => ({
+    id: tb.id,
+    title: tb.label,
+    icon: tb.icon,
+    isWall: WALL_TABS.some((w) => w.id === tb.id),
+  }));
+  const renderRoomActivity = (id: string): ReactNode => {
+    switch (id as ActivityTabId) {
+      case "vision_board":
+        return <VisionBoard />;
+      case "fridge_notes":
+        return <FridgeNotes active />;
+      case "bookshelf":
+        return <Bookshelf />;
+      case "questions":
+        return <QuestionDeck />;
+      case "this_or_that":
+        return <ThisOrThat />;
+      case "the_36":
+        return <The36 />;
+      case "2_truths":
+        return <TwoTruths />;
+      case "truth_or_dare":
+        return <TruthOrDare />;
+      case "watch":
+        return <WatchTogether />;
+      case "dj":
+        return <DJ watchActive={false} />;
+      case "chat":
+        return <ChatWithBoundary />;
+      default:
+        return null;
+    }
+  };
+
+  if (isPermanentRoom) {
     return (
       <PageShell
         orbs={false}
@@ -468,15 +505,14 @@ function RoomShell({
           </button>
         </header>
 
-        <PermanentRoomHome
+        <RoomStage
+          roomId={roomId}
+          items={canvasItems}
+          renderContent={renderRoomActivity}
           partnerStatus={partnerStatus}
+          callActive={liveMode}
           onCallIn={() => enterLiveMode("vision_board")}
-          extraTabs={visibleTabs
-            .filter(
-              (t) =>
-                !["vision_board", "fridge_notes", "bookshelf", "watch", "dj"].includes(t.id),
-            )
-            .map((t) => ({ id: t.id as HomeFeatureId, label: t.label, icon: t.icon }))}
+          onLeaveCall={exitLiveMode}
         />
 
         {showLeaveConfirm && (
@@ -560,41 +596,6 @@ function RoomShell({
     </>
   );
 
-  // Together-room "desktop" — each activity/wall is a free-floating window.
-  const canvasItems: CanvasItem[] = visibleTabs.map((tb) => ({
-    id: tb.id,
-    title: tb.label,
-    icon: tb.icon,
-    isWall: WALL_TABS.some((w) => w.id === tb.id),
-  }));
-  const renderRoomActivity = (id: string): ReactNode => {
-    switch (id as ActivityTabId) {
-      case "vision_board":
-        return <VisionBoard />;
-      case "fridge_notes":
-        return <FridgeNotes active />;
-      case "bookshelf":
-        return <Bookshelf />;
-      case "questions":
-        return <QuestionDeck />;
-      case "this_or_that":
-        return <ThisOrThat />;
-      case "the_36":
-        return <The36 />;
-      case "2_truths":
-        return <TwoTruths />;
-      case "truth_or_dare":
-        return <TruthOrDare />;
-      case "watch":
-        return <WatchTogether />;
-      case "dj":
-        return <DJ watchActive={false} />;
-      case "chat":
-        return <ChatWithBoundary />;
-      default:
-        return null;
-    }
-  };
 
   return (
     <PageShell
@@ -719,18 +720,6 @@ function RoomShell({
           expired && "opacity-60 pointer-events-none",
         )}
       >
-        {isPersistent ? (
-          /* Together room: a free-floating window "desktop" — activities/walls
-             and the call are draggable, resizable windows. */
-          <RoomCanvas
-            roomId={roomId}
-            items={canvasItems}
-            renderContent={renderRoomActivity}
-            onLeave={() => setShowLeaveConfirm(true)}
-          />
-        ) : (
-          /* Session room: 60/40 split, with the video floating to a PiP while
-             watching together. */
           <div className="flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 p-3 sm:p-4 min-h-0">
             <section
               className={cn(
@@ -805,7 +794,6 @@ function RoomShell({
               {activityTabs}
             </section>
           </div>
-        )}
       </main>
 
       {/* ── Leave confirm modal ── */}

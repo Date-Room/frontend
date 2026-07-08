@@ -8,6 +8,7 @@ import {
   ImagePlus,
   Loader2,
   Pencil,
+  Pin,
   Plus,
   Sparkles,
   Trash2,
@@ -36,6 +37,8 @@ type BoardMode = "board" | "add" | "edit";
 const DRAG_THRESHOLD_PX = 8;
 const MAX_IMAGE_BYTES = 900_000;
 const MAX_PDF_BYTES = 2_500_000;
+/** How many vision items may be pinned onto the room stage at once. */
+const MAX_STAGE_PINS = 2;
 
 const SHAPE_PRESETS: Record<ShapePreset, { width: number; height: number; shape: "rect" | "circle" }> = {
   rect: { width: 24, height: 28, shape: "rect" },
@@ -85,6 +88,123 @@ function resolveMediaType(url: string, uploadType: VisionMediaType | null): Visi
   if (!url.trim()) return "none";
   if (url.startsWith("data:application/pdf") || /\.pdf(\?|#|$)/i.test(url)) return "pdf";
   return "image";
+}
+
+/** A single dream in the gallery grid — image-forward card with a caption
+ *  scrim and hover actions. Not draggable (only pinned items are, out on the
+ *  room stage). */
+function VisionGridCard({
+  item,
+  canEdit,
+  pinDisabled,
+  onView,
+  onEdit,
+  onRemove,
+  onTogglePin,
+}: {
+  item: VisionBoardItem;
+  canEdit: boolean;
+  pinDisabled: boolean;
+  onView: () => void;
+  onEdit: () => void;
+  onRemove: () => void;
+  onTogglePin: () => void;
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const gradient = item.gradient ?? pickVisionGradient(item.caption || item.id);
+  const media = visionMediaType(item);
+  const showImage = media === "image" && item.image_url.trim() && !imgFailed;
+  const label = item.caption || item.filename || (media === "pdf" ? "Document" : "Dream");
+
+  return (
+    <div
+      className={cn(
+        "group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_44px_-14px_rgba(0,0,0,0.7)]",
+        item.pinned ? "border-primary/50 ring-1 ring-primary/30" : "border-white/[0.1]",
+      )}
+    >
+      <button
+        type="button"
+        onClick={onView}
+        className="absolute inset-0 h-full w-full"
+        aria-label={`View ${label}`}
+      >
+        {showImage ? (
+          <img
+            src={item.image_url}
+            alt={label}
+            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+            loading="lazy"
+            draggable={false}
+            onError={() => setImgFailed(true)}
+          />
+        ) : media === "pdf" ? (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-amber-950/90 via-[#2a1810] to-indigo-950/80 px-3">
+            <FileText className="h-8 w-8 text-amber/80" strokeWidth={1.25} />
+            <p className="max-w-full truncate text-center text-[11px] text-cream/70">
+              {item.filename || "PDF document"}
+            </p>
+          </div>
+        ) : (
+          <div className={cn("h-full w-full bg-gradient-to-br", gradient)} />
+        )}
+      </button>
+
+      {/* Caption scrim */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent px-3 pb-2.5 pt-8">
+        <p className="truncate text-sm font-medium text-cream drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)]">
+          {label}
+        </p>
+        {item.added_by_name ? (
+          <p className="truncate text-[10px] uppercase tracking-[0.16em] text-cream/55">
+            {item.added_by_name}
+          </p>
+        ) : null}
+      </div>
+
+      {/* Pinned marker */}
+      {item.pinned && (
+        <span className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[#1a1207] shadow">
+          <Pin className="h-3.5 w-3.5 fill-current" />
+        </span>
+      )}
+
+      {/* Hover actions */}
+      {canEdit && (
+        <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+          <button
+            type="button"
+            onClick={onTogglePin}
+            disabled={pinDisabled}
+            aria-pressed={item.pinned}
+            title={item.pinned ? "Unpin from room" : pinDisabled ? "Two dreams already pinned" : "Pin to room"}
+            className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md transition disabled:opacity-35",
+              item.pinned ? "bg-primary text-[#1a1207]" : "bg-black/50 text-cream hover:bg-black/70",
+            )}
+          >
+            <Pin className={cn("h-4 w-4", item.pinned && "fill-current")} />
+          </button>
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label="Edit"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-cream backdrop-blur-md transition hover:bg-black/70"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label="Remove"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-cream backdrop-blur-md transition hover:bg-red-500/70"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function MediaViewer({
@@ -185,7 +305,7 @@ function MediaViewer({
           ) : (
             <div
               className={cn(
-                "flex h-48 w-full max-w-sm items-center justify-center rounded-2xl bg-gradient-to-br px-6 text-center font-serif text-lg italic text-cream/90",
+                "flex h-48 w-full max-w-sm items-center justify-center rounded-2xl bg-gradient-to-br px-6 text-center text-lg font-medium text-cream/90",
                 item.gradient ?? pickVisionGradient(item.caption || item.id),
               )}
             >
@@ -322,7 +442,7 @@ function VisionCard({
         </div>
       </div>
       {item.caption && (
-        <p className="mt-2 px-1 text-center font-serif text-sm italic leading-snug text-cream/90 pointer-events-none">
+        <p className="mt-2 px-1 text-center text-sm leading-snug text-cream/90 pointer-events-none">
           {item.caption}
         </p>
       )}
@@ -378,7 +498,7 @@ function DreamForm({
 }: DreamFormProps) {
   return (
     <div className="space-y-4">
-      <p className="font-serif italic text-amber text-base">{title}</p>
+      <p className="text-base font-medium text-amber">{title}</p>
 
       {showStarters && onStarter && (
         <div className="flex flex-wrap gap-2">
@@ -402,7 +522,7 @@ function DreamForm({
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
           placeholder="A porch like this one…"
-          className="bg-secondary/50 border-white/10 font-serif italic text-base"
+          className="bg-secondary/50 border-white/10 text-base"
         />
 
         <div className="flex gap-2">
@@ -623,7 +743,7 @@ export function VisionBoard() {
     if (ok) {
       resetForm();
       setMode("board");
-      toast.success("Pinned — tap to view, drag to move");
+      toast.success("Added to your board");
     }
   }
 
@@ -667,6 +787,19 @@ export function VisionBoard() {
       backToBoard();
       toast.success("Removed from the board");
     }
+  }
+
+  async function togglePin(item: VisionBoardItem) {
+    const willPin = !item.pinned;
+    if (willPin && pinnedCount >= MAX_STAGE_PINS) {
+      toast.message(`Only ${MAX_STAGE_PINS} dreams can sit on the stage — unpin one first.`);
+      return;
+    }
+    const ok = await persist(
+      { items: items.map((i) => (i.id === item.id ? { ...i, pinned: willPin } : i)) },
+      false,
+    );
+    if (ok) toast.success(willPin ? "Pinned to the room" : "Unpinned");
   }
 
   function startDrag(item: VisionBoardItem, e: React.PointerEvent) {
@@ -780,6 +913,7 @@ export function VisionBoard() {
 
   const empty = items.length === 0;
   const canPin = caption.trim() || uploadDataUrl || imageUrl.trim();
+  const pinnedCount = items.filter((i) => i.pinned).length;
   const showBoard = mode === "board" || (mode === "add" && !empty);
 
   if (!ready) {
@@ -800,7 +934,7 @@ export function VisionBoard() {
           <h2 className="font-serif text-2xl italic text-cream">Vision Board</h2>
           <div className="wall-empty-copy mt-5 space-y-4">
             <p>Add photos, PDFs, or words for the life you&apos;re building — trips, a home, a feeling, a goal.</p>
-            <p>Drag cards to arrange them. Tap any card to view, edit, or remove.</p>
+            <p>Tap any dream to view, edit, or remove — and pin up to two onto the room.</p>
           </div>
           {room.canPersist ? (
             <button type="button" className="wall-cta mt-8" onClick={openAdd}>
@@ -834,7 +968,8 @@ export function VisionBoard() {
           </p>
           {mode === "board" && (
             <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70">
-              {items.length} dream{items.length === 1 ? "" : "s"} · tap to view · drag to move
+              {items.length} dream{items.length === 1 ? "" : "s"}
+              {pinnedCount > 0 ? ` · ${pinnedCount}/${MAX_STAGE_PINS} pinned` : " · tap to view"}
             </p>
           )}
         </div>
@@ -861,7 +996,7 @@ export function VisionBoard() {
             <button
               type="button"
               aria-label="Help"
-              title="Tap a card to view. Drag to rearrange. Hover for edit & remove."
+              title="Tap a dream to view. Pin up to two onto the room. Hover for edit & remove."
               className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-muted-foreground hover:text-cream"
             >
               <HelpCircle className="h-3.5 w-3.5" />
@@ -933,45 +1068,26 @@ export function VisionBoard() {
         </div>
       )}
 
-      {/* Board canvas */}
+      {/* Board — a clean, scrollable list of dreams with images. Items only
+          become draggable once pinned onto the room stage. */}
       {showBoard && (
-        <div className={cn("flex-1 min-h-0 overflow-auto p-4", mode !== "board" && "max-h-[220px] opacity-80")}>
+        <div className={cn("flex-1 min-h-0 overflow-auto p-3 sm:p-4", mode !== "board" && "max-h-[220px] opacity-80")}>
           <div
-            ref={(el) => {
-              canvasRef.current = el;
-              boardRef.current = el;
-            }}
-            className="relative min-h-[360px] rounded-2xl border border-white/[0.08] bg-[#120e0c]/95 shadow-inner sm:min-h-[460px]"
-            style={{
-              backgroundImage:
-                "radial-gradient(circle at 20% 30%, rgba(212,130,106,0.06), transparent 50%), radial-gradient(circle at 80% 70%, rgba(120,80,200,0.05), transparent 45%)",
-            }}
+            ref={boardRef}
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
           >
-            <div className="pointer-events-none absolute bottom-4 left-4">
-              <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground/60">Our wall</p>
-            </div>
-
-            {items
-              .slice()
-              .sort((a, b) => a.z - b.z)
-              .map((item) => (
-                <VisionCard
-                  key={item.id}
-                  item={item}
-                  isDragging={draggingId === item.id}
-                  canEdit={room.canPersist && mode === "board"}
-                  onDragStart={(e) => startDrag(item, e)}
-                  onView={() => openView(item)}
-                  onEdit={(e) => {
-                    e.stopPropagation();
-                    openEdit(item);
-                  }}
-                  onRemove={(e) => {
-                    e.stopPropagation();
-                    void removeItem(item.id);
-                  }}
-                />
-              ))}
+            {items.map((item) => (
+              <VisionGridCard
+                key={item.id}
+                item={item}
+                canEdit={room.canPersist && mode === "board"}
+                pinDisabled={!item.pinned && pinnedCount >= MAX_STAGE_PINS}
+                onView={() => openView(item)}
+                onEdit={() => openEdit(item)}
+                onRemove={() => void removeItem(item.id)}
+                onTogglePin={() => void togglePin(item)}
+              />
+            ))}
           </div>
         </div>
       )}

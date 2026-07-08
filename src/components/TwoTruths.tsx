@@ -70,7 +70,7 @@ export function TwoTruths() {
               aria-label={`Mark statement ${i + 1} as the lie`}
               className={`focus-ring h-7 w-7 shrink-0 rounded-full border text-[10px] uppercase transition-all ${
                 lie === i
-                  ? "bg-rose border-rose text-cream shadow-[0_0_0_4px_rgba(212,130,106,0.18)]"
+                  ? "bg-rose border-rose text-cream shadow-[0_0_0_4px_rgba(232,166,83,0.18)]"
                   : "border-muted-foreground/40 text-muted-foreground hover:border-rose/40"
               }`}
             >

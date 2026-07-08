@@ -3,6 +3,7 @@ import {
   HelpCircle,
   Loader2,
   Pencil,
+  Pin,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -20,6 +21,8 @@ import {
 import { cn } from "@/lib/utils";
 
 const NOTE_MAX = 500;
+/** How many notes may be stuck onto the room stage at once. */
+const MAX_STAGE_PINS = 2;
 
 type Filter = "all" | "them" | "yours";
 
@@ -106,6 +109,92 @@ function StickyNote({
         </div>
       </div>
     </button>
+  );
+}
+
+/** A note in the list — a coloured sticky swatch + text, with pin / edit /
+ *  remove. Distinct from the vision list (paper hues, not photos); notes only
+ *  become draggable once stuck onto the room stage. */
+function FridgeRow({
+  note,
+  mine,
+  unread,
+  canEdit,
+  pinDisabled,
+  onEdit,
+  onRemove,
+  onTogglePin,
+}: {
+  note: FridgeNote;
+  mine: boolean;
+  unread: boolean;
+  canEdit: boolean;
+  pinDisabled: boolean;
+  onEdit: () => void;
+  onRemove: () => void;
+  onTogglePin: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "group flex gap-3 rounded-2xl border p-3 transition",
+        note.stage_pinned
+          ? "border-primary/40 bg-primary/[0.07]"
+          : "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.04]",
+      )}
+    >
+      <span
+        className="mt-0.5 w-1.5 shrink-0 self-stretch rounded-full"
+        style={{ background: notePalette(note.id, mine) }}
+        aria-hidden
+      />
+      <div className="min-w-0 flex-1">
+        <p className="whitespace-pre-wrap break-words text-sm leading-snug text-cream/90 line-clamp-4">
+          {note.text}
+        </p>
+        <p className="mt-1.5 truncate text-[11px] uppercase tracking-[0.14em] text-muted-foreground/70">
+          {mine ? "You" : note.pinned_by_name || "Them"} · {timeAgo(note.pinned_at)}
+          {note.emergency ? " · greets on entry" : ""}
+          {note.stage_pinned ? " · on stage" : ""}
+          {unread ? " · new" : ""}
+        </p>
+      </div>
+      {canEdit && (
+        <div className="flex shrink-0 items-start gap-1">
+          <button
+            type="button"
+            onClick={onTogglePin}
+            disabled={pinDisabled}
+            aria-pressed={note.stage_pinned}
+            title={note.stage_pinned ? "Unpin from room" : pinDisabled ? "Two notes already pinned" : "Pin to room"}
+            className={cn(
+              "flex h-8 w-8 items-center justify-center rounded-full border transition disabled:opacity-35",
+              note.stage_pinned
+                ? "border-primary/50 bg-primary/20 text-primary"
+                : "border-white/10 text-muted-foreground hover:text-cream",
+            )}
+          >
+            <Pin className={cn("h-4 w-4", note.stage_pinned && "fill-current")} />
+          </button>
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label="Edit"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-muted-foreground opacity-0 transition hover:text-cream group-hover:opacity-100"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label="Remove"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 text-muted-foreground opacity-0 transition hover:border-red-400/30 hover:text-red-300 group-hover:opacity-100"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -340,6 +429,18 @@ export function FridgeNotes({ active = true }: Props) {
     }
   }
 
+  async function togglePin(note: FridgeNote) {
+    const willPin = !note.stage_pinned;
+    if (willPin && pinnedCount >= MAX_STAGE_PINS) {
+      toast.message(`Only ${MAX_STAGE_PINS} notes can sit on the stage — unpin one first.`);
+      return;
+    }
+    const ok = await persist({
+      notes: notes.map((n) => (n.id === note.id ? { ...n, stage_pinned: willPin } : n)),
+    });
+    if (ok) toast.success(willPin ? "Pinned to the room" : "Unpinned");
+  }
+
   function startEdit(note: FridgeNote) {
     setEditingId(note.id);
     setSelectedId(null);
@@ -380,6 +481,7 @@ export function FridgeNotes({ active = true }: Props) {
 
   const empty = notes.length === 0;
   const canStick = text.trim().length > 0;
+  const pinnedCount = notes.filter((n) => n.stage_pinned).length;
 
   return (
     <div className="wall-surface relative">
@@ -488,50 +590,31 @@ export function FridgeNotes({ active = true }: Props) {
         </div>
       )}
 
-      <div className="relative flex-1 min-h-0 overflow-auto p-4">
+      <div className="relative flex-1 min-h-0 overflow-auto p-3 sm:p-4">
         {empty ? (
-          <FridgeAppliance empty>
-            <FridgeEmpty onFocusAdd={focusAdd} embedded />
-          </FridgeAppliance>
+          <FridgeEmpty onFocusAdd={focusAdd} />
         ) : filtered.length === 0 ? (
-          <FridgeAppliance>
-            <p className="fridge-empty-filter">No notes in this view yet.</p>
-          </FridgeAppliance>
+          <p className="py-12 text-center text-sm text-muted-foreground">No notes in this view yet.</p>
         ) : (
-          <>
-            <FridgeAppliance>
-              <div className="fridge-notes-grid">
-                {filtered.map((note) => {
-                  const mine = note.pinned_by === room.senderId;
-                  const unread =
-                    !mine && !!note.pinned_by && !note.seen_by.includes(room.senderId);
-                  return (
-                    <StickyNote
-                      key={note.id}
-                      note={note}
-                      mine={mine}
-                      unread={unread}
-                      selected={selectedId === note.id}
-                      onSelect={() =>
-                        setSelectedId(selectedId === note.id ? null : note.id)
-                      }
-                    />
-                  );
-                })}
-              </div>
-            </FridgeAppliance>
-
-            {selected && (
-              <NoteDetail
-                note={selected}
-                mine={selected.pinned_by === room.senderId}
-                canEdit={room.canPersist}
-                onClose={() => setSelectedId(null)}
-                onEdit={() => startEdit(selected)}
-                onRemove={() => void removeNote(selected.id)}
-              />
-            )}
-          </>
+          <div className="flex flex-col gap-2">
+            {filtered.map((note) => {
+              const mine = note.pinned_by === room.senderId;
+              const unread = !mine && !!note.pinned_by && !note.seen_by.includes(room.senderId);
+              return (
+                <FridgeRow
+                  key={note.id}
+                  note={note}
+                  mine={mine}
+                  unread={unread}
+                  canEdit={room.canPersist}
+                  pinDisabled={!note.stage_pinned && pinnedCount >= MAX_STAGE_PINS}
+                  onEdit={() => startEdit(note)}
+                  onRemove={() => void removeNote(note.id)}
+                  onTogglePin={() => void togglePin(note)}
+                />
+              );
+            })}
+          </div>
         )}
 
         {!empty && !editingNote && (

@@ -295,7 +295,7 @@ export default function Lobby() {
           <div className="w-full max-w-md sm:max-w-xl">
             <div
               className="editorial-card animate-scale-in flex flex-col items-center gap-6 p-6 text-center sm:p-10"
-              style={{ boxShadow: "0 30px 80px -20px rgba(0,0,0,0.6), inset 0 0 60px rgba(212,130,106,0.04)" }}
+              style={{ boxShadow: "0 30px 80px -20px rgba(0,0,0,0.6), inset 0 0 60px rgba(232,166,83,0.04)" }}
             >
               {invite.greeting_headline && (
                 <h1
@@ -374,7 +374,7 @@ export default function Lobby() {
                   <p className="mb-4 font-serif italic text-[11px] text-cream/82 sm:text-xs">Room opens in</p>
                   <p
                     className="font-serif text-5xl tabular-nums leading-none text-cream sm:text-7xl"
-                    style={{ textShadow: "0 4px 30px rgba(0,0,0,0.72), 0 0 48px rgba(212,130,106,0.1)" }}
+                    style={{ textShadow: "0 4px 30px rgba(0,0,0,0.72), 0 0 48px rgba(232,166,83,0.1)" }}
                   >
                     {formatRemaining(remaining)}
                   </p>

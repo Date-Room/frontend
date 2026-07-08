@@ -191,7 +191,7 @@ export default function Auth() {
                 <button
                   type="submit"
                   disabled={loading || code.length !== 6}
-                  className="btn-primary mt-1 flex w-full items-center justify-center gap-3 rounded-xl py-4 font-semibold text-primary-foreground shadow-[0_12px_40px_rgba(212,130,106,0.22)] disabled:cursor-not-allowed disabled:opacity-40 sm:rounded-[1.15rem]"
+                  className="btn-primary mt-1 flex w-full items-center justify-center gap-3 rounded-xl py-4 font-semibold text-primary-foreground shadow-[0_12px_40px_rgba(232,166,83,0.22)] disabled:cursor-not-allowed disabled:opacity-40 sm:rounded-[1.15rem]"
                 >
                   {loading ? (
                     <>
@@ -277,7 +277,7 @@ export default function Auth() {
                 <button
                   type="submit"
                   disabled={loading || !email.trim()}
-                  className="btn-primary mt-1 flex w-full items-center justify-center gap-2.5 rounded-xl py-4 font-semibold text-primary-foreground shadow-[0_12px_40px_rgba(212,130,106,0.22)] disabled:cursor-not-allowed disabled:opacity-40 sm:rounded-[1.15rem]"
+                  className="btn-primary mt-1 flex w-full items-center justify-center gap-2.5 rounded-xl py-4 font-semibold text-primary-foreground shadow-[0_12px_40px_rgba(232,166,83,0.22)] disabled:cursor-not-allowed disabled:opacity-40 sm:rounded-[1.15rem]"
                 >
                   {loading ? (
                     <>

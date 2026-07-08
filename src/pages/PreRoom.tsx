@@ -898,7 +898,7 @@ function PreRoomShell({ children }: { children: React.ReactNode }) {
         className="pointer-events-none fixed inset-0 -z-[5]"
         style={{
           background:
-            "radial-gradient(ellipse 130% 95% at 50% 118%, rgba(155, 95, 50, 0.45) 0%, transparent 58%), radial-gradient(circle at 18% 18%, rgba(245, 166, 35, 0.18) 0%, transparent 42%), radial-gradient(circle at 85% 12%, rgba(212, 130, 106, 0.16) 0%, transparent 40%)",
+            "radial-gradient(ellipse 130% 95% at 50% 118%, rgba(155, 95, 50, 0.45) 0%, transparent 58%), radial-gradient(circle at 18% 18%, rgba(245, 166, 35, 0.18) 0%, transparent 42%), radial-gradient(circle at 85% 12%, rgba(232,166,83, 0.16) 0%, transparent 40%)",
         }}
       />
       <div className="relative z-10 mx-auto min-h-screen w-full py-6 sm:py-10">

@@ -21,6 +21,9 @@ export type LobbyPreviewScene = {
   centerVignetteOpacity: number;
   /** Base RGB for radial center dim (mood-tinted shadow) */
   centerRgb: readonly [number, number, number];
+  /** Signature colour pulled from the scene — drives the room's accent /
+   *  colour scheme so UI chrome matches the chosen background. */
+  accentRgb: readonly [number, number, number];
 };
 
 const Q = "auto=format&fit=crop&w=1800&q=88";
@@ -37,6 +40,7 @@ export const LOBBY_PREVIEW_SCENES: Record<AmbiancePresetId, LobbyPreviewScene> =
     accentR: "bg-[radial-gradient(ellipse_48%_40%_at_82%_70%,rgba(255,215,165,0.1)_0%,transparent_55%)]",
     centerVignetteOpacity: 0.42,
     centerRgb: [12, 5, 8],
+    accentRgb: [255, 165, 92],
   },
   moonlit: {
     src: `https://images.unsplash.com/photo-1519681393784-d120267933ba?${Q}`,
@@ -48,6 +52,7 @@ export const LOBBY_PREVIEW_SCENES: Record<AmbiancePresetId, LobbyPreviewScene> =
     accentR: "bg-[radial-gradient(ellipse_46%_40%_at_22%_75%,rgba(70,105,165,0.12)_0%,transparent_55%)]",
     centerVignetteOpacity: 0.4,
     centerRgb: [6, 8, 26],
+    accentRgb: [140, 155, 235],
   },
   golden: {
     src: `https://images.unsplash.com/photo-1506905925346-21bda4d32df4?${Q}`,
@@ -59,6 +64,7 @@ export const LOBBY_PREVIEW_SCENES: Record<AmbiancePresetId, LobbyPreviewScene> =
     accentR: "bg-[radial-gradient(ellipse_44%_36%_at_82%_55%,rgba(255,158,74,0.14)_0%,transparent_52%)]",
     centerVignetteOpacity: 0.34,
     centerRgb: [22, 10, 5],
+    accentRgb: [255, 205, 118],
   },
   ocean: {
     src: `https://images.unsplash.com/photo-1505118380757-91f5f5632de0?${Q}`,
@@ -70,6 +76,7 @@ export const LOBBY_PREVIEW_SCENES: Record<AmbiancePresetId, LobbyPreviewScene> =
     accentR: "bg-[radial-gradient(ellipse_52%_42%_at_28%_70%,rgba(40,145,178,0.12)_0%,transparent_55%)]",
     centerVignetteOpacity: 0.45,
     centerRgb: [2, 16, 24],
+    accentRgb: [90, 215, 228],
   },
   secret: {
     src: `https://images.unsplash.com/photo-1572116469696-31de0f17cc34?${Q}`,
@@ -81,6 +88,7 @@ export const LOBBY_PREVIEW_SCENES: Record<AmbiancePresetId, LobbyPreviewScene> =
     accentR: "bg-[radial-gradient(ellipse_48%_40%_at_28%_70%,rgba(255,205,148,0.1)_0%,transparent_52%)]",
     centerVignetteOpacity: 0.46,
     centerRgb: [12, 4, 18],
+    accentRgb: [220, 165, 245],
   },
   aurora: {
     src: `https://images.unsplash.com/photo-1531366936337-7c912a4589a7?${Q}`,
@@ -92,6 +100,7 @@ export const LOBBY_PREVIEW_SCENES: Record<AmbiancePresetId, LobbyPreviewScene> =
     accentR: "bg-[radial-gradient(ellipse_50%_42%_at_26%_70%,rgba(186,148,248,0.16)_0%,transparent_54%)]",
     centerVignetteOpacity: 0.38,
     centerRgb: [4, 12, 24],
+    accentRgb: [120, 238, 206],
   },
   ember: {
     src: `https://images.unsplash.com/photo-1672698163035-ed62e6c191f9?${Q}`,
@@ -103,6 +112,7 @@ export const LOBBY_PREVIEW_SCENES: Record<AmbiancePresetId, LobbyPreviewScene> =
     accentR: "bg-[radial-gradient(ellipse_44%_36%_at_82%_32%,rgba(255,206,148,0.12)_0%,transparent_50%)]",
     centerVignetteOpacity: 0.44,
     centerRgb: [18, 6, 4],
+    accentRgb: [255, 138, 72],
   },
   blush: {
     src: `https://images.unsplash.com/photo-1472214103451-9374bd1c798e?${Q}`,
@@ -114,5 +124,6 @@ export const LOBBY_PREVIEW_SCENES: Record<AmbiancePresetId, LobbyPreviewScene> =
     accentR: "bg-[radial-gradient(ellipse_50%_40%_at_76%_60%,rgba(255,208,226,0.12)_0%,transparent_52%)]",
     centerVignetteOpacity: 0.37,
     centerRgb: [14, 4, 16],
+    accentRgb: [255, 146, 214],
   },
 };

@@ -24,7 +24,7 @@ type PageShellProps = {
 export function PageShell({
   children,
   className,
-  orbs = true,
+  orbs = false,
   vignette = true,
   style,
 }: PageShellProps) {

@@ -16,7 +16,9 @@
     --card-foreground: 40 14% 96%;
     --popover: 22 20% 11%;
     --popover-foreground: 40 14% 96%;
-    --primary: 16 56% 64%;
+    /* Primary amber — matches the mobile brand colour (#E8A653) so the two
+       clients share one palette. Was rosegold (hue 16) which read as brown. */
+    --primary: 33 76% 62%;
     --primary-foreground: 22 22% 9%;
     --secondary: 22 16% 16%;
     --secondary-foreground: 40 14% 96%;
@@ -28,7 +30,7 @@
     --destructive-foreground: 35 35% 98%;
     --border: 30 10% 24%;
     --input: 30 10% 22%;
-    --ring: 16 56% 64%;
+    --ring: 33 76% 62%;
     --radius: 1.5rem;
     --champagne: 38 72% 72%;
   }
@@ -56,8 +58,8 @@
     --card-foreground: 262 35% 14%;
     --popover: 35 35% 99%;
     --popover-foreground: 262 35% 14%;
-    --primary: 16 52% 48%;
-    --primary-foreground: 35 35% 99%;
+    --primary: 33 74% 50%;
+    --primary-foreground: 26 30% 12%;
     --secondary: 35 18% 92%;
     --secondary-foreground: 262 35% 18%;
     --muted: 35 14% 90%;
@@ -68,7 +70,7 @@
     --destructive-foreground: 35 35% 99%;
     --border: 35 12% 86%;
     --input: 35 12% 86%;
-    --ring: 16 52% 48%;
+    --ring: 33 74% 50%;
   }
 }
 
@@ -105,7 +107,7 @@
 
   .btn-primary {
     @apply px-8 py-4 rounded-full bg-primary text-primary-foreground font-medium transition-all duration-300 
-           hover:scale-105 hover:shadow-[0_0_30px_rgba(212,130,106,0.3)] active:scale-95;
+           hover:scale-105 hover:shadow-[0_0_30px_rgba(232,166,83,0.3)] active:scale-95;
   }
 
   .btn-secondary {
@@ -121,14 +123,14 @@
   /* Gentle lift on hover for tappable cards. */
   .hover-lift {
     @apply transition-all duration-300 ease-out
-           hover:-translate-y-0.5 hover:shadow-[0_22px_60px_-22px_rgba(212,130,106,0.28)];
+           hover:-translate-y-0.5 hover:shadow-[0_22px_60px_-22px_rgba(232,166,83,0.28)];
   }
 
   /* Stronger lift for hero CTAs / paywall tiles — same easing as
      hover-lift so motion stays consistent across surfaces. */
   .hover-lift-strong {
     @apply transition-all duration-300 ease-out
-           hover:-translate-y-1 hover:shadow-[0_28px_72px_-22px_rgba(212,130,106,0.38)];
+           hover:-translate-y-1 hover:shadow-[0_28px_72px_-22px_rgba(232,166,83,0.38)];
   }
 
   /* Reusable focus ring — consistent across inputs, buttons, links. */
@@ -201,7 +203,7 @@
   }
 
   .ember-glow {
-    background: radial-gradient(ellipse at 50% 50%, rgba(212,130,106,0.12) 0%, transparent 70%);
+    background: radial-gradient(ellipse at 50% 50%, rgba(232,166,83,0.12) 0%, transparent 70%);
     pointer-events: none;
   }
 
@@ -235,7 +237,7 @@
   .auth-mode-switch {
     @apply mt-2 inline-flex min-h-[2.75rem] items-center justify-center rounded-full border border-primary/55
            bg-primary/20 px-6 py-2 text-sm font-semibold tracking-wide text-cream
-           shadow-[0_0_24px_rgba(212,130,106,0.22)] transition-colors duration-200
+           shadow-[0_0_24px_rgba(232,166,83,0.22)] transition-colors duration-200
            hover:border-primary hover:bg-primary/30 hover:text-cream
            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2
            focus-visible:ring-offset-[hsl(250_18%_8%)];
@@ -1141,7 +1143,7 @@
   }
 
   .perm-call-btn {
-    @apply inline-flex items-center gap-2 rounded-full bg-amber px-4 py-2.5 text-sm font-semibold text-[#1a120c] shadow-[0_8px_28px_rgba(232,157,77,0.4)] transition hover:scale-[1.02];
+    @apply inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-[#1a120c] shadow-[0_8px_28px_rgba(232,166,83,0.4)] transition hover:scale-[1.02];
   }
 
   .perm-partner-join-toast {
@@ -1185,7 +1187,7 @@
   .perm-wall-canvas {
     @apply relative min-h-[260px] p-4 sm:min-h-[300px] sm:p-5;
     background:
-      radial-gradient(circle at 20% 25%, rgba(212, 130, 106, 0.1), transparent 50%),
+      radial-gradient(circle at 20% 25%, rgba(232,166,83, 0.1), transparent 50%),
       radial-gradient(circle at 80% 75%, rgba(120, 80, 200, 0.08), transparent 45%),
       linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
   }

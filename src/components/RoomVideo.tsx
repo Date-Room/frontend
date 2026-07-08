@@ -6,7 +6,8 @@ import {
   useTracks,
   useLocalParticipant,
 } from "@livekit/components-react";
-import { Track } from "livekit-client";
+import { Track, DisconnectReason } from "livekit-client";
+import { toast } from "sonner";
 import "@livekit/components-styles";
 import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Maximize2, Minimize2, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -157,8 +158,8 @@ function capturePhoto(
     ctx.restore();
     // Amber rim.
     const rim = ctx.createLinearGradient(x, y, x, y + h);
-    rim.addColorStop(0, "rgba(212,130,106,0.7)");
-    rim.addColorStop(1, "rgba(212,130,106,0.25)");
+    rim.addColorStop(0, "rgba(232,166,83,0.7)");
+    rim.addColorStop(1, "rgba(232,166,83,0.25)");
     ctx.strokeStyle = rim;
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -347,6 +348,72 @@ function Stage({
     );
   }
 
+  // PiP — video fills the frame; controls fade in on hover.
+  if (isPip) {
+    const ctrlBtn =
+      "flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-cream backdrop-blur-md transition hover:bg-black/65";
+    return (
+      <div className="group relative h-full w-full overflow-hidden rounded-xl bg-black">
+        <ReactionsLayer />
+        <div ref={partnerWrapRef} className="absolute inset-0">
+          {remotes.length > 0 ? (
+            <Tile participant={remotes[0]} label={remotes[0].participant.name || partnerDisplay.name} />
+          ) : (
+            <Tile participant={local} isLocal label="you" />
+          )}
+        </div>
+        {countdown != null && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/30">
+            <span
+              className="font-serif text-[72px] leading-none drop-shadow-[0_4px_30px_rgba(0,0,0,0.6)]"
+              style={{ color: "var(--room-accent)" }}
+            >
+              {countdown}
+            </span>
+          </div>
+        )}
+        {/* Hover controls — scrim + fade/slide in. stopPropagation so the
+            buttons don't start a window drag on the parent. */}
+        <div
+          onPointerDown={(e) => e.stopPropagation()}
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex translate-y-1 items-center justify-center gap-1.5 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-2 pb-2 pt-8 opacity-0 transition-all duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100"
+        >
+          <button
+            onClick={() => void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
+            aria-label={isMicrophoneEnabled ? "Mute" : "Unmute"}
+            className={ctrlBtn}
+          >
+            {isMicrophoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4 text-rose" />}
+          </button>
+          <button
+            onClick={() => void localParticipant.setCameraEnabled(!isCameraEnabled)}
+            aria-label={isCameraEnabled ? "Camera off" : "Camera on"}
+            className={ctrlBtn}
+          >
+            {isCameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4 text-rose" />}
+          </button>
+          {onExpand && (
+            <button onClick={onExpand} aria-label="Full screen call" className={ctrlBtn}>
+              <Maximize2 className="h-4 w-4" />
+            </button>
+          )}
+          {onCollapse && (
+            <button onClick={onCollapse} aria-label="Collapse call" className={ctrlBtn}>
+              <Minus className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            onClick={onLeave}
+            aria-label="Leave call"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-destructive/85 text-cream backdrop-blur-md transition hover:bg-destructive"
+          >
+            <PhoneOff className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2 h-full relative">
       <ReactionsLayer />
@@ -516,7 +583,23 @@ export function RoomVideo({
   }
 
   return (
-    <LiveKitRoom token={conn.token} serverUrl={conn.url} connect audio video data-lk-theme="default" className="h-full w-full">
+    <LiveKitRoom
+      token={conn.token}
+      serverUrl={conn.url}
+      connect
+      audio
+      video
+      data-lk-theme="default"
+      className="h-full w-full"
+      onDisconnected={(reason) => {
+        // Only one device per user per room — joining elsewhere takes over the
+        // call stream, so this (older) device leaves cleanly.
+        if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
+          toast.message("Call moved to your other device.");
+          onLeave?.();
+        }
+      }}
+    >
       <Stage
         onLeave={onLeave ?? (() => {})}
         variant={variant}

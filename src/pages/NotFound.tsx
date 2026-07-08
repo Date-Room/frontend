@@ -27,7 +27,7 @@ export default function NotFound() {
           >
             <Home className="w-4 h-4" aria-hidden /> Marketing site
           </Link>
-          <Link to="/home" className="btn-primary rounded-[1.1rem] py-3.5 px-8 inline-flex items-center justify-center gap-2 shadow-[0_12px_40px_rgba(212,130,106,0.25)]">
+          <Link to="/home" className="btn-primary rounded-[1.1rem] py-3.5 px-8 inline-flex items-center justify-center gap-2 shadow-[0_12px_40px_rgba(232,166,83,0.25)]">
             <ArrowLeft className="w-4 h-4 opacity-90" aria-hidden /> My dashboard
           </Link>
         </div>
