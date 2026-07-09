@@ -25,7 +25,6 @@ import {
   roomAccentStyle,
   useRoomCustomization,
 } from "@/context/RoomCustomizationContext";
-import { RoomVideo } from "@/components/RoomVideo";
 import { RoomStage, type StageItem } from "@/components/RoomStage";
 import { ChatWithBoundary } from "@/components/Chat";
 import { WatchTogether } from "@/components/WatchTogether";
@@ -33,7 +32,6 @@ import { VisionBoard } from "@/components/VisionBoard";
 import { FridgeNotes } from "@/components/FridgeNotes";
 import { Bookshelf } from "@/components/Bookshelf";
 import { WelcomeBackGate } from "@/components/WelcomeBackGate";
-import { LiveRoomTabBar } from "@/components/LiveRoomTabBar";
 import type { PresenceState } from "@/lib/realtime/roomChannel";
 import {
   partnerDisplayName,
@@ -335,8 +333,6 @@ function RoomShell({
       setTab((current) => (current === "questions" ? "vision_board" : current));
     }
   }, [wallRoom]);
-  const [trayExpanded, setTrayExpanded] = useState(false);
-  const [videoMinimized, setVideoMinimized] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [ambianceOpen, setAmbianceOpen] = useState(false);
   const [ambianceOverride, setAmbianceOverride] = useState<LobbyMood | null>(null);
@@ -351,6 +347,18 @@ function RoomShell({
   const expired = !isPersistent && expiresAt
     ? now >= new Date(expiresAt).getTime()
     : false;
+
+  // Session (time-limited) rooms auto-start the call on entry — the date is the
+  // point and the window is short. Permanent rooms never force a call. Runs once
+  // we know the room type and it isn't already expired.
+  const autoCallStartedRef = useRef(false);
+  useEffect(() => {
+    if (autoCallStartedRef.current) return;
+    if (isPermanentRoom || expired || liveMode) return;
+    autoCallStartedRef.current = true;
+    enterLiveMode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPermanentRoom, expired]);
 
   const activeAmbiance = ambianceOverride ?? customization.ambiancePreset;
   const moodLabel = activeAmbiance === PLAIN_MOOD ? "Plain" : ambianceMeta(activeAmbiance).label;
@@ -423,22 +431,6 @@ function RoomShell({
     }
   }, [visibleTabs, tab]);
 
-  const watching = tab === "watch";
-  const videoInPip = videoMinimized || (trayExpanded && watching);
-
-  useEffect(() => {
-    if (!watching) setVideoMinimized(false);
-  }, [watching]);
-
-  function toggleVideoPanel() {
-    if (watching) {
-      setVideoMinimized((v) => !v);
-      setTrayExpanded(false);
-      return;
-    }
-    setTrayExpanded((v) => !v);
-  }
-
   const shellStyle: React.CSSProperties = {
     ...roomAccentStyle(customization.theme),
     // When a background is chosen, tint the room accent to match it; plain
@@ -490,8 +482,10 @@ function RoomShell({
     }
   };
 
-  if (isPermanentRoom) {
-    return (
+  // One unified room layout for every room type — the Together-room stage,
+  // tray, walls and call PiP. Session (time-limited) rooms differ only in that
+  // the call auto-starts (above) and they keep their countdown + expiry (below).
+  return (
       <PageShell
         orbs={false}
         vignette={false}
@@ -516,12 +510,42 @@ function RoomShell({
           <div className="min-w-0">
             <h1 className="font-serif text-2xl italic text-cream sm:text-3xl">{BRAND_NAME}</h1>
           </div>
-          <button
-            onClick={() => setShowLeaveConfirm(true)}
-            className="text-xs uppercase tracking-[0.2em] text-muted-foreground transition hover:text-cream"
-          >
-            {t("common.leave")}
-          </button>
+          <div className="flex items-center gap-3 sm:gap-4">
+            {/* Session (time-limited) rooms keep their countdown + add-time. */}
+            {!isPersistent && expiresAt && (
+              <div className="flex items-center gap-2">
+                <div className={cn("flex items-center gap-1.5 text-[10px] sm:text-xs", timerModel.expired && "text-destructive")}>
+                  <Clock className={cn("h-3 w-3 shrink-0", timerModel.criticalTime ? "text-rose-400" : "text-muted-foreground")} />
+                  <span
+                    className={cn(
+                      "tabular-nums",
+                      timerModel.criticalTime
+                        ? "font-bold text-rose-400 animate-timer-critical-blink"
+                        : "font-medium text-cream/90",
+                      timerModel.expired && "font-bold text-destructive",
+                    )}
+                  >
+                    {timerModel.display}
+                  </span>
+                </div>
+                {timerModel.criticalTime && (
+                  <button
+                    type="button"
+                    onClick={() => setUpgradeOpen(true)}
+                    className="shrink-0 rounded-full border border-rose-400/45 bg-rose-500/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-rose-300 transition hover:border-rose-400/60 hover:bg-rose-500/25"
+                  >
+                    Add time
+                  </button>
+                )}
+              </div>
+            )}
+            <button
+              onClick={() => setShowLeaveConfirm(true)}
+              className="text-xs uppercase tracking-[0.2em] text-muted-foreground transition hover:text-cream"
+            >
+              {t("common.leave")}
+            </button>
+          </div>
         </header>
 
         <RoomStage
@@ -569,343 +593,59 @@ function RoomShell({
           current={activeAmbiance}
           onPick={(id) => setAmbianceOverride(id)}
         />
+
+        {/* Session-room "add more time" — unique to time-limited rooms. */}
+        {!isPersistent && (
+          <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
+            <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-card/95 text-cream sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="font-serif font-semibold text-xl">Add more time</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">
+                Keep the evening going — add 15 minutes, 30 minutes, or a full hour.
+              </p>
+              <AddMoreTimeCheckout
+                roomId={roomId}
+                participantId={session.participantId}
+                canPay={session.canPersist}
+                onTimeAdded={(next) => {
+                  onExpiresAtChange(next);
+                  setUpgradeOpen(false);
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Session-room expiry — unique to time-limited rooms. */}
+        {expired && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/90 backdrop-blur-md animate-fade-in pointer-events-auto">
+            <div className="w-full max-w-md mx-4 editorial-card p-8 text-center animate-scale-in">
+              <Sparkles className="w-8 h-8 text-primary mx-auto mb-4 opacity-90" aria-hidden />
+              <h2 className="font-serif font-semibold text-cream text-2xl mb-3">Your window closed</h2>
+              <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
+                Time&apos;s up — add more minutes to keep the date going.
+              </p>
+              <div className="flex flex-col gap-3">
+                <button type="button" className="btn-primary w-full py-3 rounded-full" onClick={() => setUpgradeOpen(true)}>
+                  Add more time
+                </button>
+                <button type="button" className="btn-primary w-full py-3 rounded-full" onClick={() => navigate(`/room/${roomId}/recap`)}>
+                  View recap
+                </button>
+                <button
+                  type="button"
+                  className="text-xs uppercase tracking-[0.22em] text-muted-foreground hover:text-cream transition py-2"
+                  onClick={() => navigate("/home")}
+                >
+                  Back to rooms
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </PageShell>
     );
-  }
-
-  const activityTabs = (
-    <>
-      <LiveRoomTabBar
-        tabs={visibleTabs.map((tb) => ({ id: tb.id, label: tb.label, icon: tb.icon }))}
-        activeId={tab}
-        onChange={(id) => setTab(id as ActivityTabId)}
-        dividerBeforeId={tabBarDividerBefore}
-      />
-      <div className="flex-1 min-h-0 overflow-auto relative">
-        <div className={tab === "vision_board" ? "h-full" : "hidden"}>
-          <VisionBoard />
-        </div>
-        <div className={tab === "fridge_notes" ? "h-full" : "hidden"}>
-          <FridgeNotes active={tab === "fridge_notes"} />
-        </div>
-        <div className={tab === "bookshelf" ? "h-full" : "hidden"}>
-          <Bookshelf />
-        </div>
-        <div className={tab === "questions" ? "h-full" : "hidden"}>
-          <QuestionDeck />
-        </div>
-        <div className={tab === "this_or_that" ? "h-full" : "hidden"}>
-          <ThisOrThat />
-        </div>
-        <div className={tab === "the_36" ? "h-full" : "hidden"}>
-          <The36 />
-        </div>
-        <div className={tab === "2_truths" ? "h-full" : "hidden"}>
-          <TwoTruths />
-        </div>
-        <div className={tab === "truth_or_dare" ? "h-full" : "hidden"}>
-          <TruthOrDare />
-        </div>
-        <div className={tab === "watch" ? "h-full" : "hidden"}>
-          <WatchTogether />
-        </div>
-        <div className={tab === "dj" ? "h-full" : "hidden"}>
-          <DJ watchActive={tab === "watch"} />
-        </div>
-        <div className={tab === "chat" ? "h-full" : "hidden"}>
-          <ChatWithBoundary />
-        </div>
-      </div>
-    </>
-  );
-
-
-  return (
-    <PageShell
-      orbs={false}
-      vignette={false}
-      className="min-h-0 h-screen flex flex-col overflow-hidden"
-      style={shellStyle}
-    >
-      <LiveRoomAmbianceBackdrop preset={activeAmbiance} />
-      <div className="page-grain" aria-hidden />
-
-      <WelcomeBackGate enabled={wallRoom} />
-
-      <KickedListener
-        onKicked={() => {
-          toast.message("You were removed from this room");
-          void queryClient.invalidateQueries({ queryKey: ["recap", roomId] });
-          void queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
-          navigate("/home");
-        }}
-      />
-
-      {/* ── Header — metadata strip ── */}
-      <header className="flex items-center justify-between px-4 sm:px-6 py-3 glass-subtle z-30 shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          {isPermanentRoom && (
-            <button
-              type="button"
-              onClick={exitLiveMode}
-              className="flex shrink-0 items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-[10px] uppercase tracking-[0.16em] text-muted-foreground transition hover:border-amber/30 hover:bg-white/[0.08] hover:text-cream"
-              aria-label={t("room.backToHome")}
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              <Home className="h-3.5 w-3.5 text-amber" />
-              <span className="hidden sm:inline">{t("room.backToHome")}</span>
-            </button>
-          )}
-          <span className="w-1.5 h-1.5 rounded-full bg-rosegold animate-pulse-glow shrink-0" />
-          <div className="min-w-0">
-            <h1 className="font-serif italic text-cream text-base sm:text-lg tracking-wide truncate">
-              {BRAND_NAME}
-            </h1>
-            <p className="text-[10px] uppercase tracking-[0.26em] text-muted-foreground/90 truncate">
-              <span className="text-muted-foreground/85">{moodLabel} lighting</span>
-              <span className="text-muted-foreground/45"> · </span>
-              <span className="text-muted-foreground/70">{planLabel}</span>
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {!isPersistent && expiresAt && (
-            <div className="flex items-center gap-2 sm:gap-2.5">
-              <div
-                className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 text-center",
-                  timerModel.expired && "text-destructive",
-                )}
-              >
-                <div className="flex items-center gap-1.5 text-[10px] sm:text-xs">
-                  <Clock
-                    className={cn(
-                      "w-3 h-3 shrink-0",
-                      timerModel.criticalTime ? "text-rose-400" : "text-muted-foreground",
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      "tabular-nums",
-                      timerModel.criticalTime
-                        ? "font-bold text-rose-400 animate-timer-critical-blink"
-                        : "font-medium text-cream/90",
-                      timerModel.expired && "font-bold text-destructive",
-                    )}
-                  >
-                    {timerModel.display}
-                  </span>
-                </div>
-                {timerModel.caption && !timerModel.criticalTime && (
-                  <span
-                    className={cn(
-                      "hidden sm:inline text-[9px] uppercase tracking-[0.14em] whitespace-nowrap leading-tight",
-                      "text-muted-foreground/75",
-                    )}
-                  >
-                    {timerModel.caption}
-                  </span>
-                )}
-              </div>
-              {timerModel.criticalTime && (
-                <button
-                  type="button"
-                  onClick={() => setUpgradeOpen(true)}
-                  className="shrink-0 self-center rounded-full border border-rose-400/45 bg-rose-500/15 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-rose-300 whitespace-nowrap transition hover:bg-rose-500/25 hover:border-rose-400/60"
-                >
-                  Add More Time
-                </button>
-              )}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => setAmbianceOpen(true)}
-            aria-label="Set room lighting mood"
-            className="flex items-center gap-1.5 rounded-full px-3 py-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground hover:text-cream hover:bg-secondary/70 transition border border-border/25 hover:border-rosegold/30"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-rosegold shrink-0" />
-            <span className="hidden sm:inline">Light</span>
-          </button>
-          <button
-            onClick={() => setShowLeaveConfirm(true)}
-            className="text-xs uppercase tracking-[0.2em] text-muted-foreground hover:text-cream transition flex items-center gap-1.5 px-1"
-          >
-            <LogOut className="w-3.5 h-3.5" /> Leave
-          </button>
-        </div>
-      </header>
-
-      {/* ── Main ── */}
-      <main
-        className={cn(
-          "flex-1 flex flex-col min-h-0 z-10",
-          expired && "opacity-60 pointer-events-none",
-        )}
-      >
-          <div className="flex-1 flex flex-col lg:flex-row gap-3 lg:gap-4 p-3 sm:p-4 min-h-0">
-            <section
-              className={cn(
-                "flex flex-col relative",
-                videoInPip
-                  ? "fixed bottom-4 left-4 z-30 w-[min(300px,38vw)] h-[min(240px,30vh)] rounded-2xl glass p-2 shadow-2xl pointer-events-auto"
-                  : cn(
-                      "lg:basis-3/5 lg:flex-shrink-0 h-[40vh] lg:h-auto rounded-3xl glass p-3 sm:p-4",
-                      trayExpanded && !watching ? "hidden lg:flex" : "flex",
-                    ),
-              )}
-            >
-              <RoomVideo compact={videoInPip} onLeave={() => setShowLeaveConfirm(true)} />
-              {watching && !videoInPip && (
-                <button
-                  type="button"
-                  aria-label={t("room.minimizeVideo")}
-                  onClick={() => setVideoMinimized(true)}
-                  className="absolute top-3 right-3 w-8 h-8 rounded-full bg-secondary/70 border border-border/40 hidden lg:flex items-center justify-center z-20 pointer-events-auto hover:bg-secondary transition"
-                >
-                  <Minimize2 className="w-3.5 h-3.5 text-cream" />
-                </button>
-              )}
-              {videoInPip && (
-                <button
-                  type="button"
-                  aria-label={t("room.restoreVideo")}
-                  onClick={() => {
-                    setVideoMinimized(false);
-                    setTrayExpanded(false);
-                  }}
-                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-secondary/80 border border-border/40 flex items-center justify-center z-20 pointer-events-auto hover:bg-secondary transition"
-                >
-                  <Maximize2 className="w-3 h-3 text-cream" />
-                </button>
-              )}
-              {!watching && (
-                <button
-                  type="button"
-                  aria-label={trayExpanded ? t("room.restoreVideo") : t("room.showActivities")}
-                  onClick={toggleVideoPanel}
-                  className="absolute top-4 right-4 w-8 h-8 rounded-full bg-secondary/60 flex items-center justify-center lg:hidden z-20 pointer-events-auto"
-                >
-                  {trayExpanded ? (
-                    <Maximize2 className="w-3.5 h-3.5 text-cream" />
-                  ) : (
-                    <Minimize2 className="w-3.5 h-3.5 text-cream" />
-                  )}
-                </button>
-              )}
-              {watching && (
-                <button
-                  type="button"
-                  aria-label={videoInPip ? t("room.restoreVideo") : t("room.minimizeVideo")}
-                  onClick={toggleVideoPanel}
-                  className="absolute top-3 right-3 w-8 h-8 rounded-full bg-secondary/70 border border-border/40 flex items-center justify-center lg:hidden z-20 pointer-events-auto hover:bg-secondary transition"
-                >
-                  {videoInPip ? (
-                    <Maximize2 className="w-3.5 h-3.5 text-cream" />
-                  ) : (
-                    <Minimize2 className="w-3.5 h-3.5 text-cream" />
-                  )}
-                </button>
-              )}
-            </section>
-            <section
-              className={cn(
-                "flex-1 flex flex-col rounded-3xl glass overflow-hidden min-h-0",
-                videoInPip ? "w-full" : "lg:basis-2/5 lg:flex-shrink-0 lg:min-h-[480px]",
-              )}
-            >
-              {activityTabs}
-            </section>
-          </div>
-      </main>
-
-      {/* ── Leave confirm modal ── */}
-      {showLeaveConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in pointer-events-auto">
-          <div className="w-full max-w-sm mx-4 rounded-3xl p-6 glass-strong text-center card-shadow">
-            <h2 className="font-serif text-xl text-cream mb-2">Leave the room?</h2>
-            <p className="text-sm text-muted-foreground mb-6">
-              Your date night will end. You&apos;ll both see a recap.
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowLeaveConfirm(false)} className="flex-1 btn-secondary py-3">
-                Stay
-              </button>
-              <button
-                onClick={() => navigate("/home")}
-                className="flex-1 px-6 py-3 rounded-full bg-destructive text-cream text-sm font-medium hover:bg-destructive/80 transition"
-              >
-                Leave
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <RoomAmbianceSheet
-        open={ambianceOpen}
-        onOpenChange={setAmbianceOpen}
-        current={activeAmbiance}
-        onPick={(id) => setAmbianceOverride(id)}
-      />
-
-      <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-card/95 text-cream sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-serif font-semibold text-xl">Add more time</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Keep the evening going — add 15 minutes, 30 minutes, or a full hour.
-          </p>
-          <AddMoreTimeCheckout
-            roomId={roomId}
-            participantId={session.participantId}
-            canPay={session.canPersist}
-            onTimeAdded={(next) => {
-              onExpiresAtChange(next);
-              setUpgradeOpen(false);
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Expired overlay ── */}
-      {expired && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/90 backdrop-blur-md animate-fade-in pointer-events-auto">
-          <div className="w-full max-w-md mx-4 editorial-card p-8 text-center animate-scale-in">
-            <Sparkles className="w-8 h-8 text-primary mx-auto mb-4 opacity-90" aria-hidden />
-            <h2 className="font-serif font-semibold text-cream text-2xl mb-3">Your window closed</h2>
-            <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
-              Time&apos;s up — add more minutes to keep the date going.
-            </p>
-            <div className="flex flex-col gap-3">
-              <button
-                type="button"
-                className="btn-primary w-full py-3 rounded-full"
-                onClick={() => setUpgradeOpen(true)}
-              >
-                Add more time
-              </button>
-              <button
-                type="button"
-                className="btn-primary w-full py-3 rounded-full"
-                onClick={() => navigate(`/room/${roomId}/recap`)}
-              >
-                View recap
-              </button>
-              <button
-                type="button"
-                className="text-xs uppercase tracking-[0.22em] text-muted-foreground hover:text-cream transition py-2"
-                onClick={() => navigate("/home")}
-              >
-                Back to rooms
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </PageShell>
-  );
 }
 
 export default function LiveRoom() {

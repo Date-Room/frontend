@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
+import { SyncScheduler } from "@/lib/realtime/syncScheduler";
 import { cn } from "@/lib/utils";
 import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/types/youtubeIframeApi";
 import { extractId, fetchOEmbed, loadYT, type DjTrack, type OEmbed } from "@/components/DJ";
@@ -90,6 +91,8 @@ export function MusicRoomProvider({
       return 80;
     }
   });
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
   useEffect(() => {
     try {
       localStorage.setItem("dr:music:volume", String(volume));
@@ -117,6 +120,32 @@ export function MusicRoomProvider({
   // so a reload respects the persisted paused/playing state for both people.
   const playingRef = useRef(playing);
   playingRef.current = playing;
+
+  // Near-perfect resume sync — both sides start on a shared instant.
+  const schedulerRef = useRef<SyncScheduler | null>(null);
+  const startPlaybackAt = useCallback((videoTime: number) => {
+    const p = playerRef.current;
+    if (!p) return;
+    suppress(2500);
+    try {
+      p.seekTo?.(videoTime, true);
+      p.unMute?.();
+      p.setVolume?.(volumeRef.current);
+      p.playVideo?.();
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    const sched = new SyncScheduler(room.channel, "dj", userId);
+    schedulerRef.current = sched;
+    const stop = sched.start((videoTime) => startPlaybackAt(videoTime));
+    return () => {
+      stop();
+      schedulerRef.current = null;
+    };
+  }, [room.channel, userId, startPlaybackAt]);
 
   const persistDj = useCallback(
     (patch: Record<string, unknown>, recapEvent?: { event_type: string; payload?: Record<string, unknown> }) => {
@@ -452,18 +481,24 @@ export function MusicRoomProvider({
         /* ignore */
       }
     } else {
-      void session?.sendEvent("play", { timestamp_seconds: time });
+      // Resume together on a shared instant (falls back to immediate play).
       persistDj({ playing: true, timestamp_seconds: time, silence: false });
-      suppress(5000);
-      try {
-        playerRef.current?.unMute?.();
-        playerRef.current?.playVideo?.();
-      } catch {
-        /* ignore */
+      const sched = schedulerRef.current;
+      if (sched) {
+        sched.scheduleStart(time, (videoTime) => startPlaybackAt(videoTime));
+      } else {
+        void session?.sendEvent("play", { timestamp_seconds: time });
+        suppress(5000);
+        try {
+          playerRef.current?.unMute?.();
+          playerRef.current?.playVideo?.();
+        } catch {
+          /* ignore */
+        }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoId, playing, session, persistDj]);
+  }, [videoId, playing, session, persistDj, startPlaybackAt]);
 
   const restartCurrent = useCallback(() => {
     if (!videoId) return;

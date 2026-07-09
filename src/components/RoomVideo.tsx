@@ -459,9 +459,11 @@ function Stage({
             <Tile participant={partner} label={partnerLabel} contain />
           )}
         </div>
-        {/* Inset PiP-in-PiP — the other person; drag within the frame, tap to swap. */}
+        {/* Inset PiP-in-PiP — the other person; drag within the frame, tap to swap.
+            selfWrapRef rides the inset so a photo capture grabs BOTH faces. */}
         {partner && (
           <div
+            ref={selfWrapRef}
             onPointerDown={startInsetDrag}
             onClick={() => {
               if (!pipMovedRef.current) setPipSwapped((v) => !v);
@@ -505,6 +507,15 @@ function Stage({
             className={ctrlBtn}
           >
             {isCameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4 text-rose" />}
+          </button>
+          {/* FaceTime-style capture — grabs both faces to a photo. */}
+          <button
+            onClick={startCapture}
+            disabled={countdown != null}
+            aria-label="Take a photo"
+            className={cn(ctrlBtn, "disabled:opacity-40")}
+          >
+            <Camera className="h-4 w-4" style={{ color: "var(--room-accent)" }} />
           </button>
           {onExpand && (
             <button onClick={onExpand} aria-label="Full screen call" className={ctrlBtn}>

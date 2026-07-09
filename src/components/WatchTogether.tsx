@@ -16,6 +16,7 @@ import { Clock, FastForward, Pause, Play, Rewind, Volume2, VolumeX, X } from "lu
 import { EmptyState } from "@/components/EmptyState";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
+import { SyncScheduler } from "@/lib/realtime/syncScheduler";
 import {
   addWatchHistory,
   fetchYoutubeTitle,
@@ -160,6 +161,36 @@ export function WatchTogether() {
     }
   }
 
+  // Near-perfect resume sync: both sides start playback on a shared instant.
+  const schedulerRef = useRef<SyncScheduler | null>(null);
+  const startPlaybackAt = useCallback((videoTime: number, asController: boolean) => {
+    const p = playerRef.current;
+    if (!p) return;
+    isControllerRef.current = asController;
+    suppress(2500);
+    try {
+      p.seekTo?.(videoTime, true);
+      if (volumeRef.current > 0) {
+        p.unMute?.();
+        p.setVolume?.(volumeRef.current);
+      }
+      p.playVideo?.();
+    } catch {
+      void 0;
+    }
+    setPlaying(true);
+    setLivePlaying(true);
+  }, []);
+  useEffect(() => {
+    const sched = new SyncScheduler(room.channel, "watch", userId);
+    schedulerRef.current = sched;
+    const stop = sched.start((videoTime) => startPlaybackAt(videoTime, false));
+    return () => {
+      stop();
+      schedulerRef.current = null;
+    };
+  }, [room.channel, userId, startPlaybackAt]);
+
   const [videoId, setVideoId] = useState<string | null>(dVideo);
   const videoIdRef = useRef(videoId);
   videoIdRef.current = videoId;
@@ -178,6 +209,8 @@ export function WatchTogether() {
       return 100;
     }
   });
+  const volumeRef = useRef(volume);
+  volumeRef.current = volume;
   useEffect(() => {
     try {
       localStorage.setItem("dr:watch:volume", String(volume));
@@ -554,24 +587,34 @@ export function WatchTogether() {
     if (!p || !videoId) return;
     const next = !livePlaying;
     isControllerRef.current = true;
-    suppress(600);
-    try {
-      const time = p.getCurrentTime?.() ?? 0;
-      if (next) {
-        if (volume > 0) {
-          p.unMute?.();
-          p.setVolume?.(volume);
-        }
-        p.playVideo?.();
+    const time = p.getCurrentTime?.() ?? 0;
+    if (next) {
+      // Resume = shared future instant so both sides start together. The peer
+      // gets a sync_start; we start locally after the same lead. Falls back to
+      // an immediate play if the scheduler isn't ready.
+      const sched = schedulerRef.current;
+      if (sched) {
+        sched.scheduleStart(time, (videoTime) => {
+          startPlaybackAt(videoTime, true);
+          persistWatch({ video_id: videoId, playing: true, timestamp_seconds: videoTime });
+        });
       } else {
-        p.pauseVideo?.();
+        startPlaybackAt(time, true);
+        void session?.sendEvent("play", { timestamp_seconds: time });
+        persistWatch({ video_id: videoId, playing: true, timestamp_seconds: time });
       }
-      void session?.sendEvent(next ? "play" : "pause", { timestamp_seconds: time });
-      persistWatch({ video_id: videoId, playing: next, timestamp_seconds: time });
-    } catch {
-      void 0;
+    } else {
+      // Pause immediately; the partner pauses + seeks to this exact frame.
+      suppress(600);
+      try {
+        p.pauseVideo?.();
+      } catch {
+        void 0;
+      }
+      void session?.sendEvent("pause", { timestamp_seconds: time });
+      persistWatch({ video_id: videoId, playing: false, timestamp_seconds: time });
+      setPlaying(false);
     }
-    setPlaying(next);
   };
 
   const stopVideo = () => {
