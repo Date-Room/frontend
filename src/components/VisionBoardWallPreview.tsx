@@ -91,7 +91,7 @@ export function VisionBoardWallPreview({ onOpen }: Props) {
       <div className="perm-wall-canvas">
         {!ready ? (
           <div className="flex h-full min-h-[240px] items-center justify-center">
-            <Loader2 className="h-5 w-5 animate-spin text-amber/70" />
+            <Loader2 className="h-5 w-5 animate-spin text-primary/70" />
           </div>
         ) : items.length === 0 ? (
           <div className="flex h-full min-h-[240px] flex-col items-center justify-center px-6 text-center">

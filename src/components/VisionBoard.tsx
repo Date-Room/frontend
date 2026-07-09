@@ -29,6 +29,7 @@ import {
   type VisionMediaType,
 } from "@/lib/roomWalls";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/EmptyState";
 
 type ShapePreset = "rect" | "circle" | "wide" | "tall";
 type PhotoMode = "upload" | "link";
@@ -162,16 +163,15 @@ function VisionGridCard({
         ) : null}
       </div>
 
-      {/* Pinned marker */}
-      {item.pinned && (
-        <span className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[#1a1207] shadow">
-          <Pin className="h-3.5 w-3.5 fill-current" />
-        </span>
-      )}
-
-      {/* Hover actions */}
+      {/* Actions — pinned cards keep them visible so the lit pin shows; others
+          reveal on hover. */}
       {canEdit && (
-        <div className="absolute right-2 top-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+        <div
+          className={cn(
+            "absolute right-2 top-2 flex items-center gap-1 transition",
+            item.pinned ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+          )}
+        >
           <button
             type="button"
             onClick={onTogglePin}
@@ -481,7 +481,6 @@ function DreamForm({
   onFilePick,
   fileRef,
 }: DreamFormProps) {
-  const [showLink, setShowLink] = useState(Boolean(imageUrl));
   const hasPhoto = Boolean(uploadDataUrl);
   return (
     <form onSubmit={(e) => void onSubmit(e)} className="space-y-3">
@@ -519,23 +518,6 @@ function DreamForm({
             </div>
           ))}
       </div>
-
-      {showLink ? (
-        <Input
-          value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
-          placeholder="Paste an image or PDF link…"
-          className="bg-secondary/50 border-white/10"
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setShowLink(true)}
-          className="px-1 text-xs text-muted-foreground transition hover:text-cream"
-        >
-          or paste a link
-        </button>
-      )}
 
       <button
         type="submit"
@@ -684,6 +666,9 @@ export function VisionBoard() {
     };
     const ok = await persist({ items: [...items, newItem] });
     if (ok) {
+      // Notify the partner (persist converges via postgres_changes, which the
+      // room notifier doesn't watch — so send an explicit activity event).
+      void session?.sendEvent("added", { caption: cap });
       resetForm();
       setMode("board");
       toast.success("Added to your board");
@@ -724,6 +709,9 @@ export function VisionBoard() {
   }
 
   async function removeItem(id: string) {
+    // Tell the stage right away so any pinned floating card for this dream
+    // disappears immediately, without waiting for the durable round-trip.
+    void room.channel.broadcast("vision_removed", { id });
     const ok = await persist({ items: items.filter((i) => i.id !== id) });
     if (ok) {
       setViewingId(null);
@@ -856,12 +844,12 @@ export function VisionBoard() {
   const empty = items.length === 0;
   const canPin = caption.trim() || uploadDataUrl || imageUrl.trim();
   const pinnedCount = items.filter((i) => i.pinned).length;
-  const showBoard = mode === "board" || (mode === "add" && !empty);
+  const showBoard = mode === "board";
 
   if (!ready) {
     return (
       <div className="wall-surface flex flex-1 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-amber" aria-hidden />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden />
       </div>
     );
   }
@@ -869,23 +857,13 @@ export function VisionBoard() {
   if (empty && mode === "board") {
     return (
       <div className="wall-surface">
-        <div className="flex flex-1 flex-col items-center justify-center px-6 py-10 text-center">
-          <div className="mb-5 h-14 w-14 overflow-hidden rounded-lg ring-1 ring-white/10">
-            <div className="h-full w-full bg-gradient-to-br from-amber/40 via-rose-400/30 to-indigo-500/40" />
-          </div>
-          <h2 className="font-serif text-2xl italic text-cream">Vision Board</h2>
-          <div className="wall-empty-copy mt-5 space-y-4">
-            <p>Add photos, PDFs, or words for the life you&apos;re building — trips, a home, a feeling, a goal.</p>
-            <p>Tap any dream to view, edit, or remove — and pin up to two onto the room.</p>
-          </div>
-          {room.canPersist ? (
-            <button type="button" className="wall-cta mt-8" onClick={openAdd}>
-              Start pinning
-            </button>
-          ) : (
-            <p className="mt-6 text-sm text-muted-foreground">Sign in to add to your shared board.</p>
-          )}
-        </div>
+        <EmptyState
+          variant="vision"
+          title="Vision Board"
+          onAdd={room.canPersist ? openAdd : undefined}
+          addLabel="Add a vision"
+          subtitle={room.canPersist ? undefined : "Sign in to add to your shared board."}
+        />
       </div>
     );
   }
@@ -893,56 +871,38 @@ export function VisionBoard() {
   return (
     <div className="wall-surface relative">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-3 shrink-0">
-        <div className="min-w-0">
-          {mode !== "board" ? (
-            <button
-              type="button"
-              onClick={backToBoard}
-              className="mb-1 inline-flex items-center gap-1.5 text-sm text-amber hover:text-cream"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to board
-            </button>
-          ) : null}
-          <p className="font-serif italic text-cream text-base sm:text-lg truncate">
-            {mode === "add" ? "Pin a new dream" : mode === "edit" ? "Edit dream" : "The life we're building"}
-          </p>
-          {mode === "board" && (
+      <div className="border-b border-white/[0.06] px-4 py-3 shrink-0">
+        {mode === "board" ? (
+          <div className="flex items-center justify-between gap-2">
             <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70">
               {items.length} dream{items.length === 1 ? "" : "s"}
               {pinnedCount > 0 ? ` · ${pinnedCount}/${MAX_STAGE_PINS} pinned` : " · tap to view"}
             </p>
-          )}
-        </div>
-        {mode === "board" && (
-          <div className="flex items-center gap-1.5 shrink-0">
             {room.canPersist && (
               <button
                 type="button"
                 onClick={openAdd}
-                className="inline-flex items-center gap-1 rounded-full border border-amber/40 bg-amber/15 px-3 py-1.5 text-[11px] font-semibold text-amber"
+                aria-label="Add a vision"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-primary-foreground transition hover:opacity-90"
+                style={{ backgroundColor: "var(--room-accent)" }}
               >
-                <Plus className="h-3.5 w-3.5" />
-                Add
+                <Plus className="h-4 w-4" />
               </button>
             )}
+          </div>
+        ) : (
+          <div className="relative flex items-center justify-center">
             <button
               type="button"
-              onClick={exportPdf}
-              className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-muted-foreground hover:text-cream"
+              onClick={backToBoard}
+              className="absolute left-0 inline-flex items-center gap-1.5 text-sm text-primary transition hover:opacity-80"
             >
-              <FileDown className="h-3.5 w-3.5" />
-              PDF
+              <ArrowLeft className="h-4 w-4" />
+              Back
             </button>
-            <button
-              type="button"
-              aria-label="Help"
-              title="Tap a dream to view. Pin up to two onto the room. Hover for edit & remove."
-              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-muted-foreground hover:text-cream"
-            >
-              <HelpCircle className="h-3.5 w-3.5" />
-            </button>
+            <p className="text-sm font-semibold text-cream">
+              {mode === "add" ? "Add Vision" : "Edit Vision"}
+            </p>
           </div>
         )}
       </div>
@@ -1028,17 +988,6 @@ export function VisionBoard() {
         />
       )}
 
-      {/* Floating add on board view (mobile-friendly) */}
-      {mode === "board" && room.canPersist && items.length > 0 && (
-        <button
-          type="button"
-          onClick={openAdd}
-          className="absolute bottom-6 right-4 z-20 flex items-center gap-2 rounded-full bg-amber px-4 py-2.5 text-sm font-semibold text-[#1a120c] shadow-[0_8px_32px_hsl(var(--primary)/0.45)] transition hover:scale-[1.02]"
-        >
-          <Plus className="h-4 w-4" />
-          Pin another
-        </button>
-      )}
     </div>
   );
 }

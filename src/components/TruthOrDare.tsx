@@ -22,15 +22,16 @@ export function TruthOrDare() {
   // Pre-deal.
   if (!dealt) {
     return (
-      <div className="flex flex-col h-full items-center justify-center p-8 gap-5 text-center">
-        <p className="font-serif italic text-cream text-xl">Truth or Dare</p>
-        <p className="text-sm text-muted-foreground max-w-xs">
+      <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+        <p className="font-serif text-2xl text-cream">Truth or Dare</p>
+        <p className="max-w-xs text-sm text-muted-foreground">
           Three cards each — a mix of truths and dares. Two skips, and you can trade your top card.
         </p>
         {partnerId ? (
           <Button
             onClick={() => emit("deal", makeDeal([senderId, partnerId]))}
-            className="rounded-full bg-amber text-primary-foreground"
+            className="rounded-full px-6 text-primary-foreground hover:opacity-90"
+            style={{ backgroundColor: "var(--room-accent)" }}
           >
             Deal the cards
           </Button>
@@ -52,32 +53,36 @@ export function TruthOrDare() {
 
   if (!card) {
     return (
-      <div className="flex flex-col h-full items-center justify-center p-8 text-center gap-3">
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
         <div className="text-3xl">🃏</div>
-        <p className="font-serif italic text-cream text-xl">You're out of cards</p>
+        <p className="font-serif text-2xl text-cream">You're out of cards</p>
         <p className="text-sm text-muted-foreground">That's the deck. Nicely played.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full p-4 sm:p-6 gap-4 min-h-0">
-      <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-muted-foreground">
+    <div className="flex h-full min-h-0 flex-col gap-5 p-5 sm:p-6">
+      <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
         <span>Your card</span>
         <span className="tabular-nums">{cardsLeftInDeck} left in deck</span>
       </div>
 
-      <div className="flex-1 min-h-0 flex items-center justify-center">
+      <div className="flex min-h-0 flex-1 items-center justify-center">
         {revealed ? (
           <div
-            className={`w-full max-w-sm rounded-3xl border-2 p-6 text-center animate-scale-in shadow-[0_28px_72px_-22px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)] ${
-              card.kind === "dare" ? "border-rose/40 bg-rose/[0.06]" : "border-amber/40 bg-amber/[0.06]"
+            className={`w-full max-w-sm rounded-2xl border p-6 text-center animate-scale-in ${
+              card.kind === "dare" ? "border-rose/40 bg-rose/[0.06]" : "border-primary/40 bg-primary/[0.06]"
             }`}
           >
-            <p className={`text-[10px] uppercase tracking-[0.3em] mb-3 ${card.kind === "dare" ? "text-rose" : "text-amber"}`}>
+            <p
+              className={`mb-3 text-[11px] font-semibold uppercase tracking-[0.22em] ${
+                card.kind === "dare" ? "text-rose" : "text-primary"
+              }`}
+            >
               {card.kind}
             </p>
-            <p className="font-serif italic text-cream text-2xl leading-snug">{card.text}</p>
+            <p className="text-xl font-medium leading-snug text-cream">{card.text}</p>
           </div>
         ) : (
           <button
@@ -94,26 +99,34 @@ export function TruthOrDare() {
                   : undefined,
               )
             }
-            className="focus-ring w-full max-w-sm aspect-[3/4] rounded-3xl border-2 border-dashed border-white/15 bg-card/40 flex flex-col items-center justify-center gap-3 hover:border-amber/40 hover:bg-card/60 hover:-translate-y-1 transition-all duration-300"
+            className="focus-ring flex aspect-[3/4] w-full max-w-sm flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:bg-white/[0.04]"
           >
             <span className="text-4xl">🂠</span>
-            <span className="font-serif italic text-cream/70">Tap to flip your card</span>
+            <span className="text-sm text-cream/70">Tap to flip your card</span>
           </button>
         )}
       </div>
 
       {trade && (
-        <div className="rounded-2xl border border-rosegold/30 bg-rosegold/10 p-4 text-center space-y-3 animate-float-up">
+        <div className="space-y-3 rounded-2xl border border-primary/25 bg-primary/[0.06] p-4 text-center animate-float-up">
           {iAmProposer ? (
             <p className="text-sm text-cream">Trade proposed — waiting for your partner…</p>
           ) : (
             <>
               <p className="text-sm text-cream">Your partner wants to swap top cards.</p>
-              <div className="flex gap-2 justify-center">
-                <Button onClick={() => emit("accept_trade")} className="rounded-full bg-amber text-primary-foreground">
+              <div className="flex justify-center gap-2">
+                <Button
+                  onClick={() => emit("accept_trade")}
+                  className="rounded-full text-primary-foreground hover:opacity-90"
+                  style={{ backgroundColor: "var(--room-accent)" }}
+                >
                   Accept
                 </Button>
-                <Button variant="outline" onClick={() => emit("decline_trade")} className="rounded-full border-border">
+                <Button
+                  variant="outline"
+                  onClick={() => emit("decline_trade")}
+                  className="rounded-full border-white/10 text-cream hover:bg-white/5"
+                >
                   Decline
                 </Button>
               </div>
@@ -123,36 +136,33 @@ export function TruthOrDare() {
       )}
 
       {revealed && (
-        <div className="flex flex-wrap gap-2 justify-center">
+        <div className="flex flex-wrap justify-center gap-2">
           <Button
             onClick={() =>
-              emit(
-                "done",
-                {},
-                card ? { event_type: "done", payload: { text: card.text } } : undefined,
-              )
+              emit("done", {}, card ? { event_type: "done", payload: { text: card.text } } : undefined)
             }
-            className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90"
+            className="rounded-full text-primary-foreground hover:opacity-90"
+            style={{ backgroundColor: "var(--room-accent)" }}
           >
-            <Check className="w-4 h-4 mr-1.5" /> Done — next card
+            <Check className="mr-1.5 h-4 w-4" /> Done — next card
           </Button>
           <Button
             variant="outline"
             onClick={() =>
-              emit(
-                "skip",
-                {},
-                card ? { event_type: "skipped", payload: { text: card.text } } : undefined,
-              )
+              emit("skip", {}, card ? { event_type: "skipped", payload: { text: card.text } } : undefined)
             }
             disabled={skipsLeft <= 0}
-            className="rounded-full border-border"
+            className="rounded-full border-white/10 text-cream hover:bg-white/5"
           >
-            <SkipForward className="w-4 h-4 mr-1.5" /> Skip ({skipsLeft})
+            <SkipForward className="mr-1.5 h-4 w-4" /> Skip ({skipsLeft})
           </Button>
           {!trade && (
-            <Button variant="outline" onClick={() => emit("propose_trade")} className="rounded-full border-border">
-              <ArrowRightLeft className="w-4 h-4 mr-1.5" /> Trade
+            <Button
+              variant="outline"
+              onClick={() => emit("propose_trade")}
+              className="rounded-full border-white/10 text-cream hover:bg-white/5"
+            >
+              <ArrowRightLeft className="mr-1.5 h-4 w-4" /> Trade
             </Button>
           )}
         </div>

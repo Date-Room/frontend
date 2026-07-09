@@ -32,7 +32,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
+import { ActivityHelp, hasActivityHelp } from "@/components/ActivityHelp";
 import { MusicPlayerBar, MusicRoomProvider } from "@/components/MusicRoom";
+import { ActivityBoundary } from "@/components/RoomErrorBoundary";
+import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
 import {
   parseFridgeNotes,
@@ -63,6 +66,26 @@ const CATEGORIES: { id: string; label: string; icon: LucideIcon; itemIds: string
   { id: "music", label: "Music", icon: Headphones, itemIds: ["dj"] },
   { id: "chat", label: "Chat", icon: MessageCircle, itemIds: ["chat"] },
 ];
+
+/** Partner-action → notifier copy + which stage item to open. Maps the raw
+ *  activity_id (as broadcast) to a friendly line and the stage target. */
+const NOTIF: Record<string, { verb: string; target: string }> = {
+  chat: { verb: "sent a message", target: "chat" },
+  dj: { verb: "played a song", target: "dj" },
+  watch: { verb: "started a video", target: "watch" },
+  vision_board: { verb: "added a dream", target: "vision_board" },
+  pinned_note: { verb: "left a note", target: "fridge_notes" },
+  bookshelf: { verb: "added to the shelf", target: "bookshelf" },
+  // Bookshelf persists under the legacy activity_id "fridge".
+  fridge: { verb: "added to the shelf", target: "bookshelf" },
+  questions: { verb: "is playing Questions", target: "questions" },
+  this_or_that: { verb: "is playing This or That", target: "this_or_that" },
+  the_36: { verb: "is playing The 36", target: "the_36" },
+  "2_truths": { verb: "is playing Two Truths", target: "2_truths" },
+  truth_or_dare: { verb: "is playing Truth or Dare", target: "truth_or_dare" },
+};
+/** Chatty sync events that shouldn't pop a notification. */
+const NOTIF_NOISY = new Set(["tick", "seek", "cursor", "typing", "presence", "pause"]);
 
 /** Lucide equivalents of the mobile activity-menu icons (Material) — keeps
  *  the two clients visually consistent (no ad-hoc emojis). */
@@ -125,6 +148,9 @@ export function RoomStage({
   items,
   renderContent,
   partnerStatus,
+  partnerName = "Your partner",
+  partnerInRoom = false,
+  partnerInCall = false,
   partnerPresent = false,
   callActive,
   onCallIn,
@@ -134,6 +160,9 @@ export function RoomStage({
   items: StageItem[];
   renderContent: (id: string) => ReactNode;
   partnerStatus: string;
+  partnerName?: string;
+  partnerInRoom?: boolean;
+  partnerInCall?: boolean;
   partnerPresent?: boolean;
   callActive: boolean;
   onCallIn: () => void;
@@ -156,32 +185,50 @@ export function RoomStage({
     }
   }, [roomId, staged]);
 
-  // The staged item is shared server-side so both partners see the same thing
-  // (and it persists after they both leave). localStorage is just a warm cache
-  // for the first paint before the durable state hydrates.
-  const { session: stageSession, state: stageState } = useActivitySession("room_stage");
-  const serverStaged = typeof stageState?.staged === "string" ? stageState.staged : null;
-  useEffect(() => {
-    if (serverStaged && serverStaged !== staged && items.some((i) => i.id === serverStaged)) {
-      setStaged(serverStaged);
-    }
-  }, [serverStaged, items, staged]);
-  const commitStage = useCallback(
-    (id: string) => {
-      setStaged(id);
-      if (!stageSession) return;
-      void stageSession
-        .persist({ staged: id }, { event_type: "stage_set", payload: { staged: id } })
-        .catch(() => {
-          /* stays on local state if the sync fails */
-        });
-    },
-    [stageSession],
-  );
+  // Each person browses activities on their own — the staged item is local
+  // (cached per room in localStorage), NOT shared. Partner actions surface via
+  // the notifier on the Activities button instead.
+  const commitStage = useCallback((id: string) => setStaged(id), []);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   // Two-level launcher (mirrors mobile): null = category list, else drilled in.
   const [catId, setCatId] = useState<string | null>(null);
+
+  // Dynamic-island notifier: partner actions expand the Activities button into
+  // a tappable notice for ~3s, then it settles back. (Activities are per-user,
+  // so this is how you learn your partner did something.)
+  const room = useRoomSession();
+  const [notif, setNotif] = useState<{ id: number; text: string; target: string } | null>(null);
+  const notifTimer = useRef<number | undefined>(undefined);
+  // Ids removed via the delete broadcast — dropped from pinned cards instantly.
+  const [removedVisionIds, setRemovedVisionIds] = useState<Set<string>>(() => new Set());
+  const stagedRef = useRef(staged);
+  stagedRef.current = staged;
+  useEffect(() => {
+    const off = room.channel.onBroadcast((e) => {
+      if (e.kind === "vision_removed") {
+        const id = (e.payload as { id?: string }).id;
+        if (id) setRemovedVisionIds((prev) => new Set(prev).add(id));
+        return;
+      }
+      if (e.kind !== "activity") return;
+      const d = e.payload as { activity_id?: string; type?: string; user_id?: string };
+      if (!d.activity_id || d.user_id === room.senderId) return;
+      if (d.type && NOTIF_NOISY.has(d.type)) return;
+      const meta = NOTIF[d.activity_id];
+      if (!meta) return;
+      // Already viewing that activity — no need to nudge me to open it.
+      if (meta.target === stagedRef.current) return;
+      setNotif({ id: Date.now(), text: `${partnerName} ${meta.verb}`, target: meta.target });
+      window.clearTimeout(notifTimer.current);
+      notifTimer.current = window.setTimeout(() => setNotif(null), 3400);
+    });
+    return () => {
+      off();
+      window.clearTimeout(notifTimer.current);
+    };
+  }, [room.channel, room.senderId, partnerName]);
   const [portrait, setPortrait] = useState(true);
   const [scale, setScale] = useState(1);
   const size = portrait ? PORTRAIT : LANDSCAPE;
@@ -317,8 +364,8 @@ export function RoomStage({
   // draggable cards that float free of it.
   const { state: visionState } = useActivitySession("vision_board");
   const pinnedVisions = useMemo(
-    () => parseVisionBoard(visionState).items.filter((i) => i.pinned),
-    [visionState],
+    () => parseVisionBoard(visionState).items.filter((i) => i.pinned && !removedVisionIds.has(i.id)),
+    [visionState, removedVisionIds],
   );
   const { state: fridgeState } = useActivitySession("pinned_note");
   const pinnedNotes = useMemo(
@@ -330,6 +377,9 @@ export function RoomStage({
   const musicActive =
     djState?.closed !== true &&
     (Boolean(djState?.now_playing) || (Array.isArray(djState?.queue) && djState.queue.length > 0));
+  // Watch shows its own bottom bar while it's staged with a video.
+  const { state: watchState } = useActivitySession("watch");
+  const bottomBarActive = musicActive || (staged === "watch" && Boolean(watchState?.video_id));
 
   return (
     <MusicRoomProvider watchActive={staged === "watch"}>
@@ -341,29 +391,48 @@ export function RoomStage({
         {callActive ? (
           <div className="perm-status-bar">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.65)]" />
-              <p className="truncate text-sm text-cream/80">{partnerStatus}</p>
+              <span
+                className={cn(
+                  "h-2 w-2 shrink-0 rounded-full",
+                  partnerInCall
+                    ? "bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.65)]"
+                    : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse",
+                )}
+              />
+              <p className="truncate text-sm text-cream/80">
+                {partnerInCall ? `${partnerName} is in the call` : `Ringing ${partnerName}…`}
+              </p>
             </div>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={onCallIn}
-            className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-cream backdrop-blur-md transition hover:border-primary/30 hover:bg-white/[0.07] active:scale-[0.99]"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-              <Video className="h-[18px] w-[18px]" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold leading-tight">
-                {partnerPresent ? "Join the call" : "Start the call"}
-              </span>
-              <span className="block truncate text-xs leading-tight text-muted-foreground">
-                {partnerStatus}
-              </span>
-            </span>
-            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
-          </button>
+          (() => {
+            const title = partnerInCall
+              ? "Join the call"
+              : partnerInRoom
+                ? "Invite them to the call"
+                : "Start the call";
+            const sub = partnerInCall
+              ? `${partnerName} is in the call`
+              : partnerInRoom
+                ? `${partnerName} is in the room`
+                : `${partnerName} isn't in yet`;
+            return (
+              <button
+                type="button"
+                onClick={onCallIn}
+                className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-cream backdrop-blur-md transition hover:border-primary/30 hover:bg-white/[0.07] active:scale-[0.99]"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                  <Video className="h-[18px] w-[18px]" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-semibold leading-tight">{title}</span>
+                  <span className="block truncate text-xs leading-tight text-muted-foreground">{sub}</span>
+                </span>
+                <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
+              </button>
+            );
+          })()
         )}
 
         {/* Stage — Vision-Board-sized card that mounts the chosen activity. */}
@@ -377,12 +446,26 @@ export function RoomStage({
             <span className="text-xs font-medium uppercase tracking-[0.16em] text-cream/80">
               {stagedItem?.title ?? "Stage"}
             </span>
+            {staged && hasActivityHelp(staged) && (
+              <button
+                type="button"
+                onClick={() => setHelpOpen(true)}
+                aria-label="How this works"
+                className="ml-auto flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/5 hover:text-cream"
+              >
+                <HelpCircle className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <div
             key={staged}
             className="animate-stage-swell h-[clamp(400px,58vh,680px)] min-h-0 overflow-hidden"
           >
-            {staged ? renderContent(staged) : null}
+            {staged ? (
+              <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
+                {renderContent(staged)}
+              </ActivityBoundary>
+            ) : null}
           </div>
         </section>
 
@@ -395,7 +478,7 @@ export function RoomStage({
       <div
         className={cn(
           "pointer-events-none fixed inset-x-0 z-40 flex justify-center px-3 transition-[bottom] duration-300",
-          musicActive ? "bottom-[80px]" : "bottom-4",
+          bottomBarActive ? "bottom-[80px]" : "bottom-4",
         )}
       >
         <div className="relative">
@@ -457,14 +540,40 @@ export function RoomStage({
               )}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={openMenu}
-            className="focus-ring pointer-events-auto flex items-center gap-2 rounded-full border border-white/10 bg-card/85 px-5 py-2.5 text-sm font-medium text-cream shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition hover:border-primary/30"
-          >
-            {menuOpen ? <X className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4 text-primary" />}
-            {menuOpen ? "Close" : "Activities"}
-          </button>
+          {(() => {
+            const showNotif = notif && !menuOpen;
+            const NotifIcon = showNotif ? ITEM_ICONS[notif.target] ?? LayoutGrid : LayoutGrid;
+            return (
+              <button
+                type="button"
+                onClick={
+                  showNotif
+                    ? () => {
+                        commitStage(notif.target);
+                        setNotif(null);
+                      }
+                    : openMenu
+                }
+                className={cn(
+                  "focus-ring pointer-events-auto flex max-w-[80vw] items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-medium text-cream shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-300",
+                  showNotif
+                    ? "border-primary/40 bg-primary/20"
+                    : "border-white/10 bg-card/85 hover:border-primary/30",
+                )}
+              >
+                {showNotif ? (
+                  <NotifIcon className="h-4 w-4 shrink-0 text-primary" />
+                ) : menuOpen ? (
+                  <X className="h-4 w-4" />
+                ) : (
+                  <LayoutGrid className="h-4 w-4 text-primary" />
+                )}
+                <span key={showNotif ? notif.id : menuOpen ? "close" : "activities"} className="animate-fade-in truncate">
+                  {showNotif ? notif.text : menuOpen ? "Close" : "Activities"}
+                </span>
+              </button>
+            );
+          })()}
         </div>
       </div>
 
@@ -518,6 +627,8 @@ export function RoomStage({
           ))}
         </div>
       )}
+
+      {helpOpen && staged && <ActivityHelp id={staged} onClose={() => setHelpOpen(false)} />}
     </main>
     </MusicRoomProvider>
   );

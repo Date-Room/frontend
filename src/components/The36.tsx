@@ -15,10 +15,12 @@ export function The36() {
 
   if (state.done) {
     return (
-      <div className="flex flex-col h-full items-center justify-center p-8 text-center gap-3">
+      <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
         <div className="text-4xl">💞</div>
-        <p className="font-serif italic text-cream text-2xl">You made it through all 36</p>
-        <p className="text-sm text-muted-foreground max-w-xs">Three sets, twelve each. That's the whole protocol.</p>
+        <p className="font-serif text-2xl text-cream">You made it through all 36</p>
+        <p className="max-w-xs text-sm text-muted-foreground">
+          Three sets, twelve each. That&apos;s the whole protocol.
+        </p>
       </div>
     );
   }
@@ -27,17 +29,19 @@ export function The36() {
   const overall = state.set_index * PER_SET + state.question_index + 1;
 
   return (
-    <div className="flex flex-col h-full p-4 sm:p-6 gap-4 min-h-0">
-      <div className="flex items-center justify-between text-xs uppercase tracking-[0.2em] text-muted-foreground">
+    <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6">
+      <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
         <span>{SET_LABELS[state.set_index]}</span>
-        <span className="tabular-nums">{overall} / {SETS_COUNT * PER_SET}</span>
+        <span className="tabular-nums">
+          {overall} / {SETS_COUNT * PER_SET}
+        </span>
       </div>
 
       <div
         key={`${state.set_index}-${state.question_index}`}
-        className="flex-1 min-h-0 flex items-center justify-center rounded-3xl border-2 border-rosegold/30 bg-rosegold/5 p-6 text-center animate-scale-in shadow-[0_28px_72px_-22px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)]"
+        className="flex min-h-0 flex-1 animate-scale-in items-center justify-center rounded-2xl border border-primary/20 bg-primary/[0.04] p-6 text-center"
       >
-        <p className="font-serif italic text-cream text-2xl leading-snug">{prompt}</p>
+        <p className="text-2xl font-medium leading-snug text-cream">{prompt}</p>
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
@@ -53,7 +57,8 @@ export function The36() {
             { event_type: "answered", payload: { text: prompt } },
           )
         }
-        className="btn-primary focus-ring w-full py-3.5 rounded-full font-semibold"
+        className="focus-ring w-full rounded-full py-3.5 font-semibold text-primary-foreground transition hover:opacity-90"
+        style={{ backgroundColor: "var(--room-accent)" }}
       >
         Next question
       </button>

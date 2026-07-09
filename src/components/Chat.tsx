@@ -188,14 +188,14 @@ export function Chat() {
   const mine = useMemo(() => new Set([room.senderId]), [room.senderId]);
 
   return (
-    <div className="flex flex-col h-full p-4 sm:p-6 gap-3 min-h-0">
+    <div className="flex flex-col h-full p-5 sm:p-6 gap-4 min-h-0">
       <div
         ref={scrollRef}
-        className="flex-1 min-h-0 overflow-y-auto rounded-2xl bg-secondary/40 border border-white/[0.08] p-3 flex flex-col gap-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+        className="flex-1 min-h-0 overflow-y-auto rounded-2xl bg-secondary/40 border border-white/[0.08] p-4 flex flex-col gap-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
       >
         {messages.length === 0 ? (
-          <div className="m-auto text-muted-foreground font-serif italic text-sm text-center px-4">
-            say something sweet, or just check in.
+          <div className="m-auto text-muted-foreground text-sm text-center px-4">
+            Say something sweet, or just check in.
           </div>
         ) : (
           messages.map((m, idx) => {
@@ -214,10 +214,10 @@ export function Chat() {
                   </span>
                 )}
                 <div
-                  className={`px-3 py-2 rounded-2xl text-sm leading-snug whitespace-pre-wrap break-words shadow-[0_4px_18px_-8px_rgba(0,0,0,0.45)] ${
+                  className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
                     isMine
-                      ? "text-primary-foreground rounded-br-sm"
-                      : "bg-card text-cream border border-white/[0.08] rounded-bl-sm"
+                      ? "text-primary-foreground rounded-br-md"
+                      : "bg-white/[0.04] text-cream border border-white/[0.08] rounded-bl-md"
                   }`}
                   style={isMine ? { backgroundColor: "var(--room-accent)" } : undefined}
                 >
@@ -275,8 +275,8 @@ class ChatErrorBoundary extends Component<
     if (this.state.error) {
       return (
         <div className="flex flex-col h-full items-center justify-center gap-3 p-6 text-center">
-          <p className="font-serif italic text-cream/80 text-sm max-w-xs leading-relaxed">
-            chat hit a snag. refresh to keep going.
+          <p className="text-cream/80 text-sm max-w-xs leading-relaxed">
+            Chat hit a snag. Refresh to keep going.
           </p>
           <button
             type="button"

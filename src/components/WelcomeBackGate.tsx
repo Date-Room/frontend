@@ -10,6 +10,9 @@ import {
   parseVisionBoard,
   parseFridge,
   newFridgeItems,
+  markFridgeItemsRead,
+  newVisionItems,
+  markVisionItemsSeen,
   markRoomVisited,
   type FridgeItem,
 } from "@/lib/roomWalls";
@@ -32,9 +35,9 @@ export function WelcomeBackGate({ enabled }: Props) {
   const room = useRoomSession();
   const { session: noteSession, state: noteRaw, ready: noteReady } =
     useActivitySession("pinned_note");
-  const { state: fridgeRaw, ready: fridgeReady } =
+  const { session: fridgeSession, state: fridgeRaw, ready: fridgeReady } =
     useActivitySession("fridge");
-  const { state: boardRaw, ready: boardReady } =
+  const { session: boardSession, state: boardRaw, ready: boardReady } =
     useActivitySession("vision_board");
 
   const [dismissed, setDismissed] = useState(false);
@@ -53,22 +56,56 @@ export function WelcomeBackGate({ enabled }: Props) {
 
   const boardCount = useMemo(() => {
     if (!boardReady) return 0;
-    return parseVisionBoard(boardRaw).items.length;
-  }, [boardRaw, boardReady]);
+    return newVisionItems(parseVisionBoard(boardRaw), room.senderId).length;
+  }, [boardRaw, boardReady, room.senderId]);
 
   const allReady = noteReady && fridgeReady && boardReady;
-  const hasUpdates = hasNote || fridgeUpdates.length > 0;
+  const hasUpdates = hasNote || fridgeUpdates.length > 0 || boardCount > 0;
 
   const handleDismiss = useCallback(async () => {
+    // Mark everything the gate just showed as seen/read so it never re-appears.
+    const writes: Promise<void>[] = [];
     if (hasNote && noteSession) {
-      const next = {
-        notes: markPartnerNotesSeen(fridgeNotes.notes, room.senderId),
-      };
-      await noteSession.persist(next as unknown as Record<string, unknown>);
+      writes.push(
+        noteSession.persist({
+          notes: markPartnerNotesSeen(fridgeNotes.notes, room.senderId),
+        } as unknown as Record<string, unknown>),
+      );
+    }
+    if (fridgeUpdates.length > 0 && fridgeSession) {
+      writes.push(
+        fridgeSession.persist({
+          items: markFridgeItemsRead(parseFridge(fridgeRaw), room.senderId),
+        } as unknown as Record<string, unknown>),
+      );
+    }
+    if (boardCount > 0 && boardSession) {
+      writes.push(
+        boardSession.persist({
+          items: markVisionItemsSeen(parseVisionBoard(boardRaw), room.senderId),
+        } as unknown as Record<string, unknown>),
+      );
     }
     markRoomVisited(room.roomId);
     setDismissed(true);
-  }, [hasNote, noteSession, fridgeNotes.notes, room.senderId, room.roomId]);
+    try {
+      await Promise.all(writes);
+    } catch {
+      /* best-effort; the gate is already dismissed locally */
+    }
+  }, [
+    hasNote,
+    noteSession,
+    fridgeNotes.notes,
+    fridgeUpdates.length,
+    fridgeSession,
+    fridgeRaw,
+    boardCount,
+    boardSession,
+    boardRaw,
+    room.senderId,
+    room.roomId,
+  ]);
 
   if (!enabled || dismissed || !allReady || !hasUpdates) return null;
 

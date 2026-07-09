@@ -297,7 +297,7 @@ export function QuestionDeck() {
   }
 
   return (
-    <div className="flex flex-col h-full p-4 sm:p-6 gap-4 sm:gap-6">
+    <div className="flex h-full flex-col gap-5 overflow-y-auto p-5 sm:p-6">
       {/* Top actions: custom question + revisit */}
       <div className="flex items-center justify-between gap-2">
         <Sheet open={customOpen} onOpenChange={setCustomOpen}>
@@ -307,7 +307,7 @@ export function QuestionDeck() {
               size="sm"
               onClick={() => { setCustomError(null); setCustomDraft(""); setCustomOpen(true); }}
               disabled={customLeft <= 0}
-              className="rounded-full border-amber/40 text-amber hover:bg-amber/10 disabled:opacity-50"
+              className="rounded-full border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-50"
             >
               <PenLine className="w-3.5 h-3.5 mr-1.5" />
               Write your own ({customLeft})
@@ -336,12 +336,13 @@ export function QuestionDeck() {
                 <Button
                   onClick={submitCustomQuestion}
                   disabled={!customDraft.trim() || customLeft <= 0}
-                  className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90"
+                  className="rounded-full text-primary-foreground hover:opacity-90"
+                  style={{ backgroundColor: "var(--room-accent)" }}
                 >
                   Send to them
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground italic">
+              <p className="text-xs text-muted-foreground">
                 It'll replace their current card. They'll see it's from you.
               </p>
             </div>
@@ -366,14 +367,15 @@ export function QuestionDeck() {
                 </p>
               )}
               {state.revisit.map((qIdx) => (
-                <div key={qIdx} className="rounded-2xl border border-border bg-secondary/40 p-4 flex flex-col gap-3">
+                <div key={qIdx} className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
                   <p className="font-serif italic text-cream leading-snug">
                     "{resolveText(pool, qIdx, state.customs)}"
                   </p>
                   <Button
                     size="sm"
                     onClick={() => bringBack(qIdx)}
-                    className="self-start rounded-full bg-amber text-primary-foreground hover:bg-amber/90"
+                    className="self-start rounded-full text-primary-foreground hover:opacity-90"
+                    style={{ backgroundColor: "var(--room-accent)" }}
                   >
                     Bring it back
                   </Button>
@@ -388,25 +390,22 @@ export function QuestionDeck() {
       <div className="flex-1 flex flex-col items-center justify-center gap-4 relative">
         {/* Current card */}
         <div className="relative w-full max-w-md">
-          <div className="absolute -inset-6 rounded-[2rem] ember-glow pointer-events-none" aria-hidden />
-          <div className="absolute inset-0 translate-x-2 translate-y-2 rounded-3xl bg-secondary/60 border border-amber/10" />
-          <div className="absolute inset-0 translate-x-1 translate-y-1 rounded-3xl bg-secondary/80 border border-amber/10" />
           <div
             className={cn(
-              "relative rounded-3xl bg-card border border-border p-6 sm:p-10 min-h-[220px] sm:min-h-[260px] flex items-center justify-center text-center card-shadow transition-opacity duration-300",
+              "relative flex min-h-[220px] items-center justify-center rounded-3xl border border-white/[0.08] bg-card/60 p-6 text-center transition-opacity duration-300 sm:min-h-[260px] sm:p-10",
               incomingTrade && "opacity-40",
             )}
           >
             {state.revisit.includes(current) && (
-              <BookmarkCheck className="absolute top-3 right-3 w-4 h-4 text-amber" />
+              <BookmarkCheck className="absolute top-3 right-3 w-4 h-4 text-primary" />
             )}
             {isCustomFromOther && (
-              <div className="absolute top-3 left-3 text-[10px] uppercase tracking-[0.2em] text-amber italic flex items-center gap-1">
+              <div className="absolute left-3 top-3 flex items-center gap-1 text-[10px] uppercase tracking-[0.2em] text-primary">
                 <PenLine className="w-3 h-3" />
                 from {customAuthor}
               </div>
             )}
-            <p className="font-serif text-xl sm:text-3xl leading-snug text-cream italic">
+            <p className="font-serif text-xl leading-snug text-cream italic sm:text-3xl">
               "{resolveText(pool, current, state.customs)}"
             </p>
 
@@ -440,14 +439,14 @@ export function QuestionDeck() {
         </div>
 
         {/* Reactions row */}
-        <div className="flex flex-col items-center gap-1.5">
-          <p className="text-[11px] italic text-muted-foreground/80">Tap to react</p>
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Tap to react</p>
           <div className="flex gap-2">
             {reactions.map((emoji) => (
               <button
                 key={emoji}
                 onClick={() => sendReaction(emoji)}
-                className="w-10 h-10 rounded-full bg-secondary/60 border border-border hover:bg-secondary text-xl transition"
+                className="h-10 w-10 rounded-full border border-white/10 bg-white/[0.03] text-xl transition hover:bg-white/[0.06]"
                 aria-label={`React ${emoji}`}
               >
                 {emoji}
@@ -467,13 +466,13 @@ export function QuestionDeck() {
                 disabled={!tappable}
                 onClick={() => tappable && acceptTradeWith(handSlot)}
                 className={cn(
-                  "rounded-2xl border border-border bg-secondary/40 p-3 text-left text-cream/80 text-xs sm:text-sm font-serif italic min-h-[80px] transition relative",
-                  tappable && "hover:bg-amber/20 hover:border-amber cursor-pointer",
+                  "relative min-h-[80px] rounded-2xl border border-white/[0.08] bg-white/[0.02] p-3 text-left font-serif text-xs italic text-cream/80 transition sm:text-sm",
+                  tappable && "cursor-pointer hover:border-primary/50 hover:bg-primary/10",
                   !tappable && "opacity-70",
                 )}
               >
                 {state.revisit.includes(qIdx) && (
-                  <BookmarkCheck className="absolute top-2 right-2 w-3 h-3 text-amber" />
+                  <BookmarkCheck className="absolute top-2 right-2 w-3 h-3 text-primary" />
                 )}
                 "{resolveText(pool, qIdx, state.customs)}"
               </button>
@@ -481,7 +480,7 @@ export function QuestionDeck() {
           })}
         </div>
         {incomingTrade && (
-          <button onClick={() => acceptTradeWith(0)} className="text-xs underline text-amber">
+          <button onClick={() => acceptTradeWith(0)} className="text-xs text-primary underline">
             Send my current card instead
           </button>
         )}
@@ -507,7 +506,8 @@ export function QuestionDeck() {
         <Button
           onClick={handleAnswered}
           disabled={!!incomingTrade}
-          className="rounded-full bg-amber text-primary-foreground hover:bg-amber/90"
+          className="rounded-full text-primary-foreground hover:opacity-90"
+          style={{ backgroundColor: "var(--room-accent)" }}
         >
           <Check className="w-4 h-4 mr-2" /> Answered
         </Button>

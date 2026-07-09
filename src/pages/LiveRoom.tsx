@@ -51,7 +51,7 @@ import { TwoTruths } from "@/components/TwoTruths";
 import { TruthOrDare } from "@/components/TruthOrDare";
 import { toast } from "sonner";
 import { authClient } from "@/lib/authClient";
-import { DATE_NAME } from "@/lib/room";
+// (DATE_NAME removed — header shows the brand wordmark)
 import { BRAND_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -122,7 +122,7 @@ type TabDef = {
 
 const WALL_TABS: TabDef[] = [
   { id: "vision_board", label: "Vision Board", icon: "✨", curatableId: "vision_board" },
-  { id: "fridge_notes", label: "Fridge", icon: "🧲", curatableId: null },
+  { id: "fridge_notes", label: "Fridge Note", icon: "🧲", curatableId: null },
   { id: "bookshelf", label: "Bookshelf", icon: "📚", curatableId: "fridge" },
 ];
 
@@ -183,10 +183,15 @@ function RoomShell({
     () => partnerLightLabel(partnerPresenceEntry(session.presence, session.senderId)),
     [session.presence, session.senderId, i18n.language],
   );
-  const partnerPresent = useMemo(
-    () => Boolean(partnerPresenceEntry(session.presence, session.senderId)),
-    [session.presence, session.senderId],
-  );
+  const partnerInfo = useMemo(() => {
+    const p = partnerPresenceEntry(session.presence, session.senderId);
+    return {
+      name: partnerDisplayName(p) || "Your partner",
+      inRoom: Boolean(p),
+      inCall: p?.is_in_call === true,
+    };
+  }, [session.presence, session.senderId]);
+  const partnerPresent = partnerInfo.inRoom;
 
   const enterLiveMode = useCallback(
     (nextTab?: ActivityTabId) => {
@@ -244,24 +249,24 @@ function RoomShell({
     });
   }, [session, setSearchParams]);
 
-  useEffect(() => {
-    if (!isPermanentRoom || liveMode || userPrefersAtHomeRef.current) return;
-    // Don't yank the user out of a focused activity when the partner joins.
-    if (tab === "watch") return;
-    const partner = partnerPresenceEntry(session.presence, session.senderId);
-    if (partner?.is_in_call === true) setLiveMode(true);
-  }, [isPermanentRoom, liveMode, session.presence, session.senderId, tab]);
+  // Note: we intentionally do NOT auto-join the call when the partner starts
+  // one — a call is never forced. They see the "Join the call" invite (and the
+  // notifier) and choose to join.
 
   useEffect(() => {
     if (!isPermanentRoom) return;
     return session.channel.onBroadcast((e) => {
       if (e.kind !== "call_started") return;
       if (e.payload.from === session.senderId) return;
-      if (userPrefersAtHomeRef.current) return;
-      if (tab === "watch") return;
-      setLiveMode(true);
+      // Never force a call on the other party — just invite them. They also see
+      // the persistent "Join the call" CTA on the stage.
+      const who = partnerDisplayName(partnerPresenceEntry(session.presence, session.senderId)) || "Your partner";
+      toast(`${who} started the call`, {
+        action: { label: "Join", onClick: () => setLiveMode(true) },
+        duration: 8000,
+      });
     });
-  }, [isPermanentRoom, session.channel, session.senderId, tab]);
+  }, [isPermanentRoom, session.channel, session.senderId, session.presence]);
 
 
   const partnerJoinBaselineRef = useRef<{ hadPartner: boolean; partnerInCall: boolean } | null>(
@@ -509,7 +514,7 @@ function RoomShell({
 
         <header className="relative z-30 flex shrink-0 items-center justify-between px-4 py-4 sm:px-6">
           <div className="min-w-0">
-            <h1 className="font-serif text-2xl italic text-cream sm:text-3xl">{t("common.ourRoom")}</h1>
+            <h1 className="font-serif text-2xl italic text-cream sm:text-3xl">{BRAND_NAME}</h1>
           </div>
           <button
             onClick={() => setShowLeaveConfirm(true)}
@@ -524,6 +529,9 @@ function RoomShell({
           items={canvasItems}
           renderContent={renderRoomActivity}
           partnerStatus={partnerStatus}
+          partnerName={partnerInfo.name}
+          partnerInRoom={partnerInfo.inRoom}
+          partnerInCall={partnerInfo.inCall}
           partnerPresent={partnerPresent}
           callActive={liveMode}
           onCallIn={() => enterLiveMode("vision_board")}
@@ -651,7 +659,7 @@ function RoomShell({
           <span className="w-1.5 h-1.5 rounded-full bg-rosegold animate-pulse-glow shrink-0" />
           <div className="min-w-0">
             <h1 className="font-serif italic text-cream text-base sm:text-lg tracking-wide truncate">
-              {DATE_NAME || BRAND_NAME}
+              {BRAND_NAME}
             </h1>
             <p className="text-[10px] uppercase tracking-[0.26em] text-muted-foreground/90 truncate">
               <span className="text-muted-foreground/85">{moodLabel} lighting</span>

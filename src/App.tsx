@@ -16,6 +16,7 @@ import PreRoom from "./pages/PreRoom";
 import JoinByCode from "./pages/JoinByCode";
 import Lobby from "./pages/Lobby";
 import LiveRoom from "./pages/LiveRoom";
+import { RoomErrorBoundary } from "@/components/RoomErrorBoundary";
 import Recap from "./pages/Recap";
 import OurRoom from "./pages/OurRoom";
 import Settings from "./pages/Settings";
@@ -79,7 +80,7 @@ const App = () => {
             <Route path="/home" element={<AuthGuard><Home /></AuthGuard>} />
             <Route path="/create" element={<AuthGuard><CreateRoom /></AuthGuard>} />
             <Route path="/rooms/:id/pre" element={<AuthGuard><PreRoom /></AuthGuard>} />
-            <Route path="/room/:id" element={<AuthGuard guestParam="participant_id"><LiveRoom /></AuthGuard>} />
+            <Route path="/room/:id" element={<AuthGuard guestParam="participant_id"><RoomErrorBoundary><LiveRoom /></RoomErrorBoundary></AuthGuard>} />
             <Route path="/room/:id/recap" element={<AuthGuard><Recap /></AuthGuard>} />
             <Route path="/our-room/:id" element={<AuthGuard><OurRoom /></AuthGuard>} />
             <Route path="/paywall" element={<AuthGuard><Paywall /></AuthGuard>} />

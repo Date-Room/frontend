@@ -146,16 +146,16 @@ export function ThisOrThat() {
         onClick={() => choose(side)}
         disabled={!!myPick}
         className={[
-          "focus-ring group relative flex-1 rounded-3xl border-2 p-6 sm:p-8 min-h-[180px] md:min-h-[280px] flex flex-col items-center justify-center gap-4 text-center transition-all duration-500 shadow-[0_22px_60px_-22px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.05)]",
+          "focus-ring group relative flex-1 rounded-2xl border p-6 sm:p-8 min-h-[180px] md:min-h-[260px] flex flex-col items-center justify-center gap-4 text-center transition-all duration-500",
           chosenByMe && chosenByOther
-            ? "border-amber bg-amber/15 scale-[1.02] shadow-[0_30px_80px_-22px_rgba(245,166,35,0.45)]"
+            ? "border-primary bg-primary/15 scale-[1.02]"
             : chosenByMe
-              ? "border-amber bg-amber/10 shadow-[0_22px_60px_-22px_rgba(245,166,35,0.35)]"
+              ? "border-primary bg-primary/10"
               : chosenByOther
                 ? "border-rose bg-rose/10"
                 : reveal
-                  ? "border-white/[0.08] bg-card"
-                  : "border-white/[0.10] bg-card hover:border-amber/50 hover:-translate-y-0.5",
+                  ? "border-white/[0.08] bg-white/[0.02]"
+                  : "border-white/[0.10] bg-white/[0.02] hover:border-primary/50 hover:-translate-y-0.5",
           dimmed ? "opacity-30 grayscale" : "",
           myPick && !chosenByMe && !reveal ? "opacity-50" : "",
         ].join(" ")}
@@ -168,11 +168,11 @@ export function ThisOrThat() {
         >
           {opt.emoji}
         </div>
-        <div className="font-serif text-2xl text-cream">{opt.label}</div>
+        <div className="text-xl font-medium text-cream">{opt.label}</div>
         {reveal && (chosenByMe || chosenByOther) && (
           <div className="flex gap-2 mt-1 text-[10px] uppercase tracking-[0.25em] font-medium">
             {chosenByMe && (
-              <span className="px-2 py-0.5 rounded-full bg-amber/20 text-amber border border-amber/40">you</span>
+              <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/40">you</span>
             )}
             {chosenByOther && (
               <span className="px-2 py-0.5 rounded-full bg-rose/20 text-rose border border-rose/40">them</span>
@@ -184,13 +184,13 @@ export function ThisOrThat() {
   };
 
   return (
-    <div className="flex flex-col h-full p-4 sm:p-6 gap-6 animate-fade-in">
-      <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground text-center">
+    <div className="flex flex-col h-full gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground text-center">
         Round {idx + 1} · pick one
       </div>
       <div className="flex-1 flex flex-col md:flex-row items-stretch gap-3 max-w-3xl mx-auto w-full">
         <Card side="a" opt={pair.a} />
-        <div className="flex items-center justify-center font-serif italic text-muted-foreground/70">
+        <div className="flex items-center justify-center text-muted-foreground/70">
           <span className="px-2 text-[10px] uppercase tracking-[0.32em]">or</span>
         </div>
         <Card side="b" opt={pair.b} />
@@ -198,8 +198,8 @@ export function ThisOrThat() {
       <div className="min-h-[3.5rem] flex items-center justify-center">
         {bothPicked ? (
           revealComplete ? (
-            <div className="flex flex-col items-center gap-2 fade-in-slow">
-              <p className={["font-serif italic text-lg", isMatch ? "text-amber" : "text-cream/80"].join(" ")}>
+            <div className="flex flex-col items-center gap-3 fade-in-slow">
+              <p className={["text-lg font-medium", isMatch ? "text-primary" : "text-cream/80"].join(" ")}>
                 {isMatch ? "you both leaned the same way" : "different paths"}
               </p>
               <Button
@@ -212,15 +212,13 @@ export function ThisOrThat() {
             </div>
           ) : (
             <p
-              className={["font-serif italic text-lg animate-pulse", isMatch ? "text-amber" : "text-cream/80"].join(
-                " ",
-              )}
+              className={["text-lg font-medium animate-pulse", isMatch ? "text-primary" : "text-cream/80"].join(" ")}
             >
               {isMatch ? "✨ same pick" : "split"}
             </p>
           )
         ) : myPick ? (
-          <p className="text-sm text-muted-foreground italic">waiting for them to pick…</p>
+          <p className="text-sm text-muted-foreground">waiting for them to pick…</p>
         ) : null}
       </div>
     </div>

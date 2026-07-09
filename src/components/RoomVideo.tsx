@@ -2,18 +2,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
+  StartAudio,
   VideoTrack,
   useTracks,
   useLocalParticipant,
   useIsSpeaking,
+  useRoomContext,
 } from "@livekit/components-react";
-import { Track, DisconnectReason } from "livekit-client";
+import { Track, DisconnectReason, RoomEvent } from "livekit-client";
 import { toast } from "sonner";
 import "@livekit/components-styles";
 import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Maximize2, Minimize2, Minus, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getInvitedGuestName } from "@/lib/invitedGuest";
 import { livekitToken } from "@/lib/rooms";
+import { useLowPowerMode } from "@/hooks/useLowPowerMode";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import type { PresenceState } from "@/lib/realtime/roomChannel";
 
@@ -190,12 +193,16 @@ function capturePhoto(
 
 /* ── Beauty-filtered video tile ── */
 
+// Full look on capable devices. The blur() and the soft-light overlay are the
+// expensive per-frame recomposites, so low-power/thermally-pressured devices
+// get the cheap color-only path (see LITE_CSS) to avoid overheating.
 const BEAUTY_CSS = [
   "brightness(1.06)",
   "contrast(0.95)",
   "saturate(1.08)",
   "blur(0.3px)",       // subtle skin smoothing
 ].join(" ");
+const LITE_CSS = ["brightness(1.05)", "saturate(1.06)"].join(" ");
 
 /** Camera-off placeholder — the person's initial in a disc with a ring that
  *  pulses while they're speaking, so the call still feels alive. */
@@ -242,14 +249,18 @@ function Tile({
   participant,
   isLocal,
   label,
+  contain,
 }: {
   participant?: ReturnType<typeof useTracks>[number];
   isLocal?: boolean;
   label: string;
+  /** Show the whole camera frame (no crop) so both sides see the same thing. */
+  contain?: boolean;
 }) {
   const cameraOff = !participant || participant.publication?.isMuted;
+  const lowPower = useLowPowerMode();
   return (
-    <div className="relative w-full h-full overflow-hidden rounded-2xl bg-secondary/80 border border-white/[0.08]"
+    <div className="relative w-full h-full overflow-hidden rounded-2xl bg-black border border-white/[0.08]"
       style={{ boxShadow: "0 12px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)" }}
     >
       {cameraOff || !participant ? (
@@ -264,18 +275,21 @@ function Tile({
         <>
           <VideoTrack
             trackRef={participant}
-            className={`w-full h-full object-cover ${isLocal ? "scale-x-[-1]" : ""}`}
-            style={{ filter: BEAUTY_CSS }}
+            className={`w-full h-full ${contain ? "object-contain" : "object-cover"} ${isLocal ? "scale-x-[-1]" : ""}`}
+            style={{ filter: lowPower ? LITE_CSS : BEAUTY_CSS }}
           />
-          {/* Soft-glow overlay — Snapchat-style beauty sheen */}
-          <div
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background: "radial-gradient(ellipse at 50% 35%, rgba(255,235,215,0.06) 0%, transparent 65%)",
-              mixBlendMode: "soft-light",
-            }}
-            aria-hidden
-          />
+          {/* Soft-glow overlay — Snapchat-style beauty sheen. Skipped on
+              low-power/thermal devices (soft-light blend is costly per frame). */}
+          {!lowPower && (
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background: "radial-gradient(ellipse at 50% 35%, rgba(255,235,215,0.06) 0%, transparent 65%)",
+                mixBlendMode: "soft-light",
+              }}
+              aria-hidden
+            />
+          )}
         </>
       )}
       <span className="absolute bottom-2.5 left-3 text-[10px] sm:text-xs uppercase tracking-[0.2em] text-cream/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">
@@ -335,6 +349,36 @@ function Stage({
   const partnerWrapRef = useRef<HTMLDivElement>(null);
   const selfWrapRef = useRef<HTMLDivElement>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+
+  // PiP dual-view: which participant is the big one, and where the small inset
+  // sits inside the frame (dragged within the frame's bounds).
+  const [pipSwapped, setPipSwapped] = useState(false);
+  const [pipPos, setPipPos] = useState<{ x: number; y: number } | null>(null);
+  const pipFrameRef = useRef<HTMLDivElement>(null);
+  const pipMovedRef = useRef(false);
+  function startInsetDrag(e: React.PointerEvent) {
+    e.stopPropagation(); // don't move the whole PiP window
+    pipMovedRef.current = false;
+    const frame = pipFrameRef.current;
+    const el = e.currentTarget as HTMLElement;
+    if (!frame) return;
+    const fr = frame.getBoundingClientRect();
+    const sr = el.getBoundingClientRect();
+    const offX = e.clientX - sr.left;
+    const offY = e.clientY - sr.top;
+    const move = (ev: PointerEvent) => {
+      pipMovedRef.current = true;
+      const x = Math.max(0, Math.min(fr.width - sr.width, ev.clientX - fr.left - offX));
+      const y = Math.max(0, Math.min(fr.height - sr.height, ev.clientY - fr.top - offY));
+      setPipPos({ x, y });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
 
   const partnerDisplay = useMemo(
     () => partnerNameFromPresence(room.presence, room.senderId, room.roomId),
@@ -401,16 +445,37 @@ function Stage({
   if (isPip) {
     const ctrlBtn =
       "flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-cream backdrop-blur-md transition hover:bg-black/65";
+    const partner = remotes[0];
+    const partnerLabel = partner?.participant.name || partnerDisplay.name;
+    // Big vs inset: default big = partner, inset = you; tapping the inset swaps.
+    const bigIsLocal = partner ? pipSwapped : true;
     return (
-      <div className="group relative h-full w-full overflow-hidden rounded-xl bg-black">
+      <div ref={pipFrameRef} className="group relative h-full w-full overflow-hidden rounded-xl bg-black">
         <ReactionsLayer />
         <div ref={partnerWrapRef} className="absolute inset-0">
-          {remotes.length > 0 ? (
-            <Tile participant={remotes[0]} label={remotes[0].participant.name || partnerDisplay.name} />
+          {bigIsLocal ? (
+            <Tile participant={local} isLocal label="you" contain />
           ) : (
-            <Tile participant={local} isLocal label="you" />
+            <Tile participant={partner} label={partnerLabel} contain />
           )}
         </div>
+        {/* Inset PiP-in-PiP — the other person; drag within the frame, tap to swap. */}
+        {partner && (
+          <div
+            onPointerDown={startInsetDrag}
+            onClick={() => {
+              if (!pipMovedRef.current) setPipSwapped((v) => !v);
+            }}
+            style={pipPos ? { left: pipPos.x, top: pipPos.y } : { right: 8, bottom: 8 }}
+            className="absolute z-20 h-[32%] w-[34%] cursor-pointer overflow-hidden rounded-lg border border-white/25 shadow-lg active:cursor-grabbing"
+          >
+            {bigIsLocal ? (
+              <Tile participant={partner} label={partnerLabel} contain />
+            ) : (
+              <Tile participant={local} isLocal label="you" contain />
+            )}
+          </div>
+        )}
         {countdown != null && (
           <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/30">
             <span
@@ -641,6 +706,15 @@ export function RoomVideo({
       video
       data-lk-theme="default"
       className="h-full w-full"
+      onError={(e) => {
+        // Surface connect/publish errors instead of silently swallowing them.
+        toast.error(e instanceof Error ? e.message : "Call error.");
+      }}
+      onMediaDeviceFailure={(failure) => {
+        toast.error(
+          failure ? `Microphone/camera blocked (${failure}).` : "Microphone/camera unavailable.",
+        );
+      }}
       onDisconnected={(reason) => {
         // Only one device per user per room — joining elsewhere takes over the
         // call stream, so this (older) device leaves cleanly.
@@ -650,6 +724,7 @@ export function RoomVideo({
         }
       }}
     >
+      <MicKeepAlive />
       <Stage
         onLeave={onLeave ?? (() => {})}
         variant={variant}
@@ -661,7 +736,51 @@ export function RoomVideo({
         onRotate={onRotate}
       />
       <RoomAudioRenderer />
+      {/* Recovers when the browser blocks autoplay of the partner's audio —
+          renders an unobtrusive tap-to-hear affordance only when needed. */}
+      <StartAudio label="Tap to enable sound" className="lk-start-audio-button" />
     </LiveKitRoom>
   );
+}
+
+/**
+ * Guarantees the microphone actually gets published. `LiveKitRoom audio` only
+ * publishes ONCE on SignalConnected and swallows failures — so a single failed
+ * attempt (permission race, device briefly busy) means the partner can never
+ * hear you until a full relog. This re-attempts publish on connect and whenever
+ * a participant joins, but ONLY when no mic track exists yet — so it never
+ * overrides an intentional mute (which keeps a published-but-muted track).
+ */
+function MicKeepAlive() {
+  const room = useRoomContext();
+  useEffect(() => {
+    if (!room) return;
+    let cancelled = false;
+    const ensureMic = async (attempt = 0) => {
+      if (cancelled) return;
+      const lp = room.localParticipant;
+      // A publication (even muted) means the mic is on the SFU — leave it alone.
+      if (lp.getTrackPublication(Track.Source.Microphone)) return;
+      try {
+        await lp.setMicrophoneEnabled(true);
+      } catch {
+        if (attempt < 3 && !cancelled) {
+          window.setTimeout(() => void ensureMic(attempt + 1), 800 * (attempt + 1));
+        }
+      }
+    };
+    const onConnected = () => void ensureMic();
+    const onParticipant = () => void ensureMic();
+    room.on(RoomEvent.Connected, onConnected);
+    room.on(RoomEvent.ParticipantConnected, onParticipant);
+    // Cover the case where we're already connected when this mounts.
+    void ensureMic();
+    return () => {
+      cancelled = true;
+      room.off(RoomEvent.Connected, onConnected);
+      room.off(RoomEvent.ParticipantConnected, onParticipant);
+    };
+  }, [room]);
+  return null;
 }
 

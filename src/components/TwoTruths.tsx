@@ -25,24 +25,27 @@ export function TwoTruths() {
   const theirScore = Object.entries(state.scores).reduce((n, [k, v]) => (k === senderId ? n : n + v), 0);
 
   const scoreBar = (
-    <div className="flex justify-center gap-6 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+    <div className="flex justify-center gap-6 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
       <span>You {myScore}</span>
       <span>·</span>
       <span>Them {theirScore}</span>
     </div>
   );
 
+  const accentBtn = "rounded-full text-primary-foreground transition hover:opacity-90 disabled:opacity-50";
+  const accentStyle = { backgroundColor: "var(--room-accent)" } as const;
+
   // No round — anyone can claim the storyteller seat.
   if (!round) {
     return (
-      <div className="flex flex-col h-full items-center justify-center p-8 gap-5 text-center">
-        <p className="font-serif italic text-cream text-xl">Two truths and a lie</p>
-        <p className="text-sm text-muted-foreground max-w-xs">
+      <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center">
+        <p className="font-serif text-2xl italic text-cream">Two truths and a lie</p>
+        <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
           One of you tells three things — two true, one made up. The other guesses the lie.
         </p>
         {scoreBar}
-        <Button onClick={() => emit("claim_turn")} className="rounded-full bg-amber text-primary-foreground">
-          I'll go first
+        <Button onClick={() => emit("claim_turn")} className={accentBtn} style={accentStyle}>
+          I&apos;ll go first
         </Button>
       </div>
     );
@@ -52,38 +55,42 @@ export function TwoTruths() {
   if (round.phase === "composing") {
     if (!isStoryteller) {
       return (
-        <div className="flex flex-col h-full items-center justify-center p-8 gap-3 text-center">
-          <p className="font-serif italic text-cream text-lg">They're thinking up their three…</p>
+        <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+          <p className="text-lg font-medium text-cream">They&apos;re thinking up their three…</p>
           {scoreBar}
         </div>
       );
     }
     const canSubmit = drafts.every((d) => d.trim()) && lie !== null;
     return (
-      <div className="flex flex-col h-full p-4 sm:p-6 gap-3 min-h-0">
-        <p className="font-serif italic text-cream">Write three — mark the lie</p>
-        {drafts.map((d, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setLie(i)}
-              aria-label={`Mark statement ${i + 1} as the lie`}
-              className={`focus-ring h-7 w-7 shrink-0 rounded-full border text-[10px] uppercase transition-all ${
-                lie === i
-                  ? "bg-rose border-rose text-cream shadow-[0_0_0_4px_rgba(232,166,83,0.18)]"
-                  : "border-muted-foreground/40 text-muted-foreground hover:border-rose/40"
-              }`}
-            >
-              lie
-            </button>
-            <Input
-              value={d}
-              onChange={(e) => setDrafts((arr) => arr.map((x, j) => (j === i ? e.target.value : x)))}
-              placeholder={`Statement ${i + 1}`}
-              className="focus-ring bg-secondary/60 border-white/[0.10] focus-visible:border-primary/40"
-            />
-          </div>
-        ))}
+      <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Write three — mark the lie
+        </p>
+        <div className="flex flex-col gap-3">
+          {drafts.map((d, i) => (
+            <div key={i} className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setLie(i)}
+                aria-label={`Mark statement ${i + 1} as the lie`}
+                className={`focus-ring h-8 w-8 shrink-0 rounded-full border text-[10px] uppercase transition ${
+                  lie === i
+                    ? "border-primary bg-primary text-primary-foreground shadow-[0_0_0_4px_hsl(var(--primary)/0.18)]"
+                    : "border-muted-foreground/40 text-muted-foreground hover:border-primary/50"
+                }`}
+              >
+                lie
+              </button>
+              <Input
+                value={d}
+                onChange={(e) => setDrafts((arr) => arr.map((x, j) => (j === i ? e.target.value : x)))}
+                placeholder={`Statement ${i + 1}`}
+                className="bg-secondary/60 border-white/10 focus-visible:border-primary/40"
+              />
+            </div>
+          ))}
+        </div>
         <Button
           onClick={() => {
             if (lie === null) return;
@@ -95,7 +102,8 @@ export function TwoTruths() {
             );
           }}
           disabled={!canSubmit}
-          className="rounded-full bg-amber text-primary-foreground disabled:opacity-50 mt-1"
+          className={accentBtn}
+          style={accentStyle}
         >
           Submit
         </Button>
@@ -109,16 +117,18 @@ export function TwoTruths() {
   if (round.phase === "guessing") {
     if (isStoryteller) {
       return (
-        <div className="flex flex-col h-full items-center justify-center p-8 gap-3 text-center">
-          <p className="font-serif italic text-cream text-lg">Waiting for their guess…</p>
+        <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+          <p className="text-lg font-medium text-cream">Waiting for their guess…</p>
           {scoreBar}
         </div>
       );
     }
     return (
-      <div className="flex flex-col h-full p-4 sm:p-6 gap-3 min-h-0">
-        <p className="font-serif italic text-cream text-center">Which one's the lie?</p>
-        <div className="flex-1 flex flex-col justify-center gap-3">
+      <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6">
+        <p className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Which one&apos;s the lie?
+        </p>
+        <div className="flex flex-1 flex-col justify-center gap-3">
           {statements.map((s, i) => (
             <button
               key={i}
@@ -130,7 +140,7 @@ export function TwoTruths() {
                   { event_type: "guessed", payload: { text: s } },
                 )
               }
-              className="focus-ring animate-float-up rounded-2xl border border-white/[0.08] bg-card/60 p-4 text-left text-cream hover:border-rose/50 hover:bg-card/80 hover:-translate-y-0.5 transition-all duration-200 shadow-[0_4px_18px_-8px_rgba(0,0,0,0.4)]"
+              className="focus-ring animate-float-up rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 text-left text-cream transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-white/[0.05]"
               style={{ animationDelay: `${i * 60}ms` }}
             >
               {s}
@@ -145,11 +155,11 @@ export function TwoTruths() {
   // Revealing.
   const guessedRight = round.guess === round.lie_index;
   return (
-    <div className="flex flex-col h-full p-4 sm:p-6 gap-3 min-h-0">
-      <p className="font-serif italic text-cream text-center">
+    <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6">
+      <p className="text-center text-lg font-medium text-cream">
         {guessedRight ? "Lie spotted! 🎯" : "The lie slipped through 😶"}
       </p>
-      <div className="flex-1 flex flex-col justify-center gap-3">
+      <div className="flex flex-1 flex-col justify-center gap-3">
         {statements.map((s, i) => {
           const isLie = i === round.lie_index;
           const wasGuess = i === round.guess;
@@ -157,18 +167,20 @@ export function TwoTruths() {
             <div
               key={i}
               className={`rounded-2xl border p-4 text-cream ${
-                isLie ? "border-rose bg-rose/10" : "border-border bg-card/60"
+                isLie ? "border-primary bg-primary/10" : "border-white/[0.08] bg-white/[0.02]"
               }`}
             >
               <span>{s}</span>
-              {isLie && <span className="ml-2 text-[10px] uppercase tracking-wider text-rose">the lie</span>}
-              {wasGuess && !isLie && <span className="ml-2 text-[10px] uppercase tracking-wider text-muted-foreground">their guess</span>}
+              {isLie && <span className="ml-2 text-[10px] uppercase tracking-wider text-primary">the lie</span>}
+              {wasGuess && !isLie && (
+                <span className="ml-2 text-[10px] uppercase tracking-wider text-muted-foreground">their guess</span>
+              )}
             </div>
           );
         })}
       </div>
       {scoreBar}
-      <Button onClick={() => emit("reveal_and_swap")} className="rounded-full bg-amber text-primary-foreground">
+      <Button onClick={() => emit("reveal_and_swap")} className={accentBtn} style={accentStyle}>
         Next round — swap
       </Button>
     </div>

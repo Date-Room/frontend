@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  HelpCircle,
+  ArrowLeft,
   Loader2,
   Pencil,
   Pin,
   Plus,
+  StickyNote as StickyNoteIcon,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/EmptyState";
 import { Textarea } from "@/components/ui/textarea";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
@@ -154,9 +156,7 @@ function FridgeRow({
         </p>
         <p className="mt-1.5 truncate text-[11px] uppercase tracking-[0.14em] text-muted-foreground/70">
           {mine ? "You" : note.pinned_by_name || "Them"} · {timeAgo(note.pinned_at)}
-          {note.emergency ? " · greets on entry" : ""}
-          {note.stage_pinned ? " · on stage" : ""}
-          {unread ? " · new" : ""}
+          {note.stage_pinned ? " · pinned" : ""}
         </p>
       </div>
       {canEdit && (
@@ -320,6 +320,7 @@ export function FridgeNotes({ active = true }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const editingNote = useMemo(
@@ -416,10 +417,12 @@ export function FridgeNotes({ active = true }: Props) {
     };
     const ok = await persist({ notes: [...notes, newNote] });
     if (ok) {
+      // Ping the partner's activity button (persist alone doesn't broadcast).
+      void session?.sendEvent("added", {});
       setText("");
       setEmergency(true);
-      toast.success("Stuck on the fridge — add another?");
-      textareaRef.current?.focus();
+      setAdding(false);
+      toast.success("Stuck on the fridge");
     }
   }
 
@@ -448,13 +451,14 @@ export function FridgeNotes({ active = true }: Props) {
   function startEdit(note: FridgeNote) {
     setEditingId(note.id);
     setSelectedId(null);
+    setAdding(true);
     setText(note.text);
     setEmergency(note.emergency ?? false);
-    textareaRef.current?.focus();
   }
 
   function cancelEdit() {
     setEditingId(null);
+    setAdding(false);
     setText("");
     setEmergency(true);
   }
@@ -463,14 +467,14 @@ export function FridgeNotes({ active = true }: Props) {
     setEditingId(null);
     setSelectedId(null);
     setText("");
-    textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    textareaRef.current?.focus();
+    setEmergency(true);
+    setAdding(true);
   }
 
   if (!ready) {
     return (
       <div className="wall-surface flex flex-1 items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-amber" aria-hidden />
+        <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden />
       </div>
     );
   }
@@ -478,7 +482,7 @@ export function FridgeNotes({ active = true }: Props) {
   if (!room.canPersist) {
     return (
       <div className="wall-surface">
-        <FridgeEmpty readonly noteCount={notes.length} onFocusAdd={focusAdd} />
+        <EmptyState variant="fridge" title="Fridge Note" subtitle="Sign in to leave notes on your shared fridge." />
       </div>
     );
   }
@@ -487,45 +491,56 @@ export function FridgeNotes({ active = true }: Props) {
   const canStick = text.trim().length > 0;
   const pinnedCount = notes.filter((n) => n.stage_pinned).length;
 
+  const showForm = adding || Boolean(editingNote);
+
   return (
     <div className="wall-surface relative">
-      {/* Always-visible quick add */}
-      <div className="shrink-0 border-b border-white/[0.06] px-4 py-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <p className="font-serif italic text-amber text-base">
-            {editingNote ? "Edit your note" : "Stick a note on the fridge"}
-          </p>
-          <button
-            type="button"
-            aria-label="Help"
-            title="Notes stay on the fridge for both of you. Check 'Greet on entry' to show yours first when they arrive."
-            className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/10 text-muted-foreground hover:text-cream"
-          >
-            <HelpCircle className="h-3.5 w-3.5" />
-          </button>
-        </div>
-
-        <form onSubmit={(e) => void stickNote(e)} className="space-y-2">
-          <div className="fridge-draft-wrap">
-            <div
-              className="fridge-sticky-paper fridge-draft-paper"
-              style={{ background: NOTE_PALETTES_MINE[0] }}
+      {/* Header — list shows a count + add; the form gets Back + a centred title. */}
+      <div className="shrink-0 border-b border-white/[0.06] px-5 py-3">
+        {showForm ? (
+          <div className="relative flex items-center justify-center">
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="absolute left-0 inline-flex items-center gap-1.5 text-sm text-primary transition hover:opacity-80"
             >
-              <span className="fridge-sticky-magnet" aria-hidden />
-              <span className="fridge-sticky-tape" aria-hidden />
-              <span className="fridge-sticky-fold" aria-hidden />
-              <span className="fridge-sticky-lines" aria-hidden />
-              <Textarea
-                ref={textareaRef}
-                value={text}
-                onChange={(e) => setText(e.target.value.slice(0, NOTE_MAX))}
-                placeholder="Thinking about you today. Don't let me forget we said we'd plan the trip tonight. x"
-                rows={5}
-                className="fridge-draft-input"
-              />
-            </div>
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </button>
+            <p className="text-sm font-semibold text-cream">{editingNote ? "Edit Note" : "Add Note"}</p>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70">
+              {notes.length} note{notes.length === 1 ? "" : "s"}
+              {pinnedCount > 0 ? ` · ${pinnedCount}/${MAX_STAGE_PINS} pinned` : ""}
+            </p>
+            {room.canPersist && (
+              <button
+                type="button"
+                onClick={focusAdd}
+                aria-label="Add a note"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-primary-foreground transition hover:opacity-90"
+                style={{ backgroundColor: "var(--room-accent)" }}
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {showForm ? (
+        <div className="flex-1 min-h-0 overflow-auto p-5">
+          <form onSubmit={(e) => void stickNote(e)} className="space-y-3">
+            <Textarea
+              ref={textareaRef}
+              value={text}
+              onChange={(e) => setText(e.target.value.slice(0, NOTE_MAX))}
+              placeholder="Thinking about you today…"
+              rows={4}
+              className="resize-none border-white/10 bg-secondary/60 text-sm leading-relaxed"
+            />
             <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
               <input
                 type="checkbox"
@@ -533,105 +548,46 @@ export function FridgeNotes({ active = true }: Props) {
                 onChange={(e) => setEmergency(e.target.checked)}
                 className="rounded border-border"
               />
-              Greet them with this when they enter
+              Greet them with this on entry
             </label>
-            <div className="flex gap-2">
-              {editingNote && (
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  className="rounded-full px-4 py-2 text-sm text-muted-foreground hover:text-cream"
-                >
-                  Cancel
-                </button>
-              )}
-              <button
-                type="submit"
-                disabled={!canStick || saving}
-                className="wall-cta inline-flex items-center justify-center gap-1.5 px-5 py-2.5"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                {editingNote ? "Save changes" : "Stick on fridge"}
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      {/* Filter tabs */}
-      {!empty && (
-        <div className="flex gap-6 border-b border-white/[0.06] px-4 pt-2 shrink-0">
-          {(
-            [
-              { id: "all" as const, label: `All (${notes.length})` },
-              {
-                id: "them" as const,
-                label: `From them (${notes.filter((n) => n.pinned_by !== room.senderId).length})`,
-              },
-              {
-                id: "yours" as const,
-                label: `Yours (${notes.filter((n) => n.pinned_by === room.senderId).length})`,
-              },
-            ] as const
-          ).map((t) => (
             <button
-              key={t.id}
-              type="button"
-              onClick={() => {
-                setFilter(t.id);
-                setSelectedId(null);
-              }}
-              className={cn(
-                "pb-2 text-sm transition border-b-2",
-                filter === t.id
-                  ? "border-amber text-amber"
-                  : "border-transparent text-muted-foreground hover:text-cream",
-              )}
+              type="submit"
+              disabled={!canStick || saving}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+              style={{ backgroundColor: "var(--room-accent)" }}
             >
-              {t.label}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {editingNote ? "Save" : "Add note"}
             </button>
-          ))}
+          </form>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 overflow-auto p-4 sm:p-5">
+          {empty ? (
+            <EmptyState variant="fridge" title="Fridge Note" onAdd={focusAdd} addLabel="Add a note" />
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {notes.map((note) => {
+                const mine = note.pinned_by === room.senderId;
+                const unread = !mine && !!note.pinned_by && !note.seen_by.includes(room.senderId);
+                return (
+                  <FridgeRow
+                    key={note.id}
+                    note={note}
+                    mine={mine}
+                    unread={unread}
+                    canEdit={room.canPersist}
+                    pinDisabled={!note.stage_pinned && pinnedCount >= MAX_STAGE_PINS}
+                    onEdit={() => startEdit(note)}
+                    onRemove={() => void removeNote(note.id)}
+                    onTogglePin={() => void togglePin(note)}
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
-
-      <div className="relative flex-1 min-h-0 overflow-auto p-3 sm:p-4">
-        {empty ? (
-          <FridgeEmpty onFocusAdd={focusAdd} />
-        ) : filtered.length === 0 ? (
-          <p className="py-12 text-center text-sm text-muted-foreground">No notes in this view yet.</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {filtered.map((note) => {
-              const mine = note.pinned_by === room.senderId;
-              const unread = !mine && !!note.pinned_by && !note.seen_by.includes(room.senderId);
-              return (
-                <FridgeRow
-                  key={note.id}
-                  note={note}
-                  mine={mine}
-                  unread={unread}
-                  canEdit={room.canPersist}
-                  pinDisabled={!note.stage_pinned && pinnedCount >= MAX_STAGE_PINS}
-                  onEdit={() => startEdit(note)}
-                  onRemove={() => void removeNote(note.id)}
-                  onTogglePin={() => void togglePin(note)}
-                />
-              );
-            })}
-          </div>
-        )}
-
-        {!empty && !editingNote && (
-          <button
-            type="button"
-            onClick={focusAdd}
-            className="absolute bottom-4 right-4 z-10 flex items-center gap-2 rounded-full bg-amber px-4 py-2.5 text-sm font-semibold text-[#1a120c] shadow-[0_8px_32px_hsl(var(--primary)/0.45)] transition hover:scale-[1.02]"
-          >
-            <Plus className="h-4 w-4" />
-            Another note
-          </button>
-        )}
-      </div>
     </div>
   );
 }
@@ -647,43 +603,24 @@ function FridgeEmpty({
   onFocusAdd?: () => void;
   embedded?: boolean;
 }) {
-  const content = (
-    <>
-      <span className="text-3xl" aria-hidden>
-        🧲
-      </span>
-      <p className="mt-3 font-serif text-base italic text-[#2a2018]/45">
-        {embedded ? "The door is empty — stick your first note above" : "Fridge Notes"}
-      </p>
-      {!embedded && (
-        <div className="wall-empty-copy mt-4 space-y-3">
-          <p>Like notes on the kitchen fridge. Leave a thought, a reminder, an I-love-you.</p>
-          <p>Every note stays here — yours and theirs — so you can look back anytime.</p>
-        </div>
-      )}
-      {!readonly && onFocusAdd && (
-        <button
-          type="button"
-          className={cn("wall-cta inline-flex items-center gap-2", embedded ? "mt-4" : "mt-8")}
-          onClick={onFocusAdd}
-        >
-          <Plus className="h-4 w-4" />
-          {noteCount || embedded ? "Write a note above" : "Leave the first note"}
-        </button>
-      )}
-      {readonly && !embedded && (
-        <p className="mt-6 text-sm text-muted-foreground">Sign in to leave notes on your shared fridge.</p>
-      )}
-    </>
-  );
-
-  if (embedded) {
-    return <div className="fridge-empty-embedded">{content}</div>;
-  }
-
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
-      {content}
+    <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center text-muted-foreground">
+      <span className="text-3xl" aria-hidden>🧲</span>
+      <p className="text-sm">No notes yet.</p>
+      {readonly ? (
+        <p className="text-sm">Sign in to leave notes on your shared fridge.</p>
+      ) : (
+        onFocusAdd && (
+          <button
+            type="button"
+            onClick={onFocusAdd}
+            className="rounded-full px-5 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+            style={{ backgroundColor: "var(--room-accent)" }}
+          >
+            {noteCount ? "Write a note" : "Leave the first note"}
+          </button>
+        )
+      )}
     </div>
   );
 }

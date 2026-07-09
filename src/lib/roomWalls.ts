@@ -26,6 +26,8 @@ export type VisionBoardItem = {
   added_by_name?: string;
   /** Pinned onto the room stage — pops out as a draggable card (max 2). */
   pinned?: boolean;
+  /** Viewers who've acknowledged this item (via the welcome-back gate). */
+  seen_by?: string[];
 };
 
 export type VisionBoardState = {
@@ -143,6 +145,7 @@ export function parseVisionBoard(raw: Record<string, unknown> | null): VisionBoa
       added_by: typeof x.added_by === "string" ? x.added_by : undefined,
       added_by_name: typeof x.added_by_name === "string" ? x.added_by_name : undefined,
       pinned: x.pinned === true,
+      seen_by: Array.isArray(x.seen_by) ? x.seen_by.map(String) : [],
     }))
     .filter((x) => x.image_url.trim() || x.caption.trim());
   return { items };
@@ -260,21 +263,37 @@ export function markRoomVisited(roomId: string): void {
   } catch { /* quota */ }
 }
 
-/** Count vision-board items added by someone else after `since`. */
-export function newVisionBoardCount(
-  board: VisionBoardState,
-  _since: string | null,
-): number {
-  if (!_since) return board.items.length > 0 ? board.items.length : 0;
-  return board.items.length;
+/** Vision-board items added by the partner that this viewer hasn't seen yet. */
+export function newVisionItems(board: VisionBoardState, viewerId: string): VisionBoardItem[] {
+  return board.items.filter(
+    (i) => i.added_by && i.added_by !== viewerId && !(i.seen_by ?? []).includes(viewerId),
+  );
 }
 
-/** Fridge items added by someone other than the viewer. */
+/** Mark every partner vision item as seen by the viewer (welcome-back ack). */
+export function markVisionItemsSeen(board: VisionBoardState, viewerId: string): VisionBoardItem[] {
+  return board.items.map((i) =>
+    i.added_by && i.added_by !== viewerId && !(i.seen_by ?? []).includes(viewerId)
+      ? { ...i, seen_by: [...new Set([...(i.seen_by ?? []), viewerId])] }
+      : i,
+  );
+}
+
+/** Fridge items added by someone other than the viewer that they haven't read. */
 export function newFridgeItems(
   fridge: FridgeState,
   viewerId: string,
 ): FridgeItem[] {
   return fridge.items.filter(
     (i) => i.added_by && i.added_by !== viewerId && !(i.read_by ?? []).includes(viewerId),
+  );
+}
+
+/** Mark every partner fridge item as read by the viewer (welcome-back ack). */
+export function markFridgeItemsRead(fridge: FridgeState, viewerId: string): FridgeItem[] {
+  return fridge.items.map((i) =>
+    i.added_by && i.added_by !== viewerId && !(i.read_by ?? []).includes(viewerId)
+      ? { ...i, read_by: [...new Set([...(i.read_by ?? []), viewerId])] }
+      : i,
   );
 }

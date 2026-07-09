@@ -361,18 +361,33 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
     });
   }, [session]);
 
-  // Mute the player when Watch tab is foregrounded.
+  // Apply local volume changes to the player.
+  useEffect(() => {
+    try {
+      playerRef.current?.setVolume?.(volume);
+    } catch { /* ignore */ }
+  }, [volume]);
+
+  // Pause (not just mute) the player when the Watch tab is foregrounded — two
+  // YouTube video decoders at once is a major overheating cause. suppress()
+  // keeps this local pause from broadcasting to the partner.
   useEffect(() => {
     const p = playerRef.current;
     if (!p) return;
     try {
-      if (watchActive) p.mute?.();
-      else {
+      if (watchActive) {
+        suppress(2000);
+        p.pauseVideo?.();
+      } else if (playing) {
+        suppress(2000);
+        if (dTsRef.current) p.seekTo(dTsRef.current, true);
         p.unMute?.();
         p.setVolume?.(volume);
+        p.playVideo?.();
       }
     } catch { /* ignore */ }
-  }, [volume, watchActive]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchActive]);
 
   const playId = useCallback(
     (id: string) => {

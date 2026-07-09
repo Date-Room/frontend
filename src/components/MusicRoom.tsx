@@ -1,19 +1,12 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import {
+  ArrowLeft,
   GripVertical,
   ListMusic,
   Music,
   Pause,
   Play,
+  Plus,
   Repeat,
   Repeat1,
   SkipBack,
@@ -27,6 +20,14 @@ import { useActivitySession } from "@/hooks/useActivitySession";
 import { cn } from "@/lib/utils";
 import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/types/youtubeIframeApi";
 import { extractId, fetchOEmbed, loadYT, type DjTrack, type OEmbed } from "@/components/DJ";
+import { EmptyState } from "@/components/EmptyState";
+import {
+  MusicCtx,
+  useMusicRoom,
+  type MusicCtxValue,
+  type Reaction,
+  type RepeatMode,
+} from "@/components/musicRoomContext";
 
 /**
  * MusicRoom — the persistent-room take on Music. No turns: it's a simple shared
@@ -36,54 +37,6 @@ import { extractId, fetchOEmbed, loadYT, type DjTrack, type OEmbed } from "@/com
  * The stage renders {@link MusicLibrary} (add + reorderable queue) and
  * {@link MusicPlayerBar} docks at the bottom of the screen.
  */
-
-type Reaction = { id: string; emoji: string };
-type RepeatMode = "none" | "all" | "one";
-
-type MusicCtxValue = {
-  nowPlaying: DjTrack | null;
-  tracks: DjTrack[];
-  currentId: string | null;
-  upcomingCount: number;
-  playing: boolean;
-  silence: boolean;
-  videoId: string | null;
-  trackTitle: string | null;
-  trackChannel: string | null;
-  thumb: string | null;
-  repeat: RepeatMode;
-  cycleRepeat: () => void;
-  position: number;
-  duration: number;
-  seekFraction: (f: number) => void;
-  volume: number;
-  setVolume: (v: number) => void;
-  needsAudioGesture: boolean;
-  enableAudio: () => void;
-  reactions: Reaction[];
-  playId: (id: string) => void;
-  playTrack: (id: string) => void;
-  togglePlayPause: () => void;
-  restartCurrent: () => void;
-  previous: () => void;
-  stop: () => void;
-  next: () => void;
-  removeTrack: (id: string) => void;
-  reorderTracks: (from: number, to: number) => void;
-  clearQueue: () => void;
-  close: () => void;
-  closed: boolean;
-  hasContent: boolean;
-};
-
-const MusicCtx = createContext<MusicCtxValue | null>(null);
-
-// eslint-disable-next-line react-refresh/only-export-components -- hook + provider co-located
-export function useMusicRoom(): MusicCtxValue {
-  const v = useContext(MusicCtx);
-  if (!v) throw new Error("useMusicRoom must be used within MusicRoomProvider");
-  return v;
-}
 
 export function MusicRoomProvider({
   watchActive = false,
@@ -160,6 +113,10 @@ export function MusicRoomProvider({
   const isController = lastController === userId;
   const isControllerRef = useRef(isController);
   isControllerRef.current = isController;
+  // Latest play state for onReady (which captures a stale closure otherwise) —
+  // so a reload respects the persisted paused/playing state for both people.
+  const playingRef = useRef(playing);
+  playingRef.current = playing;
 
   const persistDj = useCallback(
     (patch: Record<string, unknown>, recapEvent?: { event_type: string; payload?: Record<string, unknown> }) => {
@@ -203,7 +160,12 @@ export function MusicRoomProvider({
       if (cancelled || !containerRef.current || playerRef.current) return;
       const yt = window.YT;
       if (!yt) return;
-      playerRef.current = new yt.Player(containerRef.current, {
+      // Mount YT into a throwaway child (YT replaces the node it's given with an
+      // iframe). If we handed it our React-owned div, React would later try to
+      // removeChild a node YT swapped out → "not a child" crash.
+      const mount = document.createElement("div");
+      containerRef.current.appendChild(mount);
+      playerRef.current = new yt.Player(mount, {
         videoId: videoId ?? undefined,
         playerVars: { rel: 0, modestbranding: 1, playsinline: 1, controls: 0, enablejsapi: 1, origin: window.location.origin },
         events: {
@@ -211,9 +173,12 @@ export function MusicRoomProvider({
             try {
               playerRef.current?.setVolume?.(volume);
               if (dTsRef.current) playerRef.current?.seekTo(dTsRef.current, true);
-              if (playing) {
+              if (playingRef.current) {
                 playerRef.current?.unMute?.();
                 playerRef.current?.playVideo?.();
+              } else {
+                // Persisted paused → stay paused on reload (don't autoplay).
+                playerRef.current?.pauseVideo?.();
               }
             } catch {
               /* ignore */
@@ -348,20 +313,29 @@ export function MusicRoomProvider({
     });
   }, [session]);
 
-  // Mute while a video is staged.
+  // Pause (not just mute) while a movie is on the stage. Two YouTube video
+  // decoders running at once is a major cause of phone overheating, so we stop
+  // the music player from decoding entirely. suppress() keeps this local pause
+  // from broadcasting to the partner; onReady/drift resync on resume.
   useEffect(() => {
     const p = playerRef.current;
     if (!p) return;
     try {
-      if (watchActive) p.mute?.();
-      else {
+      if (watchActive) {
+        suppress(2000);
+        p.pauseVideo?.();
+      } else if (playingRef.current) {
+        suppress(2000);
+        if (dTsRef.current) p.seekTo(dTsRef.current, true);
         p.unMute?.();
         p.setVolume?.(volume);
+        p.playVideo?.();
       }
     } catch {
       /* ignore */
     }
-  }, [volume, watchActive]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchActive]);
 
   // Add a song to the end of the list. Starts playing only if nothing is.
   const playId = useCallback(
@@ -712,6 +686,7 @@ export function MusicLibrary() {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -723,6 +698,7 @@ export function MusicLibrary() {
     setUrlError(null);
     m.playId(id);
     setUrl("");
+    setAdding(false);
   };
 
   const drop = (to: number) => {
@@ -731,43 +707,68 @@ export function MusicLibrary() {
     setOverIdx(null);
   };
 
-  return (
-    <div className="flex h-full flex-col gap-6 overflow-y-auto p-5 sm:p-6">
-      <form onSubmit={submit} className="space-y-2.5">
-        <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Add a song
-        </p>
-        <div className="flex gap-2">
+  // ── Add screen (its own view) ──
+  if (adding) {
+    return (
+      <div className="flex h-full flex-col gap-5 overflow-y-auto p-5 sm:p-6">
+        <div className="relative flex items-center justify-center">
+          <button
+            type="button"
+            onClick={() => setAdding(false)}
+            className="absolute left-0 inline-flex items-center gap-1.5 text-sm text-primary transition hover:opacity-80"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+          <p className="text-sm font-semibold text-cream">Add Song</p>
+        </div>
+        <form onSubmit={submit} className="space-y-3">
           <Input
+            autoFocus
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="Paste a YouTube link…"
             className="focus-ring bg-secondary/60 border-white/[0.10] focus-visible:border-primary/40"
           />
+          {urlError && <p className="px-1 text-xs text-rose">{urlError}</p>}
           <button
             type="submit"
-            className="focus-ring rounded-full px-5 text-sm font-medium text-primary-foreground hover:opacity-90"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
             style={{ backgroundColor: "var(--room-accent)" }}
           >
-            Add
+            <Plus className="h-4 w-4" /> Add song
           </button>
-        </div>
-        {urlError && <p className="px-1 text-xs text-rose">{urlError}</p>}
-      </form>
+        </form>
+      </div>
+    );
+  }
 
+  return (
+    <div className="flex h-full flex-col gap-6 overflow-y-auto p-5 sm:p-6">
       {m.tracks.length > 0 ? (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between px-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               {m.tracks.length} song{m.tracks.length === 1 ? "" : "s"} · drag to reorder
             </p>
-            <button
-              type="button"
-              onClick={() => setConfirmClear(true)}
-              className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground transition hover:text-rose"
-            >
-              Clear list
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmClear(true)}
+                className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground transition hover:text-rose"
+              >
+                Clear list
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                aria-label="Add song"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-primary-foreground transition hover:opacity-90"
+                style={{ backgroundColor: "var(--room-accent)" }}
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <ul className="flex flex-col gap-1">
             {m.tracks.map((t, idx) => {
@@ -805,10 +806,7 @@ export function MusicLibrary() {
           </ul>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-          <Music className="h-10 w-10" style={{ color: "var(--room-accent)" }} strokeWidth={1.5} />
-          <p className="text-sm">Paste a YouTube link to start the queue.</p>
-        </div>
+        <EmptyState variant="music" title="Music" onAdd={() => setAdding(true)} addLabel="Add a song" />
       )}
 
       {confirmClear && (

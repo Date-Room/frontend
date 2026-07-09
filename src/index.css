@@ -321,6 +321,14 @@
   50%      { transform: scaleY(1); }
 }
 
+/* Ringing — pulsing green edge glow around the call PiP while waiting for the
+   partner to join (Samsung-style). */
+@keyframes call-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0), 0 20px 56px rgba(0,0,0,0.55); }
+  50%      { box-shadow: 0 0 0 3px rgba(52,211,153,0.6), 0 0 24px rgba(52,211,153,0.55), 0 20px 56px rgba(0,0,0,0.55); }
+}
+.call-ring { animation: call-ring 1.6s ease-in-out infinite; }
+
 /* Stage "received a new activity" — a subtle Apple-style swell + settle with
    a whisper of overshoot, so swapping the staged item feels acknowledged. */
 @keyframes stage-swell {

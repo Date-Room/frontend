@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,13 +12,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Clock, Pause, Play, Square } from "lucide-react";
+import { Clock, FastForward, Pause, Play, Rewind, Volume2, VolumeX, X } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
 import {
   addWatchHistory,
+  fetchYoutubeTitle,
   loadWatchHistory,
+  setWatchHistoryTitle,
   type WatchHistoryEntry,
+  youtubeThumbnail,
   youtubeWatchUrl,
 } from "@/lib/watchHistory";
 import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/types/youtubeIframeApi";
@@ -30,17 +36,28 @@ import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/ty
  * Durable snapshots are written on load/play/pause/stop (not on every tick).
  */
 
-function extractId(url: string): string | null {
+function extractId(raw: string): string | null {
+  const input = raw.trim();
+  const clean = (s: string | null | undefined): string | null => {
+    const id = (s ?? "").trim();
+    return /^[\w-]{11}$/.test(id) ? id : null;
+  };
+  // Bare 11-char id pasted directly.
+  const bare = clean(input);
+  if (bare) return bare;
+  // Add a protocol so URL() parses "youtube.com/..." and "youtu.be/..." too.
+  const withProto = /^https?:\/\//i.test(input) ? input : `https://${input}`;
   try {
-    const u = new URL(url);
-    if (u.hostname.includes("youtu.be")) return u.pathname.slice(1);
-    if (u.searchParams.get("v")) return u.searchParams.get("v");
-    const m = u.pathname.match(/\/embed\/([^/?]+)/);
-    if (m) return m[1];
+    const u = new URL(withProto);
+    if (u.hostname.includes("youtu.be")) return clean(u.pathname.slice(1));
+    const v = clean(u.searchParams.get("v"));
+    if (v) return v;
+    // /embed/ID, /shorts/ID, /live/ID, /v/ID
+    const m = u.pathname.match(/\/(?:embed|shorts|live|v)\/([^/?#]+)/);
+    if (m) return clean(m[1]);
   } catch {
     void 0;
   }
-  if (/^[\w-]{11}$/.test(url)) return url;
   return null;
 }
 
@@ -77,6 +94,26 @@ export function WatchTogether() {
 
   const [url, setUrl] = useState("");
   const [history, setHistory] = useState<WatchHistoryEntry[]>(() => loadWatchHistory());
+  // Backfill names for any past entries saved before we tracked titles.
+  useEffect(() => {
+    let cancelled = false;
+    const missing = history.filter((e) => !e.title).map((e) => e.videoId);
+    if (missing.length === 0) return;
+    void (async () => {
+      for (const id of missing) {
+        const title = await fetchYoutubeTitle(id);
+        if (cancelled) return;
+        if (title) setHistory(setWatchHistoryTitle(id, title));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Run once on mount; setHistory updates are self-limiting (only refetch new gaps).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [position, setPosition] = useState(0);
+  const [duration, setDuration] = useState(0);
   const playerRef = useRef<YoutubeIframeApiPlayer | null>(null);
   const playerShellRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -124,7 +161,76 @@ export function WatchTogether() {
   }
 
   const [videoId, setVideoId] = useState<string | null>(dVideo);
+  const videoIdRef = useRef(videoId);
+  videoIdRef.current = videoId;
   const [playing, setPlaying] = useState<boolean>(dPlaying);
+  // Actual player state (drives the bar icon) — can differ from the synced
+  // `playing` intent when autoplay is blocked or we're mid-catch-up.
+  const [livePlaying, setLivePlaying] = useState<boolean>(false);
+
+  // Volume is per-viewer (not shared), persisted locally. Player starts muted
+  // for autoplay-sync; touching volume (a user gesture) unmutes it.
+  const [volume, setVolume] = useState(() => {
+    try {
+      const v = Number(localStorage.getItem("dr:watch:volume"));
+      return Number.isFinite(v) && v >= 0 && v <= 100 ? v : 100;
+    } catch {
+      return 100;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("dr:watch:volume", String(volume));
+    } catch {
+      void 0;
+    }
+    const p = playerRef.current;
+    if (!p) return;
+    try {
+      p.setVolume?.(volume);
+      if (volume === 0) p.mute?.();
+      else p.unMute?.();
+    } catch {
+      void 0;
+    }
+  }, [volume]);
+
+  // The bottom bar is portalled to <body>, which is outside the room's
+  // accent-scoped element — so the room-scoped CSS vars don't cascade to it.
+  // Read them off this in-tree node and re-apply them on the portalled bar.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [barVars, setBarVars] = useState<React.CSSProperties>({});
+  useEffect(() => {
+    if (!rootRef.current) return;
+    const cs = getComputedStyle(rootRef.current);
+    const vars = [
+      "--primary",
+      "--primary-foreground",
+      "--ring",
+      "--amber",
+      "--room-accent",
+      "--room-accent-soft",
+      "--card",
+    ];
+    const next: Record<string, string> = {};
+    for (const v of vars) {
+      const value = cs.getPropertyValue(v).trim();
+      if (value) next[v] = value;
+    }
+    setBarVars((prev) => {
+      // Only update if something actually changed — avoids re-render churn.
+      const keys = Object.keys(next);
+      const prevRec = prev as Record<string, string>;
+      if (keys.length === Object.keys(prevRec).length && keys.every((k) => prevRec[k] === next[k])) {
+        return prev;
+      }
+      return next as React.CSSProperties;
+    });
+  }, [videoId]);
+  // Latest value for onReady's stale closure — so a reload honours the
+  // persisted paused/playing state (synced via durable for both people).
+  const playingRef = useRef(playing);
+  playingRef.current = playing;
   const [videoTitle, setVideoTitle] = useState<string | null>(null);
 
   // Pull the title from the player (no native title bar since controls are off).
@@ -136,8 +242,10 @@ export function WatchTogether() {
         playerRef.current as { getVideoData?: () => { title?: string } } | null
       )?.getVideoData?.();
       const title = data?.title?.trim();
+      const vid = videoIdRef.current;
       if (title) {
         setVideoTitle(title);
+        if (vid) setHistory(setWatchHistoryTitle(vid, title));
       } else if (tries++ < 5) {
         window.setTimeout(grab, 400);
       }
@@ -182,10 +290,14 @@ export function WatchTogether() {
       const rect = shell?.getBoundingClientRect();
       const w = rect && rect.width > 0 ? Math.round(rect.width) : 640;
       const h = rect && rect.height > 0 ? Math.round(rect.height) : 360;
-      playerRef.current = new yt.Player(containerRef.current, {
+      // Mount YT into a throwaway child so React never tries to removeChild the
+      // node YT replaces with its iframe ("not a child" crash on unmount).
+      const mount = document.createElement("div");
+      containerRef.current.appendChild(mount);
+      playerRef.current = new yt.Player(mount, {
         width: w,
         height: h,
-        videoId: videoId ?? undefined,
+        videoId: videoIdRef.current ?? undefined,
         // No native chrome — DateRoom drives playback so the two sides stay
         // in sync. A transparent overlay blocks YouTube's hover/click too.
         playerVars: {
@@ -207,7 +319,7 @@ export function WatchTogether() {
               suppress(3000);
               p.mute?.();
               if (dTsRef.current) p.seekTo(dTsRef.current, true);
-              if (playing) p.playVideo?.();
+              if (playingRef.current) p.playVideo?.();
               else p.pauseVideo?.();
               captureTitle();
             } catch {
@@ -215,19 +327,32 @@ export function WatchTogether() {
             }
           },
           onStateChange: (e: YoutubePlayerStateChangeEvent) => {
-            if (isSuppressed()) return;
             const PS = yt.PlayerState;
-            const time = playerRef.current?.getCurrentTime?.() ?? 0;
+            if (e.data === PS.PLAYING) setLivePlaying(true);
+            else if (e.data === PS.PAUSED || e.data === PS.ENDED) setLivePlaying(false);
+            // Programmatic changes we make are suppressed, so anything reaching
+            // here is a real user interaction (bottom bar OR a direct click on
+            // the video). Whoever acts takes control and the change syncs.
+            if (isSuppressed()) return;
+            const p = playerRef.current;
+            const time = p?.getCurrentTime?.() ?? 0;
             if (e.data === PS.PLAYING) {
-              const leader = lastControllerRef.current;
-              if (!weLeadPlaybackRef.current && leader && leader !== userId) return;
               isControllerRef.current = true;
+              // A direct click on a muted video is still a gesture — give it sound.
+              if (volume > 0) {
+                try {
+                  p?.unMute?.();
+                  p?.setVolume?.(volume);
+                } catch {
+                  void 0;
+                }
+              }
+              setPlaying(true);
               void session?.sendEvent("play", { timestamp_seconds: time });
               persistWatch({ video_id: videoId, playing: true, timestamp_seconds: time });
             } else if (e.data === PS.PAUSED) {
-              const leader = lastControllerRef.current;
-              if (!weLeadPlaybackRef.current && leader && leader !== userId) return;
               isControllerRef.current = true;
+              setPlaying(false);
               void session?.sendEvent("pause", { timestamp_seconds: time });
               persistWatch({ video_id: videoId, playing: false, timestamp_seconds: time });
             }
@@ -245,8 +370,30 @@ export function WatchTogether() {
       playerRef.current = null;
       isControllerRef.current = false;
     };
+    // Create the player ONCE when a video first appears; new videos load into it
+    // (below) rather than destroying/recreating — which raced with the durable
+    // mirror and left a freshly-pasted video not playing until a reload.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldMount, videoId]);
+  }, [shouldMount]);
+
+  // Load a newly-chosen video into the existing player without remounting.
+  useEffect(() => {
+    const p = playerRef.current;
+    if (!p || !videoId) return;
+    try {
+      const current = p.getVideoData?.()?.video_id;
+      if (current === videoId) return;
+      suppress(3000);
+      setVideoTitle(null);
+      if (playingRef.current) p.loadVideoById?.(videoId);
+      else p.cueVideoById?.(videoId);
+      if (dTsRef.current) p.seekTo?.(dTsRef.current, true);
+      captureTitle();
+    } catch {
+      void 0;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoId]);
 
   useEffect(() => {
     const shell = playerShellRef.current;
@@ -257,14 +404,21 @@ export function WatchTogether() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shouldMount, videoId]);
 
-  // Apply local play/pause to the mounted player without remounting.
+  // Apply local play/pause to the mounted player without remounting. When we
+  // begin playing because the partner started (we're not the controller), also
+  // seek to their durable timestamp so we jump straight into sync — this is what
+  // the old "tap to sync & catch up" button did, now fully automatic.
   useEffect(() => {
     const p = playerRef.current;
     if (!p || isSuppressed()) return;
     try {
       if (playing) {
         if (!playerIsPlaying(p)) {
-          suppress(500);
+          suppress(1500);
+          if (lastController !== userId) {
+            const target = dTsRef.current;
+            if (target > 0) p.seekTo?.(target, true);
+          }
           p.playVideo?.();
         }
       } else if (playerIsPlaying(p)) {
@@ -274,6 +428,7 @@ export function WatchTogether() {
     } catch {
       void 0;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing]);
 
   // Heartbeat: controller emits a `tick` every 2s for drift correction.
@@ -377,9 +532,14 @@ export function WatchTogether() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const id = extractId(url.trim());
-    if (!id) return;
-    queueVideo(id, url.trim());
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    const id = extractId(trimmed);
+    if (!id) {
+      toast.error("That doesn't look like a YouTube link.");
+      return;
+    }
+    queueVideo(id, trimmed);
     setUrl("");
   };
 
@@ -392,13 +552,20 @@ export function WatchTogether() {
   const togglePlayback = () => {
     const p = playerRef.current;
     if (!p || !videoId) return;
-    const next = !playing;
+    const next = !livePlaying;
     isControllerRef.current = true;
     suppress(600);
     try {
       const time = p.getCurrentTime?.() ?? 0;
-      if (next) p.playVideo?.();
-      else p.pauseVideo?.();
+      if (next) {
+        if (volume > 0) {
+          p.unMute?.();
+          p.setVolume?.(volume);
+        }
+        p.playVideo?.();
+      } else {
+        p.pauseVideo?.();
+      }
       void session?.sendEvent(next ? "play" : "pause", { timestamp_seconds: time });
       persistWatch({ video_id: videoId, playing: next, timestamp_seconds: time });
     } catch {
@@ -421,8 +588,54 @@ export function WatchTogether() {
     persistWatch({ video_id: null, playing: false, timestamp_seconds: 0 });
   };
 
+  const seekTo = (t: number) => {
+    const p = playerRef.current;
+    const target = Math.max(0, t);
+    suppress(1500);
+    try {
+      p?.seekTo?.(target, true);
+    } catch {
+      void 0;
+    }
+    void session?.sendEvent("seek", { timestamp_seconds: target });
+    persistWatch({ video_id: videoId, playing, timestamp_seconds: target });
+    setPosition(target);
+  };
+  const seekBy = (delta: number) => {
+    const p = playerRef.current;
+    seekTo((p?.getCurrentTime?.() ?? position) + delta);
+  };
+  const seekFraction = (f: number) => {
+    const p = playerRef.current as (YoutubeIframeApiPlayer & { getDuration?: () => number }) | null;
+    const d = duration || p?.getDuration?.() || 0;
+    if (d) seekTo(f * d);
+  };
+
+  // Position / duration for the control-bar progress.
+  useEffect(() => {
+    if (!videoId) {
+      setPosition(0);
+      setDuration(0);
+      return;
+    }
+    const id = setInterval(() => {
+      const p = playerRef.current as (YoutubeIframeApiPlayer & { getDuration?: () => number }) | null;
+      if (!p?.getCurrentTime) return;
+      try {
+        setPosition(p.getCurrentTime() ?? 0);
+        const d = p.getDuration?.() ?? 0;
+        if (d) setDuration(d);
+      } catch {
+        void 0;
+      }
+    }, 500);
+    return () => clearInterval(id);
+  }, [videoId]);
+
+  const pct = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
+
   return (
-    <div className="flex flex-col h-full p-4 sm:p-5 gap-3">
+    <div ref={rootRef} className="flex flex-col h-full p-4 sm:p-5 gap-3">
       <form onSubmit={submit} className="flex gap-2">
         <Input
           value={url}
@@ -458,12 +671,19 @@ export function WatchTogether() {
                   className="cursor-pointer gap-3 py-2.5"
                   onSelect={() => playFromHistory(entry)}
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-black/40 text-muted-foreground">
-                    <Play className="h-3.5 w-3.5" />
+                  <span className="relative flex h-9 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-black/40 text-muted-foreground">
+                    {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                    <img
+                      src={youtubeThumbnail(entry.videoId)}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                      onError={(e) => (e.currentTarget.style.display = "none")}
+                    />
+                    <Play className="pointer-events-none absolute h-3.5 w-3.5 text-white/90 drop-shadow" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm">
-                      {entry.url.replace(/^https?:\/\//, "")}
+                      {entry.title ?? "YouTube video"}
                     </span>
                     <span className="block text-[11px] text-muted-foreground">
                       {new Date(entry.addedAt).toLocaleDateString(undefined, {
@@ -486,11 +706,7 @@ export function WatchTogether() {
         </Button>
       </form>
 
-      <div className="flex-1 min-h-0 flex flex-col gap-2">
-        <p className="shrink-0 text-xs text-muted-foreground italic px-1">
-          {t("room.watchVolumeHint")}
-        </p>
-
+      <div className="flex-1 min-h-0 flex flex-col gap-3">
         <div className="flex-1 min-h-0 flex items-center justify-center w-full">
           <div
             ref={playerShellRef}
@@ -502,81 +718,116 @@ export function WatchTogether() {
                 className="absolute inset-0 overflow-hidden [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full"
               />
             )}
-            {/* Transparent shield — swallows YouTube's own hover/click/scrub so
-                playback is only driven by DateRoom controls (keeps sync clean).
-                Clicking it toggles our synced play/pause. */}
-            {videoId && (
-              <button
-                type="button"
-                onClick={togglePlayback}
-                aria-label={playing ? "Pause" : "Play"}
-                className="absolute inset-0 z-[5] cursor-pointer"
-              />
-            )}
+            {/* No shield — the user can click the video directly to play/pause.
+                YouTube's onStateChange reports that interaction and we sync it to
+                the partner just like the bottom-bar controls. */}
             {!videoId && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                <div className="text-3xl opacity-40">▶</div>
-                <p className="font-serif italic text-sm">paste a link to begin</p>
-              </div>
-            )}
-            {/* Our own title bar (native chrome is off). */}
-            {videoId && videoTitle && (
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-gradient-to-b from-black/70 via-black/25 to-transparent p-3 pb-8">
-                <p className="truncate text-sm font-medium text-cream drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)]">
-                  {videoTitle}
-                </p>
-              </div>
-            )}
-            {videoId && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-2 bg-gradient-to-t from-black/70 via-black/25 to-transparent p-3 pt-10">
-                <Button
-                  type="button"
-                  onClick={togglePlayback}
-                  variant="outline"
-                  size="sm"
-                  className="pointer-events-auto rounded-full border-white/20 bg-black/50 text-cream hover:bg-black/70"
-                >
-                  {playing ? <Pause className="w-3.5 h-3.5 mr-1" /> : <Play className="w-3.5 h-3.5 mr-1" />}
-                  {playing ? "Pause" : "Play"}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={stopVideo}
-                  variant="outline"
-                  size="sm"
-                  className="pointer-events-auto rounded-full border-white/20 bg-black/50 text-cream hover:bg-black/70"
-                >
-                  <Square className="w-3.5 h-3.5 mr-1" /> Stop
-                </Button>
+              <div className="absolute inset-0">
+                <EmptyState variant="watch" title="Watch" subtitle="Paste a YouTube link above to begin." />
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {videoId && dPlaying && !playing && (
-        <Button
-          type="button"
-          onClick={() => {
-            const targetTime = dTsRef.current;
-            const p = playerRef.current;
-            isControllerRef.current = false;
-            suppress(5000);
-            try {
-              p?.seekTo?.(targetTime, false);
-              p?.playVideo?.();
-            } catch {
-              void 0;
-            }
-            setPlaying(true);
-          }}
-          className="rounded-full text-primary-foreground hover:opacity-90 self-center"
-          style={{ backgroundColor: "var(--room-accent)" }}
-        >
-          <Play className="w-4 h-4 mr-1.5" /> Tap to sync & catch up
-        </Button>
-      )}
-
+      {/* Full-width control bar at the bottom of the SCREEN — mirrors the music
+          player; only present while Watch is on the stage. Portalled to <body>
+          so the stage's transform/overflow doesn't trap the fixed positioning. */}
+      {videoId &&
+        createPortal(
+          <div
+            style={barVars}
+            className="pointer-events-auto fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-card/60 backdrop-blur-sm"
+          >
+          <button
+            type="button"
+            aria-label="Seek"
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              seekFraction((e.clientX - rect.left) / rect.width);
+            }}
+            className="group relative block h-1.5 w-full cursor-pointer bg-white/10"
+          >
+            <div
+              className="absolute inset-y-0 left-0 bg-primary transition-[width] duration-500 ease-linear group-hover:brightness-110"
+              style={{ width: `${pct}%` }}
+            />
+          </button>
+          <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-1.5 pr-12">
+            <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-black">
+              {/* eslint-disable-next-line jsx-a11y/alt-text */}
+              <img
+                src={`https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`}
+                className="h-full w-full object-cover"
+                onError={(e) => (e.currentTarget.style.display = "none")}
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-cream">{videoTitle ?? "Watching"}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => seekBy(-10)}
+                aria-label="Back 10 seconds"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-cream transition hover:bg-white/10"
+              >
+                <Rewind className="h-[18px] w-[18px]" />
+              </button>
+              <button
+                type="button"
+                onClick={togglePlayback}
+                aria-label={livePlaying ? "Pause" : "Play"}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-primary-foreground transition hover:opacity-90"
+                style={{ backgroundColor: "var(--room-accent)" }}
+              >
+                {livePlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => seekBy(10)}
+                aria-label="Forward 10 seconds"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-cream transition hover:bg-white/10"
+              >
+                <FastForward className="h-[18px] w-[18px]" />
+              </button>
+              <div className="ml-1 hidden items-center gap-1.5 sm:flex">
+                <button
+                  type="button"
+                  onClick={() => setVolume((v) => (v === 0 ? 100 : 0))}
+                  aria-label={volume === 0 ? "Unmute" : "Mute"}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition hover:text-cream"
+                >
+                  {volume === 0 ? (
+                    <VolumeX className="h-[18px] w-[18px]" />
+                  ) : (
+                    <Volume2 className="h-[18px] w-[18px]" />
+                  )}
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={volume}
+                  onChange={(e) => setVolume(Number(e.target.value))}
+                  aria-label="Volume"
+                  className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-white/15"
+                  style={{ accentColor: "var(--room-accent)" }}
+                />
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={stopVideo}
+            aria-label="Close player"
+            className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition hover:text-cream"
+          >
+            <X className="h-[18px] w-[18px]" />
+          </button>
+        </div>,
+          document.body,
+        )}
     </div>
   );
 }
