@@ -1,7 +1,8 @@
 /*
  * Privacy policy — production copy describing the deployed DateRoom stack
- * (Supabase Auth + Postgres, FastAPI on Railway, LiveKit, Stripe, optional
- * Google / Apple OAuth, YouTube embeds for Watch + DJ).
+ * (Supabase Auth + Postgres, FastAPI on Railway, LiveKit, Stripe on web,
+ * Apple in-app purchase on iOS, optional Google / Apple OAuth, YouTube
+ * embeds for Watch + DJ).
  *
  * TODO(legal): this page is plain-language drafting intended for review by
  * counsel before any production launch. Do not treat as legally binding
@@ -11,7 +12,7 @@
 import { BRAND_NAME } from "@/lib/constants";
 import { LegalShell, type LegalSection } from "@/components/LegalShell";
 
-const LAST_UPDATED = "5 June 2026";
+const LAST_UPDATED = "13 July 2026";
 const PRIVACY_EMAIL = "privacy@dateroom.io";
 
 export default function Privacy() {
@@ -21,8 +22,10 @@ export default function Privacy() {
       title: "Who we are",
       body: (
         <p>
-          {BRAND_NAME} is a virtual date room for two. The service is operated by
-          the DateRoom team. For privacy questions or requests, write to{" "}
+          {BRAND_NAME} is a virtual date room for two. This policy covers the
+          iOS app, the web client, and our backend. The service is operated by{" "}
+          [Company legal name] (&ldquo;we&rdquo;, &ldquo;us&rdquo;). For privacy
+          questions or requests, write to{" "}
           <a className="text-rosegold hover:underline" href={`mailto:${PRIVACY_EMAIL}`}>
             {PRIVACY_EMAIL}
           </a>
@@ -60,9 +63,14 @@ export default function Privacy() {
             are connected.
           </li>
           <li>
-            <span className="text-cream/90">Payments.</span> Your Stripe
-            customer identifier and subscription state. Card numbers are
-            handled by Stripe directly; we never see or store them.
+            <span className="text-cream/90">Payments.</span> When you buy on the
+            web, your Stripe customer identifier and subscription state; card
+            numbers are handled by Stripe directly and we never see or store
+            them. When you buy inside the iOS app, purchases are processed by
+            Apple through in-app purchase — Apple handles your payment details,
+            and we receive only the resulting purchase receipt and entitlement
+            state (which products and passes you own), never your card number or
+            Apple ID credentials.
           </li>
           <li>
             <span className="text-cream/90">Device and technical data.</span> IP
@@ -101,11 +109,18 @@ export default function Privacy() {
             </li>
             <li>
               <span className="text-cream/90">Stripe</span> — subscription
-              billing and payment processing.
+              billing and payment processing on the web.
             </li>
             <li>
-              <span className="text-cream/90">Google and Apple</span> — only
-              when you choose to sign in with one of those providers.
+              <span className="text-cream/90">Apple</span> — on iOS, in-app
+              purchases (the Together subscription, Date Pack, Long Pack, and
+              time extensions) are processed by Apple through the App Store.
+              Apple handles your payment and reports purchase and entitlement
+              data back to us.
+            </li>
+            <li>
+              <span className="text-cream/90">Google and Apple sign-in</span> —
+              only when you choose to sign in with one of those providers.
             </li>
             <li>
               <span className="text-cream/90">YouTube</span> — embedded video

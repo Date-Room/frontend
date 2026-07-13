@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   RotateCw,
   LayoutGrid,
@@ -287,6 +288,38 @@ export function RoomStage({
     if (pos !== null || !callActive) return;
     setPos({ x: window.innerWidth - PORTRAIT.w - EDGE, y: TOP_PAD + 8 });
   }, [pos, callActive]);
+
+  // ── Call PiP ↔ Watch-fullscreen bridge ──
+  // When Watch enters native fullscreen, the browser only paints the fullscreen
+  // element's own subtree — so the call PiP would disappear. We re-parent the
+  // live PiP into the fullscreen element (marked `data-dr-watch-fs`) so it
+  // floats on top of the fullscreen video, and move it back on exit. The PiP is
+  // portalled into a persistent, hand-managed host node (NOT reconciled by
+  // React), so moving that node never remounts LiveKit — the <video> tracks
+  // keep playing across the move (unlike an <iframe>, a <video> survives
+  // re-parenting).
+  const pipHostRef = useRef<HTMLDivElement | null>(null);
+  if (!pipHostRef.current && typeof document !== "undefined") {
+    pipHostRef.current = document.createElement("div");
+    pipHostRef.current.style.display = "contents";
+  }
+  const pipAnchorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const host = pipHostRef.current;
+    const anchor = pipAnchorRef.current;
+    if (!host || !anchor) return;
+    const place = () => {
+      const fsEl = document.fullscreenElement as HTMLElement | null;
+      const target = fsEl?.getAttribute("data-dr-watch-fs") === "1" ? fsEl : anchor;
+      if (host.parentElement !== target) target.appendChild(host);
+    };
+    place();
+    document.addEventListener("fullscreenchange", place);
+    return () => {
+      document.removeEventListener("fullscreenchange", place);
+      host.remove();
+    };
+  }, []);
   const onMove = useCallback(
     (e: PointerEvent) => {
       if (!drag.current) return;
@@ -590,8 +623,14 @@ export function RoomStage({
       ))}
 
       {/* Call PiP — portrait by default, rotate to landscape, draggable,
-          and edge-resizable (aspect-locked) between full and 2/3 size. */}
-      {callActive && (
+          and edge-resizable (aspect-locked) between full and 2/3 size.
+          Rendered into a persistent host (see pipHostRef) so it can be
+          re-parented into the Watch fullscreen layer without remounting the
+          call. The anchor marks its normal home in the room. */}
+      <div ref={pipAnchorRef} className="contents" />
+      {callActive &&
+        pipHostRef.current &&
+        createPortal(
         <div
           className="group fixed z-40 select-none rounded-2xl glass p-1 shadow-[0_20px_56px_rgba(0,0,0,0.55)] touch-none"
           style={pos ? { left: pos.x, top: pos.y, width: curW, height: curH } : undefined}
@@ -625,8 +664,9 @@ export function RoomStage({
               )}
             />
           ))}
-        </div>
-      )}
+        </div>,
+          pipHostRef.current,
+        )}
 
       {helpOpen && staged && <ActivityHelp id={staged} onClose={() => setHelpOpen(false)} />}
     </main>

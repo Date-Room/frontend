@@ -10,8 +10,9 @@
  * panel (desktop) — exactly mirrors mobile media_mini_player.dart.
  */
 import { useMemo } from "react";
-import { Pause, Play, SkipForward } from "lucide-react";
+import { FastForward, Pause, Play, Rewind, SkipForward } from "lucide-react";
 import { useActivitySession } from "@/hooks/useActivitySession";
+import { useRoomSession } from "@/context/RoomSessionContext";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -31,6 +32,7 @@ type DjTrack = {
 };
 
 export function MediaMiniPlayer({ currentActivityId, onOpenActivity, bottomOffsetPx = 0 }: Props) {
+  const room = useRoomSession();
   const dj = useActivitySession("dj");
   const watch = useActivitySession("watch");
 
@@ -87,6 +89,25 @@ export function MediaMiniPlayer({ currentActivityId, onOpenActivity, bottomOffse
     void dj.session?.sendEvent("end_turn", {});
   }
 
+  // Watch back/forward are 10-second seeks (not track skips) — mirrors
+  // WatchTogether's seekBy(∓10): broadcast a `seek` so the open player
+  // (partner / us on reopen) jumps in sync, and persist the durable
+  // timestamp so a reload resumes at the new spot. We have no local YT
+  // player here, so seek relative to the last-known durable position.
+  function seekWatch(delta: number, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (active !== "watch") return;
+    const ts = typeof watch.state?.timestamp_seconds === "number" ? (watch.state.timestamp_seconds as number) : 0;
+    const target = Math.max(0, ts + delta);
+    void watch.session?.sendEvent("seek", { timestamp_seconds: target });
+    void watch.session?.persist({
+      video_id: watchVideoId,
+      playing: watchPlaying,
+      timestamp_seconds: target,
+      last_controller: room.senderId,
+    });
+  }
+
   return (
     <button
       type="button"
@@ -121,6 +142,18 @@ export function MediaMiniPlayer({ currentActivityId, onOpenActivity, bottomOffse
         <p className="truncate text-[11px] text-muted-foreground">{subtitle}</p>
       </div>
 
+      {/* Back 10s — Watch only (track has no "previous"; DJ has no rewind). */}
+      {active === "watch" && (
+        <button
+          type="button"
+          onClick={(e) => seekWatch(-10, e)}
+          aria-label="Back 10 seconds"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-cream transition hover:bg-white/10"
+        >
+          <Rewind className="h-[18px] w-[18px]" />
+        </button>
+      )}
+
       {/* Play / pause */}
       <button
         type="button"
@@ -131,6 +164,18 @@ export function MediaMiniPlayer({ currentActivityId, onOpenActivity, bottomOffse
       >
         {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
       </button>
+
+      {/* Forward 10s — Watch only. */}
+      {active === "watch" && (
+        <button
+          type="button"
+          onClick={(e) => seekWatch(10, e)}
+          aria-label="Forward 10 seconds"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-cream transition hover:bg-white/10"
+        >
+          <FastForward className="h-[18px] w-[18px]" />
+        </button>
+      )}
 
       {/* Skip-next — DJ only */}
       {canSkip && (

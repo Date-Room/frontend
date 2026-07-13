@@ -106,6 +106,18 @@ export class RoomActivitySession {
             target: d.target == null ? null : String(d.target),
             sentAt: String(d.sent_at ?? ""),
           });
+        } else if (e.kind === "durable") {
+          // A peer persisted a new durable snapshot. postgres_changes will
+          // converge us eventually, but it's sometimes delayed/dropped — which
+          // made pins (and other durable edits) not show until a manual
+          // refresh. Re-hydrate immediately on the bump so every OTHER session
+          // instance (the room stage's pinned view, the partner) reflects it at
+          // once. Deduped by version so we skip our own bump / stale ones.
+          const d = e.payload;
+          if (d.activity_id !== this.activityId) return;
+          const v = typeof d.version === "number" ? d.version : 0;
+          if (this.serverVersion !== null && v <= this.serverVersion) return;
+          void this.hydrate().catch(() => null);
         }
       }),
     );
@@ -155,6 +167,15 @@ export class RoomActivitySession {
     });
     this.serverVersion = row.version;
     this.emitState({ state: row.state, version: row.version });
+    // Broadcast a lightweight durable-changed bump so OTHER session instances
+    // (the room stage's pinned-dreams view, the partner) re-hydrate instantly
+    // instead of waiting on postgres_changes (sometimes delayed/dropped — pins
+    // not showing until refresh). Payload is just id+version, never the full
+    // (potentially large, image-bearing) state.
+    void this.channel.broadcast("durable", {
+      activity_id: this.activityId,
+      version: row.version,
+    });
   }
 
   sendReaction(kind: string, target: string | null = null): Promise<unknown> {

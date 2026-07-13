@@ -12,7 +12,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Clock, FastForward, Pause, Play, Rewind, Volume2, VolumeX, X } from "lucide-react";
+import { Clock, FastForward, Maximize, Minimize, Pause, Play, Rewind, Volume2, VolumeX, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/EmptyState";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
@@ -118,6 +119,48 @@ export function WatchTogether() {
   const playerRef = useRef<YoutubeIframeApiPlayer | null>(null);
   const playerShellRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Fullscreen: we promote the wrapper (not the iframe) so the live YT player
+  // is never re-parented — reparenting an iframe reloads it and would drop
+  // watch sync. The existing ResizeObserver resizes the player when the shell
+  // grows to fill the screen. Uses the native Fullscreen API (reliable full-
+  // viewport, escapes the room's backdrop-filter containing block); the call
+  // PiP is layered on top by RoomStage, which moves its PiP DOM into the
+  // fullscreen element on `fullscreenchange` (see [data-dr-watch-fs]).
+  const fullscreenWrapRef = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const toggleFullscreen = useCallback(() => {
+    const el = fullscreenWrapRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen?.().catch(() => setFullscreen(false));
+    } else if (el.requestFullscreen) {
+      // Mark the element imperatively BEFORE requesting so it's already present
+      // when the `fullscreenchange` event fires — RoomStage keys the PiP move
+      // off this attribute and reacts on that same event.
+      el.setAttribute("data-dr-watch-fs", "1");
+      void el.requestFullscreen().catch(() => {
+        el.removeAttribute("data-dr-watch-fs");
+        setFullscreen((v) => !v);
+      });
+    } else {
+      // No Fullscreen API — fall back to the CSS `fixed inset-0` layer.
+      setFullscreen((v) => !v);
+    }
+  }, []);
+  useEffect(() => {
+    const onChange = () => {
+      const isFs = document.fullscreenElement === fullscreenWrapRef.current;
+      setFullscreen(isFs);
+      if (!isFs) fullscreenWrapRef.current?.removeAttribute("data-dr-watch-fs");
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  // Keep the YT player sized to the shell as it grows/shrinks with fullscreen.
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => syncPlayerSize());
+    return () => cancelAnimationFrame(raf);
+  }, [fullscreen]);
 
   function syncPlayerSize() {
     const shell = playerShellRef.current;
@@ -677,6 +720,109 @@ export function WatchTogether() {
 
   const pct = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
 
+  // Shared control-bar content — rendered in a fixed bottom-of-screen portal
+  // while docked, and inline at the bottom of the fullscreen layer when
+  // fullscreen (a fullscreen element only paints its own subtree, so the
+  // portalled bar would vanish otherwise).
+  const barInner = (
+    <>
+      <button
+        type="button"
+        aria-label="Seek"
+        onClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          seekFraction((e.clientX - rect.left) / rect.width);
+        }}
+        className="group relative block h-1.5 w-full cursor-pointer bg-white/10"
+      >
+        <div
+          className="absolute inset-y-0 left-0 bg-primary transition-[width] duration-500 ease-linear group-hover:brightness-110"
+          style={{ width: `${pct}%` }}
+        />
+      </button>
+      <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-1.5 pr-12">
+        <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-black">
+          {/* eslint-disable-next-line jsx-a11y/alt-text */}
+          <img
+            src={`https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`}
+            className="h-full w-full object-cover"
+            onError={(e) => (e.currentTarget.style.display = "none")}
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-cream">{videoTitle ?? "Watching"}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => seekBy(-10)}
+            aria-label="Back 10 seconds"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-cream transition hover:bg-white/10"
+          >
+            <Rewind className="h-[18px] w-[18px]" />
+          </button>
+          <button
+            type="button"
+            onClick={togglePlayback}
+            aria-label={livePlaying ? "Pause" : "Play"}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-primary-foreground transition hover:opacity-90"
+            style={{ backgroundColor: "var(--room-accent)" }}
+          >
+            {livePlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => seekBy(10)}
+            aria-label="Forward 10 seconds"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-cream transition hover:bg-white/10"
+          >
+            <FastForward className="h-[18px] w-[18px]" />
+          </button>
+          <div className="ml-1 hidden items-center gap-1.5 sm:flex">
+            <button
+              type="button"
+              onClick={() => setVolume((v) => (v === 0 ? 100 : 0))}
+              aria-label={volume === 0 ? "Unmute" : "Mute"}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition hover:text-cream"
+            >
+              {volume === 0 ? (
+                <VolumeX className="h-[18px] w-[18px]" />
+              ) : (
+                <Volume2 className="h-[18px] w-[18px]" />
+              )}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={volume}
+              onChange={(e) => setVolume(Number(e.target.value))}
+              aria-label="Volume"
+              className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-white/15"
+              style={{ accentColor: "var(--room-accent)" }}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            aria-label={fullscreen ? "Exit full screen" : "Full screen"}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-cream transition hover:bg-white/10"
+          >
+            {fullscreen ? <Minimize className="h-[18px] w-[18px]" /> : <Maximize className="h-[18px] w-[18px]" />}
+          </button>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={stopVideo}
+        aria-label="Close player"
+        className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition hover:text-cream"
+      >
+        <X className="h-[18px] w-[18px]" />
+      </button>
+    </>
+  );
+
   return (
     <div ref={rootRef} className="flex flex-col h-full p-4 sm:p-5 gap-3">
       <form onSubmit={submit} className="flex gap-2">
@@ -749,11 +895,26 @@ export function WatchTogether() {
         </Button>
       </form>
 
-      <div className="flex-1 min-h-0 flex flex-col gap-3">
+      <div
+        ref={fullscreenWrapRef}
+        className={cn(
+          "flex-1 min-h-0 flex flex-col gap-3",
+          // Fullscreen: cover the viewport (the native Fullscreen API promotes
+          // this element to the top layer; the fixed/inset classes also serve as
+          // a fallback where the API is unavailable). Room chrome — including the
+          // call PiP that RoomStage re-parents in — layers above the video.
+          fullscreen && "fixed inset-0 z-[70] gap-0 bg-black p-0",
+        )}
+      >
         <div className="flex-1 min-h-0 flex items-center justify-center w-full">
           <div
             ref={playerShellRef}
-            className="relative mx-auto h-[clamp(320px,min(62vh,100%),720px)] max-h-full w-auto max-w-full aspect-video rounded-2xl overflow-hidden bg-black border border-white/[0.08] shadow-[0_22px_60px_-22px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.04)]"
+            className={cn(
+              "relative overflow-hidden bg-black",
+              fullscreen
+                ? "h-full w-full max-h-full max-w-full"
+                : "mx-auto h-[clamp(320px,min(62vh,100%),720px)] max-h-full w-auto max-w-full aspect-video rounded-2xl border border-white/[0.08] shadow-[0_22px_60px_-22px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.04)]",
+            )}
           >
             {shouldMount && (
               <div
@@ -771,104 +932,30 @@ export function WatchTogether() {
             )}
           </div>
         </div>
+
+        {/* In fullscreen the bar rides inside this layer (an inline flex child)
+            so it isn't clipped away with the rest of the page. */}
+        {fullscreen && videoId && (
+          <div className="relative w-full shrink-0 border-t border-white/10 bg-card/70 backdrop-blur-sm">
+            {barInner}
+          </div>
+        )}
       </div>
 
       {/* Full-width control bar at the bottom of the SCREEN — mirrors the music
-          player; only present while Watch is on the stage. Portalled to <body>
-          so the stage's transform/overflow doesn't trap the fixed positioning. */}
+          player; only present while Watch is on the stage (and not fullscreen,
+          where the bar moves inside the fullscreen layer above). Portalled to
+          <body> so the stage's transform/overflow doesn't trap the fixed
+          positioning. */}
       {videoId &&
+        !fullscreen &&
         createPortal(
           <div
             style={barVars}
             className="pointer-events-auto fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-card/60 backdrop-blur-sm"
           >
-          <button
-            type="button"
-            aria-label="Seek"
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              seekFraction((e.clientX - rect.left) / rect.width);
-            }}
-            className="group relative block h-1.5 w-full cursor-pointer bg-white/10"
-          >
-            <div
-              className="absolute inset-y-0 left-0 bg-primary transition-[width] duration-500 ease-linear group-hover:brightness-110"
-              style={{ width: `${pct}%` }}
-            />
-          </button>
-          <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-1.5 pr-12">
-            <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-black">
-              {/* eslint-disable-next-line jsx-a11y/alt-text */}
-              <img
-                src={`https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`}
-                className="h-full w-full object-cover"
-                onError={(e) => (e.currentTarget.style.display = "none")}
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-cream">{videoTitle ?? "Watching"}</p>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <button
-                type="button"
-                onClick={() => seekBy(-10)}
-                aria-label="Back 10 seconds"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-cream transition hover:bg-white/10"
-              >
-                <Rewind className="h-[18px] w-[18px]" />
-              </button>
-              <button
-                type="button"
-                onClick={togglePlayback}
-                aria-label={livePlaying ? "Pause" : "Play"}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-primary-foreground transition hover:opacity-90"
-                style={{ backgroundColor: "var(--room-accent)" }}
-              >
-                {livePlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-              </button>
-              <button
-                type="button"
-                onClick={() => seekBy(10)}
-                aria-label="Forward 10 seconds"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-cream transition hover:bg-white/10"
-              >
-                <FastForward className="h-[18px] w-[18px]" />
-              </button>
-              <div className="ml-1 hidden items-center gap-1.5 sm:flex">
-                <button
-                  type="button"
-                  onClick={() => setVolume((v) => (v === 0 ? 100 : 0))}
-                  aria-label={volume === 0 ? "Unmute" : "Mute"}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition hover:text-cream"
-                >
-                  {volume === 0 ? (
-                    <VolumeX className="h-[18px] w-[18px]" />
-                  ) : (
-                    <Volume2 className="h-[18px] w-[18px]" />
-                  )}
-                </button>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={volume}
-                  onChange={(e) => setVolume(Number(e.target.value))}
-                  aria-label="Volume"
-                  className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-white/15"
-                  style={{ accentColor: "var(--room-accent)" }}
-                />
-              </div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={stopVideo}
-            aria-label="Close player"
-            className="absolute right-2 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition hover:text-cream"
-          >
-            <X className="h-[18px] w-[18px]" />
-          </button>
-        </div>,
+            {barInner}
+          </div>,
           document.body,
         )}
     </div>
