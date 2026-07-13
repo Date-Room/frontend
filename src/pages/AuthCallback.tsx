@@ -11,7 +11,17 @@ const REDIRECT_KEY = "post_auth_redirect";
  *  custom-scheme deep-link bounce into the native app first. */
 function looksLikeMobile(): boolean {
   if (typeof navigator === "undefined") return false;
-  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) return true;
+  // iPadOS 13+ Safari defaults to a desktop "Macintosh" user-agent with
+  // NO "iPad" token, so UA-sniffing alone misses iPads and they never
+  // bounce into the native app (the App Review iPad rejection). Detect an
+  // iPad masquerading as a Mac by its touch points — a real Mac reports
+  // 0, an iPad reports >1. Worst case on a false positive (a touch-screen
+  // laptop) is a harmless ~1.5s delay before the web verify fallback.
+  return (
+    /Macintosh/i.test(navigator.userAgent) &&
+    (navigator.maxTouchPoints ?? 0) > 1
+  );
 }
 
 /**
