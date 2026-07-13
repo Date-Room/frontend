@@ -20,8 +20,8 @@ export default function Terms() {
       title: "Acceptance",
       body: (
         <p>
-          {BRAND_NAME} is operated by [Company legal name]
-          (&ldquo;we&rdquo;, &ldquo;us&rdquo;). These terms are the end-user
+          {BRAND_NAME} is operated by Wired Intelligence Ltd. (trading as
+          Blache) (&ldquo;we&rdquo;, &ldquo;us&rdquo;). These terms are the end-user
           licence agreement and terms of use for the {BRAND_NAME} iOS app and
           web service. By creating an account, signing in, or otherwise using
           {" "}
@@ -244,16 +244,16 @@ export default function Terms() {
         </p>
       ),
     },
-    /* TODO(legal): set the governing jurisdiction to match the operating
-        entity ([Company legal name]). Placeholder below must be filled
-        before launch. */
+    /* Governing law: Canada, matching the operating entity Wired
+        Intelligence Ltd. A DateRoom-specific US entity is planned; revisit
+        this jurisdiction when that entity is established. */
     {
       id: "governing-law",
       title: "Governing law and disputes",
       body: (
         <p>
-          These terms are governed by the laws of [Governing jurisdiction], and
-          the courts of [Governing jurisdiction] have non-exclusive jurisdiction
+          These terms are governed by the laws of Canada, and
+          the courts of Canada have non-exclusive jurisdiction
           over any dispute, unless a mandatory consumer-protection law in your
           place of residence says otherwise. We'd prefer to resolve issues by
           email first — write to{" "}

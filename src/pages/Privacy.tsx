@@ -24,7 +24,8 @@ export default function Privacy() {
         <p>
           {BRAND_NAME} is a virtual date room for two. This policy covers the
           iOS app, the web client, and our backend. The service is operated by{" "}
-          [Company legal name] (&ldquo;we&rdquo;, &ldquo;us&rdquo;). For privacy
+          Wired Intelligence Ltd. (trading as Blache) (&ldquo;we&rdquo;,
+          &ldquo;us&rdquo;). For privacy
           questions or requests, write to{" "}
           <a className="text-rosegold hover:underline" href={`mailto:${PRIVACY_EMAIL}`}>
             {PRIVACY_EMAIL}
