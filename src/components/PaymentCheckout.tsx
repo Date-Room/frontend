@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
   checkoutBlockedMessage,
   formatProductPrice,
+  getBillingConfig,
   paymentRailLabel,
   purchaseProduct,
   type BillingConfig,
@@ -69,9 +70,11 @@ export function PaymentCheckout({
     try {
       await updateMe({ country: code });
       await onConfigRefresh?.();
-      toast.success(`Location set — pay with ${paymentRailLabel(
-        code === "KE" || code === "TZ" || code === "UG" ? "mpesa" : "stripe",
-      )}.`);
+      // The server decides the payment rail (it routes on the account's
+      // billing region, not the profile country we just saved) — ask it
+      // rather than re-deriving with a hand-kept country list.
+      const fresh = await getBillingConfig();
+      toast.success(`Location set — pay with ${paymentRailLabel(fresh.payment_provider)}.`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save country.");
     } finally {
