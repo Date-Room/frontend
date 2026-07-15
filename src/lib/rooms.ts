@@ -106,6 +106,12 @@ export type JoinRoomRequest = {
   display_name: string;
   photo_url?: string | null;
   pin: string;
+  /**
+   * Anonymous guests replay the participant_id from their first join so
+   * a rejoin reconnects to their existing slot instead of being told the
+   * room is full. Signed-in users omit it (matched by session).
+   */
+  participant_id?: string | null;
 };
 
 export type JoinRoomResponse = {
@@ -170,8 +176,11 @@ export function endRoom(roomId: string): Promise<Room> {
   return api.post<Room>(`/v1/rooms/${roomId}/end`);
 }
 
-export function leaveRoom(roomId: string): Promise<void> {
-  return api.post<void>(`/v1/rooms/${roomId}/leave`);
+/** Guests pass the participant_id they got from join; signed-in users omit it. */
+export function leaveRoom(roomId: string, participantId?: string): Promise<void> {
+  return api.post<void>(`/v1/rooms/${roomId}/leave`, {
+    participant_id: participantId ?? null,
+  });
 }
 
 export function promoteRoom(roomId: string): Promise<Room> {
