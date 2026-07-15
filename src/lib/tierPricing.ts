@@ -32,12 +32,12 @@ export const TIER_PRICING: Record<TierId, TierPricing> = {
   together: {
     priceLabel: "$20",
     priceSuffix: "/ month",
-    unit: "for two · watch party up to 12",
+    unit: "for two",
   },
   crew: {
     priceLabel: "$25",
     priceSuffix: "/ month",
-    unit: "watch party · up to 12 people",
+    unit: "watch party · up to 5 people",
   },
 };
 

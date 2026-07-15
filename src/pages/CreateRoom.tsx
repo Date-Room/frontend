@@ -111,7 +111,7 @@ const PLANS: PlanMeta[] = [
     priceHint: "Together subscription",
     group: "subscription",
     highlight: true,
-    features: ["Persistent room, same code", "Vision board & bookshelf", "Watch party up to 12", "Recap timeline"],
+    features: ["Persistent room, same code", "Vision board & bookshelf", "Just for the two of you", "Recap timeline"],
   },
   {
     id: "crew",
@@ -122,7 +122,7 @@ const PLANS: PlanMeta[] = [
     package: "subscription",
     priceHint: "Crew subscription",
     group: "subscription",
-    features: ["Persistent group room", "Vision board & bookshelf", "Group watch parties", "Up to 12 people"],
+    features: ["Persistent group room", "Vision board & bookshelf", "Group watch parties", "Up to 5 people"],
   },
 ];
 
