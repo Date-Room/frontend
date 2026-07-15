@@ -4,6 +4,7 @@
 import { api } from "@/lib/api";
 import {
   paymentRailLabel,
+  STORE_ONLY_MESSAGE,
   type PaymentProvider,
   waitForMpesaPayment,
 } from "@/lib/billing";
@@ -143,14 +144,20 @@ export function formatTimeExtensionPrice(product: TimeExtensionProduct): string 
 
 export function isTimeCheckoutReady(config: TimeExtensionConfig): boolean {
   if (config.dev_checkout_enabled) return true;
+  if (config.payment_provider === "store") return false;
   return config.payment_provider === "mpesa"
     ? config.mpesa_configured
     : config.stripe_configured;
 }
 
+export function isTimeStoreCheckout(config: TimeExtensionConfig): boolean {
+  return config.payment_provider === "store" && !config.dev_checkout_enabled;
+}
+
 export function timeCheckoutBlockedMessage(
   config: TimeExtensionConfig,
 ): string | null {
+  if (isTimeStoreCheckout(config)) return STORE_ONLY_MESSAGE;
   if (config.payment_provider === "mpesa" && !config.country_code) {
     return "Set your country in Manage profile before paying with M-Pesa.";
   }
@@ -169,6 +176,10 @@ export async function purchaseTimeExtension(
   if (config.dev_checkout_enabled) {
     const { expires_at } = await devPurchaseTimeExtension(roomId, product);
     return { result: "completed", expires_at };
+  }
+
+  if (config.payment_provider === "store") {
+    throw new Error(STORE_ONLY_MESSAGE);
   }
 
   if (config.payment_provider === "mpesa") {

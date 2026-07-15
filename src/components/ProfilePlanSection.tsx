@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, Plus, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PaymentCheckout } from "@/components/PaymentCheckout";
+import { StoreDownloadCta } from "@/components/StoreDownloadCta";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,7 @@ import {
   type BillingConfig,
   type Entitlement,
   checkoutBlockedMessage,
+  isStoreCheckout,
   paymentRailLabel,
 } from "@/lib/billing";
 import {
@@ -169,7 +171,9 @@ export function ProfilePlanSection({
           </div>
           {billingConfig && !paywallOpen && (
             <span className="text-[11px] text-muted-foreground">
-              Pay with {paymentRailLabel(billingConfig.payment_provider)}
+              {isStoreCheckout(billingConfig)
+                ? "Purchases in the app"
+                : `Pay with ${paymentRailLabel(billingConfig.payment_provider)}`}
             </span>
           )}
         </div>
@@ -274,7 +278,9 @@ export function ProfilePlanSection({
           <DialogHeader>
             <DialogTitle className="font-serif font-semibold text-xl">{upgradeTitle}</DialogTitle>
           </DialogHeader>
-          {checkoutBlocked ? (
+          {billingConfig && isStoreCheckout(billingConfig) ? (
+            <StoreDownloadCta note={`${upgradeTitle} is available in the DateRoom app.`} />
+          ) : checkoutBlocked ? (
             <div className="space-y-4 text-sm text-muted-foreground">
               <p>{checkoutBlocked}</p>
               {checkoutBlocked.includes("country") && (
