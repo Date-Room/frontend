@@ -6,6 +6,7 @@ import {
   defaultTimeExtensionConfig,
   formatTimeExtensionPrice,
   getTimeExtensionConfig,
+  isTimeStoreCheckout,
   purchaseTimeExtension,
   resolveTimeExtensionConfig,
   timeCheckoutBlockedMessage,
@@ -13,6 +14,7 @@ import {
   type TimeExtensionProductId,
 } from "@/lib/timeExtensions";
 import { paymentRailLabel } from "@/lib/billing";
+import { StoreDownloadCta } from "@/components/StoreDownloadCta";
 import { cn } from "@/lib/utils";
 
 type AddMoreTimeCheckoutProps = {
@@ -49,6 +51,7 @@ export function AddMoreTimeCheckout({
 
   const config = resolveTimeExtensionConfig(serverConfig);
   const blocked = timeCheckoutBlockedMessage(config);
+  const isStore = isTimeStoreCheckout(config);
   const isMpesa = config.payment_provider === "mpesa";
   const loadError =
     isError && error instanceof Error ? error.message : isError ? "Could not load checkout." : null;
@@ -108,7 +111,7 @@ export function AddMoreTimeCheckout({
         </p>
       )}
 
-      {blocked && (
+      {blocked && !isStore && (
         <p className="rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 text-xs leading-relaxed text-amber/90">
           {blocked}
         </p>
@@ -130,31 +133,41 @@ export function AddMoreTimeCheckout({
                 <p className="font-medium text-cream">{product.label}</p>
                 <p className="text-xs text-muted-foreground">{price}</p>
               </div>
-              <button
-                type="button"
-                disabled={
-                  Boolean(blocked) ||
-                  busy ||
-                  busyProduct !== null ||
-                  (isMpesa && !phone.trim())
-                }
-                onClick={() => void handleBuy(product)}
-                className={cn(
-                  "shrink-0 rounded-full border border-primary/35 bg-primary/15 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-primary transition hover:bg-primary/25 disabled:opacity-50",
-                )}
-              >
-                {busy ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                ) : (
-                  <>Add · {price}</>
-                )}
-              </button>
+              {isStore ? (
+                <span className="shrink-0 rounded-full border border-white/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  In app
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  disabled={
+                    Boolean(blocked) ||
+                    busy ||
+                    busyProduct !== null ||
+                    (isMpesa && !phone.trim())
+                  }
+                  onClick={() => void handleBuy(product)}
+                  className={cn(
+                    "shrink-0 rounded-full border border-primary/35 bg-primary/15 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-primary transition hover:bg-primary/25 disabled:opacity-50",
+                  )}
+                >
+                  {busy ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                  ) : (
+                    <>Add · {price}</>
+                  )}
+                </button>
+              )}
             </li>
           );
         })}
       </ul>
 
-      {isMpesa && !blocked && (
+      {isStore && (
+        <StoreDownloadCta note="Add more time in the DateRoom app." />
+      )}
+
+      {!isStore && isMpesa && !blocked && (
         <div className="space-y-2">
           <label
             htmlFor="time-mpesa-phone"
@@ -185,7 +198,7 @@ export function AddMoreTimeCheckout({
         </div>
       )}
 
-      {!isMpesa && !blocked && (
+      {!isStore && !isMpesa && !blocked && (
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           Tap Add — you&apos;ll complete payment with{" "}
           {paymentRailLabel(config.payment_provider)} and return here with extra time.

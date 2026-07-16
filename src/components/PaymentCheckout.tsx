@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import {
   checkoutBlockedMessage,
   formatProductPrice,
-  getBillingConfig,
+  isStoreCheckout,
   paymentRailLabel,
   purchaseProduct,
   type BillingConfig,
@@ -15,6 +15,7 @@ import { COUNTRIES, flagFor } from "@/lib/countries";
 import { tierPriceForProduct } from "@/lib/tierPricing";
 import { updateMe } from "@/lib/users";
 import { cn } from "@/lib/utils";
+import { StoreDownloadCta } from "@/components/StoreDownloadCta";
 
 type PaymentCheckoutProps = {
   config: BillingConfig;
@@ -54,6 +55,7 @@ export function PaymentCheckout({
     tierPriceForProduct(product, config.products) ||
     (productMeta ? formatProductPrice(productMeta) : null);
   const isMpesa = config.payment_provider === "mpesa";
+  const isStore = isStoreCheckout(config);
   const needsCountry = !config.country_code;
   const blocked = checkoutBlockedMessage(config);
 
@@ -70,11 +72,9 @@ export function PaymentCheckout({
     try {
       await updateMe({ country: code });
       await onConfigRefresh?.();
-      // The server decides the payment rail (it routes on the account's
-      // billing region, not the profile country we just saved) — ask it
-      // rather than re-deriving with a hand-kept country list.
-      const fresh = await getBillingConfig();
-      toast.success(`Location set — pay with ${paymentRailLabel(fresh.payment_provider)}.`);
+      // Routing follows the server-persisted billing region, not this
+      // profile country — so saving here doesn't change the payment rail.
+      toast.success("Location saved to your profile.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save country.");
     } finally {
@@ -99,6 +99,19 @@ export function PaymentCheckout({
       toast.error(e instanceof Error ? e.message : "Payment could not start.");
       setBusy(false);
     }
+  }
+
+  if (isStore) {
+    return (
+      <div className={cn("space-y-3", className)}>
+        {priceHint && (
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {label} · {priceHint}
+          </p>
+        )}
+        <StoreDownloadCta />
+      </div>
+    );
   }
 
   return (
@@ -145,7 +158,8 @@ export function PaymentCheckout({
             ))}
           </ul>
           <p className="text-[11px] leading-relaxed text-muted-foreground">
-            We use this to show M-Pesa in Kenya, Tanzania, and Uganda — Stripe everywhere else.
+            Saved to your profile. Your payment region is set separately, so this
+            doesn&apos;t change how you pay.
           </p>
         </div>
       )}

@@ -4,8 +4,13 @@
 import { api } from "@/lib/api";
 
 export type AccountTier = "try" | "date_pack" | "long_pack" | "together" | "crew";
-export type PaymentProvider = "stripe" | "mpesa";
+// "store" = web can't take payment in this region (non-KE while card
+// checkout is dark); purchases happen in the native app instead.
+export type PaymentProvider = "stripe" | "mpesa" | "store";
 export type BillableProduct = "date_pack" | "long_pack" | "together" | "crew";
+
+/** Shown wherever a store-region user would otherwise see a checkout. */
+export const STORE_ONLY_MESSAGE = "Purchases are available in the DateRoom app.";
 
 export type SubscriptionSnapshot = {
   id: string;
@@ -170,6 +175,12 @@ export async function purchaseProduct(
     return "completed";
   }
 
+  // Store regions can't pay on the web — callers should route to the app
+  // download instead of reaching here; this is the safety net.
+  if (config.payment_provider === "store") {
+    throw new Error(STORE_ONLY_MESSAGE);
+  }
+
   if (config.payment_provider === "mpesa") {
     if (!phone?.trim()) {
       throw new Error("Enter your M-Pesa mobile number.");
@@ -208,18 +219,30 @@ export function formatProductPrice(product: BillingProduct): string | null {
 }
 
 export function paymentRailLabel(provider: PaymentProvider): string {
-  return provider === "mpesa" ? "M-Pesa" : "Stripe";
+  if (provider === "mpesa") return "M-Pesa";
+  if (provider === "store") return "the DateRoom app";
+  return "Stripe";
+}
+
+/** True when this region's purchases happen in the native app, not the web. */
+export function isStoreCheckout(config: {
+  payment_provider: PaymentProvider;
+  dev_checkout_enabled?: boolean;
+}): boolean {
+  return config.payment_provider === "store" && !config.dev_checkout_enabled;
 }
 
 /** True when the server can start checkout on the user's payment rail. */
 export function isCheckoutReady(config: BillingConfig): boolean {
   if (config.dev_checkout_enabled) return true;
+  if (config.payment_provider === "store") return false;
   return config.payment_provider === "mpesa"
     ? config.mpesa_configured
     : config.stripe_configured;
 }
 
 export function checkoutBlockedMessage(config: BillingConfig): string | null {
+  if (isStoreCheckout(config)) return STORE_ONLY_MESSAGE;
   if (!isCheckoutReady(config)) {
     return `Checkout is not available yet — ${paymentRailLabel(config.payment_provider)} is not configured on the server.`;
   }
