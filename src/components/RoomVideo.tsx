@@ -9,16 +9,29 @@ import {
   useIsSpeaking,
   useRoomContext,
 } from "@livekit/components-react";
-import { Track, DisconnectReason, RoomEvent } from "livekit-client";
+import { Track, DisconnectReason, RoomEvent, VideoPresets, type RoomOptions } from "livekit-client";
 import { toast } from "sonner";
 import "@livekit/components-styles";
 import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Maximize2, Minimize2, Minus, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AmbientController } from "@/components/AmbientController";
 import { getInvitedGuestName } from "@/lib/invitedGuest";
 import { livekitToken } from "@/lib/rooms";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import type { PresenceState } from "@/lib/realtime/roomChannel";
+
+// Adaptive stream + dynacast let LiveKit stop sending layers nobody is
+// watching; simulcast gives ambient mode a defined "lowest" layer to fall
+// back to. Stable reference so the Room isn't reconfigured on re-render.
+const LIVEKIT_ROOM_OPTIONS: RoomOptions = {
+  adaptiveStream: true,
+  dynacast: true,
+  publishDefaults: {
+    simulcast: true,
+    videoSimulcastLayers: [VideoPresets.h180, VideoPresets.h360],
+  },
+};
 
 const REACTIONS = ["❤️", "🔥", "😂", "🤔", "🥹"];
 
@@ -715,8 +728,9 @@ export function RoomVideo({
       connect
       audio
       video
+      options={LIVEKIT_ROOM_OPTIONS}
       data-lk-theme="default"
-      className="h-full w-full"
+      className="relative h-full w-full"
       onError={(e) => {
         // Surface connect/publish errors instead of silently swallowing them.
         toast.error(e instanceof Error ? e.message : "Call error.");
@@ -736,6 +750,7 @@ export function RoomVideo({
       }}
     >
       <MicKeepAlive />
+      <AmbientController />
       <Stage
         onLeave={onLeave ?? (() => {})}
         variant={variant}

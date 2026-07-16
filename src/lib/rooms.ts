@@ -131,6 +131,9 @@ export type RoomExperience = {
   curated_activity_ids: string[];
   expires_at?: string | null;
   max_participants?: number;
+  /** Ambient/idle mode config (feature-flagged off by default server-side). */
+  ambient_mode_enabled?: boolean;
+  ambient_idle_minutes?: number;
 };
 
 export type LiveKitToken = {
@@ -166,6 +169,18 @@ export function getRoomExperienceApi(
     ? `?participant_id=${encodeURIComponent(participantId)}`
     : "";
   return api.get<RoomExperience>(`/v1/rooms/${roomId}/experience${qs}`);
+}
+
+/** Report an ambient/active transition for usage tagging (best-effort). */
+export function postAmbientState(
+  roomId: string,
+  state: "ambient" | "active",
+  participantId?: string,
+): Promise<void> {
+  return api.post<void>(`/v1/rooms/${roomId}/ambient`, {
+    state,
+    participant_id: participantId ?? null,
+  });
 }
 
 export function startRoom(roomId: string): Promise<Room> {
