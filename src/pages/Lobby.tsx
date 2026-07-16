@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { getRoomByCode, joinRoom, type InviteCard } from "@/lib/rooms";
+import { setSmartAppBanner, clearSmartAppBanner } from "@/lib/appBanner";
 import { saveRoomPlanFromServer } from "@/lib/roomExperience";
 import { getMe, updateMe } from "@/lib/users";
 import { authClient } from "@/lib/authClient";
@@ -47,6 +48,14 @@ export default function Lobby() {
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, []);
+
+  // iOS Smart App Banner — only while on the invite/lobby route, carrying
+  // this invite URL so a tap deep-links straight into the app's lobby.
+  // No-ops until VITE_APPSTORE_APP_ID is set.
+  useEffect(() => {
+    setSmartAppBanner(window.location.href);
+    return () => clearSmartAppBanner();
+  }, [code, pinParam]);
 
   useEffect(() => {
     if (!code) return;
