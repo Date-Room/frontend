@@ -505,7 +505,7 @@ function Stage({
             buttons don't start a window drag on the parent. */}
         <div
           onPointerDown={(e) => e.stopPropagation()}
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex translate-y-1 items-center justify-center gap-1.5 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-2 pb-2 pt-8 opacity-0 transition-all duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100"
+          className="absolute inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-center gap-1.5 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-2 pb-2 pt-8 transition-all duration-200 pointer-events-auto translate-y-0 opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:translate-y-1 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:pointer-events-auto [@media(hover:hover)]:group-hover:translate-y-0 [@media(hover:hover)]:group-hover:opacity-100"
         >
           <button
             onClick={() => void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}

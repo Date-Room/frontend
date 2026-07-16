@@ -132,11 +132,31 @@ export type StageItem = {
 const EDGE = 12;
 const TOP_PAD = 68;
 const BOTTOM_PAD = 96;
+// Desktop call window: large, freely resizable/draggable.
 const PORTRAIT = { w: 336, h: 576 };
 const LANDSCAPE = { w: 576, h: 336 };
+// Phone default: a compact corner window so the activity stays usable; the
+// call enlarges to (near) full-width only when the user taps expand. Sized
+// to hold the control row without covering the whole stage.
+const COMPACT_PORTRAIT = { w: 168, h: 252 };
+const COMPACT_LANDSCAPE = { w: 252, h: 168 };
 /** Default size is the biggest; drag-resize shrinks down to 2/3 of it. */
 const MIN_SCALE = 2 / 3;
 type Corner = "nw" | "ne" | "sw" | "se";
+
+/** True on phone-width / touch viewports — drives the compact call layout. */
+function useCompactViewport(): boolean {
+  const [compact, setCompact] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const on = () => setCompact(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return compact;
+}
 
 /**
  * The Our Room "stage" — a Vision-Board-sized card that mounts the chosen
@@ -230,11 +250,29 @@ export function RoomStage({
       window.clearTimeout(notifTimer.current);
     };
   }, [room.channel, room.senderId, partnerName]);
+  const compact = useCompactViewport();
   const [portrait, setPortrait] = useState(true);
   const [scale, setScale] = useState(1);
-  const size = portrait ? PORTRAIT : LANDSCAPE;
-  const curW = Math.round(size.w * scale);
-  const curH = Math.round(size.h * scale);
+  // Phones start as a small bubble; expand toggles a large (near-fullscreen)
+  // call. Desktop keeps the large window and freeform corner-resize. Lazy
+  // init off the viewport so desktop paints large immediately (no flicker).
+  const [expanded, setExpanded] = useState(
+    () => typeof window === "undefined" || !window.matchMedia("(max-width: 640px)").matches,
+  );
+  useEffect(() => {
+    setExpanded(!compact);
+  }, [compact]);
+  const base = expanded
+    ? portrait
+      ? PORTRAIT
+      : LANDSCAPE
+    : portrait
+      ? COMPACT_PORTRAIT
+      : COMPACT_LANDSCAPE;
+  const effScale = compact ? 1 : scale;
+  const size = base;
+  const curW = Math.round(size.w * effScale);
+  const curH = Math.round(size.h * effScale);
 
   // Categories that actually have staged items available, each carrying its
   // resolved StageItem[] — mirrors the mobile activity menu groupings.
@@ -286,8 +324,20 @@ export function RoomStage({
   );
   useEffect(() => {
     if (pos !== null || !callActive) return;
-    setPos({ x: window.innerWidth - PORTRAIT.w - EDGE, y: TOP_PAD + 8 });
-  }, [pos, callActive]);
+    // Compact: tuck the bubble into the bottom-right (out of the stage's way).
+    // Large/desktop: top-right as before.
+    const x = Math.max(EDGE, window.innerWidth - curW - EDGE);
+    const y = compact
+      ? Math.max(TOP_PAD, window.innerHeight - curH - BOTTOM_PAD)
+      : TOP_PAD + 8;
+    setPos({ x, y });
+  }, [pos, callActive, compact, curW, curH]);
+
+  // Keep the window on-screen when its size changes (expand/collapse/rotate).
+  useEffect(() => {
+    setPos((p) => (p ? clamp(p.x, p.y, curW, curH) : p));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [curW, curH]);
 
   // ── Call PiP ↔ Watch-fullscreen bridge ──
   // When Watch enters native fullscreen, the browser only paints the fullscreen
@@ -639,31 +689,40 @@ export function RoomStage({
             className="h-full w-full cursor-grab overflow-hidden rounded-xl active:cursor-grabbing"
             onPointerDown={startDrag}
           >
-            <RoomVideo variant="pip" onLeave={onLeaveCall} />
+            <RoomVideo
+              variant="pip"
+              onLeave={onLeaveCall}
+              // Compact bubble ↔ large call, shown as visible expand/shrink
+              // buttons in the (touch-always-visible) control bar.
+              onExpand={expanded ? undefined : () => setExpanded(true)}
+              onCollapse={expanded ? () => setExpanded(false) : undefined}
+            />
           </div>
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => setPortrait((v) => !v)}
             aria-label="Rotate call"
-            className="absolute right-2 top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-cream opacity-0 backdrop-blur transition duration-200 hover:bg-black/70 group-hover:opacity-100"
+            className="absolute right-2 top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-cream opacity-0 backdrop-blur transition duration-200 hover:bg-black/70 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
           >
             <RotateCw className="h-3.5 w-3.5" />
           </button>
-          {/* Corner resize handles — anchored to the opposite corner. */}
-          {(["nw", "ne", "sw", "se"] as Corner[]).map((corner) => (
-            <span
-              key={corner}
-              onPointerDown={startResize(corner)}
-              className={cn(
-                "absolute z-10 h-5 w-5",
-                corner === "nw" && "left-0 top-0 cursor-nwse-resize",
-                corner === "ne" && "right-0 top-0 cursor-nesw-resize",
-                corner === "sw" && "bottom-0 left-0 cursor-nesw-resize",
-                corner === "se" && "bottom-0 right-0 cursor-nwse-resize",
-              )}
-            />
-          ))}
+          {/* Corner resize handles — desktop only (invisible/unusable on touch;
+              phones use the expand/shrink toggle instead). */}
+          {!compact &&
+            (["nw", "ne", "sw", "se"] as Corner[]).map((corner) => (
+              <span
+                key={corner}
+                onPointerDown={startResize(corner)}
+                className={cn(
+                  "absolute z-10 h-5 w-5",
+                  corner === "nw" && "left-0 top-0 cursor-nwse-resize",
+                  corner === "ne" && "right-0 top-0 cursor-nesw-resize",
+                  corner === "sw" && "bottom-0 left-0 cursor-nesw-resize",
+                  corner === "se" && "bottom-0 right-0 cursor-nwse-resize",
+                )}
+              />
+            ))}
         </div>,
           pipHostRef.current,
         )}

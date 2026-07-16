@@ -489,7 +489,7 @@ function RoomShell({
       <PageShell
         orbs={false}
         vignette={false}
-        className="min-h-0 h-screen flex flex-col overflow-hidden"
+        className="min-h-0 h-[100dvh] flex flex-col overflow-hidden"
         style={shellStyle}
       >
         <LiveRoomAmbianceBackdrop preset={activeAmbiance} />
