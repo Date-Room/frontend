@@ -130,9 +130,24 @@ export default function Lobby() {
     }
     setJoining(true);
     try {
-      const res = await joinRoom(invite.id, { display_name: displayName, pin });
+      // Replay the participant_id from a prior join of THIS room (if any)
+      // so an anonymous guest reopening the invite link reconnects to
+      // their existing slot instead of hitting "Room is full".
+      let priorParticipantId: string | undefined;
+      try {
+        priorParticipantId =
+          localStorage.getItem(`dateroom_participant:${invite.id}`) ?? undefined;
+      } catch {
+        /* ignore */
+      }
+      const res = await joinRoom(invite.id, {
+        display_name: displayName,
+        pin,
+        participant_id: priorParticipantId,
+      });
       try {
         localStorage.setItem("dateroom_guest_name", displayName);
+        localStorage.setItem(`dateroom_participant:${invite.id}`, res.participant_id);
       } catch {
         /* ignore */
       }
