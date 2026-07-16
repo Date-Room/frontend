@@ -58,14 +58,14 @@ const TIER_OPTIONS: TierOption[] = [
     id: "together",
     product: "together",
     title: "Together",
-    desc: "Persistent room + watch party for up to 12.",
+    desc: "A persistent room, just for the two of you.",
     emoji: "🏠",
   },
   {
     id: "crew",
     product: "crew",
     title: "Crew",
-    desc: "Group watch parties for 10+ people.",
+    desc: "Group watch parties for up to 5 people.",
     emoji: "🎬",
   },
 ];
