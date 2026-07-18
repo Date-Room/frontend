@@ -38,6 +38,7 @@ import { MusicPlayerBar, MusicRoomProvider } from "@/components/MusicRoom";
 import { ActivityBoundary } from "@/components/RoomErrorBoundary";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
+import { backgroundMoodLabel } from "@/lib/roomAmbiance";
 import {
   parseFridgeNotes,
   parseVisionBoard,
@@ -231,6 +232,18 @@ export function RoomStage({
       if (e.kind === "vision_removed") {
         const id = (e.payload as { id?: string }).id;
         if (id) setRemovedVisionIds((prev) => new Set(prev).add(id));
+        return;
+      }
+      if (e.kind === "customize") {
+        // Partner changed the room's look — announce it so a background
+        // swap reads as a deliberate gesture, not a glitch.
+        const d = e.payload as { background_id?: string; from?: string; by?: string };
+        if (d.from === room.senderId) return; // don't notify my own change
+        const label = backgroundMoodLabel(d.background_id ?? null);
+        const who = d.by?.trim() || partnerName;
+        setNotif({ id: Date.now(), text: `${who} set the room to ${label}`, target: "room_details" });
+        window.clearTimeout(notifTimer.current);
+        notifTimer.current = window.setTimeout(() => setNotif(null), 3400);
         return;
       }
       if (e.kind !== "activity") return;
