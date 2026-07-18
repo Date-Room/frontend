@@ -6,6 +6,7 @@ import { useRoomSession } from "@/context/RoomSessionContext";
 import { useRoomCustomization } from "@/context/RoomCustomizationContext";
 import { listMyRooms, updateRoom } from "@/lib/rooms";
 import { AMBIANCE_PRESETS, PLAIN_MOOD } from "@/lib/ambiance";
+import { backgroundMoodLabel } from "@/lib/roomAmbiance";
 import { cn } from "@/lib/utils";
 
 type CopiedKey = "code" | "pin" | "link" | null;
@@ -80,7 +81,14 @@ export function RoomSettings() {
       await updateRoom(session.roomId, { background_id: id });
       await qc.invalidateQueries({ queryKey: ["my-rooms"] });
       if (code) await qc.invalidateQueries({ queryKey: ["invite-card", code] });
-      void session.channel.broadcast("customize", {});
+      // Carry who + what so the partner's client can announce the change
+      // ("Josh set the room to Ocean hush") rather than swapping silently.
+      void session.channel.broadcast("customize", {
+        background_id: id,
+        from: session.senderId,
+        by: session.displayName,
+      });
+      toast.success(`Room set to ${backgroundMoodLabel(id)}.`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't update the room.");
     } finally {

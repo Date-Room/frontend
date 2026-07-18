@@ -1,4 +1,5 @@
 import {
+  ambianceMeta,
   isAmbiancePresetId,
   PLAIN_MOOD,
   resolveAmbiancePreset,
@@ -30,6 +31,15 @@ export function resolveMoodFromBackgroundId(
 ): LobbyMood {
   if (id === PLAIN_MOOD) return PLAIN_MOOD;
   return ambianceFromBackgroundId(id) ?? PLAIN_MOOD;
+}
+
+/** Human label for a background_id, for change notices / toasts —
+ *  e.g. "Ocean hush 🌊", or "a plain room" when nothing themed is set. */
+export function backgroundMoodLabel(id: string | null | undefined): string {
+  const mood = resolveMoodFromBackgroundId(id);
+  if (mood === PLAIN_MOOD) return "a plain room";
+  const meta = ambianceMeta(mood);
+  return `${meta.label} ${meta.emoji}`;
 }
 
 /** RGB (0–255) → HSL, hue in deg, sat/lum in %. */
