@@ -50,8 +50,7 @@ import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { COUNTRIES, countryByCode, flagFor, type Country } from "@/lib/countries";
-
-const MAX_PHOTO_BYTES = 750 * 1024;
+import { resizeAvatar } from "@/lib/avatarImage";
 
 /**
  * Profile page — redesigned to match mobile `profile_view.dart`.
@@ -150,34 +149,19 @@ export default function Settings() {
   }
 
   async function pickPhoto(file: File) {
-    if (!file.type.startsWith("image/")) {
-      toast.error("Choose an image file.");
-      return;
-    }
-    if (file.size > MAX_PHOTO_BYTES) {
-      toast.error("Use an image under 750 KB.");
-      return;
-    }
     setUploading(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const dataUrl = reader.result as string;
-        const updated = await updateMe({ photo_url: dataUrl });
-        setMe(updated);
-        setAvatarUrl(updated.photo_url || null);
-        toast.success("Photo updated.");
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Couldn't upload photo.");
-      } finally {
-        setUploading(false);
-      }
-    };
-    reader.onerror = () => {
+    try {
+      // Downscale to a small square JPEG — no user-visible size limit.
+      const dataUrl = await resizeAvatar(file);
+      const updated = await updateMe({ photo_url: dataUrl });
+      setMe(updated);
+      setAvatarUrl(updated.photo_url || null);
+      toast.success("Photo updated.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't upload photo.");
+    } finally {
       setUploading(false);
-      toast.error("Couldn't read the file.");
-    };
-    reader.readAsDataURL(file);
+    }
   }
 
   async function handleSignOut() {

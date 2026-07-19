@@ -7,19 +7,7 @@ import { CardPage } from "@/components/CardPage";
 import { UserAvatarImg } from "@/components/UserAvatarImg";
 import { authClient } from "@/lib/authClient";
 import { getMe, updateMe, type UserMe } from "@/lib/users";
-
-const MAX_PHOTO_BYTES = 750 * 1024;
-
-/** Compress a File into a base64 data URL ≤ MAX_PHOTO_BYTES. Mirrors
- *  Settings's photo upload logic so the profile-row stays small. */
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Could not read file."));
-    reader.readAsDataURL(file);
-  });
-}
+import { resizeAvatar } from "@/lib/avatarImage";
 
 /**
  * First-run profile gate.
@@ -73,12 +61,9 @@ export default function ProfileComplete() {
   const initial = (displayName || me?.email || "?")[0]?.toUpperCase();
 
   async function onPickPhoto(file: File) {
-    if (file.size > MAX_PHOTO_BYTES) {
-      toast.error("Photo's too big — pick one under 750 KB.");
-      return;
-    }
     try {
-      const dataUrl = await readFileAsDataUrl(file);
+      // Downscale to a small square JPEG — no user-visible size limit.
+      const dataUrl = await resizeAvatar(file);
       setPhotoUrl(dataUrl);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't load that photo.");
