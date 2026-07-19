@@ -52,6 +52,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  deviceLabel,
+  groupDevices,
+  loadDevicePreference,
+  saveDevicePreference,
+} from "@/lib/devices";
 import { getInvitedGuestName, saveInvitedGuestName } from "@/lib/invitedGuest";
 import { saveRoomPlanFromServer, defaultCuratedForPackage } from "@/lib/roomExperience";
 import { getMe } from "@/lib/users";
@@ -156,6 +162,41 @@ export default function PreRoom() {
   const streamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Device picker — remembered preference per kind ("" = system default).
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedMic, setSelectedMic] = useState(() => loadDevicePreference("audioinput") ?? "");
+  const [selectedCam, setSelectedCam] = useState(() => loadDevicePreference("videoinput") ?? "");
+  const groupedDevices = useMemo(() => groupDevices(devices), [devices]);
+
+  // Re-enumerate once the preview grant lands (labels appear) and on hot-plug.
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      navigator.mediaDevices
+        .enumerateDevices()
+        .then((list) => {
+          if (!cancelled) setDevices(list);
+        })
+        .catch(() => {});
+    };
+    refresh();
+    navigator.mediaDevices.addEventListener?.("devicechange", refresh);
+    return () => {
+      cancelled = true;
+      navigator.mediaDevices.removeEventListener?.("devicechange", refresh);
+    };
+  }, [stream]);
+
+  function pickMic(id: string) {
+    setSelectedMic(id);
+    saveDevicePreference("audioinput", id || null);
+  }
+  function pickCam(id: string) {
+    // Persist + swap the live preview to the chosen camera (via effect dep).
+    setSelectedCam(id);
+    saveDevicePreference("videoinput", id || null);
+  }
+
   useEffect(() => {
     try {
       localStorage.setItem("dr_pre_camera_enabled", String(cameraEnabled));
@@ -184,7 +225,10 @@ export default function PreRoom() {
     let cancelled = false;
     if (cameraEnabled) {
       navigator.mediaDevices
-        .getUserMedia({ video: true, audio: false })
+        .getUserMedia({
+          video: selectedCam ? { deviceId: { ideal: selectedCam } } : true,
+          audio: false,
+        })
         .then((s) => {
           if (cancelled) {
             s.getTracks().forEach((t) => t.stop());
@@ -213,7 +257,7 @@ export default function PreRoom() {
     return () => {
       cancelled = true;
     };
-  }, [cameraEnabled]);
+  }, [cameraEnabled, selectedCam]);
 
   // Server-authoritative list of my rooms — gets us the canonical
   // code/pin/state/expiry without a per-page-load /by-code call.
@@ -706,6 +750,49 @@ export default function PreRoom() {
                   </span>
                 </div>
               </div>
+
+              {/* Device pickers — only shown once we can enumerate. Empty
+                  labels (pre-permission) fall back to "Microphone 1/2…". */}
+              {(groupedDevices.audioinput.length > 0 ||
+                groupedDevices.videoinput.length > 0) && (
+                <div className="flex w-full max-w-sm flex-col gap-2.5">
+                  {groupedDevices.audioinput.length > 0 && (
+                    <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Microphone
+                      <select
+                        value={selectedMic}
+                        onChange={(e) => pickMic(e.target.value)}
+                        className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm normal-case tracking-normal text-cream focus:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      >
+                        <option value="">System default</option>
+                        {groupedDevices.audioinput.map((d, i) => (
+                          <option key={d.deviceId || i} value={d.deviceId}>
+                            {deviceLabel(d, i, "audioinput")}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  {groupedDevices.videoinput.length > 0 && (
+                    <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                      Camera
+                      <select
+                        value={selectedCam}
+                        onChange={(e) => pickCam(e.target.value)}
+                        className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm normal-case tracking-normal text-cream focus:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      >
+                        <option value="">System default</option>
+                        {groupedDevices.videoinput.map((d, i) => (
+                          <option key={d.deviceId || i} value={d.deviceId}>
+                            {deviceLabel(d, i, "videoinput")}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
+              )}
+
               <p className="text-[11px] text-muted-foreground text-center max-w-sm mt-1">
                 Choose your settings here. They will carry over automatically when you start the date.
               </p>
