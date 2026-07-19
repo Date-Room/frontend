@@ -15,6 +15,8 @@ import "@livekit/components-styles";
 import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Maximize2, Minimize2, Minus, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AmbientController } from "@/components/AmbientController";
+import { DeviceMenu, DeviceChangeToaster } from "@/components/DeviceMenu";
+import { loadDevicePreference } from "@/lib/devices";
 import { getInvitedGuestName } from "@/lib/invitedGuest";
 import { livekitToken } from "@/lib/rooms";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
@@ -521,6 +523,7 @@ function Stage({
           >
             {isCameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4 text-rose" />}
           </button>
+          <DeviceMenu triggerClassName={ctrlBtn} iconClassName="h-4 w-4" />
           {/* FaceTime-style capture — grabs both faces to a photo. */}
           <button
             onClick={startCapture}
@@ -631,6 +634,13 @@ function Stage({
         >
           {isCameraEnabled ? <Video className="w-4 h-4 text-cream" /> : <VideoOff className="w-4 h-4 text-rose" />}
         </button>
+        <DeviceMenu
+          triggerClassName={cn(
+            "rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center justify-center transition",
+            isPip ? "h-8 w-8" : "h-11 w-11",
+          )}
+          iconClassName="w-4 h-4 text-cream"
+        />
         {!isPip && (
           <button
             onClick={startCapture}
@@ -710,6 +720,26 @@ export function RoomVideo({
     };
   }, [room.roomId, room.participantId]);
 
+  // Apply saved device preferences at join. Computed once per mount (not per
+  // render) so the Room isn't reconfigured mid-call; deviceId is an *ideal*
+  // constraint, so an unplugged saved device gracefully falls back to default.
+  const roomOptions = useMemo<RoomOptions>(() => {
+    const audioId = loadDevicePreference("audioinput");
+    const videoId = loadDevicePreference("videoinput");
+    if (!audioId && !videoId) return LIVEKIT_ROOM_OPTIONS;
+    return {
+      ...LIVEKIT_ROOM_OPTIONS,
+      audioCaptureDefaults: {
+        ...(LIVEKIT_ROOM_OPTIONS.audioCaptureDefaults ?? {}),
+        ...(audioId ? { deviceId: audioId } : {}),
+      },
+      videoCaptureDefaults: {
+        ...(LIVEKIT_ROOM_OPTIONS.videoCaptureDefaults ?? {}),
+        ...(videoId ? { deviceId: videoId } : {}),
+      },
+    };
+  }, []);
+
   if (error) {
     return <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">{error}</div>;
   }
@@ -728,7 +758,7 @@ export function RoomVideo({
       connect
       audio
       video
-      options={LIVEKIT_ROOM_OPTIONS}
+      options={roomOptions}
       data-lk-theme="default"
       className="relative h-full w-full"
       onError={(e) => {
@@ -751,6 +781,7 @@ export function RoomVideo({
     >
       <MicKeepAlive />
       <AmbientController />
+      <DeviceChangeToaster />
       <Stage
         onLeave={onLeave ?? (() => {})}
         variant={variant}
