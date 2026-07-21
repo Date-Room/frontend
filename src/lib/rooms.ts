@@ -134,6 +134,8 @@ export type RoomExperience = {
   /** Ambient/idle mode config (feature-flagged off by default server-side). */
   ambient_mode_enabled?: boolean;
   ambient_idle_minutes?: number;
+  /** Chaperon (AI observer) availability — server flag AND a session room. */
+  chaperon_enabled?: boolean;
 };
 
 export type LiveKitToken = {
