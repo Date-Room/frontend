@@ -20,6 +20,8 @@ import { ambianceAccentStyle } from "@/lib/roomAmbiance";
 import { RoomAmbianceSheet } from "@/components/RoomAmbianceSheet";
 import { PageShell } from "@/components/PageShell";
 import { RoomSessionProvider, useRoomSession, type RoomIdentity } from "@/context/RoomSessionContext";
+import { ChaperonProvider } from "@/context/ChaperonContext";
+import { ChaperonMount } from "@/components/ChaperonMount";
 import {
   RoomCustomizationProvider,
   roomAccentStyle,
@@ -657,6 +659,7 @@ export default function LiveRoom() {
   const [roomPackage, setRoomPackage] = useState<RoomPackage | null>(null);
   const [curatedActivityIds, setCuratedActivityIds] = useState<CuratableActivityId[]>([]);
   const [maxParticipants, setMaxParticipants] = useState(2);
+  const [chaperonEnabled, setChaperonEnabled] = useState(false);
 
   const slot = params.get("slot") || "a";
   const participantId = params.get("participant_id") || undefined;
@@ -731,6 +734,7 @@ export default function LiveRoom() {
         const plan = saveRoomPlanFromServer(roomId, exp);
         setRoomPackage(plan.package);
         setCuratedActivityIds(plan.curatedActivityIds);
+        setChaperonEnabled(exp.chaperon_enabled === true);
         if (plan.maxParticipants) {
           setMaxParticipants(plan.maxParticipants);
         }
@@ -791,14 +795,17 @@ export default function LiveRoom() {
       maxParticipants={maxParticipants}
     >
       <RoomCustomizationProvider>
-        <RoomShell
-          expiresAt={sessionExpiresAt}
-          onExpiresAtChange={setSessionExpiresAt}
-          isHost={identity.isHost}
-          roomId={roomId}
-          roomPackage={roomPackage}
-          curatedActivityIds={curatedActivityIds}
-        />
+        <ChaperonProvider enabled={chaperonEnabled}>
+          <RoomShell
+            expiresAt={sessionExpiresAt}
+            onExpiresAtChange={setSessionExpiresAt}
+            isHost={identity.isHost}
+            roomId={roomId}
+            roomPackage={roomPackage}
+            curatedActivityIds={curatedActivityIds}
+          />
+          <ChaperonMount />
+        </ChaperonProvider>
       </RoomCustomizationProvider>
     </RoomSessionProvider>
   );

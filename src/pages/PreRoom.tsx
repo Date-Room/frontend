@@ -19,6 +19,7 @@ import {
   MicOff,
   Video,
   VideoOff,
+  ShieldCheck,
 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { UserAvatarImg } from "@/components/UserAvatarImg";
@@ -34,6 +35,7 @@ import {
   listMyRooms,
   startRoom,
   getRoomByCode,
+  getRoomExperienceApi,
   kickParticipant,
   rotateRoomPin,
   updateRoom,
@@ -43,6 +45,7 @@ import {
   type Room,
   type ParticipantInfo,
 } from "@/lib/rooms";
+import { ChaperonSetupSheet } from "@/components/ChaperonSetupSheet";
 import { RoomAmbianceSheet } from "@/components/RoomAmbianceSheet";
 import { resolveLobbyMood, type LobbyMood } from "@/lib/ambiance";
 import {
@@ -267,6 +270,17 @@ export default function PreRoom() {
     staleTime: 5_000,
   });
   const room: Room | undefined = rooms?.find((r) => r.id === id);
+
+  // Chaperon availability (server flag AND session room). Lets us pre-set the
+  // user's chaperon preferences before they enter.
+  const [chaperonSetupOpen, setChaperonSetupOpen] = useState(false);
+  const { data: chaperonExp } = useQuery({
+    queryKey: ["room-experience-chaperon", room?.id],
+    queryFn: () => getRoomExperienceApi(room!.id),
+    enabled: !!room && room.persistence !== "persistent",
+    staleTime: 60_000,
+  });
+  const chaperonAvailable = chaperonExp?.chaperon_enabled === true;
 
   // Persist the name the host typed in the create wizard (navigation
   // state on first landing, localStorage on return visits).
@@ -900,6 +914,16 @@ export default function PreRoom() {
                 {starting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
                 {live ? "Rejoin Room" : "Enter Room"}
               </button>
+              {chaperonAvailable && (
+                <button
+                  type="button"
+                  onClick={() => setChaperonSetupOpen(true)}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/[0.06] py-3 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/[0.12]"
+                >
+                  <ShieldCheck className="h-4 w-4" />
+                  Set up chaperon
+                </button>
+              )}
             </div>
 
           </div>
@@ -912,6 +936,12 @@ export default function PreRoom() {
         onOpenChange={setThemeOpen}
         current={currentMood}
         onPick={(id) => void onPickTheme(id)}
+      />
+
+      <ChaperonSetupSheet
+        open={chaperonSetupOpen}
+        onClose={() => setChaperonSetupOpen(false)}
+        variant="preferences"
       />
 
       <Dialog open={destroyOpen} onOpenChange={(o) => !destroyBusy && setDestroyOpen(o)}>
