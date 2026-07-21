@@ -20,6 +20,7 @@ import { RoomErrorBoundary } from "@/components/RoomErrorBoundary";
 import Recap from "./pages/Recap";
 import OurRoom from "./pages/OurRoom";
 import Settings from "./pages/Settings";
+import DeleteAccount from "./pages/DeleteAccount";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Support from "./pages/Support";
@@ -66,6 +67,10 @@ const App = () => {
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
+            {/* Public account-deletion instructions. Google Play requires a
+                URL for this (Data safety), and it's linked from the store
+                listing, so the path must stay stable. */}
+            <Route path="/delete-account" element={<DeleteAccount />} />
             <Route path="/support" element={<Support />} />
 
             {/* Room Entry / Gating */}
