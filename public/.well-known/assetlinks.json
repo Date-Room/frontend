@@ -5,8 +5,8 @@
       "namespace": "android_app",
       "package_name": "io.dateroom.dateroom",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_RELEASE_SIGNING_SHA256",
-        "REPLACE_WITH_PLAY_APP_SIGNING_SHA256"
+        "36:7B:92:23:DE:FA:9B:AF:39:B8:23:3A:3F:D3:D4:8B:75:C3:8C:30:39:3A:AC:7D:F8:E3:98:CD:19:28:C2:CB",
+        "BF:C1:CE:94:DA:42:70:F8:2C:65:DA:29:53:08:4C:B3:78:B6:58:A9:A0:A0:B6:C0:CA:01:38:F8:FF:CD:93:2A"
       ]
     }
   }
