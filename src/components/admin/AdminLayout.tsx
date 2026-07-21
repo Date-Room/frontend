@@ -5,6 +5,7 @@ import {
   Ticket,
   DoorOpen,
   ScrollText,
+  ShieldCheck,
   ArrowLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ const NAV = [
   { to: "/admin/users", label: "Users", icon: Users },
   { to: "/admin/promo", label: "Promo codes", icon: Ticket },
   { to: "/admin/rooms", label: "Rooms", icon: DoorOpen },
+  { to: "/admin/chaperon", label: "Chaperon AI", icon: ShieldCheck },
   { to: "/admin/audit", label: "Audit log", icon: ScrollText },
 ];
 

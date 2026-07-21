@@ -144,6 +144,35 @@ export function listAdminAudit() {
   return api.get<Page<AdminAuditRow>>("/v1/admin/audit");
 }
 
+// --- Chaperon (AI observer) provider config -------------------------------
+
+export type ChaperonProviderInfo = {
+  id: string; // mock | anthropic | openai_compat
+  configured: boolean; // env keys present (never the key itself)
+  default_model: string;
+};
+
+export type ChaperonStats = {
+  sessions_today: number;
+  signals_today: number;
+  thumbs_up_pct: number | null;
+};
+
+export type ChaperonConfig = {
+  provider: string;
+  model: string;
+  providers: ChaperonProviderInfo[];
+  stats: ChaperonStats;
+};
+
+export function getChaperonConfig() {
+  return api.get<ChaperonConfig>("/v1/admin/chaperon/config");
+}
+
+export function setChaperonConfig(body: { provider: string; model: string }) {
+  return api.patch<ChaperonConfig>("/v1/admin/chaperon/config", body);
+}
+
 export function getPlatformInfo() {
   return api.get<{ environment: string; paywall_enabled: boolean; admin_emails_configured: number }>(
     "/v1/admin/platform",
