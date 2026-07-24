@@ -31,7 +31,7 @@ export function ChaperonMount() {
 
   if (!ctrl || !ctrl.enabled) return null;
 
-  const { status, currentWhisper, active, dismiss, sendFeedback } = ctrl;
+  const { status, currentWhisper, active, listening, wordsHeard, dismiss, sendFeedback } = ctrl;
 
   const dotClass =
     status === "watching"
@@ -63,6 +63,11 @@ export function ChaperonMount() {
       >
         <ShieldCheck className={cn("h-3.5 w-3.5", active ? "text-emerald-300" : "text-white/60")} />
         <span className={cn("h-2 w-2 rounded-full", dotClass)} aria-hidden />
+        {active && (
+          <span className="text-[10px] font-medium tabular-nums text-white/70">
+            {listening ? `${wordsHeard}w` : "no mic"}
+          </span>
+        )}
       </button>
 
       {/* One whisper at a time. */}
@@ -125,8 +130,11 @@ export function ChaperonMount() {
         variant="live"
         active={active}
         transcriptSupported={ctrl.transcriptSupported}
+        listening={ctrl.listening}
+        wordsHeard={ctrl.wordsHeard}
         onStart={ctrl.start}
         onStop={ctrl.stop}
+        onInject={ctrl.injectText}
       />
     </>
   );
