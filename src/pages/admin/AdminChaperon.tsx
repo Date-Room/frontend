@@ -1,21 +1,27 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Loader2, ShieldCheck, XCircle, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import {
   getChaperonConfig,
   setChaperonConfig,
+  testChaperonProvider,
   type ChaperonConfig,
   type ChaperonProviderInfo,
+  type ChaperonTestResult,
 } from "@/lib/admin";
 import { cn } from "@/lib/utils";
 
 const PROVIDER_LABELS: Record<string, string> = {
   mock: "Mock (offline, deterministic)",
   anthropic: "Anthropic (Claude)",
-  openai_compat: "OpenAI-compatible (OpenAI / Gemini / self-hosted)",
+  gemini: "Gemini (Google)",
+  openai: "OpenAI",
+  openai_compat: "OpenAI-compatible (self-hosted / custom)",
 };
+
+const CUSTOM_MODEL = "__custom__";
 
 export default function AdminChaperon() {
   const { data, isLoading, refetch } = useQuery({
@@ -26,6 +32,8 @@ export default function AdminChaperon() {
   const [provider, setProvider] = useState<string>("");
   const [model, setModel] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<ChaperonTestResult | null>(null);
 
   // Sync form to the server state once loaded / after a save.
   useEffect(() => {
@@ -45,6 +53,30 @@ export default function AdminChaperon() {
     setProvider(p.id);
     // Prefill the provider's suggested model when switching.
     setModel(p.default_model);
+    setTestResult(null);
+  }
+
+  const knownModels = selected?.models ?? [];
+  const isCustomModel = model !== "" && !knownModels.includes(model);
+
+  async function test() {
+    if (!selectedConfigured) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await testChaperonProvider({ provider, model: model.trim() });
+      setTestResult(res);
+    } catch (e) {
+      setTestResult({
+        ok: false,
+        error: e instanceof ApiError ? e.message : "Test failed.",
+        latency_ms: null,
+        signals: 0,
+        sample_whisper: null,
+      });
+    } finally {
+      setTesting(false);
+    }
   }
 
   async function save() {
@@ -135,17 +167,90 @@ export default function AdminChaperon() {
           >
             Model
           </label>
-          <input
-            id="chaperon-model"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder={selected?.default_model || "model id"}
-            className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500/50 focus:outline-none"
-          />
-          <p className="text-xs text-slate-500">
-            For Gemini via OpenAI-compat, e.g. <code>gemini-2.0-flash</code> (needs
-            CHAPERON_OPENAI_BASE_URL + key in the server env).
-          </p>
+          {knownModels.length > 0 ? (
+            <select
+              id="chaperon-model"
+              value={isCustomModel ? CUSTOM_MODEL : model}
+              onChange={(e) => {
+                const v = e.target.value;
+                setModel(v === CUSTOM_MODEL ? "" : v);
+                setTestResult(null);
+              }}
+              className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 focus:border-emerald-500/50 focus:outline-none"
+            >
+              {knownModels.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+              <option value={CUSTOM_MODEL}>Custom…</option>
+            </select>
+          ) : null}
+          {(knownModels.length === 0 || isCustomModel) && (
+            <input
+              value={model}
+              onChange={(e) => {
+                setModel(e.target.value);
+                setTestResult(null);
+              }}
+              placeholder={selected?.default_model || "model id"}
+              className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500/50 focus:outline-none"
+            />
+          )}
+          {provider === "openai_compat" && (
+            <p className="text-xs text-slate-500">
+              Custom endpoint — set <code>CHAPERON_OPENAI_BASE_URL</code> + key in the
+              server env.
+            </p>
+          )}
+        </section>
+      )}
+
+      {/* Verify the provider actually responds (not just "key present"). */}
+      {selectedConfigured && (
+        <section className="space-y-2">
+          <button
+            type="button"
+            disabled={testing}
+            onClick={() => void test()}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:opacity-40"
+          >
+            {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+            Test provider
+          </button>
+          {testResult && (
+            <div
+              className={cn(
+                "flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm",
+                testResult.ok
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                  : "border-rose-500/40 bg-rose-500/10 text-rose-200",
+              )}
+            >
+              {testResult.ok ? (
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+              ) : (
+                <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              )}
+              <div className="min-w-0">
+                {testResult.ok ? (
+                  <>
+                    <p>
+                      Responded in {testResult.latency_ms}ms · {testResult.signals} signal
+                      {testResult.signals === 1 ? "" : "s"}.
+                    </p>
+                    {testResult.sample_whisper && (
+                      <p className="mt-0.5 text-xs text-emerald-300/80">
+                        e.g. "{testResult.sample_whisper}"
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="break-words">{testResult.error}</p>
+                )}
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -159,9 +264,7 @@ export default function AdminChaperon() {
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           Save
         </button>
-        {dirty && (
-          <span className="text-xs text-slate-500">Unsaved changes</span>
-        )}
+        {dirty && <span className="text-xs text-slate-500">Unsaved changes</span>}
       </div>
     </div>
   );

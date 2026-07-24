@@ -147,10 +147,23 @@ export function listAdminAudit() {
 // --- Chaperon (AI observer) provider config -------------------------------
 
 export type ChaperonProviderInfo = {
-  id: string; // mock | anthropic | openai_compat
+  id: string; // mock | anthropic | gemini | openai | openai_compat
   configured: boolean; // env keys present (never the key itself)
   default_model: string;
+  models: string[]; // suggested models for the dropdown
 };
+
+export type ChaperonTestResult = {
+  ok: boolean;
+  error: string | null;
+  latency_ms: number | null;
+  signals: number;
+  sample_whisper: string | null;
+};
+
+export function testChaperonProvider(body: { provider: string; model: string }) {
+  return api.post<ChaperonTestResult>("/v1/admin/chaperon/test", body);
+}
 
 export type ChaperonStats = {
   sessions_today: number;
