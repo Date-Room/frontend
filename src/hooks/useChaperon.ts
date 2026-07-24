@@ -65,6 +65,10 @@ export function useChaperon(opts: {
   const [status, setStatus] = useState<ChaperonStatus>("off");
   const [session, setSession] = useState<ChaperonSession | null>(null);
   const [currentWhisper, setCurrentWhisper] = useState<ChaperonSignal | null>(null);
+  // Observability: is speech recognition actively listening, and how many
+  // words has it captured this session (so you can SEE the transcript layer).
+  const [listening, setListening] = useState(false);
+  const [wordsHeard, setWordsHeard] = useState(0);
 
   const runningRef = useRef(false);
   const sessionRef = useRef<ChaperonSession | null>(null);
@@ -99,8 +103,17 @@ export function useChaperon(opts: {
     [dismiss],
   );
 
+  const pushTurn = useCallback((text: string, speaker: "local" | "remote" = "local") => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    pendingTurnsRef.current.push({ speaker, text: trimmed, at: Date.now() });
+    const n = trimmed.split(/\s+/).filter(Boolean).length;
+    setWordsHeard((w) => w + n);
+  }, []);
+
   const scheduleTick = useCallback((delayMs: number) => {
     if (!runningRef.current) return;
+    if (tickTimerRef.current) window.clearTimeout(tickTimerRef.current);
     tickTimerRef.current = window.setTimeout(() => void runTick(), delayMs);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -141,6 +154,16 @@ export function useChaperon(opts: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showWhisper, scheduleTick]);
 
+  /** Inject a line of text as if it were heard — the "type a test line"
+   *  debug, so the whisper pipeline is provable without a working mic. */
+  const injectText = useCallback(
+    (text: string) => {
+      pushTurn(text, "local");
+      scheduleTick(300); // evaluate it right away for a snappy demo
+    },
+    [pushTurn, scheduleTick],
+  );
+
   const startRecognition = useCallback(() => {
     const Ctor = getSpeechRecognitionCtor();
     if (!Ctor) return;
@@ -150,22 +173,44 @@ export function useChaperon(opts: {
       rec.interimResults = false;
       // Don't hardcode en-US (prototype defect #8) — let the browser default.
       rec.onresult = (e: unknown) => {
-        const ev = e as { results?: ArrayLike<ArrayLike<{ transcript?: string }>>; resultIndex?: number };
+        const ev = e as {
+          results?: ArrayLike<ArrayLike<{ transcript?: string }>>;
+          resultIndex?: number;
+        };
         const results = ev.results;
         if (!results) return;
         const from = ev.resultIndex ?? 0;
         for (let i = from; i < results.length; i += 1) {
-          const text = results[i]?.[0]?.transcript?.trim();
-          if (text) pendingTurnsRef.current.push({ speaker: "local", text, at: Date.now() });
+          const text = results[i]?.[0]?.transcript;
+          if (text) pushTurn(text, "local");
         }
       };
-      rec.onerror = () => {};
+      // Web Speech stops itself after a pause — restart it so it keeps
+      // listening for the whole call (prototype defect: it died after one line).
+      rec.onend = () => {
+        setListening(false);
+        if (runningRef.current) {
+          try {
+            rec.start();
+            setListening(true);
+          } catch {
+            /* will retry on the next onend */
+          }
+        }
+      };
+      rec.onerror = () => {
+        // "not-allowed" / "audio-capture" — the mic is contended (common
+        // during a live call). Reflect it; onend will attempt a restart.
+        setListening(false);
+      };
       rec.start();
       recognitionRef.current = rec;
+      setListening(true);
     } catch {
       recognitionRef.current = null;
+      setListening(false);
     }
-  }, []);
+  }, [pushTurn]);
 
   const start = useCallback(
     async (cfg: ChaperonStartConfig) => {
@@ -185,6 +230,7 @@ export function useChaperon(opts: {
       failuresRef.current = 0;
       runningRef.current = true;
       setStatus("watching");
+      setWordsHeard(0);
       startRecognition();
       scheduleTick(1_000); // first tick shortly after start
     },
@@ -204,6 +250,8 @@ export function useChaperon(opts: {
     recognitionRef.current = null;
     const sess = sessionRef.current;
     setStatus("off");
+    setListening(false);
+    setWordsHeard(0);
     setCurrentWhisper(null);
     setSession(null);
     sessionRef.current = null;
@@ -237,9 +285,12 @@ export function useChaperon(opts: {
     session,
     currentWhisper,
     transcriptSupported,
+    listening,
+    wordsHeard,
     start,
     stop,
     dismiss,
     sendFeedback,
+    injectText,
   };
 }
