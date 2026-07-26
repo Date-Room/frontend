@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   admitSignal,
   createChaperonSession,
-  DEFAULT_GATE_CONFIG,
   dismissCurrent,
   endChaperonSession,
   evaluateChaperon,
@@ -17,6 +16,21 @@ import {
 } from "@/lib/chaperon";
 
 export type ChaperonStatus = "off" | "watching" | "degraded";
+
+/** A whisper as it landed, for the running rail + end-of-call recap. */
+export type WhisperLogEntry = {
+  id: string;
+  signal: ChaperonSignal;
+  at: number; // wall-clock ms
+  elapsedSec: number; // seconds into the call, for a stable "0:32" label
+};
+
+/** Alerts (safety's sharp end) stay until the user dismisses them; coaching
+ *  auto-hides, but at a readable pace — not the old 6s flash. */
+const COACH_DISPLAY_MS = 10_000;
+function isPersistentSeverity(sev: ChaperonSignal["severity"]): boolean {
+  return sev === "alert" || sev === "warn";
+}
 
 export type ChaperonStartConfig = {
   mode: ChaperonMode;
@@ -69,6 +83,10 @@ export function useChaperon(opts: {
   // words has it captured this session (so you can SEE the transcript layer).
   const [listening, setListening] = useState(false);
   const [wordsHeard, setWordsHeard] = useState(0);
+  // The running whisper log (newest first) + a badge count for whispers that
+  // landed since the user last looked at the rail.
+  const [whisperLog, setWhisperLog] = useState<WhisperLogEntry[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const runningRef = useRef(false);
   const sessionRef = useRef<ChaperonSession | null>(null);
@@ -98,10 +116,27 @@ export function useChaperon(opts: {
     (signal: ChaperonSignal) => {
       clearDismissTimer();
       setCurrentWhisper(signal);
-      dismissTimerRef.current = window.setTimeout(dismiss, DEFAULT_GATE_CONFIG.displayMs);
+      // Log it for the rail + end-of-call recap (newest first), and bump the
+      // unread badge so a whisper heard while you were talking isn't lost.
+      const elapsedSec = Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
+      const entry: WhisperLogEntry = {
+        id: signal.event_id ?? `${signal.check_id}-${Date.now()}`,
+        signal,
+        at: Date.now(),
+        elapsedSec,
+      };
+      setWhisperLog((log) => [entry, ...log]);
+      setUnreadCount((n) => n + 1);
+      // Alerts persist until dismissed; coaching auto-hides at a readable pace.
+      if (!isPersistentSeverity(signal.severity)) {
+        dismissTimerRef.current = window.setTimeout(dismiss, COACH_DISPLAY_MS);
+      }
     },
     [dismiss],
   );
+
+  /** The rail is being looked at — clear the unread badge. */
+  const markRailSeen = useCallback(() => setUnreadCount(0), []);
 
   const pushTurn = useCallback((text: string, speaker: "local" | "remote" = "local") => {
     const trimmed = text.trim();
@@ -151,7 +186,6 @@ export function useChaperon(opts: {
       if (failuresRef.current >= FAILURE_THRESHOLD) setStatus("degraded");
       scheduleTick(DEGRADED_RETRY_MS);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showWhisper, scheduleTick]);
 
   /** Inject a line of text as if it were heard — the "type a test line"
@@ -231,6 +265,8 @@ export function useChaperon(opts: {
       runningRef.current = true;
       setStatus("watching");
       setWordsHeard(0);
+      setWhisperLog([]);
+      setUnreadCount(0);
       startRecognition();
       scheduleTick(1_000); // first tick shortly after start
     },
@@ -258,11 +294,13 @@ export function useChaperon(opts: {
     if (sess) await endChaperonSession(sess.id).catch(() => {});
   }, []);
 
-  const sendFeedback = useCallback((helpful: boolean) => {
+  // Rate a whisper. Defaults to the currently-visible one (the toast buttons),
+  // but the rail passes an explicit event_id so any past whisper is rateable.
+  const sendFeedback = useCallback((helpful: boolean, eventId?: string) => {
     const sess = sessionRef.current;
-    const whisper = gateRef.current.current;
-    if (!sess || !whisper?.event_id) return;
-    void sendChaperonFeedback(sess.id, { event_id: whisper.event_id, helpful }).catch(() => {});
+    const id = eventId ?? gateRef.current.current?.event_id ?? null;
+    if (!sess || !id) return;
+    void sendChaperonFeedback(sess.id, { event_id: id, helpful }).catch(() => {});
   }, []);
 
   // Clean up on unmount.
@@ -287,6 +325,9 @@ export function useChaperon(opts: {
     transcriptSupported,
     listening,
     wordsHeard,
+    whisperLog,
+    unreadCount,
+    markRailSeen,
     start,
     stop,
     dismiss,
