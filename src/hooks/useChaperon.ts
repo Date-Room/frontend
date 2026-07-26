@@ -249,13 +249,19 @@ export function useChaperon(opts: {
   const start = useCallback(
     async (cfg: ChaperonStartConfig) => {
       if (!enabled || runningRef.current) return;
-      const sess = await createChaperonSession({
-        room_id: roomId,
-        mode: cfg.mode,
-        checks: cfg.checks,
-        announce_presence: cfg.announcePresence,
-        data_tier: cfg.dataTier,
-      });
+      let sess: ChaperonSession;
+      try {
+        sess = await createChaperonSession({
+          room_id: roomId,
+          mode: cfg.mode,
+          checks: cfg.checks,
+          announce_presence: cfg.announcePresence,
+          data_tier: cfg.dataTier,
+        });
+      } catch {
+        // e.g. 402 when Coach isn't entitled — stay off rather than half-start.
+        return;
+      }
       sessionRef.current = sess;
       setSession(sess);
       gateRef.current = initGate();
