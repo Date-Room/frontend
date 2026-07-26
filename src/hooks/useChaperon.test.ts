@@ -138,6 +138,123 @@ describe("useChaperon", () => {
     expect(result.current.status).toBe("degraded");
   });
 
+  it("logs whispers newest-first, bumps unread, and clears it on markRailSeen", async () => {
+    vi.mocked(evaluateChaperon).mockResolvedValue(
+      evalResponse({
+        signals: [
+          { event_id: "evt-1", check_id: "money_ask", severity: "alert", whisper: "first", confidence: 0.6 },
+        ],
+      }),
+    );
+    const { result } = renderHook(() => useChaperon({ roomId: "room-1", enabled: true }));
+    await act(async () => {
+      await result.current.start({
+        mode: "guardian",
+        checks: ["money_ask"],
+        announcePresence: false,
+        dataTier: "shadow",
+      });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+
+    expect(result.current.whisperLog).toHaveLength(1);
+    expect(result.current.whisperLog[0].signal.whisper).toBe("first");
+    expect(result.current.unreadCount).toBe(1);
+
+    act(() => result.current.markRailSeen());
+    expect(result.current.unreadCount).toBe(0);
+  });
+
+  it("keeps alerts on screen but auto-hides coaching after the display window", async () => {
+    // An alert stays until dismissed.
+    vi.mocked(evaluateChaperon).mockResolvedValue(
+      evalResponse({
+        signals: [
+          { event_id: "a", check_id: "money_ask", severity: "alert", whisper: "alert", confidence: 0.7 },
+        ],
+        next_eval_ms: 999_999,
+      }),
+    );
+    const { result } = renderHook(() => useChaperon({ roomId: "room-1", enabled: true }));
+    await act(async () => {
+      await result.current.start({
+        mode: "guardian",
+        checks: ["money_ask"],
+        announcePresence: false,
+        dataTier: "shadow",
+      });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(result.current.currentWhisper?.whisper).toBe("alert");
+    // Well past the 10s coach window — the alert must still be visible.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(12_000);
+    });
+    expect(result.current.currentWhisper?.whisper).toBe("alert");
+  });
+
+  it("auto-hides a coaching whisper after the display window", async () => {
+    vi.mocked(evaluateChaperon).mockResolvedValue(
+      evalResponse({
+        signals: [
+          { event_id: "c", check_id: "warmth", severity: "note", whisper: "nice", confidence: 0.5 },
+        ],
+        next_eval_ms: 999_999,
+      }),
+    );
+    const { result } = renderHook(() => useChaperon({ roomId: "room-1", enabled: true }));
+    await act(async () => {
+      await result.current.start({
+        mode: "wingman",
+        checks: ["warmth"],
+        announcePresence: false,
+        dataTier: "shadow",
+      });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(result.current.currentWhisper?.whisper).toBe("nice");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(11_000);
+    });
+    expect(result.current.currentWhisper).toBeNull();
+    // Still in the log for the rail even though the toast is gone.
+    expect(result.current.whisperLog).toHaveLength(1);
+  });
+
+  it("rates a specific past whisper by event_id", async () => {
+    vi.mocked(evaluateChaperon).mockResolvedValue(
+      evalResponse({
+        signals: [
+          { event_id: "evt-42", check_id: "money_ask", severity: "alert", whisper: "x", confidence: 0.6 },
+        ],
+      }),
+    );
+    const { result } = renderHook(() => useChaperon({ roomId: "room-1", enabled: true }));
+    await act(async () => {
+      await result.current.start({
+        mode: "guardian",
+        checks: ["money_ask"],
+        announcePresence: false,
+        dataTier: "shadow",
+      });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+
+    act(() => result.current.sendFeedback(false, "evt-42"));
+    expect(sendChaperonFeedback).toHaveBeenCalledWith("sess-1", {
+      event_id: "evt-42",
+      helpful: false,
+    });
+  });
+
   it("does nothing when disabled", async () => {
     const { result } = renderHook(() =>
       useChaperon({ roomId: "room-1", enabled: false }),
