@@ -12,7 +12,9 @@
  */
 import { api } from "@/lib/api";
 
-export type ChaperonMode = "guardian" | "wing";
+// guardian = Protect (free baseline); coached = Protect + Coaching (paid beta).
+// "wing" (coaching-only) is legacy and no longer offered by the UI.
+export type ChaperonMode = "guardian" | "wing" | "coached";
 export type ChaperonSeverity = "info" | "note" | "warn" | "alert";
 export type ChaperonDataTier = "none" | "shadow" | "beta_labeled";
 
@@ -77,52 +79,26 @@ export function endChaperonSession(sessionId: string): Promise<ChaperonSession> 
   return api.post<ChaperonSession>(`/v1/chaperon/sessions/${sessionId}/end`);
 }
 
-// --- Display catalog + presets (labels only; server owns the real rubric) --
+// --- Coach beta (gated premium) --------------------------------------------
 
-export const CHAPERON_MODE_META: Record<ChaperonMode, { name: string; tagline: string }> = {
-  guardian: { name: "Guardian", tagline: "Watches out for you" },
-  wing: { name: "Wing", tagline: "Reads the chemistry" },
+export type CoachBetaStatus = {
+  calls_remaining: number;
+  // null | pending | granted | declined
+  application_status: string | null;
 };
 
-export type ChaperonPreset = {
-  id: string;
-  label: string;
-  description: string;
-  checks: string[];
-};
+export function getCoachBetaStatus(): Promise<CoachBetaStatus> {
+  return api.get<CoachBetaStatus>("/v1/chaperon/coach-beta");
+}
 
-// Two presets per mode from the v1 catalog (spec §3.2). The user picks a
-// bundle; the full compose-every-check UI is deferred for this slice.
-export const CHAPERON_PRESETS: Record<ChaperonMode, ChaperonPreset[]> = {
-  guardian: [
-    {
-      id: "safety",
-      label: "Safety essentials",
-      description: "Pressure, one-sided escalation, and photo/undress requests.",
-      checks: ["coercion", "escalation", "explicit_request", "meetup_pressure"],
-    },
-    {
-      id: "scam",
-      label: "Scam-aware",
-      description: "Money asks, love-bombing scripts, and moving off-platform.",
-      checks: ["scam_script", "money_ask", "platform_move", "meetup_pressure"],
-    },
-  ],
-  wing: [
-    {
-      id: "read",
-      label: "Read the room",
-      description: "Where the spark is, who's talking, and when it stalls.",
-      checks: ["chemistry", "balance", "stall"],
-    },
-    {
-      id: "full",
-      label: "Full coach",
-      description: "Chemistry, balance, topics that land, and stalls.",
-      checks: ["chemistry", "balance", "topics", "stall"],
-    },
-  ],
-};
+export function applyCoachBeta(reason: string): Promise<CoachBetaStatus> {
+  return api.post<CoachBetaStatus>("/v1/chaperon/coach-beta/apply", { reason });
+}
+
+/** What Coach will cost once it leaves beta — shown to prime willingness to
+ *  pay while it's free-in-beta. */
+export const COACH_PRICE_BLURB =
+  "Will be part of the Chaperoned Datepack ($7.99) or Guardian ($12.99/mo). Free while in beta.";
 
 // --- Whisper gate (pure policy) --------------------------------------------
 
