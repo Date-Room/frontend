@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, Loader2, ShieldCheck, XCircle, Zap } from "lucide-react";
+import { CheckCircle2, Loader2, Minus, Plus, ShieldCheck, Sparkles, XCircle, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import {
+  COACH_BETA_MAX_GRANT,
   getChaperonConfig,
+  grantCoachBeta,
+  listCoachBetaApplications,
   setChaperonConfig,
   testChaperonProvider,
   type ChaperonConfig,
   type ChaperonProviderInfo,
   type ChaperonTestResult,
+  type CoachBetaApplication,
 } from "@/lib/admin";
 import { cn } from "@/lib/utils";
 
@@ -266,6 +270,155 @@ export default function AdminChaperon() {
         </button>
         {dirty && <span className="text-xs text-slate-500">Unsaved changes</span>}
       </div>
+
+      <CoachBetaSection />
+    </div>
+  );
+}
+
+/** Coach is a gated beta: users apply, an admin grants a small quota of
+ *  Coach-active date sessions. Protect stays free and never appears here. */
+function CoachBetaSection() {
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["admin-coach-beta-applications"],
+    queryFn: listCoachBetaApplications,
+  });
+
+  return (
+    <section className="space-y-3 border-t border-slate-800 pt-8">
+      <header className="flex items-center gap-2">
+        <Sparkles className="h-5 w-5 text-amber-400" />
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+            Coach beta — applications
+          </h2>
+          <p className="text-xs text-slate-500">
+            Grant a small quota of Coach date sessions. One call is spent per date;
+            Protect is always free and never listed here.
+          </p>
+        </div>
+        {data && data.pending_count > 0 && (
+          <span className="ml-auto rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-300">
+            {data.pending_count} pending
+          </span>
+        )}
+      </header>
+
+      {isLoading || !data ? (
+        <div className="flex h-24 items-center justify-center text-slate-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+      ) : data.items.length === 0 ? (
+        <p className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-6 text-center text-sm text-slate-500">
+          No pending applications.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {data.items.map((app) => (
+            <CoachBetaApplicationRow
+              key={app.id}
+              app={app}
+              onGranted={() => void refetch()}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function CoachBetaApplicationRow({
+  app,
+  onGranted,
+}: {
+  app: CoachBetaApplication;
+  onGranted: () => void;
+}) {
+  const [calls, setCalls] = useState(1);
+  const [granting, setGranting] = useState(false);
+
+  async function grant() {
+    setGranting(true);
+    try {
+      const res = await grantCoachBeta({ user_id: app.user_id, calls });
+      toast.success(
+        `Granted ${calls} call${calls === 1 ? "" : "s"} to ${app.display_name || app.email} (now ${res.calls_remaining}).`,
+      );
+      onGranted();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't grant Coach beta.");
+    } finally {
+      setGranting(false);
+    }
+  }
+
+  return (
+    <li className="flex flex-col gap-3 rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3 sm:flex-row sm:items-center">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-slate-100">
+          {app.display_name || "—"}{" "}
+          <span className="font-normal text-slate-500">· {app.email}</span>
+        </p>
+        {app.reason && (
+          <p className="mt-0.5 text-xs italic text-slate-400">“{app.reason}”</p>
+        )}
+        <p className="mt-0.5 text-[11px] text-slate-600">
+          Applied {new Date(app.created_at).toLocaleDateString()} · has{" "}
+          {app.calls_remaining} call{app.calls_remaining === 1 ? "" : "s"} now
+        </p>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
+        <Stepper value={calls} onChange={setCalls} min={1} max={COACH_BETA_MAX_GRANT} />
+        <button
+          type="button"
+          disabled={granting}
+          onClick={() => void grant()}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40"
+        >
+          {granting && <Loader2 className="h-4 w-4 animate-spin" />}
+          Grant
+        </button>
+      </div>
+    </li>
+  );
+}
+
+/** A +/- stepper — no free text, so a slip can't grant a thousand sessions. */
+function Stepper({
+  value,
+  onChange,
+  min,
+  max,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  min: number;
+  max: number;
+}) {
+  return (
+    <div className="flex items-center rounded-lg border border-slate-700 bg-slate-900">
+      <button
+        type="button"
+        aria-label="Fewer calls"
+        disabled={value <= min}
+        onClick={() => onChange(Math.max(min, value - 1))}
+        className="p-2 text-slate-300 transition hover:text-white disabled:opacity-30"
+      >
+        <Minus className="h-4 w-4" />
+      </button>
+      <span className="w-6 text-center text-sm font-semibold tabular-nums text-slate-100">
+        {value}
+      </span>
+      <button
+        type="button"
+        aria-label="More calls"
+        disabled={value >= max}
+        onClick={() => onChange(Math.min(max, value + 1))}
+        className="p-2 text-slate-300 transition hover:text-white disabled:opacity-30"
+      >
+        <Plus className="h-4 w-4" />
+      </button>
     </div>
   );
 }
