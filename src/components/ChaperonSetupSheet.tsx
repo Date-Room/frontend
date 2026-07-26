@@ -1,20 +1,23 @@
 import { useState } from "react";
-import { Loader2, ShieldCheck, X } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Loader2, ShieldCheck, Sparkles, X } from "lucide-react";
+import { toast } from "sonner";
+import { ApiError } from "@/lib/api";
 import {
-  CHAPERON_MODE_META,
-  CHAPERON_PRESETS,
-  type ChaperonMode,
+  applyCoachBeta,
+  COACH_PRICE_BLURB,
+  getCoachBetaStatus,
   type ChaperonStartConfig,
+  type CoachBetaStatus,
 } from "@/lib/chaperon";
-import { cn } from "@/lib/utils";
 
 const PREFS_KEY = "dr_chaperon_prefs";
 
-type Prefs = { mode: ChaperonMode; presetId: string; announcePresence: boolean };
+type Prefs = { coach: boolean; announcePresence: boolean };
 
-const DEFAULT_PREFS: Prefs = { mode: "guardian", presetId: "safety", announcePresence: false };
+const DEFAULT_PREFS: Prefs = { coach: false, announcePresence: false };
 
-export function loadChaperonPrefs(): Prefs {
+function loadChaperonPrefs(): Prefs {
   try {
     const raw = localStorage.getItem(PREFS_KEY);
     if (raw) return { ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<Prefs>) };
@@ -32,14 +35,13 @@ function saveChaperonPrefs(p: Prefs): void {
   }
 }
 
-/** Config for a live start, from the current form. Data tier is `shadow` at
- *  launch (spec §7) — not user-facing in this slice. */
-export function prefsToStartConfig(p: Prefs): ChaperonStartConfig {
-  const preset =
-    CHAPERON_PRESETS[p.mode].find((x) => x.id === p.presetId) ?? CHAPERON_PRESETS[p.mode][0];
+/** Config for a live start. Protect is always the baseline (`guardian`);
+ *  Coach upgrades the same session to `coached` (Protect + coaching), but only
+ *  when the user actually has beta calls. Data tier is `shadow` at launch. */
+function prefsToStartConfig(p: Prefs, coachAvailable: boolean): ChaperonStartConfig {
   return {
-    mode: p.mode,
-    checks: preset.checks,
+    mode: p.coach && coachAvailable ? "coached" : "guardian",
+    checks: [], // server fills the mode's default checks
     announcePresence: p.announcePresence,
     dataTier: "shadow",
   };
@@ -73,15 +75,17 @@ export function ChaperonSetupSheet({
   const [prefs, setPrefs] = useState<Prefs>(loadChaperonPrefs);
   const [testLine, setTestLine] = useState("");
 
+  // Coach entitlement — only fetched while the sheet is open.
+  const { data: coach, refetch: refetchCoach } = useQuery({
+    queryKey: ["coach-beta-status"],
+    queryFn: getCoachBetaStatus,
+    enabled: open,
+  });
+  const coachAvailable = (coach?.calls_remaining ?? 0) > 0;
+
   if (!open) return null;
 
-  const presets = CHAPERON_PRESETS[prefs.mode];
   const update = (patch: Partial<Prefs>) => setPrefs((p) => ({ ...p, ...patch }));
-
-  function pickMode(mode: ChaperonMode) {
-    // Reset the preset to the first of the new mode.
-    update({ mode, presetId: CHAPERON_PRESETS[mode][0].id });
-  }
 
   function handlePrimary() {
     saveChaperonPrefs(prefs);
@@ -92,7 +96,7 @@ export function ChaperonSetupSheet({
     if (active) {
       void onStop?.();
     } else {
-      void onStart?.(prefsToStartConfig(prefs));
+      void onStart?.(prefsToStartConfig(prefs, coachAvailable));
     }
     onClose();
   }
@@ -121,48 +125,29 @@ export function ChaperonSetupSheet({
           </button>
         </div>
 
-        {/* Mode */}
-        <div className="grid grid-cols-2 gap-2">
-          {(Object.keys(CHAPERON_MODE_META) as ChaperonMode[]).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => pickMode(m)}
-              className={cn(
-                "rounded-2xl border px-3 py-3 text-left transition",
-                prefs.mode === m
-                  ? "border-emerald-500/40 bg-emerald-500/10"
-                  : "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05]",
-              )}
-            >
-              <p className="text-sm font-semibold text-cream">{CHAPERON_MODE_META[m].name}</p>
-              <p className="text-[11px] text-muted-foreground">{CHAPERON_MODE_META[m].tagline}</p>
-            </button>
-          ))}
+        {/* Protect — the free safety baseline, always on when the chaperon is on. */}
+        <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.06] px-4 py-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-emerald-400" aria-hidden />
+            <p className="text-sm font-semibold text-cream">Protect</p>
+            <span className="ml-auto rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+              Free · on
+            </span>
+          </div>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            Quietly watches for scams, pressure, and money asks, and whispers only
+            to you. On for every date.
+          </p>
         </div>
 
-        {/* Presets */}
-        <div className="space-y-2">
-          <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            What it watches
-          </p>
-          {presets.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => update({ presetId: preset.id })}
-              className={cn(
-                "flex w-full flex-col rounded-2xl border px-4 py-3 text-left transition",
-                prefs.presetId === preset.id
-                  ? "border-emerald-500/40 bg-emerald-500/10"
-                  : "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05]",
-              )}
-            >
-              <span className="text-sm font-medium text-cream">{preset.label}</span>
-              <span className="text-[11px] text-muted-foreground">{preset.description}</span>
-            </button>
-          ))}
-        </div>
+        {/* Coach — the gated premium layer. */}
+        <CoachCard
+          status={coach}
+          enabled={prefs.coach}
+          available={coachAvailable}
+          onToggle={(v) => update({ coach: v })}
+          onApplied={() => void refetchCoach()}
+        />
 
         {/* Announce presence */}
         <label className="flex items-start gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3">
@@ -251,6 +236,122 @@ export function ChaperonSetupSheet({
             : active
               ? "Turn chaperon off"
               : "Turn chaperon on"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** Coach's four states: available (toggle + calls left), applied (pending),
+ *  and not-yet (apply for beta, with the price and the labeling deal). */
+function CoachCard({
+  status,
+  enabled,
+  available,
+  onToggle,
+  onApplied,
+}: {
+  status: CoachBetaStatus | undefined;
+  enabled: boolean;
+  available: boolean;
+  onToggle: (v: boolean) => void;
+  onApplied: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [applying, setApplying] = useState(false);
+  const appStatus = status?.application_status ?? null;
+
+  async function apply() {
+    setApplying(true);
+    try {
+      await applyCoachBeta(reason.trim());
+      toast.success("Application sent — we'll be in touch.");
+      setReason("");
+      onApplied();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't send your application.");
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  const header = (
+    <div className="flex items-center gap-2">
+      <Sparkles className="h-4 w-4 text-amber-400" aria-hidden />
+      <p className="text-sm font-semibold text-cream">Coach</p>
+      <span className="ml-auto rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+        Premium · beta
+      </span>
+    </div>
+  );
+
+  // Available → a real toggle with the remaining count.
+  if (available) {
+    return (
+      <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.05] px-4 py-3">
+        {header}
+        <label className="mt-2 flex items-start gap-3">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => onToggle(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-amber-500"
+          />
+          <span>
+            <span className="block text-sm text-cream">
+              Add coaching cues to this date
+            </span>
+            <span className="block text-[11px] leading-relaxed text-muted-foreground">
+              Reads chemistry and flow and nudges you, on top of Protect.{" "}
+              {status?.calls_remaining} beta call{status?.calls_remaining === 1 ? "" : "s"} left
+              · one is used per date.
+            </span>
+          </span>
+        </label>
+      </div>
+    );
+  }
+
+  // Applied and waiting.
+  if (appStatus === "pending") {
+    return (
+      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3">
+        {header}
+        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+          Application received — we'll let you in as beta spots open. Thanks for
+          helping us test it.
+        </p>
+      </div>
+    );
+  }
+
+  // Not yet (never applied, declined, or used up) → apply / re-apply.
+  const usedUp = appStatus === "granted";
+  return (
+    <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.05] px-4 py-3">
+      {header}
+      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+        {usedUp
+          ? "You've used your beta Coach calls. Ask for more below."
+          : "A private wing that reads chemistry and flow and coaches you, on top of Protect."}
+      </p>
+      <p className="mt-1 text-[11px] leading-relaxed text-amber-300/80">{COACH_PRICE_BLURB} In exchange, your 👍/👎 on cues helps train it.</p>
+      <div className="mt-2 flex gap-2">
+        <input
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          maxLength={200}
+          placeholder="One line: why you'd like Coach…"
+          className="focus-ring min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[12px] placeholder:text-muted-foreground/60"
+        />
+        <button
+          type="button"
+          disabled={applying}
+          onClick={() => void apply()}
+          className="btn-primary focus-ring inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-semibold disabled:opacity-50"
+        >
+          {applying && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {usedUp ? "Request more" : "Apply"}
         </button>
       </div>
     </div>
