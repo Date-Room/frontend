@@ -46,23 +46,37 @@ export function ChaperonMount() {
     hostRef.current = document.createElement("div");
     hostRef.current.style.display = "contents";
   }
-  const anchorRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  const anchorRef = useRef<HTMLDivElement | null>(null);
+  // Attach the portal host wherever the anchor currently lives (the page, or the
+  // fullscreen element during a watch party). Driven by a CALLBACK REF on the
+  // anchor so it runs whenever the anchor mounts — robust to `enabled` only
+  // flipping true AFTER the async experience fetch. (A plain []-effect ran once
+  // on mount, before the anchor existed while still disabled, then never re-ran
+  // when enabled turned true — leaving the whole surface detached and invisible.)
+  const placeHost = useCallback(() => {
     const host = hostRef.current;
     const anchor = anchorRef.current;
     if (!host || !anchor) return;
-    const place = () => {
-      const fsEl = document.fullscreenElement as HTMLElement | null;
-      const target = fsEl?.getAttribute("data-dr-watch-fs") === "1" ? fsEl : anchor;
-      if (host.parentElement !== target) target.appendChild(host);
-    };
-    place();
-    document.addEventListener("fullscreenchange", place);
-    return () => {
-      document.removeEventListener("fullscreenchange", place);
-      host.remove();
-    };
+    const fsEl = document.fullscreenElement as HTMLElement | null;
+    const target = fsEl?.getAttribute("data-dr-watch-fs") === "1" ? fsEl : anchor;
+    if (host.parentElement !== target) target.appendChild(host);
   }, []);
+  const setAnchor = useCallback(
+    (node: HTMLDivElement | null) => {
+      anchorRef.current = node;
+      placeHost();
+    },
+    [placeHost],
+  );
+  // Re-place on fullscreen enter/exit; detach the host on unmount.
+  useEffect(() => {
+    document.addEventListener("fullscreenchange", placeHost);
+    const host = hostRef.current;
+    return () => {
+      document.removeEventListener("fullscreenchange", placeHost);
+      host?.remove();
+    };
+  }, [placeHost]);
 
   // Remember whether the reviewer likes the rail open or collapsed.
   useEffect(() => {
@@ -238,7 +252,7 @@ export function ChaperonMount() {
   // portal host, which follows the page or the fullscreen element.
   return (
     <>
-      <div ref={anchorRef} style={{ display: "contents" }} aria-hidden />
+      <div ref={setAnchor} style={{ display: "contents" }} aria-hidden />
       {createPortal(surface, hostRef.current)}
     </>
   );
