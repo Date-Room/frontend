@@ -186,6 +186,41 @@ export function setChaperonConfig(body: { provider: string; model: string }) {
   return api.patch<ChaperonConfig>("/v1/admin/chaperon/config", body);
 }
 
+// --- Coach beta (gated premium) — applicant queue + grant -----------------
+
+export type CoachBetaApplication = {
+  id: string;
+  user_id: string;
+  email: string;
+  display_name: string;
+  reason: string;
+  status: string;
+  created_at: string;
+  calls_remaining: number;
+};
+
+export type CoachBetaApplicationsResponse = {
+  items: CoachBetaApplication[];
+  pending_count: number;
+};
+
+export function listCoachBetaApplications() {
+  return api.get<CoachBetaApplicationsResponse>("/v1/admin/chaperon/coach-beta/applications");
+}
+
+export type CoachBetaGrantResult = {
+  user_id: string;
+  calls_remaining: number;
+  calls_granted_total: number;
+};
+
+// The server clamps calls to 1..5; the UI stepper enforces the same range.
+export const COACH_BETA_MAX_GRANT = 5;
+
+export function grantCoachBeta(body: { user_id: string; calls: number }) {
+  return api.post<CoachBetaGrantResult>("/v1/admin/chaperon/coach-beta/grant", body);
+}
+
 export function getPlatformInfo() {
   return api.get<{ environment: string; paywall_enabled: boolean; admin_emails_configured: number }>(
     "/v1/admin/platform",
