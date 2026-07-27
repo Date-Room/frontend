@@ -6,14 +6,18 @@ import { ApiError } from "@/lib/api";
 import {
   COACH_BETA_MAX_GRANT,
   getChaperonConfig,
+  getSttConfig,
   grantCoachBeta,
   listCoachBetaApplications,
   setChaperonConfig,
+  setSttConfig,
   testChaperonProvider,
+  testSttProvider,
   type ChaperonConfig,
   type ChaperonProviderInfo,
   type ChaperonTestResult,
   type CoachBetaApplication,
+  type SttTestResult,
 } from "@/lib/admin";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +27,12 @@ const PROVIDER_LABELS: Record<string, string> = {
   gemini: "Gemini (Google)",
   openai: "OpenAI",
   openai_compat: "OpenAI-compatible (self-hosted / custom)",
+};
+
+const STT_LABELS: Record<string, string> = {
+  mock: "Mock (offline, deterministic)",
+  deepgram: "Deepgram (Nova-3)",
+  assemblyai: "AssemblyAI (Universal-Streaming)",
 };
 
 const CUSTOM_MODEL = "__custom__";
@@ -271,8 +281,171 @@ export default function AdminChaperon() {
         {dirty && <span className="text-xs text-slate-500">Unsaved changes</span>}
       </div>
 
+      <SttSection />
       <CoachBetaSection />
     </div>
+  );
+}
+
+/** Which speech-to-text vendor transcribes calls. Same shape as the AI
+ *  provider picker: pick the active vendor, Test that its key really works.
+ *  Keys are env-only; the live audio pipeline plugs into this choice. */
+function SttSection() {
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["admin-stt-config"],
+    queryFn: getSttConfig,
+  });
+  const [provider, setProvider] = useState<string>("");
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<SttTestResult | null>(null);
+
+  useEffect(() => {
+    if (data) setProvider(data.provider);
+  }, [data]);
+
+  if (isLoading || !data) return null;
+
+  const providers = data.providers;
+  const selected = providers.find((p) => p.id === provider);
+  const configured = selected?.configured ?? false;
+  const dirty = provider !== data.provider;
+
+  async function test() {
+    if (!configured) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      setTestResult(await testSttProvider({ provider }));
+    } catch (e) {
+      setTestResult({
+        ok: false,
+        error: e instanceof ApiError ? e.message : "Test failed.",
+        latency_ms: null,
+        sample_transcript: null,
+      });
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  async function save() {
+    if (!configured) return;
+    setSaving(true);
+    try {
+      await setSttConfig({ provider });
+      toast.success("STT vendor updated.");
+      await refetch();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't update the vendor.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="space-y-3 border-t border-slate-800 pt-8">
+      <header>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+          Speech-to-text
+        </h2>
+        <p className="text-xs text-slate-500">
+          Which vendor transcribes the call audio. Keys are set in the server env;
+          this only picks the active vendor. (The live audio pipeline is a separate
+          build — this switch is ready for it.)
+        </p>
+      </header>
+
+      <ul className="space-y-2">
+        {providers.map((p) => (
+          <li key={p.id}>
+            <button
+              type="button"
+              disabled={!p.configured}
+              onClick={() => {
+                if (!p.configured) return;
+                setProvider(p.id);
+                setTestResult(null);
+              }}
+              className={cn(
+                "flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition",
+                provider === p.id
+                  ? "border-emerald-500/50 bg-emerald-500/10"
+                  : "border-slate-800 bg-slate-900/40 hover:bg-slate-900",
+                !p.configured && "cursor-not-allowed opacity-50",
+              )}
+            >
+              <div>
+                <p className="text-sm font-medium text-slate-100">{STT_LABELS[p.id] ?? p.id}</p>
+                <p className="text-xs text-slate-500">
+                  {p.configured ? "Key configured" : "No API key configured on the server"}
+                </p>
+              </div>
+              {provider === p.id && (
+                <span className="text-xs font-semibold uppercase text-emerald-400">Selected</span>
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {configured && (
+        <div className="space-y-2">
+          <button
+            type="button"
+            disabled={testing}
+            onClick={() => void test()}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:opacity-40"
+          >
+            {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+            Test vendor
+          </button>
+          {testResult && (
+            <div
+              className={cn(
+                "flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm",
+                testResult.ok
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+                  : "border-rose-500/40 bg-rose-500/10 text-rose-200",
+              )}
+            >
+              {testResult.ok ? (
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+              ) : (
+                <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              )}
+              <div className="min-w-0">
+                {testResult.ok ? (
+                  <>
+                    <p>Transcribed a sample in {testResult.latency_ms}ms.</p>
+                    {testResult.sample_transcript && (
+                      <p className="mt-0.5 text-xs text-emerald-300/80">
+                        e.g. "{testResult.sample_transcript}"
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="break-words">{testResult.error}</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled={!dirty || !configured || saving}
+          onClick={() => void save()}
+          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          Save
+        </button>
+        {dirty && <span className="text-xs text-slate-500">Unsaved changes</span>}
+      </div>
+    </section>
   );
 }
 
