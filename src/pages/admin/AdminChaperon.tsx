@@ -6,10 +6,12 @@ import { ApiError } from "@/lib/api";
 import {
   COACH_BETA_MAX_GRANT,
   getChaperonConfig,
+  getProtectConfig,
   getSttConfig,
   grantCoachBeta,
   listCoachBetaApplications,
   setChaperonConfig,
+  setProtectMetering,
   setSttConfig,
   testChaperonProvider,
   testSttProvider,
@@ -282,8 +284,64 @@ export default function AdminChaperon() {
       </div>
 
       <SttSection />
+      <ProtectMeteringSection />
       <CoachBetaSection />
     </div>
+  );
+}
+
+/** Protect is free for everyone until this is switched on. When on, each
+ *  account gets one free Protect date, then needs credits (admin-granted per
+ *  user on the Users page, paid later). */
+function ProtectMeteringSection() {
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["admin-protect-config"],
+    queryFn: getProtectConfig,
+  });
+  const [saving, setSaving] = useState(false);
+
+  if (isLoading || !data) return null;
+
+  async function toggle(enabled: boolean) {
+    setSaving(true);
+    try {
+      await setProtectMetering(enabled);
+      toast.success(enabled ? "Protect metering on." : "Protect metering off — free for all.");
+      await refetch();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Couldn't update metering.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="space-y-3 border-t border-slate-800 pt-8">
+      <header className="flex items-center gap-2">
+        <ShieldCheck className="h-5 w-5 text-emerald-400" />
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+            Protect metering
+          </h2>
+          <p className="text-xs text-slate-500">
+            Off = Protect is free on every date. On = one free date per account, then
+            credits (grant per user on the Users page). Leave off until STT cost is live.
+          </p>
+        </div>
+        <label className="ml-auto inline-flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            checked={data.metering_enabled}
+            disabled={saving}
+            onChange={(e) => void toggle(e.target.checked)}
+            className="h-4 w-4 accent-emerald-500"
+          />
+          <span className="text-sm text-slate-200">
+            {data.metering_enabled ? "Metered" : "Free for all"}
+          </span>
+        </label>
+      </header>
+    </section>
   );
 }
 

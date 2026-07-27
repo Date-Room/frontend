@@ -8,8 +8,10 @@ import {
   COACH_BETA_MAX_GRANT,
   getAdminUser,
   grantCoachBeta,
+  grantProtect,
   grantUserProduct,
   listAdminUsers,
+  PROTECT_MAX_GRANT,
   revokeUserSubscription,
   setUserAdmin,
   type AdminUserRow,
@@ -28,6 +30,7 @@ export default function AdminUsers() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<AdminUserRow | null>(null);
   const [coachCalls, setCoachCalls] = useState(1);
+  const [protectDates, setProtectDates] = useState(1);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin-users", search],
@@ -64,6 +67,19 @@ export default function AdminUsers() {
       const res = await grantCoachBeta({ user_id: selected.id, calls: coachCalls });
       toast.success(
         `Granted ${coachCalls} Coach call${coachCalls === 1 ? "" : "s"} to ${selected.email} (now ${res.calls_remaining})`,
+      );
+      refreshUser();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Grant failed");
+    }
+  }
+
+  async function grantProtectDates() {
+    if (!selected) return;
+    try {
+      const res = await grantProtect({ user_id: selected.id, dates: protectDates });
+      toast.success(
+        `Granted ${protectDates} Protect date${protectDates === 1 ? "" : "s"} to ${selected.email} (now ${res.credits_remaining})`,
       );
       refreshUser();
     } catch (e) {
@@ -239,6 +255,44 @@ export default function AdminUsers() {
                     onClick={() => void grantCoach()}
                   >
                     Grant Coach beta
+                  </Button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-wider text-slate-500">
+                  Protect (grant extra dates)
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center rounded-lg border border-slate-700 bg-slate-900">
+                    <button
+                      type="button"
+                      aria-label="Fewer dates"
+                      disabled={protectDates <= 1}
+                      onClick={() => setProtectDates((n) => Math.max(1, n - 1))}
+                      className="p-2 text-slate-300 transition hover:text-white disabled:opacity-30"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </button>
+                    <span className="w-6 text-center text-sm font-semibold tabular-nums text-slate-100">
+                      {protectDates}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="More dates"
+                      disabled={protectDates >= PROTECT_MAX_GRANT}
+                      onClick={() => setProtectDates((n) => Math.min(PROTECT_MAX_GRANT, n + 1))}
+                      className="p-2 text-slate-300 transition hover:text-white disabled:opacity-30"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 border-slate-700 text-slate-300"
+                    onClick={() => void grantProtectDates()}
+                  >
+                    Grant Protect dates
                   </Button>
                 </div>
               </div>

@@ -221,6 +221,31 @@ export function grantCoachBeta(body: { user_id: string; calls: number }) {
   return api.post<CoachBetaGrantResult>("/v1/admin/chaperon/coach-beta/grant", body);
 }
 
+// --- Chaperon Protect entitlement (free first date, then metered) ------------
+
+export type ProtectGrantResult = {
+  user_id: string;
+  credits_remaining: number;
+  credits_granted_total: number;
+};
+
+// Server clamps to 1..10; the stepper enforces the same.
+export const PROTECT_MAX_GRANT = 10;
+
+export function getProtectConfig() {
+  return api.get<{ metering_enabled: boolean }>("/v1/admin/chaperon/protect-config");
+}
+
+export function setProtectMetering(enabled: boolean) {
+  return api.patch<{ metering_enabled: boolean }>("/v1/admin/chaperon/protect-config", {
+    enabled,
+  });
+}
+
+export function grantProtect(body: { user_id: string; dates: number }) {
+  return api.post<ProtectGrantResult>("/v1/admin/chaperon/protect/grant", body);
+}
+
 // --- Chaperon speech-to-text (STT) provider ---------------------------------
 
 export type SttProviderInfo = {
