@@ -22,6 +22,7 @@ import OurRoom from "./pages/OurRoom";
 import Settings from "./pages/Settings";
 import DeleteAccount from "./pages/DeleteAccount";
 import Privacy from "./pages/Privacy";
+import ChildSafety from "./pages/ChildSafety";
 import Terms from "./pages/Terms";
 import Support from "./pages/Support";
 import NotFound from "./pages/NotFound";
@@ -68,6 +69,11 @@ const App = () => {
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
+            {/* Published child-safety (CSAE) standards. Required by Google
+                Play for Social/Dating apps and referenced in the Play Console
+                "Child safety standards" declaration, plus linked in-app from
+                Settings → Report a Safety Concern, so the path must stay stable. */}
+            <Route path="/child-safety" element={<ChildSafety />} />
             {/* Public account-deletion instructions. Google Play requires a
                 URL for this (Data safety), and it's linked from the store
                 listing, so the path must stay stable. */}
