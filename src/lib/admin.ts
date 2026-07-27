@@ -221,6 +221,37 @@ export function grantCoachBeta(body: { user_id: string; calls: number }) {
   return api.post<CoachBetaGrantResult>("/v1/admin/chaperon/coach-beta/grant", body);
 }
 
+// --- Chaperon speech-to-text (STT) provider ---------------------------------
+
+export type SttProviderInfo = {
+  id: string; // mock | deepgram | assemblyai
+  configured: boolean; // env key present (never the key itself)
+};
+
+export type SttConfig = {
+  provider: string;
+  providers: SttProviderInfo[];
+};
+
+export type SttTestResult = {
+  ok: boolean;
+  error: string | null;
+  latency_ms: number | null;
+  sample_transcript: string | null;
+};
+
+export function getSttConfig() {
+  return api.get<SttConfig>("/v1/admin/chaperon/stt-config");
+}
+
+export function setSttConfig(body: { provider: string }) {
+  return api.patch<SttConfig>("/v1/admin/chaperon/stt-config", body);
+}
+
+export function testSttProvider(body: { provider: string }) {
+  return api.post<SttTestResult>("/v1/admin/chaperon/stt-test", body);
+}
+
 export function getPlatformInfo() {
   return api.get<{ environment: string; paywall_enabled: boolean; admin_emails_configured: number }>(
     "/v1/admin/platform",
