@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -32,10 +32,14 @@ export default function AdminUsers() {
   const [coachCalls, setCoachCalls] = useState(1);
   const [protectDates, setProtectDates] = useState(1);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["admin-users", search],
-    queryFn: () => listAdminUsers({ search: search || undefined }),
+    queryFn: ({ pageParam }) =>
+      listAdminUsers({ search: search || undefined, cursor: pageParam }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
   });
+  const users = data?.pages.flatMap((p) => p.items) ?? [];
 
   // Full inventory for the selected user — plans are additive, so we show
   // every owned plan/credit rather than a single "tier".
@@ -142,7 +146,7 @@ export default function AdminUsers() {
                   </td>
                 </tr>
               )}
-              {data?.items.map((u) => (
+              {users.map((u) => (
                 <tr
                   key={u.id}
                   onClick={() => setSelected(u)}
@@ -168,6 +172,27 @@ export default function AdminUsers() {
                   </td>
                 </tr>
               ))}
+              {!isLoading && users.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="px-4 py-8 text-center text-slate-500">
+                    No users found.
+                  </td>
+                </tr>
+              )}
+              {hasNextPage && (
+                <tr>
+                  <td colSpan={3} className="px-4 py-3 text-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void fetchNextPage()}
+                      disabled={isFetchingNextPage}
+                    >
+                      {isFetchingNextPage ? "Loading…" : "Load more"}
+                    </Button>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

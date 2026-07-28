@@ -236,6 +236,29 @@ export function getProtectConfig() {
   return api.get<{ metering_enabled: boolean }>("/v1/admin/chaperon/protect-config");
 }
 
+// --- STT stream-cost summary (the agent's spend) ---
+
+export type StreamCostVendor = {
+  vendor: string;
+  sessions: number;
+  stream_hours: number;
+  est_cost_usd: number;
+};
+
+export type StreamCostSummary = {
+  window_days: number;
+  vendors: StreamCostVendor[];
+  total_sessions: number;
+  total_stream_hours: number;
+  total_est_cost_usd: number;
+};
+
+export function getStreamCosts(windowDays = 30) {
+  return api.get<StreamCostSummary>(
+    `/v1/admin/chaperon/stream-costs?window_days=${windowDays}`,
+  );
+}
+
 export function setProtectMetering(enabled: boolean) {
   return api.patch<{ metering_enabled: boolean }>("/v1/admin/chaperon/protect-config", {
     enabled,
