@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, Loader2, Minus, Plus, ShieldCheck, Sparkles, XCircle, Zap } from "lucide-react";
+import { Activity, CheckCircle2, Loader2, Minus, Plus, ShieldCheck, Sparkles, XCircle, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   COACH_BETA_MAX_GRANT,
   getChaperonConfig,
   getProtectConfig,
   getSttConfig,
+  getStreamCosts,
   grantCoachBeta,
   listCoachBetaApplications,
   setChaperonConfig,
@@ -133,6 +135,14 @@ export default function AdminChaperon() {
 
       <StatsStrip data={data} />
 
+      <Tabs defaultValue="providers" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3 bg-slate-900/60">
+          <TabsTrigger value="providers">Providers</TabsTrigger>
+          <TabsTrigger value="access">Access</TabsTrigger>
+          <TabsTrigger value="activity">Activity &amp; cost</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="providers" className="space-y-8">
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
           Provider
@@ -284,9 +294,100 @@ export default function AdminChaperon() {
       </div>
 
       <SttSection />
-      <ProtectMeteringSection />
-      <CoachBetaSection />
+        </TabsContent>
+
+        <TabsContent value="access" className="space-y-8">
+          <ProtectMeteringSection />
+          <CoachBetaSection />
+        </TabsContent>
+
+        <TabsContent value="activity" className="space-y-8">
+          <StreamCostSection />
+        </TabsContent>
+      </Tabs>
     </div>
+  );
+}
+
+/** What the STT agent has streamed to the vendor over the last 30 days, from
+ *  the cost meter. Estimate only — the real invoice is the vendor's. */
+function StreamCostSection() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-stream-costs"],
+    queryFn: () => getStreamCosts(30),
+  });
+
+  return (
+    <section className="space-y-3">
+      <header className="flex items-center gap-2">
+        <Activity className="h-5 w-5 text-emerald-400" />
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+            STT stream cost · last 30 days
+          </h2>
+          <p className="text-xs text-slate-500">
+            Voiced audio streamed to the vendor across monitored dates. Estimate only —
+            the real invoice is the vendor's.
+          </p>
+        </div>
+      </header>
+
+      {isLoading || !data ? (
+        <div className="flex h-24 items-center justify-center text-slate-500">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+      ) : data.vendors.length === 0 ? (
+        <p className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-6 text-center text-sm text-slate-500">
+          No monitored dates yet. Costs appear here once the agent runs.
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { label: "Est. spend", value: `$${data.total_est_cost_usd.toFixed(2)}` },
+              { label: "Stream-hours", value: data.total_stream_hours.toFixed(1) },
+              { label: "Monitored dates", value: String(data.total_sessions) },
+            ].map((s) => (
+              <div
+                key={s.label}
+                className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3"
+              >
+                <p className="text-xs uppercase tracking-wide text-slate-500">{s.label}</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-slate-100">{s.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-slate-800">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-2 text-left font-medium">Vendor</th>
+                  <th className="px-4 py-2 text-right font-medium">Dates</th>
+                  <th className="px-4 py-2 text-right font-medium">Stream-hrs</th>
+                  <th className="px-4 py-2 text-right font-medium">Est. cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.vendors.map((v) => (
+                  <tr key={v.vendor} className="border-t border-slate-800">
+                    <td className="px-4 py-2.5 text-slate-200">{v.vendor}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">
+                      {v.sessions}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">
+                      {v.stream_hours.toFixed(1)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-100">
+                      ${v.est_cost_usd.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 
