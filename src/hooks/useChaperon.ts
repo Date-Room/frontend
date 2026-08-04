@@ -44,6 +44,11 @@ export type ChaperonStartConfig = {
 const FAILURE_THRESHOLD = 2;
 const DEGRADED_RETRY_MS = 15_000;
 
+// When the server-side agent is present it becomes the brain (it hears BOTH
+// mics accurately). If its heartbeats stop for this long, fall back to the
+// browser's own loop. Must be > the agent's ~8s heartbeat interval.
+const AGENT_SILENCE_MS = 20_000;
+
 type SpeechRecognitionLike = {
   continuous: boolean;
   interimResults: boolean;
@@ -98,6 +103,9 @@ export function useChaperon(opts: {
   const dismissTimerRef = useRef<number | undefined>(undefined);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const inFlightRef = useRef(false);
+  // Handover: is the server agent currently the brain? + its silence watchdog.
+  const agentModeRef = useRef(false);
+  const agentWatchdogRef = useRef<number | undefined>(undefined);
 
   const transcriptSupported = getSpeechRecognitionCtor() !== null;
 
@@ -155,7 +163,8 @@ export function useChaperon(opts: {
 
   const runTick = useCallback(async () => {
     const sess = sessionRef.current;
-    if (!runningRef.current || !sess || inFlightRef.current) return;
+    // In agent mode the server agent drives everything; the browser loop rests.
+    if (!runningRef.current || !sess || inFlightRef.current || agentModeRef.current) return;
 
     const window_ = pendingTurnsRef.current;
     pendingTurnsRef.current = [];
@@ -246,6 +255,68 @@ export function useChaperon(opts: {
     }
   }, [pushTurn]);
 
+  // --- Server-agent handover ------------------------------------------------
+  // The agent hears both mics accurately over LiveKit; when it's present it
+  // becomes the brain and the browser's local-only Web Speech loop stands down.
+
+  const enterAgentMode = useCallback(() => {
+    if (agentModeRef.current) return;
+    agentModeRef.current = true;
+    if (tickTimerRef.current) window.clearTimeout(tickTimerRef.current);
+    try {
+      recognitionRef.current?.stop();
+    } catch {
+      /* ignore */
+    }
+    recognitionRef.current = null;
+    setListening(false);
+  }, []);
+
+  const exitAgentMode = useCallback(() => {
+    if (!agentModeRef.current) return;
+    agentModeRef.current = false;
+    if (!runningRef.current) return;
+    // Agent went quiet — resume the browser fallback loop.
+    setStatus("degraded");
+    startRecognition();
+    scheduleTick(1_000);
+  }, [startRecognition, scheduleTick]);
+
+  const armAgentWatchdog = useCallback(() => {
+    if (agentWatchdogRef.current) window.clearTimeout(agentWatchdogRef.current);
+    agentWatchdogRef.current = window.setTimeout(exitAgentMode, AGENT_SILENCE_MS);
+  }, [exitAgentMode]);
+
+  /** Handle a targeted message from the server agent (whisper or health).
+   *  Called by the in-room DataReceived bridge. Input is off the wire, so it's
+   *  narrowed defensively. */
+  const ingestAgentMessage = useCallback(
+    (msg: Record<string, unknown>) => {
+      if (!runningRef.current || typeof msg?.type !== "string") return;
+      enterAgentMode(); // any agent message means the agent is on the case
+      armAgentWatchdog();
+      if (msg.type === "chaperon.health") {
+        setStatus(msg.healthy ? "watching" : "degraded");
+      } else if (
+        msg.type === "chaperon.whisper" &&
+        typeof msg.check_id === "string" &&
+        typeof msg.severity === "string"
+      ) {
+        const signal: ChaperonSignal = {
+          event_id: typeof msg.event_id === "string" ? msg.event_id : null,
+          check_id: msg.check_id,
+          severity: msg.severity as ChaperonSignal["severity"],
+          whisper: typeof msg.whisper === "string" ? msg.whisper : "",
+          confidence: typeof msg.confidence === "number" ? msg.confidence : 0,
+        };
+        const { state, show } = admitSignal(gateRef.current, signal, Date.now());
+        gateRef.current = state;
+        if (show) showWhisper(show);
+      }
+    },
+    [enterAgentMode, armAgentWatchdog, showWhisper],
+  );
+
   const start = useCallback(
     async (cfg: ChaperonStartConfig) => {
       if (!enabled || runningRef.current) return;
@@ -268,6 +339,7 @@ export function useChaperon(opts: {
       pendingTurnsRef.current = [];
       startedAtRef.current = Date.now();
       failuresRef.current = 0;
+      agentModeRef.current = false; // start in browser fallback; agent takes over on its first beat
       runningRef.current = true;
       setStatus("watching");
       setWordsHeard(0);
@@ -282,7 +354,9 @@ export function useChaperon(opts: {
   const stop = useCallback(async () => {
     if (!runningRef.current) return;
     runningRef.current = false;
+    agentModeRef.current = false;
     if (tickTimerRef.current) window.clearTimeout(tickTimerRef.current);
+    if (agentWatchdogRef.current) window.clearTimeout(agentWatchdogRef.current);
     clearDismissTimer();
     try {
       recognitionRef.current?.stop();
@@ -314,6 +388,7 @@ export function useChaperon(opts: {
     return () => {
       runningRef.current = false;
       if (tickTimerRef.current) window.clearTimeout(tickTimerRef.current);
+      if (agentWatchdogRef.current) window.clearTimeout(agentWatchdogRef.current);
       clearDismissTimer();
       try {
         recognitionRef.current?.stop();
@@ -339,5 +414,6 @@ export function useChaperon(opts: {
     dismiss,
     sendFeedback,
     injectText,
+    ingestAgentMessage,
   };
 }
