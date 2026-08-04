@@ -270,4 +270,78 @@ describe("useChaperon", () => {
     expect(createChaperonSession).not.toHaveBeenCalled();
     expect(result.current.status).toBe("off");
   });
+
+  async function startRunning() {
+    const hook = renderHook(() => useChaperon({ roomId: "room-1", enabled: true }));
+    await act(async () => {
+      await hook.result.current.start({
+        mode: "guardian",
+        checks: ["scam_script"],
+        announcePresence: false,
+        dataTier: "shadow",
+      });
+    });
+    return hook;
+  }
+
+  it("hands over to the agent: the browser evaluate loop stands down on the first heartbeat", async () => {
+    const { result } = await startRunning();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000); // one browser tick
+    });
+    expect(evaluateChaperon).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      result.current.ingestAgentMessage({ type: "chaperon.health", healthy: true });
+    });
+    expect(result.current.status).toBe("watching");
+
+    // While the agent is present (within its silence window), the browser loop
+    // no longer fires — the agent is the brain now.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(evaluateChaperon).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a whisper the agent delivers", async () => {
+    const { result } = await startRunning();
+    await act(async () => {
+      result.current.ingestAgentMessage({
+        type: "chaperon.whisper",
+        event_id: "e1",
+        check_id: "money_ask",
+        severity: "alert",
+        whisper: "careful with money talk",
+        confidence: 0.9,
+      });
+    });
+    expect(result.current.currentWhisper?.whisper).toBe("careful with money talk");
+  });
+
+  it("reflects the agent's unhealthy heartbeat as degraded", async () => {
+    const { result } = await startRunning();
+    await act(async () => {
+      result.current.ingestAgentMessage({ type: "chaperon.health", healthy: false });
+    });
+    expect(result.current.status).toBe("degraded");
+  });
+
+  it("falls back to the browser loop when the agent goes silent", async () => {
+    const { result } = await startRunning();
+    await act(async () => {
+      result.current.ingestAgentMessage({ type: "chaperon.health", healthy: true });
+    });
+    const atHandover = vi.mocked(evaluateChaperon).mock.calls.length;
+
+    // No heartbeat for > 20s -> watchdog resumes the browser loop, which
+    // evaluates again ~1s later.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(21_000);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_500);
+    });
+    expect(vi.mocked(evaluateChaperon).mock.calls.length).toBeGreaterThan(atHandover);
+  });
 });
