@@ -4,6 +4,7 @@ import { ChevronDown, ShieldCheck, ThumbsDown, ThumbsUp, X } from "lucide-react"
 import { useChaperonController } from "@/context/ChaperonContext";
 import { ChaperonSetupSheet } from "@/components/ChaperonSetupSheet";
 import { ChaperonRail } from "@/components/ChaperonRail";
+import { ChaperonStatusPanel } from "@/components/ChaperonStatusPanel";
 import type { ChaperonSeverity } from "@/lib/chaperon";
 import { cn } from "@/lib/utils";
 
@@ -91,10 +92,9 @@ export function ChaperonMount() {
 
   const {
     status,
+    agent,
     currentWhisper,
     active,
-    listening,
-    wordsHeard,
     whisperLog,
     unreadCount,
     markRailSeen,
@@ -114,15 +114,19 @@ export function ChaperonMount() {
   const dotClass =
     status === "watching"
       ? "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse"
-      : status === "degraded"
-        ? "bg-amber shadow-[0_0_10px_rgba(251,191,36,0.6)]"
-        : "bg-white/30";
+      : status === "connecting"
+        ? "bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.6)] animate-pulse"
+        : status === "degraded"
+          ? "bg-amber shadow-[0_0_10px_rgba(251,191,36,0.6)]"
+          : "bg-white/30";
   const dotTitle =
     status === "watching"
       ? "Chaperon is watching"
-      : status === "degraded"
-        ? "Chaperon can't see right now"
-        : "Chaperon is off";
+      : status === "connecting"
+        ? "Connecting to the agent…"
+        : status === "degraded"
+          ? "Coaching is degraded — retrying"
+          : "Chaperon is off";
 
   // Shield is the collapsed rail: when active it toggles the whisper history;
   // when off (nothing to review) it opens setup so you can turn it on.
@@ -151,8 +155,8 @@ export function ChaperonMount() {
         <ShieldCheck className={cn("h-3.5 w-3.5", active ? "text-emerald-300" : "text-white/60")} />
         <span className={cn("h-2 w-2 rounded-full", dotClass)} aria-hidden />
         {active && (
-          <span className="text-[10px] font-medium tabular-nums text-white/70">
-            {listening ? `${wordsHeard}w` : "no mic"}
+          <span className="text-[10px] font-medium text-white/70">
+            {status === "connecting" ? "connecting" : status === "degraded" ? "degraded" : "watching"}
           </span>
         )}
         {unreadCount > 0 && (
@@ -170,6 +174,14 @@ export function ChaperonMount() {
           />
         )}
       </button>
+
+      {/* Honest per-stage status: what the agent is actually doing, per person.
+          Beta shows it by default (see CHAPERON_STATUS_DEFAULT_OPEN). */}
+      {active && (
+        <div className="pointer-events-auto fixed left-3 top-12 z-40">
+          <ChaperonStatusPanel status={status} agent={agent} />
+        </div>
+      )}
 
       {/* The running whisper log — collapsible; only when the reviewer opens it. */}
       {railOpen && (
@@ -238,12 +250,8 @@ export function ChaperonMount() {
         onClose={() => setSetupOpen(false)}
         variant="live"
         active={active}
-        transcriptSupported={ctrl.transcriptSupported}
-        listening={ctrl.listening}
-        wordsHeard={ctrl.wordsHeard}
         onStart={ctrl.start}
         onStop={ctrl.stop}
-        onInject={ctrl.injectText}
       />
     </>
   );

@@ -53,27 +53,18 @@ export function ChaperonSetupSheet({
   variant,
   active = false,
   busy = false,
-  transcriptSupported = true,
-  listening = false,
-  wordsHeard = 0,
   onStart,
   onStop,
-  onInject,
 }: {
   open: boolean;
   onClose: () => void;
   variant: "live" | "preferences";
   active?: boolean;
   busy?: boolean;
-  transcriptSupported?: boolean;
-  listening?: boolean;
-  wordsHeard?: number;
   onStart?: (cfg: ChaperonStartConfig) => void | Promise<void>;
   onStop?: () => void | Promise<void>;
-  onInject?: (text: string) => void;
 }) {
   const [prefs, setPrefs] = useState<Prefs>(loadChaperonPrefs);
-  const [testLine, setTestLine] = useState("");
 
   // Coach entitlement — only fetched while the sheet is open.
   const { data: coach, refetch: refetchCoach } = useQuery({
@@ -167,56 +158,12 @@ export function ChaperonSetupSheet({
           </span>
         </label>
 
-        {variant === "live" && !transcriptSupported && (
-          <p className="rounded-xl border border-amber/25 bg-amber/10 px-3 py-2 text-[11px] leading-relaxed text-amber/90">
-            This browser can't listen to the call (Safari doesn't support live
-            speech capture yet) — use Chrome, or the native app which hears the
-            whole conversation. You can still type a line below to test cues.
-          </p>
-        )}
-
         {variant === "live" && active && (
-          <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
-            <p className="flex items-center gap-2 text-[11px] font-medium">
-              <span
-                className={
-                  listening
-                    ? "h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-400"
-                    : "h-2 w-2 shrink-0 rounded-full bg-slate-500"
-                }
-              />
-              {transcriptSupported
-                ? listening
-                  ? `Listening — heard ${wordsHeard} word${wordsHeard === 1 ? "" : "s"}`
-                  : "Not hearing you — check the mic, or type a line to test"
-                : `Speech capture off — heard ${wordsHeard} typed word${wordsHeard === 1 ? "" : "s"}`}
-            </p>
-            {onInject && (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const t = testLine.trim();
-                  if (!t) return;
-                  onInject(t);
-                  setTestLine("");
-                }}
-                className="flex gap-2"
-              >
-                <input
-                  value={testLine}
-                  onChange={(e) => setTestLine(e.target.value)}
-                  placeholder="Type a test line…"
-                  className="focus-ring min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[12px] placeholder:text-muted-foreground/60"
-                />
-                <button
-                  type="submit"
-                  className="btn-primary focus-ring rounded-lg px-3 py-2 text-[12px] font-semibold"
-                >
-                  Send
-                </button>
-              </form>
-            )}
-          </div>
+          <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+            The chaperon listens to the whole call from our server (both sides).
+            The status panel on the call shows, live, whether it's hearing each of
+            you — no mic setup needed here.
+          </p>
         )}
 
         <p className="text-[11px] leading-relaxed text-muted-foreground">
