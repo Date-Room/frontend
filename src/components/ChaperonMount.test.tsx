@@ -14,19 +14,17 @@ function ctrl(enabled: boolean) {
   return {
     enabled,
     status: "off",
+    agent: { connected: false, judgeOk: false, you: null, them: null, lastError: null },
     currentWhisper: null,
     active: false,
-    listening: false,
-    wordsHeard: 0,
     whisperLog: [],
     unreadCount: 0,
-    transcriptSupported: true,
     markRailSeen: () => {},
     dismiss: () => {},
     sendFeedback: () => {},
     start: () => {},
     stop: () => {},
-    injectText: () => {},
+    ingestAgentMessage: () => {},
   };
 }
 
