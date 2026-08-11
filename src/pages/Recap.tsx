@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { Calendar, ChevronRight, Lightbulb, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { CardPage } from "@/components/CardPage";
 import { PaymentCheckout } from "@/components/PaymentCheckout";
 import {
@@ -17,6 +17,7 @@ import {
 } from "@/lib/activities/activityState";
 import { ApiError } from "@/lib/api";
 import { authClient } from "@/lib/authClient";
+import { getChaperonDebrief, type ChaperonDebriefResponse } from "@/lib/chaperon";
 import {
   getBillingConfig,
   getEntitlement,
@@ -83,28 +84,32 @@ const ACTIVITY_LABELS: Record<string, string> = {
   capture: "Captures",
 };
 
-/** A one-line human summary of an activity's persisted state. */
-function summarize(a: ActivityStateResponse): string {
+/** A one-line human summary of an activity's persisted state. Written to read
+ *  like a friend's recap, not a database row — exported for its copy tests. */
+export function summarize(a: ActivityStateResponse): string {
   const s = a.state ?? {};
   switch (a.activity_id) {
     case "chat": {
       const n = Array.isArray(s.messages) ? s.messages.length : 0;
-      return `${n} message${n === 1 ? "" : "s"}`;
+      if (n === 0) return "All talk, no typing";
+      return `You traded ${n} message${n === 1 ? "" : "s"}`;
     }
     case "this_or_that": {
       const i = typeof s.prompt_index === "number" ? s.prompt_index : 0;
-      return `${i + 1} round${i === 0 ? "" : "s"}`;
+      return `${i + 1} quick pick${i === 0 ? "" : "s"} — you know each other a little better now`;
     }
     case "watch":
-      return s.video_id ? "Watched a video together" : "Opened";
+      return s.video_id ? "Watched something together" : "Opened, but never pressed play";
     case "dj": {
       const np = s.now_playing as { title?: string } | null;
-      return np?.title ? `Last track: ${np.title}` : "Took turns on the aux";
+      return np?.title ? `The night ended on “${np.title}”` : "Took turns on the aux";
     }
     case "questions":
-      return typeof s.phase === "string" ? `Phase: ${s.phase}` : "Played";
+      return typeof s.phase === "string"
+        ? `Made it to the ${s.phase} questions`
+        : "Asked the questions that matter";
     default:
-      return "Saved";
+      return "Saved from tonight";
   }
 }
 
@@ -164,6 +169,15 @@ export default function Recap() {
     queryKey: ["entitlement"],
     queryFn: getEntitlement,
     enabled: Boolean(authClient.getSession()),
+  });
+
+  // The caller's own chaperon debrief for this room. 404 = they never ran a
+  // chaperon here — normal, render nothing. Per-viewer private server-side.
+  const { data: debriefRes } = useQuery<ChaperonDebriefResponse | null>({
+    queryKey: ["chaperon-debrief", id],
+    enabled: Boolean(id) && Boolean(authClient.getSession()),
+    retry: false,
+    queryFn: () => getChaperonDebrief(id as string).catch(() => null),
   });
 
   const { data: billingConfig } = useQuery({
@@ -326,6 +340,60 @@ export default function Recap() {
         </h1>
         <p className="text-muted-foreground text-sm">A look back at what you did together</p>
       </div>
+
+      {/* The chaperon's debrief — the centrepiece when it exists. Yours only;
+          your date has their own. */}
+      {debriefRes?.debrief && (
+        <section className="mb-10 animate-float-up">
+          <div className="editorial-card p-6">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
+                <ShieldCheck className="h-3.5 w-3.5 text-rosegold" aria-hidden />
+                From your chaperon
+              </p>
+              <span
+                className={cn(
+                  "rounded-full border px-2.5 py-0.5 text-[10px] font-medium",
+                  debriefRes.debrief.safety === "all_clear"
+                    ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
+                    : "border-rose-500/40 bg-rose-500/10 text-rose-300",
+                )}
+              >
+                {debriefRes.debrief.safety === "all_clear"
+                  ? "Nothing needed flagging"
+                  : "Something was flagged"}
+              </span>
+            </div>
+            <h2 className="font-serif text-xl italic leading-snug text-cream">
+              {debriefRes.debrief.headline}
+            </h2>
+            {debriefRes.debrief.moments.length > 0 && (
+              <ul className="mt-4 space-y-2">
+                {debriefRes.debrief.moments.map((m) => (
+                  <li key={m} className="flex items-start gap-2.5 text-sm text-cream/85">
+                    <span
+                      className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rosegold/70"
+                      aria-hidden
+                    />
+                    {m}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {debriefRes.debrief.tip && (
+              <p className="mt-4 flex items-start gap-2 border-t border-white/10 pt-3 text-sm text-muted-foreground">
+                <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-rosegold/70" aria-hidden />
+                {debriefRes.debrief.tip}
+              </p>
+            )}
+          </div>
+        </section>
+      )}
+      {debriefRes && !debriefRes.debrief && debriefRes.ended_at && debriefRes.data_tier === "none" && (
+        <p className="mb-10 text-center text-xs italic text-muted-foreground">
+          Your chaperon kept no summary — you chose the no-retention setting.
+        </p>
+      )}
 
       {isLoading ? (
         <div className="flex justify-center py-12">

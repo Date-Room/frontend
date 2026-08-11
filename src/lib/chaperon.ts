@@ -48,6 +48,29 @@ export type ChaperonEvaluateResponse = {
 
 // --- API -------------------------------------------------------------------
 
+/** End-of-date summary the judge writes once per session (recap page). */
+export type ChaperonDebrief = {
+  headline: string;
+  moments: string[];
+  tip: string;
+  safety: "all_clear" | "flagged";
+};
+
+export type ChaperonDebriefResponse = {
+  session_id: string;
+  mode: ChaperonMode;
+  data_tier: ChaperonDataTier;
+  started_at: string;
+  ended_at: string | null;
+  // null while the session is active, or on the `none` (no-retention) tier.
+  debrief: ChaperonDebrief | null;
+};
+
+/** 404s when the caller never ran a chaperon in this room. */
+export function getChaperonDebrief(roomId: string): Promise<ChaperonDebriefResponse> {
+  return api.get<ChaperonDebriefResponse>(`/v1/chaperon/rooms/${roomId}/debrief`);
+}
+
 export function createChaperonSession(body: {
   room_id: string;
   mode: ChaperonMode;
