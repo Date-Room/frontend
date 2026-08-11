@@ -20,8 +20,9 @@ function formatElapsed(sec: number): string {
 /**
  * The running whisper rail: every whisper this call, newest at top, older
  * ones fading back so they're reviewable but don't read as the live signal.
- * Sits in the previously-empty left column. Each entry is rateable if it
- * carries an event_id.
+ * Rendered inside ChaperonMount's left column (normal flow — the parent
+ * positions it, so the status card above can never overlap it). Each entry is
+ * rateable if it carries an event_id.
  */
 export function ChaperonRail({
   entries,
@@ -39,7 +40,7 @@ export function ChaperonRail({
   if (entries.length === 0) return null;
 
   return (
-    <div className="pointer-events-auto fixed left-3 top-14 z-30 flex w-[min(15rem,44vw)] flex-col gap-1.5">
+    <div className="pointer-events-auto flex w-full flex-col gap-1.5">
       <div className="flex items-center gap-1.5 px-1">
         <p className="flex flex-1 items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40">
           <ShieldCheck className="h-3 w-3" aria-hidden />
