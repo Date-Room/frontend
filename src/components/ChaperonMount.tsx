@@ -4,7 +4,10 @@ import { ChevronDown, ShieldCheck, ThumbsDown, ThumbsUp, X } from "lucide-react"
 import { useChaperonController } from "@/context/ChaperonContext";
 import { ChaperonSetupSheet } from "@/components/ChaperonSetupSheet";
 import { ChaperonRail } from "@/components/ChaperonRail";
-import { ChaperonStatusPanel } from "@/components/ChaperonStatusPanel";
+import {
+  CHAPERON_STATUS_DEFAULT_OPEN,
+  ChaperonStatusPanel,
+} from "@/components/ChaperonStatusPanel";
 import type { ChaperonSeverity } from "@/lib/chaperon";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +40,17 @@ export function ChaperonMount() {
   // whisper once, from either surface).
   const [ratings, setRatings] = useState<Record<string, "up" | "down">>({});
   const [railOpen, setRailOpen] = useState(loadRailOpen);
+  // The per-stage status card. Open by default in beta, but it AUTO-COLLAPSES
+  // to a slim indicator chip the moment a whisper lands: the coach's words are
+  // the product, diagnostics must never sit on top of them (live complaint —
+  // the expanded card covered the whisper rail and couldn't be dismissed).
+  const [statusOpen, setStatusOpen] = useState(CHAPERON_STATUS_DEFAULT_OPEN);
+  const whisperCount = ctrl?.whisperLog.length ?? 0;
+  const prevWhisperCount = useRef(whisperCount);
+  useEffect(() => {
+    if (whisperCount > prevWhisperCount.current) setStatusOpen(false);
+    prevWhisperCount.current = whisperCount;
+  }, [whisperCount]);
 
   // Persistent host node so the surface survives native fullscreen (watch
   // party): on `fullscreenchange` we re-parent it into the fullscreen element
@@ -144,55 +158,73 @@ export function ChaperonMount() {
 
   const surface = (
     <>
-      {/* Discreet control cluster — status + toggles the whisper rail. */}
-      <button
-        type="button"
-        onClick={onShieldClick}
-        title={dotTitle}
-        aria-label="Chaperon"
-        className="pointer-events-auto fixed left-3 top-3 z-40 flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1.5 backdrop-blur transition hover:bg-black/70"
-      >
-        <ShieldCheck className={cn("h-3.5 w-3.5", active ? "text-emerald-300" : "text-white/60")} />
-        <span className={cn("h-2 w-2 rounded-full", dotClass)} aria-hidden />
+      {/* One flex COLUMN owns the top-left corner: pill, then status, then the
+          whisper rail. Everything is in normal flow, so an expanded status card
+          can only push the rail down — it can never sit on top of a whisper
+          (the old layout floated each piece at its own fixed offset, and the
+          status card covered the rail with no way to move it). */}
+      <div className="pointer-events-none fixed left-3 top-3 z-40 flex max-h-[calc(100vh-4rem)] w-[min(15rem,44vw)] flex-col items-start gap-2">
+        {/* Discreet control cluster — status + toggles the whisper rail. */}
+        <button
+          type="button"
+          onClick={onShieldClick}
+          title={dotTitle}
+          aria-label="Chaperon"
+          className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1.5 backdrop-blur transition hover:bg-black/70"
+        >
+          <ShieldCheck
+            className={cn("h-3.5 w-3.5", active ? "text-emerald-300" : "text-white/60")}
+          />
+          <span className={cn("h-2 w-2 rounded-full", dotClass)} aria-hidden />
+          {active && (
+            <span className="text-[10px] font-medium text-white/70">
+              {status === "connecting"
+                ? "connecting"
+                : status === "degraded"
+                  ? "degraded"
+                  : "watching"}
+            </span>
+          )}
+          {unreadCount > 0 && (
+            <span className="ml-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-bold text-black">
+              {unreadCount}
+            </span>
+          )}
+          {active && whisperLog.length > 0 && (
+            <ChevronDown
+              className={cn(
+                "h-3 w-3 text-white/50 transition-transform",
+                railOpen && "rotate-180",
+              )}
+              aria-hidden
+            />
+          )}
+        </button>
+
+        {/* Honest per-stage status. Expanded card in beta; collapses to a slim
+            indicator chip on tap or whenever a whisper arrives. */}
         {active && (
-          <span className="text-[10px] font-medium text-white/70">
-            {status === "connecting" ? "connecting" : status === "degraded" ? "degraded" : "watching"}
-          </span>
+          <div className="pointer-events-auto">
+            <ChaperonStatusPanel
+              status={status}
+              agent={agent}
+              open={statusOpen}
+              onToggle={() => setStatusOpen((v) => !v)}
+            />
+          </div>
         )}
-        {unreadCount > 0 && (
-          <span className="ml-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-bold text-black">
-            {unreadCount}
-          </span>
-        )}
-        {active && whisperLog.length > 0 && (
-          <ChevronDown
-            className={cn(
-              "h-3 w-3 text-white/50 transition-transform",
-              railOpen && "rotate-180",
-            )}
-            aria-hidden
+
+        {/* The running whisper log — collapsible; only when the reviewer opens it. */}
+        {railOpen && (
+          <ChaperonRail
+            entries={whisperLog}
+            ratings={ratings}
+            onRate={rate}
+            onCollapse={() => setRailOpen(false)}
+            onOpenSetup={() => setSetupOpen(true)}
           />
         )}
-      </button>
-
-      {/* Honest per-stage status: what the agent is actually doing, per person.
-          Beta shows it by default (see CHAPERON_STATUS_DEFAULT_OPEN). */}
-      {active && (
-        <div className="pointer-events-auto fixed left-3 top-12 z-40">
-          <ChaperonStatusPanel status={status} agent={agent} />
-        </div>
-      )}
-
-      {/* The running whisper log — collapsible; only when the reviewer opens it. */}
-      {railOpen && (
-        <ChaperonRail
-          entries={whisperLog}
-          ratings={ratings}
-          onRate={rate}
-          onCollapse={() => setRailOpen(false)}
-          onOpenSetup={() => setSetupOpen(true)}
-        />
-      )}
+      </div>
 
       {/* Newest whisper as a centre toast; it also lands in the rail. */}
       {currentWhisper && (

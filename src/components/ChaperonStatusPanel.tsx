@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ChevronRight, Loader2, Minus, X } from "lucide-react";
+import { Check, ChevronRight, ChevronUp, Loader2, Minus, X } from "lucide-react";
 import type { AgentStatus, ChaperonStatus, TrackStatus } from "@/hooks/useChaperon";
 import { cn } from "@/lib/utils";
 
@@ -50,17 +50,26 @@ function trackState(track: TrackStatus, agentConnected: boolean): RowState {
  * glance which part is working and, when something breaks, exactly where — per
  * person. A tap opens a diagnostics drawer with counts and the last error, so a
  * problem is self-service to read out instead of pulling server logs.
+ *
+ * Collapse is CONTROLLED by the parent (`open`/`onToggle`): ChaperonMount
+ * auto-collapses it when a whisper lands so diagnostics never crowd out the
+ * coach. Collapsed, it is a slim chip of the same four indicators — a bad
+ * stage stays visible as a red mark, which is the cue to expand.
  */
 export function ChaperonStatusPanel({
   status,
   agent,
   remoteName = "them",
+  open,
+  onToggle,
 }: {
   status: ChaperonStatus;
   agent: AgentStatus;
   remoteName?: string;
+  open: boolean;
+  onToggle: () => void;
 }) {
-  const [detailsOpen, setDetailsOpen] = useState(CHAPERON_STATUS_DEFAULT_OPEN);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const agentState: RowState = agent.connected ? "ok" : "pending";
   const judgeState: RowState = !agent.connected
@@ -69,8 +78,35 @@ export function ChaperonStatusPanel({
       ? "ok"
       : "bad";
 
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label="Expand chaperon status"
+        title="Agent · hearing you · hearing them · coaching"
+        className="flex w-fit items-center gap-1.5 rounded-full border border-white/10 bg-black/70 px-2.5 py-1 backdrop-blur transition hover:bg-black/80"
+      >
+        <Indicator state={agentState} />
+        <Indicator state={trackState(agent.you, agent.connected)} />
+        <Indicator state={trackState(agent.them, agent.connected)} />
+        <Indicator state={judgeState} />
+        <ChevronRight className="h-3 w-3 text-white/40" aria-hidden />
+      </button>
+    );
+  }
+
   return (
     <div className="w-56 rounded-xl border border-white/10 bg-black/70 px-3 py-2 backdrop-blur">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label="Collapse chaperon status"
+        className="mb-0.5 flex w-full items-center justify-between text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40 transition hover:text-white/70"
+      >
+        Status
+        <ChevronUp className="h-3 w-3" aria-hidden />
+      </button>
       <Row label={agent.connected ? "Agent connected" : "Connecting to agent…"} state={agentState} />
       <Row label="Hearing you" state={trackState(agent.you, agent.connected)} />
       <Row label={`Hearing ${remoteName}`} state={trackState(agent.them, agent.connected)} />
