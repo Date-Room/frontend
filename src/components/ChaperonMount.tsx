@@ -163,7 +163,7 @@ export function ChaperonMount() {
           can only push the rail down — it can never sit on top of a whisper
           (the old layout floated each piece at its own fixed offset, and the
           status card covered the rail with no way to move it). */}
-      <div className="pointer-events-none fixed left-3 top-3 z-40 flex max-h-[calc(100vh-4rem)] w-[min(15rem,44vw)] flex-col items-start gap-2">
+      <div className="pointer-events-none fixed left-3 top-16 z-40 flex max-h-[calc(100vh-6rem)] w-[min(15rem,44vw)] flex-col items-start gap-2">
         {/* Discreet control cluster — status + toggles the whisper rail. */}
         <button
           type="button"

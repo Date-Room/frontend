@@ -15,7 +15,10 @@ const PREFS_KEY = "dr_chaperon_prefs";
 
 type Prefs = { coach: boolean; announcePresence: boolean };
 
-const DEFAULT_PREFS: Prefs = { coach: false, announcePresence: false };
+// announcePresence defaults ON: Chaperon processes the other person's voice
+// too, so the fair default is to let them know one may be on the call. The user
+// can still turn it off. See the Privacy policy's "AI safety layer" section.
+const DEFAULT_PREFS: Prefs = { coach: false, announcePresence: true };
 
 function loadChaperonPrefs(): Prefs {
   try {

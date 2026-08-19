@@ -10,7 +10,7 @@
 import { BRAND_NAME } from "@/lib/constants";
 import { LegalShell, type LegalSection } from "@/components/LegalShell";
 
-const LAST_UPDATED = "13 July 2026";
+const LAST_UPDATED = "17 August 2026";
 const LEGAL_EMAIL = "legal@dateroom.io";
 
 export default function Terms() {
@@ -200,6 +200,49 @@ export default function Terms() {
       ),
     },
     {
+      id: "chaperon",
+      title: "Chaperon (AI safety layer)",
+      body: (
+        <>
+          <p>
+            Chaperon is an optional feature you can switch on during a one-off
+            date. When on, an automated system processes the call audio to
+            surface private safety cues, and — with the paid Coach option —
+            conversational suggestions. How it handles data is described in the
+            Privacy policy. By using it you agree that:
+          </p>
+          <ul className="mt-3 list-disc pl-5 space-y-2 marker:text-rosegold/60">
+            <li>
+              <span className="text-cream/90">It is an aid, not a
+              guarantee.</span> Chaperon is automated, can miss things, and can
+              be wrong. It does not make the other person safe or trustworthy,
+              it is not a monitoring or emergency service, and it is not legal,
+              medical, psychological, or other professional advice. You remain
+              responsible for your own decisions, and {BRAND_NAME} is not a
+              substitute for emergency services.
+            </li>
+            <li>
+              <span className="text-cream/90">You must have the right to use
+              it.</span> Chaperon processes the other participant's voice as well
+              as yours. You are responsible for using it lawfully, which in some
+              places means only with the other person's knowledge or consent.
+              Turning it on confirms you may lawfully do so.
+            </li>
+            <li>
+              <span className="text-cream/90">Coach is in beta.</span> The Coach
+              option is offered free while in beta, may change or be withdrawn,
+              and your feedback on cues may be used to improve the feature.
+            </li>
+            <li>
+              To the maximum extent permitted by law, we are not liable for
+              actions you take, or don't take, in reliance on a Chaperon cue or
+              on its silence.
+            </li>
+          </ul>
+        </>
+      ),
+    },
+    {
       id: "termination",
       title: "Termination",
       body: (
@@ -224,7 +267,10 @@ export default function Terms() {
           and video at good quality, but we do not warrant that it will be
           uninterrupted, error-free, or that it will meet every expectation.
           {" "}
-          {BRAND_NAME} is not a substitute for emergency services.
+          {BRAND_NAME} is not a substitute for emergency services. Automated
+          features, including the Chaperon safety layer, are provided as an aid
+          only and are not guaranteed to detect or prevent any particular
+          behaviour — see &ldquo;Chaperon (AI safety layer)&rdquo;.
         </p>
       ),
     },

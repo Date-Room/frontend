@@ -6,13 +6,16 @@
  *
  * TODO(legal): this page is plain-language drafting intended for review by
  * counsel before any production launch. Do not treat as legally binding
- * as-is.
+ * as-is. In particular, the "AI safety layer (Chaperon)" section processes
+ * BOTH participants' voices while only the initiator opts in — counsel should
+ * confirm the consent model (two-party-consent states, GDPR/UK special-category
+ * data, and whether the "announce presence" disclosure must default on).
  */
 
 import { BRAND_NAME } from "@/lib/constants";
 import { LegalShell, type LegalSection } from "@/components/LegalShell";
 
-const LAST_UPDATED = "13 July 2026";
+const LAST_UPDATED = "17 August 2026";
 const PRIVACY_EMAIL = "privacy@dateroom.io";
 
 export default function Privacy() {
@@ -89,8 +92,13 @@ export default function Privacy() {
           We use this data to run the service: authenticate you, synchronise
           what each person in a room sees, deliver real-time audio and video,
           process subscriptions, and prevent abuse. We do not sell your personal
-          data and we do not use the content of your rooms to train advertising
-          profiles.
+          data, and we do not use the content of your rooms to build advertising
+          profiles or to train general-purpose AI models. The optional Chaperon
+          safety layer is the one exception, described in{" "}
+          <span className="text-cream/90">&ldquo;AI safety layer (Chaperon)&rdquo;</span>{" "}
+          below: when you switch it on, room audio is processed to generate
+          private safety and coaching cues, and your ratings of those cues may
+          be used to improve that feature.
         </p>
       ),
     },
@@ -131,6 +139,16 @@ export default function Privacy() {
               <span className="text-cream/90">Railway and Vercel</span> — our
               backend and frontend hosting providers.
             </li>
+            <li>
+              <span className="text-cream/90">AI processing providers</span> —
+              only when the Chaperon safety layer is switched on for a call, a
+              speech-to-text provider and a large-language-model provider (such
+              as Anthropic, Google, or OpenAI) process the call audio on our
+              behalf to generate safety and coaching cues. They act as our
+              sub-processors under a data-processing agreement and are instructed
+              not to use your data to train their own models. When Chaperon is
+              off, no call content is sent to them.
+            </li>
           </ul>
           <p className="text-muted-foreground/80 text-[13px]">
             Each provider has its own privacy practices. Where appropriate, we
@@ -147,11 +165,75 @@ export default function Privacy() {
         <p>
           Calls are delivered through LiveKit — peer-to-peer where the network
           allows, relayed through LiveKit's servers when it doesn't.{" "}
-          <span className="text-cream/90">We do not record calls.</span> If
-          either participant uses OS-level screen recording, screenshots, or
-          third-party capture, that is outside our control and is their
-          responsibility.
+          <span className="text-cream/90">We do not save audio or video
+          recordings of your calls.</span> The one thing that processes your
+          call audio is the optional Chaperon safety layer, and only when
+          someone in the room turns it on — it transcribes and analyses speech
+          in real time to produce private safety cues, but does not keep the
+          recording. See{" "}
+          <span className="text-cream/90">&ldquo;AI safety layer (Chaperon)&rdquo;</span>{" "}
+          below. If either participant uses OS-level screen recording,
+          screenshots, or third-party capture, that is outside our control and
+          is their responsibility.
         </p>
+      ),
+    },
+    {
+      id: "chaperon",
+      title: "AI safety layer (Chaperon)",
+      body: (
+        <>
+          <p>
+            Chaperon is an optional feature on one-off date rooms. When someone
+            in the room turns it on, an automated system joins the call on our
+            server and listens to the audio to watch for signs of scams,
+            pressure, or unsafe situations, and — if the paid Coach option is
+            enabled — to offer gentle conversational cues. It works like this:
+          </p>
+          <ul className="mt-3 list-disc pl-5 space-y-2 marker:text-rosegold/60">
+            <li>
+              <span className="text-cream/90">Both sides' speech is
+              processed.</span> To do its job the system transcribes and
+              analyses what both participants say during the call, even though
+              the resulting cues are shown only to the person who turned it on.
+              Those cues (&ldquo;whispers&rdquo;) are private to that person and
+              are never shown to the other participant.
+            </li>
+            <li>
+              <span className="text-cream/90">You control whether the other
+              person is told.</span> There is a &ldquo;Tell them a chaperon is
+              on&rdquo; option. Because Chaperon processes the other person's
+              voice, we recommend that you only use it with their knowledge, and
+              your local laws may require their consent. Turning it on means you
+              confirm you may lawfully do so.
+            </li>
+            <li>
+              <span className="text-cream/90">You choose what is kept.</span>{" "}
+              Chaperon offers a no-retention setting, where nothing about the
+              call is stored after it ends. On the default setting we keep a
+              short after-date &ldquo;debrief&rdquo; summary and a log of the
+              cues it raised, visible only to you, so you can review the date
+              (see Retention). We do not keep the raw audio in either case.
+            </li>
+            <li>
+              <span className="text-cream/90">Feedback helps improve it.</span>{" "}
+              When you rate a cue with 👍 or 👎, we may use that rating and the
+              associated cue to improve the safety and coaching feature. You can
+              avoid this by not rating cues, and the no-retention setting keeps
+              nothing to learn from.
+            </li>
+            <li>
+              <span className="text-cream/90">It is not a guarantee.</span>{" "}
+              Chaperon is an automated aid that can miss things or be wrong. It
+              is not a substitute for your own judgment, and it is not a
+              monitoring or emergency service. See our Terms for more.
+            </li>
+          </ul>
+          <p className="mt-3 text-muted-foreground/80 text-[13px]">
+            Chaperon is off unless you switch it on, and you can turn it off at
+            any time during a call.
+          </p>
+        </>
       ),
     },
     {
@@ -162,6 +244,13 @@ export default function Privacy() {
           <li>
             Recap of a session room is viewable for 24 hours after the room
             ends, and then deleted.
+          </li>
+          <li>
+            Chaperon's after-date debrief and the log of cues it raised are kept
+            only for the person who turned it on, so they can review the date,
+            and are removed when the room and its recap are deleted. If you chose
+            the no-retention setting, none of this is stored. We never keep the
+            call's raw audio.
           </li>
           <li>
             Persistent room content — chat, journal entries, library — lives as
