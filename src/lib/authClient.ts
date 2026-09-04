@@ -33,7 +33,33 @@ export type Session = {
 };
 
 const STORAGE_KEY = "dr_auth_v1";
+/** Same-device proof for the magic link, handed to us by /request-otp.
+ *  It lives here rather than in the `dr_b` cookie the backend also sets
+ *  because the API is a different site than the app in production
+ *  (dateroom.io vs *.up.railway.app), and a SameSite=Lax cookie is
+ *  never sent on a cross-site fetch — so the cookie alone made every
+ *  web magic-link click fail the binding check. localStorage gives the
+ *  same property the cookie was there for: only the browser that asked
+ *  for the link can complete it. */
+const LINK_BINDING_KEY = "dr_link_binding_v1";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+
+function rememberLinkBinding(token: string | null | undefined): void {
+  try {
+    if (token) localStorage.setItem(LINK_BINDING_KEY, token);
+    else localStorage.removeItem(LINK_BINDING_KEY);
+  } catch {
+    /* private mode / storage disabled — the cookie path may still work */
+  }
+}
+
+function readLinkBinding(): string | null {
+  try {
+    return localStorage.getItem(LINK_BINDING_KEY);
+  } catch {
+    return null;
+  }
+}
 
 /** Build a same-origin return path to round-trip through OAuth.
  * Accepts `?next=` (canonical) and `?redirect=` (legacy in-app links).
@@ -133,6 +159,8 @@ class AuthClient {
       credentials: "include", // browser-bound magic-link cookie
     });
     if (!response.ok) throw await asError(response, "Could not send the sign-in code.");
+    const body = (await response.json().catch(() => null)) as { browser_token?: string } | null;
+    rememberLinkBinding(body?.browser_token ?? null);
   }
 
   async verifyOtp(
@@ -157,17 +185,23 @@ class AuthClient {
   }
 
   async verifyLink(token: string, referralCode?: string | null): Promise<Session> {
+    const binding = readLinkBinding();
     const response = await fetch(`${API_BASE}/v1/auth/verify-link`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         token,
         device_label: "web",
+        // Proves this is the browser that asked for the link. The cookie
+        // below says the same thing but only survives when the API is
+        // same-site as the app; this copy always makes the trip.
+        ...(binding ? { browser_token: binding } : {}),
         ...(referralCode ? { referral_code: referralCode } : {}),
       }),
       credentials: "include", // matches the browser cookie set on request-otp
     });
     if (!response.ok) throw await asError(response, "This sign-in link no longer works.");
+    rememberLinkBinding(null);
     return this.finalizeSignIn(await response.json());
   }
 
