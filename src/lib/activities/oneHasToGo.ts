@@ -144,6 +144,24 @@ export const OHTG_ROUNDS: OhtgRound[] = [
   },
 ];
 
+/**
+ * The reveal's beat timeline: your guess pins → their cut stamps down →
+ * the read verdict → did they read you → settle. Pacing tightens as the
+ * arc deepens — full theatre while the rhythm is new, quicker stamps by
+ * the time the stakes are high (ten rounds of slow reveals would drag).
+ */
+export function ohtgRevealSteps(round: number): { id: string; at: number }[] {
+  const factor = round <= 2 ? 1 : round <= 5 ? 0.72 : 0.5;
+  const base: [string, number][] = [
+    ["pin", 0],
+    ["stamp", 1000],
+    ["verdict", 2200],
+    ["mirror", 3100],
+    ["settle", 3900],
+  ];
+  return base.map(([id, at]) => ({ id, at: Math.round(at * factor) }));
+}
+
 export type OhtgPhase = "cutting" | "guessing" | "revealing";
 
 export type OhtgState = {

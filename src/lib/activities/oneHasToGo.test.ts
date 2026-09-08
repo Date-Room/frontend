@@ -4,6 +4,7 @@ import {
   initialOhtgState,
   ohtgFromJson,
   ohtgIsFinished,
+  ohtgRevealSteps,
   reduceOhtg,
   type OhtgState,
 } from "./oneHasToGo";
@@ -106,6 +107,19 @@ describe("reduceOhtg", () => {
     s = { ...s, round: OHTG_ROUNDS.length };
     const fresh = reduceOhtg(s, { type: "restart", payload: {}, userId: A });
     expect(fresh).toEqual(initialOhtgState());
+  });
+
+  it("reveal pacing tightens as the arc deepens", () => {
+    const early = ohtgRevealSteps(0);
+    const mid = ohtgRevealSteps(4);
+    const late = ohtgRevealSteps(9);
+    expect(early.map((s) => s.id)).toEqual(["pin", "stamp", "verdict", "mirror", "settle"]);
+    const settleAt = (steps: { id: string; at: number }[]) => steps.find((s) => s.id === "settle")!.at;
+    expect(settleAt(mid)).toBeLessThan(settleAt(early));
+    expect(settleAt(late)).toBeLessThan(settleAt(mid));
+    for (const steps of [early, mid, late]) {
+      for (let i = 1; i < steps.length; i++) expect(steps[i].at).toBeGreaterThan(steps[i - 1].at);
+    }
   });
 
   it("every round has exactly four options and reveal lines", () => {

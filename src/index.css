@@ -1443,3 +1443,33 @@
 @media (prefers-reduced-motion: reduce) {
   .dr-bigdoor-leaf--l, .dr-bigdoor-leaf--r, .dr-bigdoor-spill { animation: none; }
 }
+
+/* One Has To Go — stamps and the lighter dusk shade */
+.dr-stageroom--dusk .dr-stageroom-shade {
+  opacity: 1;
+  background: radial-gradient(75% 60% at 50% 40%, transparent 0%, rgb(0 0 0 / 0.5) 100%), rgb(0 0 0 / 0.22);
+}
+.dr-cutcard { overflow: visible; }
+.dr-stamp {
+  position: absolute; top: 50%; right: 4.2rem; translate: 0 -50%;
+  font-size: 1.9rem; line-height: 1; color: hsl(var(--destructive));
+  rotate: -12deg; text-shadow: 0 2px 12px rgb(0 0 0 / 0.6);
+  pointer-events: none;
+}
+.dr-stamp--anim { animation: dr-stamp-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.dr-stamp--second { right: 2.6rem; rotate: 9deg; }
+.dr-cutcard--slammed { animation: dr-slam-shake 0.45s ease 0.08s; }
+
+@keyframes dr-stamp-in {
+  from { opacity: 0; scale: 2.4; rotate: -30deg; }
+  to { opacity: 1; scale: 1; rotate: -12deg; }
+}
+@keyframes dr-slam-shake {
+  0%, 100% { translate: 0 0; }
+  25% { translate: -3px 1px; }
+  50% { translate: 3px -1px; }
+  75% { translate: -2px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dr-stamp--anim, .dr-cutcard--slammed { animation: none; }
+}
