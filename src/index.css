@@ -1444,32 +1444,57 @@
   .dr-bigdoor-leaf--l, .dr-bigdoor-leaf--r, .dr-bigdoor-spill { animation: none; }
 }
 
-/* One Has To Go — stamps and the lighter dusk shade */
-.dr-stageroom--dusk .dr-stageroom-shade {
-  opacity: 1;
-  background: radial-gradient(75% 60% at 50% 40%, transparent 0%, rgb(0 0 0 / 0.5) 100%), rgb(0 0 0 / 0.22);
+/* One Has To Go — table cards that fall off the table */
+.dr-table { perspective: 1100px; }
+.dr-table--reading .dr-tile:not(:disabled) {
+  border-style: dashed;
+  border-color: color-mix(in srgb, #d4826a 55%, transparent);
 }
-.dr-cutcard { overflow: visible; }
-.dr-stamp {
-  position: absolute; top: 50%; right: 4.2rem; translate: 0 -50%;
-  font-size: 1.9rem; line-height: 1; color: hsl(var(--destructive));
-  rotate: -12deg; text-shadow: 0 2px 12px rgb(0 0 0 / 0.6);
+.dr-tile {
+  transform-style: preserve-3d;
+  transition: transform 0.35s ease, border-color 0.35s ease, opacity 0.9s ease, filter 0.9s ease, background-color 0.35s ease;
+}
+.dr-tile--sealed {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--room-accent) 35%, transparent), 0 24px 60px -30px color-mix(in srgb, var(--room-accent) 90%, transparent);
+}
+.dr-tile--fallen {
+  animation: dr-tile-fall 1.1s cubic-bezier(0.4, 0, 0.7, 1) both;
   pointer-events: none;
+  border-color: hsl(var(--destructive) / 0.5);
 }
-.dr-stamp--anim { animation: dr-stamp-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
-.dr-stamp--second { right: 2.6rem; rotate: 9deg; }
-.dr-cutcard--slammed { animation: dr-slam-shake 0.45s ease 0.08s; }
+.dr-tile--gone {
+  opacity: 0.25;
+  transform: translateY(18px) rotateX(50deg) scale(0.95);
+  filter: grayscale(0.7) brightness(0.65);
+  pointer-events: none;
+  border-color: hsl(var(--destructive) / 0.4);
+}
+.dr-tile-x {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 3.2rem; line-height: 1; color: hsl(var(--destructive) / 0.55);
+  pointer-events: none; animation: fade-in 0.6s ease both;
+}
+.dr-tile-tag {
+  position: absolute; bottom: 0.55rem; left: 50%; translate: -50% 0;
+  padding: 0.18rem 0.55rem; border-radius: 999px; border-width: 1px; border-style: solid;
+  font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; white-space: nowrap;
+}
+.dr-tile-tag--top { bottom: auto; top: 0.55rem; }
 
-@keyframes dr-stamp-in {
-  from { opacity: 0; scale: 2.4; rotate: -30deg; }
-  to { opacity: 1; scale: 1; rotate: -12deg; }
-}
-@keyframes dr-slam-shake {
-  0%, 100% { translate: 0 0; }
-  25% { translate: -3px 1px; }
-  50% { translate: 3px -1px; }
-  75% { translate: -2px 0; }
+@keyframes dr-tile-fall {
+  0% { opacity: 1; transform: none; }
+  35% { transform: translateY(-8px) rotateZ(-2deg); }
+  100% {
+    opacity: 0.25;
+    transform: translateY(18px) rotateX(50deg) scale(0.95);
+    filter: grayscale(0.7) brightness(0.65);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .dr-stamp--anim, .dr-cutcard--slammed { animation: none; }
+  .dr-tile--fallen {
+    animation: none;
+    opacity: 0.25;
+    transform: translateY(18px) rotateX(50deg) scale(0.95);
+    filter: grayscale(0.7) brightness(0.65);
+  }
 }

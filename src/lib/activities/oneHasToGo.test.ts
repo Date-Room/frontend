@@ -113,8 +113,8 @@ describe("reduceOhtg", () => {
     const early = ohtgRevealSteps(0);
     const mid = ohtgRevealSteps(4);
     const late = ohtgRevealSteps(9);
-    expect(early.map((s) => s.id)).toEqual(["pin", "stamp", "verdict", "mirror", "settle"]);
-    const settleAt = (steps: { id: string; at: number }[]) => steps.find((s) => s.id === "settle")!.at;
+    expect(early.map((s) => s.id)).toEqual(["dim", "yours", "theirs", "verdict"]);
+    const settleAt = (steps: { id: string; at: number }[]) => steps.find((s) => s.id === "verdict")!.at;
     expect(settleAt(mid)).toBeLessThan(settleAt(early));
     expect(settleAt(late)).toBeLessThan(settleAt(mid));
     for (const steps of [early, mid, late]) {
