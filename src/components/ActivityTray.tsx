@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, X, LogOut, Gamepad2, Play, Headphones, MessageCircle, DoorOpen, Copy, Check, KeyRound, UserMinus, Loader2, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, LogOut, Gamepad2, Play, Headphones, MessageCircle, DoorOpen, Copy, Check, HelpCircle, KeyRound, UserMinus, Loader2, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChatWithBoundary } from "@/components/Chat";
@@ -10,7 +10,10 @@ import { QuestionDeck } from "@/components/QuestionDeck";
 import { The36 } from "@/components/The36";
 import { TwoTruths } from "@/components/TwoTruths";
 import { TruthOrDare } from "@/components/TruthOrDare";
+import { OneHasToGo } from "@/components/OneHasToGo";
+import { PickADoor } from "@/components/PickADoor";
 import { RankIt } from "@/components/RankIt";
+import { ActivityHelp, hasActivityHelp } from "@/components/ActivityHelp";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { getRoomExperience, isActivityEnabled } from "@/lib/roomExperience";
 import { cn } from "@/lib/utils";
@@ -44,6 +47,8 @@ const CATEGORIES: Category[] = [
       { id: "the_36", label: "The 36", tagline: "Three sets of twelve. Get closer.", ready: true },
       { id: "2_truths", label: "2 Truths and a Lie", tagline: "Spot the lie. Swap roles.", ready: true },
       { id: "truth_or_dare", label: "Truth or Dare", tagline: "Three cards each. Two skips. Trades welcome.", ready: true },
+      { id: "one_has_to_go", label: "One Has To Go", tagline: "Cut one. Guess theirs. Defend it.", ready: true },
+      { id: "pick_a_door", label: "Pick a Door", tagline: "Choose blind. Answer what's behind it.", ready: true },
       { id: "rank_it", label: "Rank It", tagline: "Order five things. Compare priorities.", ready: true },
     ],
   },
@@ -361,6 +366,10 @@ function ActivityView({ id, onLeave }: { id: string; onLeave: () => void }) {
       return <TwoTruths />;
     case "truth_or_dare":
       return <TruthOrDare />;
+    case "one_has_to_go":
+      return <OneHasToGo />;
+    case "pick_a_door":
+      return <PickADoor />;
     case "rank_it":
       return <RankIt />;
     case "room_details":
@@ -398,7 +407,26 @@ export function ActivityTray({
   // Chat) whose ids match their activity can't collide and break "back".
   const [catId, setCatId] = useState<string | null>(null);
   const [actId, setActId] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const { isHost, roomId, roomPackage, curatedActivityIds } = useRoomSession();
+
+  // First-open explainer: the first time this person ever opens an activity
+  // that has help, show it before they play. Chat and room management are
+  // self-evident and stay quiet. Storage failures (private mode) skip the
+  // auto-show rather than nagging on every open.
+  useEffect(() => {
+    setHelpOpen(false);
+    if (!actId || !hasActivityHelp(actId)) return;
+    if (actId === "chat" || actId === "room_details") return;
+    try {
+      const key = `dr_activity_help_seen:${actId}`;
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, "1");
+      setHelpOpen(true);
+    } catch {
+      /* storage unavailable — help stays reachable from the ? button */
+    }
+  }, [actId]);
 
   const curated = useMemo(
     () => (curatedActivityIds.length ? curatedActivityIds : getRoomExperience(roomId)),
@@ -501,6 +529,18 @@ export function ActivityTray({
             <span className="w-5" />
           )}
           <span className="flex-1 text-center font-serif italic text-cream">{title}</span>
+          {actId && hasActivityHelp(actId) ? (
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              className="text-muted-foreground hover:text-cream"
+              aria-label="How to play"
+            >
+              <HelpCircle className="w-5 h-5" />
+            </button>
+          ) : (
+            <span className="w-5 hidden lg:block" />
+          )}
           <button type="button" onClick={close} className="text-muted-foreground hover:text-cream lg:hidden" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
@@ -552,6 +592,7 @@ export function ActivityTray({
           ) : null}
         </div>
       </aside>
+      {helpOpen && actId && <ActivityHelp id={actId} onClose={() => setHelpOpen(false)} />}
     </>
   );
 }
