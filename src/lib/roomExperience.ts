@@ -19,6 +19,7 @@ export type CuratableActivityId =
   | "the_36"
   | "2_truths"
   | "truth_or_dare"
+  | "rank_it"
   | "watch"
   | "dj"
   | "vision_board"
@@ -52,6 +53,7 @@ export const CURATABLE_ACTIVITIES: CuratableActivityMeta[] = [
   { id: "the_36", label: "The 36", tagline: "Three sets of twelve. Get closer.", emoji: "🫶", category: "games" },
   { id: "2_truths", label: "2 Truths and a Lie", tagline: "Spot the lie. Swap roles.", emoji: "🎭", category: "games" },
   { id: "truth_or_dare", label: "Truth or Dare", tagline: "Three cards each. Two skips.", emoji: "🔥", category: "games" },
+  { id: "rank_it", label: "Rank It", tagline: "Order five things. Compare priorities.", emoji: "📊", category: "games" },
 ];
 
 /** Free Try tier: only these three are available. */
