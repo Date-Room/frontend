@@ -80,6 +80,46 @@ const ACTIVITY_HELP: Record<string, HelpContent> = {
       ] },
     ],
   },
+  one_has_to_go: {
+    title: "One Has To Go",
+    tagline: "Cut one. Guess theirs. Defend it.",
+    sections: [
+      { heading: "How to play", bullets: [
+        "Four things appear. You each secretly eliminate one, forever.",
+        "Before the reveal, guess which one your date cut.",
+        "Then the cuts show, and you defend your decision out loud.",
+      ] },
+      { heading: "The score", bullets: [
+        "Reads count how often you guess each other right. It's not a compatibility score; it's how well you're figuring each other out.",
+      ] },
+    ],
+  },
+  pick_a_door: {
+    title: "Pick a Door",
+    tagline: "Choose blind. Answer what's behind it.",
+    sections: [
+      { heading: "How to play", bullets: [
+        "Three doors, each hiding a question. Pick one before you know what's behind it.",
+        "Both chosen doors open. Answer yours out loud, then swap.",
+        "Picking the same door means you answer it together.",
+      ] },
+      { heading: "Good to know", bullets: ["The unpicked door stays closed. Its question keeps for another date."] },
+    ],
+  },
+  rank_it: {
+    title: "Rank It",
+    tagline: "Order five things. Compare priorities.",
+    sections: [
+      { heading: "How to play", bullets: [
+        "Use the arrows to put five things in your order, best first.",
+        "Lock it in. Your date can't see your order until you both have.",
+        "The reveal shows both rankings side by side.",
+      ] },
+      { heading: "The point", bullets: [
+        "Where you're furthest apart is highlighted. That's not a problem, it's the conversation: tell each other why.",
+      ] },
+    ],
+  },
   truth_or_dare: {
     title: "Truth or Dare",
     tagline: "Three cards each — a mix of truths and dares.",
