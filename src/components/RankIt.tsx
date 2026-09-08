@@ -14,6 +14,7 @@ import {
   reduceRankIt,
 } from "@/lib/activities/rankIt";
 import { useCinematic } from "@/lib/stagecraft/cinematic";
+import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 
 /**
  * Rank It — hosted reveal. Order by real drag (arrows stay as the keyboard
@@ -29,16 +30,6 @@ import { useCinematic } from "@/lib/stagecraft/cinematic";
 const accentBtn = "rounded-full text-primary-foreground transition hover:opacity-90 disabled:opacity-50";
 const accentStyle = { backgroundColor: "var(--room-accent)" } as const;
 const ROW_GAP = 10;
-
-function usePartnerName(): string {
-  const room = useRoomSession();
-  return useMemo(() => {
-    const p = room.presence.find((x) => (x.sender_id as string | undefined) !== room.senderId);
-    const raw = typeof p?.name === "string" ? p.name.trim() : "";
-    const first = raw.split(/\s+/)[0] ?? "";
-    return first ? first.slice(0, 12) : "Them";
-  }, [room.presence, room.senderId]);
-}
 
 export function RankIt() {
   const { state, emit, senderId } = useReducedActivity(
