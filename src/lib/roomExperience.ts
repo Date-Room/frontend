@@ -21,6 +21,7 @@ export type CuratableActivityId =
   | "truth_or_dare"
   | "one_has_to_go"
   | "pick_a_door"
+  | "rank_it"
   | "watch"
   | "dj"
   | "vision_board"
@@ -56,6 +57,7 @@ export const CURATABLE_ACTIVITIES: CuratableActivityMeta[] = [
   { id: "truth_or_dare", label: "Truth or Dare", tagline: "Three cards each. Two skips.", emoji: "🔥", category: "games" },
   { id: "one_has_to_go", label: "One Has To Go", tagline: "Cut one. Guess theirs. Defend it.", emoji: "🗑️", category: "games" },
   { id: "pick_a_door", label: "Pick a Door", tagline: "Choose blind. Answer what's behind it.", emoji: "🚪", category: "games" },
+  { id: "rank_it", label: "Rank It", tagline: "Order five things. Compare priorities.", emoji: "📊", category: "games" },
 ];
 
 /** Free Try tier: only these three are available. */
