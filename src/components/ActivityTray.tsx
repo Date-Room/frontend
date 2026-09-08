@@ -11,6 +11,7 @@ import { The36 } from "@/components/The36";
 import { TwoTruths } from "@/components/TwoTruths";
 import { TruthOrDare } from "@/components/TruthOrDare";
 import { OneHasToGo } from "@/components/OneHasToGo";
+import { PickADoor } from "@/components/PickADoor";
 import { ActivityHelp, hasActivityHelp } from "@/components/ActivityHelp";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { getRoomExperience, isActivityEnabled } from "@/lib/roomExperience";
@@ -46,6 +47,7 @@ const CATEGORIES: Category[] = [
       { id: "2_truths", label: "2 Truths and a Lie", tagline: "Spot the lie. Swap roles.", ready: true },
       { id: "truth_or_dare", label: "Truth or Dare", tagline: "Three cards each. Two skips. Trades welcome.", ready: true },
       { id: "one_has_to_go", label: "One Has To Go", tagline: "Cut one. Guess theirs. Defend it.", ready: true },
+      { id: "pick_a_door", label: "Pick a Door", tagline: "Choose blind. Answer what's behind it.", ready: true },
     ],
   },
   { id: "watch", label: "Watch", Icon: Play, activities: [{ id: "watch", label: "Watch", tagline: "Sync up something to watch.", ready: true, wide: true }] },
@@ -364,6 +366,8 @@ function ActivityView({ id, onLeave }: { id: string; onLeave: () => void }) {
       return <TruthOrDare />;
     case "one_has_to_go":
       return <OneHasToGo />;
+    case "pick_a_door":
+      return <PickADoor />;
     case "room_details":
       return <RoomDetails onLeave={onLeave} />;
     default:
