@@ -8,7 +8,7 @@ import {
   pickADoorIsFinished,
   reducePickADoor,
 } from "@/lib/activities/pickADoor";
-import { useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
+import { prefersReducedMotion, useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { useTypewriter } from "@/lib/stagecraft/typewriter";
 
 /**
@@ -90,7 +90,8 @@ export function PickADoor() {
 
   const dimmed = revealing && witnessed && stage != null;
   const onPlaque = revealing && witnessed && stage === "question";
-  const showDoors = !revealing || (witnessed && (stage === "dimming" || stage === "opening"));
+  const showDoors = !revealing || (witnessed && stage === "dimming");
+  const onBigDoor = revealing && witnessed && stage === "opening";
 
   const nextRound = () => emit("next_round", { round: state.round });
   const finishLabel = state.round + 1 >= DOOR_ROUNDS.length ? "Finish" : "Next round";
@@ -195,6 +196,13 @@ export function PickADoor() {
         </div>
       )}
 
+      {onBigDoor && mine && (
+        <div className="relative flex flex-1 flex-col items-center justify-center gap-4">
+          <div className="dr-beam" aria-hidden />
+          <BigDoor label={sameDoor ? "Together" : "Your door"} name={mine.name} />
+        </div>
+      )}
+
       {onPlaque && mine && theirs && (
         <StagePlaques
           sameDoor={sameDoor}
@@ -229,6 +237,24 @@ export function PickADoor() {
   );
 }
 
+/** The hero moment: a large door that swings open with light spilling
+ *  through. Plays on mount (CSS animations), sized for the panel. */
+function BigDoor({ label, name }: { label: string; name: string }) {
+  return (
+    <div className="flex flex-col items-center gap-4 animate-fade-in">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--room-accent)" }}>
+        {label} · {name}
+      </p>
+      <div className="dr-bigdoor" aria-hidden>
+        <span className="dr-bigdoor-spill" />
+        <span className="dr-bigdoor-leaf dr-bigdoor-leaf--l" />
+        <span className="dr-bigdoor-leaf dr-bigdoor-leaf--r" />
+      </div>
+      <p className="text-xs text-muted-foreground animate-pulse">opening…</p>
+    </div>
+  );
+}
+
 /** The lit stage: one plaque at a time, question typing itself in. */
 function StagePlaques({
   sameDoor,
@@ -254,7 +280,30 @@ function StagePlaques({
   const showingTheirs = beat === "theirs" || beat === "theirs-done";
   const door = showingTheirs ? theirs : mine;
   const owner = sameDoor ? "Together" : showingTheirs ? "Their door" : "Your door";
-  const typed = useTypewriter(door.question, true);
+
+  // Their door earns its own swing before its plaque appears.
+  const [theirsOpened, setTheirsOpened] = useState(false);
+  useEffect(() => {
+    if (!showingTheirs || theirsOpened) return;
+    if (prefersReducedMotion()) {
+      setTheirsOpened(true);
+      return;
+    }
+    const t = window.setTimeout(() => setTheirsOpened(true), 1500);
+    return () => window.clearTimeout(t);
+  }, [showingTheirs, theirsOpened]);
+
+  const doorIntro = showingTheirs && !theirsOpened;
+  const typed = useTypewriter(door.question, !doorIntro);
+
+  if (doorIntro) {
+    return (
+      <div className="dr-stage relative flex flex-1 flex-col items-center justify-center gap-4 text-center">
+        <div className="dr-beam" aria-hidden />
+        <BigDoor label="Their door" name={theirs.name} />
+      </div>
+    );
+  }
 
   return (
     <div className="dr-stage relative flex flex-1 flex-col items-center justify-center gap-4 text-center">
