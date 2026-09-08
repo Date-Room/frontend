@@ -13,25 +13,10 @@ import {
   LayoutGrid,
   X,
   Video,
-  Sparkles,
-  StickyNote,
-  BookOpen,
   HelpCircle,
-  ArrowLeftRight,
-  Heart,
-  Lightbulb,
-  Dice5,
-  Trash2,
-  BarChart3,
-  PlayCircle,
-  Headphones,
-  MessageCircle,
-  DoorOpen,
-  Gamepad2,
   ChevronLeft,
   ChevronRight,
   Pin,
-  Settings,
   type LucideIcon,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
@@ -40,6 +25,12 @@ import { MusicPlayerBar, MusicRoomProvider } from "@/components/MusicRoom";
 import { ActivityBoundary } from "@/components/RoomErrorBoundary";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
+import {
+  ACTIVITY_NOTIF,
+  LAUNCHER_CATEGORIES,
+  activityIcon,
+  activityTagline,
+} from "@/lib/activityRegistry";
 import { backgroundMoodLabel } from "@/lib/roomAmbiance";
 import {
   parseFridgeNotes,
@@ -51,87 +42,8 @@ import {
 } from "@/lib/roomWalls";
 import { cn } from "@/lib/utils";
 
-/** Two-level launcher categories — mirrors the mobile activity menu.
- *  Single-item categories stage directly; multi-item ones drill in. */
-const CATEGORIES: { id: string; label: string; icon: LucideIcon; itemIds: string[] }[] = [
-  {
-    id: "room",
-    label: "Room",
-    icon: DoorOpen,
-    itemIds: ["vision_board", "fridge_notes", "bookshelf", "room_details"],
-  },
-  {
-    id: "games",
-    label: "Games",
-    icon: Gamepad2,
-    itemIds: ["questions", "this_or_that", "the_36", "2_truths", "truth_or_dare", "one_has_to_go", "pick_a_door", "rank_it"],
-  },
-  { id: "watch", label: "Watch", icon: PlayCircle, itemIds: ["watch"] },
-  { id: "music", label: "Music", icon: Headphones, itemIds: ["dj"] },
-  { id: "chat", label: "Chat", icon: MessageCircle, itemIds: ["chat"] },
-];
-
-/** Partner-action → notifier copy + which stage item to open. Maps the raw
- *  activity_id (as broadcast) to a friendly line and the stage target. */
-const NOTIF: Record<string, { verb: string; target: string }> = {
-  chat: { verb: "sent a message", target: "chat" },
-  dj: { verb: "played a song", target: "dj" },
-  watch: { verb: "started a video", target: "watch" },
-  vision_board: { verb: "added a dream", target: "vision_board" },
-  pinned_note: { verb: "left a note", target: "fridge_notes" },
-  bookshelf: { verb: "added to the shelf", target: "bookshelf" },
-  // Bookshelf persists under the legacy activity_id "fridge".
-  fridge: { verb: "added to the shelf", target: "bookshelf" },
-  questions: { verb: "is playing Questions", target: "questions" },
-  this_or_that: { verb: "is playing This or That", target: "this_or_that" },
-  the_36: { verb: "is playing The 36", target: "the_36" },
-  "2_truths": { verb: "is playing Two Truths", target: "2_truths" },
-  truth_or_dare: { verb: "is playing Truth or Dare", target: "truth_or_dare" },
-  one_has_to_go: { verb: "is playing One Has To Go", target: "one_has_to_go" },
-  pick_a_door: { verb: "is playing Pick a Door", target: "pick_a_door" },
-  rank_it: { verb: "is playing Rank It", target: "rank_it" },
-};
 /** Chatty sync events that shouldn't pop a notification. */
 const NOTIF_NOISY = new Set(["tick", "seek", "cursor", "typing", "presence", "pause"]);
-
-/** Lucide equivalents of the mobile activity-menu icons (Material) — keeps
- *  the two clients visually consistent (no ad-hoc emojis). */
-const ITEM_ICONS: Record<string, LucideIcon> = {
-  vision_board: Sparkles,
-  fridge_notes: StickyNote,
-  bookshelf: BookOpen,
-  questions: HelpCircle,
-  this_or_that: ArrowLeftRight,
-  the_36: Heart,
-  "2_truths": Lightbulb,
-  truth_or_dare: Dice5,
-  one_has_to_go: Trash2,
-  pick_a_door: DoorOpen,
-  rank_it: BarChart3,
-  watch: PlayCircle,
-  dj: Headphones,
-  chat: MessageCircle,
-  room_details: Settings,
-};
-
-/** One-line taglines for the drilled-in list rows — mirror the mobile menu. */
-const ITEM_TAGLINES: Record<string, string> = {
-  vision_board: "The life you're building.",
-  fridge_notes: "Sticky notes for you two.",
-  bookshelf: "Books, links, things to watch.",
-  questions: "Pick 24, swap decks, take turns.",
-  this_or_that: "Pick blind, reveal together.",
-  the_36: "Three sets of twelve. Get closer.",
-  "2_truths": "Spot the lie. Swap roles.",
-  truth_or_dare: "Three cards each. Two skips.",
-  one_has_to_go: "Cut one. Guess theirs. Defend it.",
-  pick_a_door: "Choose blind. Answer what's behind it.",
-  rank_it: "Order five things. Compare priorities.",
-  watch: "Sync up something to watch.",
-  dj: "Take turns picking the soundtrack.",
-  chat: "Side chat while you play.",
-  room_details: "Invite, theme & background.",
-};
 
 export type StageItem = {
   id: string;
@@ -261,7 +173,7 @@ export function RoomStage({
       const d = e.payload as { activity_id?: string; type?: string; user_id?: string };
       if (!d.activity_id || d.user_id === room.senderId) return;
       if (d.type && NOTIF_NOISY.has(d.type)) return;
-      const meta = NOTIF[d.activity_id];
+      const meta = ACTIVITY_NOTIF[d.activity_id];
       if (!meta) return;
       // Already viewing that activity — no need to nudge me to open it.
       if (meta.target === stagedRef.current) return;
@@ -302,7 +214,7 @@ export function RoomStage({
   // resolved StageItem[] — mirrors the mobile activity menu groupings.
   const availCats = useMemo(
     () =>
-      CATEGORIES.map((c) => ({
+      LAUNCHER_CATEGORIES.map((c) => ({
         ...c,
         items: c.itemIds
           .map((id) => items.find((i) => i.id === id))
@@ -547,7 +459,7 @@ export function RoomStage({
           <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
             {stagedItem &&
               (() => {
-                const Icon = ITEM_ICONS[stagedItem.id] ?? LayoutGrid;
+                const Icon = activityIcon(stagedItem.id);
                 return <Icon className="h-3.5 w-3.5 text-primary" aria-hidden />;
               })()}
             <span className="text-xs font-medium uppercase tracking-[0.16em] text-cream/80">
@@ -620,9 +532,9 @@ export function RoomStage({
                     {activeCat.items.map((it) => (
                       <MenuListRow
                         key={it.id}
-                        Icon={ITEM_ICONS[it.id] ?? LayoutGrid}
+                        Icon={activityIcon(it.id)}
                         label={it.title}
-                        tagline={ITEM_TAGLINES[it.id]}
+                        tagline={activityTagline(it.id)}
                         active={staged === it.id}
                         onClick={() => pickItem(it.id)}
                       />
@@ -649,7 +561,7 @@ export function RoomStage({
           </div>
           {(() => {
             const showNotif = notif && !menuOpen;
-            const NotifIcon = showNotif ? ITEM_ICONS[notif.target] ?? LayoutGrid : LayoutGrid;
+            const NotifIcon = showNotif ? activityIcon(notif.target) : LayoutGrid;
             return (
               <button
                 type="button"
