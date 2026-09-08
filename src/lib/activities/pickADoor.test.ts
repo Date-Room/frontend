@@ -81,7 +81,7 @@ describe("reducePickADoor", () => {
   });
 
   it("every round has exactly three doors with questions", () => {
-    expect(DOOR_ROUNDS).toHaveLength(5);
+    expect(DOOR_ROUNDS).toHaveLength(8);
     for (const round of DOOR_ROUNDS) {
       expect(round.doors).toHaveLength(3);
       for (const door of round.doors) {

@@ -4,9 +4,9 @@
  * behind theirs out loud. The fun is committing to a category before knowing
  * the question.
  *
- * Five fixed rounds that earn their depth: Get to Know You → Your Kind of
- * Life → A Little Deeper → Chemistry → The Big One. No scoring at all; the
- * reveal is the payoff.
+ * Eight fixed rounds that earn their depth: Get to Know You → Tastes → Your
+ * Kind of Life → Stories → A Little Deeper → Chemistry → Curveballs → The
+ * Big One. No scoring at all; the reveal is the payoff.
  */
 
 export type Door = { emoji: string; name: string; question: string };
@@ -38,6 +38,26 @@ export const DOOR_ROUNDS: DoorRound[] = [
     ],
   },
   {
+    title: "Tastes",
+    doors: [
+      {
+        emoji: "🎵",
+        name: "Soundtrack",
+        question: "What song would play over the opening credits of a film about your life?",
+      },
+      {
+        emoji: "🍿",
+        name: "Comfort",
+        question: "What's your go-to comfort watch or comfort meal after a rough week?",
+      },
+      {
+        emoji: "👀",
+        name: "Telling",
+        question: "What's one thing you own that says the most about who you are?",
+      },
+    ],
+  },
+  {
     title: "Your Kind of Life",
     doors: [
       {
@@ -55,6 +75,26 @@ export const DOOR_ROUNDS: DoorRound[] = [
         emoji: "✈️",
         name: "Escape",
         question: "You have a completely free three-month break. How are you spending it?",
+      },
+    ],
+  },
+  {
+    title: "Stories",
+    doors: [
+      {
+        emoji: "😂",
+        name: "Chaos",
+        question: "What's the funniest thing that's ever happened to you on a night out?",
+      },
+      {
+        emoji: "🏆",
+        name: "Proud",
+        question: "What's a moment you wish someone had filmed, because you were brilliant?",
+      },
+      {
+        emoji: "🙈",
+        name: "Blush",
+        question: "What's something slightly embarrassing you're willing to admit right now?",
       },
     ],
   },
@@ -96,6 +136,26 @@ export const DOOR_ROUNDS: DoorRound[] = [
         emoji: "😂",
         name: "Chaos",
         question: "You're stuck together in an airport for 12 hours. What's the first thing you're doing?",
+      },
+    ],
+  },
+  {
+    title: "Curveballs",
+    doors: [
+      {
+        emoji: "🎤",
+        name: "Stage",
+        question: "You have to perform one song at karaoke to save your life. What is it?",
+      },
+      {
+        emoji: "🐘",
+        name: "Odd",
+        question: "What's your most irrational fear or your weirdest habit?",
+      },
+      {
+        emoji: "🔮",
+        name: "Magic",
+        question: "You can learn one true thing about your future. Do you look, and at what?",
       },
     ],
   },

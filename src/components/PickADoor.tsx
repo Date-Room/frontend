@@ -27,9 +27,9 @@ export function PickADoor() {
   if (pickADoorIsFinished(state)) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center animate-fade-in">
-        <p className="font-serif text-2xl italic text-cream">All five rounds, done</p>
+        <p className="font-serif text-2xl italic text-cream">All {DOOR_ROUNDS.length} rounds, done</p>
         <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
-          Ten doors opened between you. The ones still closed keep their secrets for next time.
+          A lot of doors opened between you. The ones still closed keep their secrets for next time.
         </p>
         <Button onClick={() => emit("restart")} className={accentBtn} style={accentStyle}>
           Play again
