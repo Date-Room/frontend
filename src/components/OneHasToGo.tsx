@@ -41,7 +41,7 @@ export function OneHasToGo() {
   if (ohtgIsFinished(state)) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center animate-fade-in">
-        <p className="font-serif text-2xl italic text-cream">That&apos;s all five</p>
+        <p className="font-serif text-2xl italic text-cream">That&apos;s all {OHTG_ROUNDS.length} rounds</p>
         <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
           {myReads === theirReads
             ? "You read each other equally well. Or equally badly."

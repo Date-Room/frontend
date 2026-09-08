@@ -5,7 +5,7 @@
  * person), which measures how well you're figuring each other out.
  *
  * Round flow: cutting → guessing → revealing → next_round. Content is a fixed
- * five-round arc that escalates from food to the dangerous one.
+ * ten-round arc that escalates from food to the dangerous one.
  */
 
 export type OhtgOption = { emoji: string; label: string };
@@ -35,6 +35,18 @@ export const OHTG_ROUNDS: OhtgRound[] = [
     matchLine: "Same instinct. Suspiciously aligned.",
   },
   {
+    title: "Drinks",
+    lead: "One of these never touches your lips again.",
+    options: [
+      { emoji: "☕", label: "Coffee" },
+      { emoji: "🍵", label: "Tea" },
+      { emoji: "🍷", label: "Wine" },
+      { emoji: "🥤", label: "Soft drinks" },
+    ],
+    clashLine: "Defend your beverage.",
+    matchLine: "Same sacrifice. The bar just got simpler.",
+  },
+  {
     title: "Weekend",
     lead: "Your weekends lose one of these.",
     options: [
@@ -45,6 +57,18 @@ export const OHTG_ROUNDS: OhtgRound[] = [
     ],
     clashLine: "Now you know what a weekend together looks like.",
     matchLine: "Two people, one weekend. This could work.",
+  },
+  {
+    title: "Entertainment",
+    lead: "One art form leaves your life entirely.",
+    options: [
+      { emoji: "🎵", label: "Music" },
+      { emoji: "📚", label: "Books" },
+      { emoji: "🎬", label: "Films" },
+      { emoji: "📺", label: "Series" },
+    ],
+    clashLine: "Now you know what their evenings look like.",
+    matchLine: "Culturally compatible. Or culturally ruthless.",
   },
   {
     title: "Technology",
@@ -59,6 +83,30 @@ export const OHTG_ROUNDS: OhtgRound[] = [
     matchLine: "Same sacrifice. Interesting.",
   },
   {
+    title: "Getaways",
+    lead: "One kind of trip you can never take again.",
+    options: [
+      { emoji: "🏖️", label: "Beach week" },
+      { emoji: "🏔️", label: "Mountain cabin" },
+      { emoji: "🏙️", label: "City break" },
+      { emoji: "🛣️", label: "Road trip" },
+    ],
+    clashLine: "Someone just lost their dream holiday.",
+    matchLine: "Same map, fewer arguments.",
+  },
+  {
+    title: "Little Joys",
+    lead: "A small pleasure disappears forever.",
+    options: [
+      { emoji: "🛏️", label: "Sleeping in" },
+      { emoji: "🚿", label: "Long hot showers" },
+      { emoji: "🍫", label: "Midnight snacks" },
+      { emoji: "🌅", label: "Golden hour walks" },
+    ],
+    clashLine: "This says more than it should.",
+    matchLine: "You'd both suffer the same way. Sweet.",
+  },
+  {
     title: "Life",
     lead: "The big four. One has to go.",
     options: [
@@ -69,6 +117,18 @@ export const OHTG_ROUNDS: OhtgRound[] = [
     ],
     clashLine: "Interesting… why?",
     matchLine: "You'd give up the same thing. Worth talking about.",
+  },
+  {
+    title: "Date Night",
+    lead: "One of these date nights is off the table for good.",
+    options: [
+      { emoji: "🍳", label: "Cooking together" },
+      { emoji: "🕯️", label: "Fancy dinner out" },
+      { emoji: "🛋️", label: "Movie night in" },
+      { emoji: "🎢", label: "A spontaneous adventure" },
+    ],
+    clashLine: "Useful intel for date number two.",
+    matchLine: "Planning the next one just got easy.",
   },
   {
     title: "The Dangerous One",

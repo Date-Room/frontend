@@ -108,6 +108,15 @@ describe("reduceOhtg", () => {
     expect(fresh).toEqual(initialOhtgState());
   });
 
+  it("every round has exactly four options and reveal lines", () => {
+    expect(OHTG_ROUNDS).toHaveLength(10);
+    for (const round of OHTG_ROUNDS) {
+      expect(round.options).toHaveLength(4);
+      expect(round.clashLine.length).toBeGreaterThan(0);
+      expect(round.matchLine.length).toBeGreaterThan(0);
+    }
+  });
+
   it("round-trips through json with junk tolerated", () => {
     expect(ohtgFromJson(null)).toEqual(initialOhtgState());
     const s = ohtgFromJson({
