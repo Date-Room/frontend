@@ -226,3 +226,71 @@ export function compareRankings(
   }
   return { closest, furthest, furthestGap: maxGap };
 }
+
+/**
+ * The chaptered reveal's timeline, as stagecraft steps. Chapter 1 reveals
+ * the partner's list from last place up (one row per beat), then the clash
+ * cards, then the agreement cards, then the settled board.
+ */
+export function rankRevealSteps(
+  rowCount: number,
+  clashCount: number,
+  agreeCount: number,
+): { id: string; at: number }[] {
+  const steps: { id: string; at: number }[] = [{ id: "dim", at: 0 }];
+  let t = 900;
+  for (let k = 1; k <= rowCount; k++) {
+    steps.push({ id: `theirs:${k}`, at: t });
+    t += 700;
+  }
+  t += 700; // hold on the completed list
+  for (let k = 1; k <= clashCount; k++) {
+    steps.push({ id: `clash:${k}`, at: t });
+    t += 900;
+  }
+  t += 600;
+  for (let k = 1; k <= agreeCount; k++) {
+    steps.push({ id: `agree:${k}`, at: t });
+    t += 900;
+  }
+  steps.push({ id: "board", at: t + 700 });
+  return steps;
+}
+
+export type RankInsights = {
+  /** Item indices with the widest rank gaps, widest first. */
+  clashes: number[];
+  /** Smallest-gap items excluding the clashes, closest first. */
+  agreements: number[];
+  /** The single widest-gap item (head of clashes) and its gap. */
+  widest: number;
+  widestGap: number;
+};
+
+/**
+ * The reveal chapters' data: top-N clashes and the closest agreements,
+ * with clash items excluded from agreements so nothing repeats. Ties break
+ * toward the earlier item index — deterministic on both clients.
+ */
+export function rankInsights(
+  a: number[],
+  b: number[],
+  clashCount = 2,
+  agreeCount = 2,
+): RankInsights {
+  const gaps = a
+    .map((_, item) => ({ item, gap: Math.abs(rankOf(a, item) - rankOf(b, item)) }))
+    .sort((x, y) => y.gap - x.gap || x.item - y.item);
+  const clashes = gaps.slice(0, clashCount).map((g) => g.item);
+  const agreements = gaps
+    .slice(clashCount)
+    .sort((x, y) => x.gap - y.gap || x.item - y.item)
+    .slice(0, agreeCount)
+    .map((g) => g.item);
+  return {
+    clashes,
+    agreements,
+    widest: gaps[0]?.item ?? 0,
+    widestGap: gaps[0]?.gap ?? 0,
+  };
+}

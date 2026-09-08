@@ -1400,3 +1400,11 @@
   .dr-stageroom-shade, .dr-door, .dr-door-leaf, .dr-door-spill { transition: none; }
   .dr-plaque, .dr-beam { animation: none; }
 }
+
+/* Rank It stagecraft */
+.dr-rank-grip { touch-action: none; cursor: grab; }
+.dr-rank-row--drag { position: relative; z-index: 5; cursor: grabbing; box-shadow: 0 20px 50px -24px color-mix(in srgb, var(--room-accent) 90%, transparent); }
+.dr-flip-row { transition: top 0.55s cubic-bezier(0.2, 1, 0.24, 1), border-color 0.3s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .dr-flip-row { transition: none; }
+}
