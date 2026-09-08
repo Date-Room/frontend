@@ -3,9 +3,11 @@ import {
   RANK_ROUNDS,
   compareRankings,
   initialRankItState,
+  rankInsights,
   rankItFromJson,
   rankItIsFinished,
   rankOf,
+  rankRevealSteps,
   reduceRankIt,
   type RankItState,
 } from "./rankIt";
@@ -88,6 +90,47 @@ describe("compareRankings", () => {
   it("rankOf is 1-based by position", () => {
     expect(rankOf([2, 0, 1], 2)).toBe(1);
     expect(rankOf([2, 0, 1], 1)).toBe(3);
+  });
+});
+
+describe("rankInsights", () => {
+  it("splits clashes and agreements with no repeats", () => {
+    const a = [0, 1, 2, 3, 4];
+    const b = [4, 1, 2, 3, 0]; // items 0 and 4 gap 4; items 1,2,3 gap 0
+    const { clashes, agreements, widest, widestGap } = rankInsights(a, b);
+    expect(clashes).toEqual([0, 4]);
+    expect(agreements).toEqual([1, 2]);
+    expect(widest).toBe(0);
+    expect(widestGap).toBe(4);
+    for (const it of agreements) expect(clashes).not.toContain(it);
+  });
+
+  it("is deterministic on ties and handles identical rankings", () => {
+    const order = [2, 0, 1, 4, 3];
+    const r = rankInsights(order, order);
+    expect(r.widestGap).toBe(0);
+    expect(r.clashes).toHaveLength(2);
+    expect(r.agreements).toHaveLength(2);
+    // Same inputs → same outputs on both clients.
+    expect(rankInsights(order, order)).toEqual(r);
+  });
+});
+
+describe("rankRevealSteps", () => {
+  it("builds dim → per-row theirs → clash cards → agree cards → board, ascending", () => {
+    const steps = rankRevealSteps(5, 2, 2);
+    expect(steps[0]).toEqual({ id: "dim", at: 0 });
+    const ids = steps.map((s) => s.id);
+    expect(ids).toEqual([
+      "dim",
+      "theirs:1", "theirs:2", "theirs:3", "theirs:4", "theirs:5",
+      "clash:1", "clash:2",
+      "agree:1", "agree:2",
+      "board",
+    ]);
+    for (let i = 1; i < steps.length; i++) {
+      expect(steps[i].at).toBeGreaterThan(steps[i - 1].at);
+    }
   });
 });
 
