@@ -49,6 +49,9 @@ import { QuestionDeck } from "@/components/QuestionDeck";
 import { The36 } from "@/components/The36";
 import { TwoTruths } from "@/components/TwoTruths";
 import { TruthOrDare } from "@/components/TruthOrDare";
+import { OneHasToGo } from "@/components/OneHasToGo";
+import { PickADoor } from "@/components/PickADoor";
+import { RankIt } from "@/components/RankIt";
 import { toast } from "sonner";
 import { authClient } from "@/lib/authClient";
 // (DATE_NAME removed — header shows the brand wordmark)
@@ -109,6 +112,9 @@ type ActivityTabId =
   | "the_36"
   | "2_truths"
   | "truth_or_dare"
+  | "one_has_to_go"
+  | "pick_a_door"
+  | "rank_it"
   | "watch"
   | "dj"
   | "chat";
@@ -132,6 +138,9 @@ const ACTIVITY_TABS: TabDef[] = [
   { id: "the_36", label: "The 36", icon: "🫶", curatableId: "the_36" },
   { id: "2_truths", label: "2 Truths", icon: "🎭", curatableId: "2_truths" },
   { id: "truth_or_dare", label: "Truth or Dare", icon: "🔥", curatableId: "truth_or_dare" },
+  { id: "one_has_to_go", label: "One Has To Go", icon: "🗑️", curatableId: "one_has_to_go" },
+  { id: "pick_a_door", label: "Pick a Door", icon: "🚪", curatableId: "pick_a_door" },
+  { id: "rank_it", label: "Rank It", icon: "📊", curatableId: "rank_it" },
   { id: "watch", label: "Watch", icon: "📺", curatableId: "watch" },
   { id: "dj", label: "Music", icon: "🎵", curatableId: "dj" },
   { id: "chat", label: "Chat", icon: "💭", curatableId: null },
@@ -471,6 +480,12 @@ function RoomShell({
         return <TwoTruths />;
       case "truth_or_dare":
         return <TruthOrDare />;
+      case "one_has_to_go":
+        return <OneHasToGo />;
+      case "pick_a_door":
+        return <PickADoor />;
+      case "rank_it":
+        return <RankIt />;
       case "watch":
         return <WatchTogether />;
       case "dj":
