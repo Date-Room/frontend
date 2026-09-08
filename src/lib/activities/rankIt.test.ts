@@ -93,7 +93,7 @@ describe("compareRankings", () => {
 
 describe("content", () => {
   it("every round has exactly five items", () => {
-    expect(RANK_ROUNDS).toHaveLength(5);
+    expect(RANK_ROUNDS).toHaveLength(8);
     for (const round of RANK_ROUNDS) expect(round.items).toHaveLength(5);
   });
 });

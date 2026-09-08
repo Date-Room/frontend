@@ -4,8 +4,8 @@
  * calls out where you're closest and where you're furthest apart, and the
  * furthest-apart item is the conversation.
  *
- * Five fixed rounds: Saturday → Holiday → What Matters → Irresistible →
- * Your Life. No scoring of any kind.
+ * Eight fixed rounds: Saturday → Holiday → Food World → What Matters →
+ * Free Time → Irresistible → Green Flags → Your Life. No scoring of any kind.
  */
 
 export type RankItem = { emoji: string; label: string };
@@ -41,6 +41,17 @@ export const RANK_ROUNDS: RankRound[] = [
     ],
   },
   {
+    title: "Food World",
+    prompt: "Rank the cuisines you'd happily eat forever.",
+    items: [
+      { emoji: "🍕", label: "Italian" },
+      { emoji: "🍣", label: "Japanese" },
+      { emoji: "🌮", label: "Mexican" },
+      { emoji: "🍛", label: "Indian" },
+      { emoji: "🍔", label: "American" },
+    ],
+  },
+  {
     title: "What Matters",
     prompt: "Rank these by importance in your life.",
     items: [
@@ -52,6 +63,17 @@ export const RANK_ROUNDS: RankRound[] = [
     ],
   },
   {
+    title: "Free Time",
+    prompt: "Rank how you'd actually spend a free afternoon.",
+    items: [
+      { emoji: "🎨", label: "Creating something" },
+      { emoji: "🏃", label: "Moving / sport" },
+      { emoji: "📚", label: "Learning something new" },
+      { emoji: "🧑‍🤝‍🧑", label: "Time with people" },
+      { emoji: "😴", label: "Pure rest" },
+    ],
+  },
+  {
     title: "Irresistible",
     prompt: "What makes someone irresistible to you? Rank it.",
     items: [
@@ -60,6 +82,17 @@ export const RANK_ROUNDS: RankRound[] = [
       { emoji: "❤️", label: "Kind" },
       { emoji: "🔥", label: "Attractive" },
       { emoji: "🎯", label: "Ambitious" },
+    ],
+  },
+  {
+    title: "Green Flags",
+    prompt: "Rank what wins you over on a first date.",
+    items: [
+      { emoji: "😄", label: "Makes you laugh early" },
+      { emoji: "🎧", label: "Actually listens" },
+      { emoji: "💬", label: "Asks good questions" },
+      { emoji: "⏰", label: "Shows up on time" },
+      { emoji: "✨", label: "Brings the energy" },
     ],
   },
   {
