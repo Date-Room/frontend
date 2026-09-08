@@ -10,6 +10,7 @@ import { QuestionDeck } from "@/components/QuestionDeck";
 import { The36 } from "@/components/The36";
 import { TwoTruths } from "@/components/TwoTruths";
 import { TruthOrDare } from "@/components/TruthOrDare";
+import { OneHasToGo } from "@/components/OneHasToGo";
 import { ActivityHelp, hasActivityHelp } from "@/components/ActivityHelp";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { getRoomExperience, isActivityEnabled } from "@/lib/roomExperience";
@@ -44,6 +45,7 @@ const CATEGORIES: Category[] = [
       { id: "the_36", label: "The 36", tagline: "Three sets of twelve. Get closer.", ready: true },
       { id: "2_truths", label: "2 Truths and a Lie", tagline: "Spot the lie. Swap roles.", ready: true },
       { id: "truth_or_dare", label: "Truth or Dare", tagline: "Three cards each. Two skips. Trades welcome.", ready: true },
+      { id: "one_has_to_go", label: "One Has To Go", tagline: "Cut one. Guess theirs. Defend it.", ready: true },
     ],
   },
   { id: "watch", label: "Watch", Icon: Play, activities: [{ id: "watch", label: "Watch", tagline: "Sync up something to watch.", ready: true, wide: true }] },
@@ -360,6 +362,8 @@ function ActivityView({ id, onLeave }: { id: string; onLeave: () => void }) {
       return <TwoTruths />;
     case "truth_or_dare":
       return <TruthOrDare />;
+    case "one_has_to_go":
+      return <OneHasToGo />;
     case "room_details":
       return <RoomDetails onLeave={onLeave} />;
     default:
