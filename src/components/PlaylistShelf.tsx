@@ -30,25 +30,48 @@ import {
 
 function toItems(tracks: DjTrack[]): MediaItem[] {
   return tracks
-    .filter((t) => t.video_id)
-    .map((t) => ({
-      source: "youtube" as const,
-      media_id: t.video_id as string,
-      title: t.title && t.title !== "Loading…" ? t.title : undefined,
-      added_at: new Date().toISOString(),
-    }));
+    .filter((t) => t.video_id || (t.source === "soundcloud" && t.sc_url))
+    .map((t) =>
+      t.source === "soundcloud"
+        ? {
+            source: "soundcloud" as const,
+            media_id: t.sc_url as string,
+            title: t.title && t.title !== "Loading…" ? t.title : undefined,
+            thumbnail: t.thumb_url,
+            added_at: new Date().toISOString(),
+          }
+        : {
+            source: "youtube" as const,
+            media_id: t.video_id as string,
+            title: t.title && t.title !== "Loading…" ? t.title : undefined,
+            added_at: new Date().toISOString(),
+          },
+    );
 }
 
 function toTracks(items: MediaItem[], senderId: string): DjTrack[] {
   return items
-    .filter((i) => i.source === "youtube" && i.media_id)
-    .map((i) => ({
-      id: crypto.randomUUID(),
-      title: i.title ?? "Loading…",
-      added_by: senderId,
-      channel_title: null,
-      video_id: i.media_id,
-    }));
+    .filter((i) => (i.source === "youtube" || i.source === "soundcloud") && i.media_id)
+    .map((i) =>
+      i.source === "soundcloud"
+        ? {
+            id: crypto.randomUUID(),
+            title: i.title ?? "Loading…",
+            added_by: senderId,
+            channel_title: null,
+            video_id: null,
+            source: "soundcloud" as const,
+            sc_url: i.media_id,
+            thumb_url: i.thumbnail,
+          }
+        : {
+            id: crypto.randomUUID(),
+            title: i.title ?? "Loading…",
+            added_by: senderId,
+            channel_title: null,
+            video_id: i.media_id,
+          },
+    );
 }
 
 export function PlaylistShelf({

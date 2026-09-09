@@ -41,6 +41,12 @@ export type DjTrack = {
   added_by: string;
   channel_title: string | null;
   video_id: string | null;
+  /** Optional (wire-compatible with mobile, which ignores unknown fields).
+   *  Absent/"youtube" = video_id is a YouTube id; "soundcloud" = sc_url is
+   *  the track URL the SoundCloud widget loads. */
+  source?: "youtube" | "soundcloud";
+  sc_url?: string;
+  thumb_url?: string;
 };
 
 export function extractId(url: string): string | null {
