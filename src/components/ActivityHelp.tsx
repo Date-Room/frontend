@@ -52,11 +52,13 @@ const ACTIVITY_HELP: Record<string, HelpContent> = {
   },
   this_or_that: {
     title: "This or That",
-    tagline: "Pick blind, reveal together.",
+    tagline: "Pick fast. Call theirs.",
     sections: [
       { heading: "How to play", bullets: [
-        "You each pick an option without seeing the other's choice.",
-        "Once you've both picked, the answers reveal side by side.",
+        "Five pairs that start easy and stop being easy.",
+        "Pick your side fast — the 7-second clock isn't a penalty, it just stops overthinking. Long pauses get noticed.",
+        "Before the reveal, call which side your date took. Right calls score a read.",
+        "The board at the end keeps every pair, where you split hardest, and where each of you hesitated.",
       ] },
     ],
   },

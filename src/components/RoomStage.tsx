@@ -120,7 +120,7 @@ const ITEM_TAGLINES: Record<string, string> = {
   fridge_notes: "Sticky notes for you two.",
   bookshelf: "Books, links, things to watch.",
   questions: "Pick 24, swap decks, take turns.",
-  this_or_that: "Pick blind, reveal together.",
+  this_or_that: "Pick fast. Call theirs.",
   the_36: "Three sets of twelve. Get closer.",
   "2_truths": "Press one. Stake your call.",
   truth_or_dare: "They deal. You deliver. Warm to Bare.",
