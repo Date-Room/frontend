@@ -465,7 +465,7 @@ function RoomShell({
     { id: "room_details", title: "Room info", icon: "⚙️", isWall: false },
   ];
   const renderRoomActivity = (id: string, launch: (id: string) => void): ReactNode => {
-    if (id === "lobby") return <ActivityLobby tabs={visibleTabs} onPick={launch} />;
+    if (id === "lobby") return <ActivityLobby tabs={visibleTabs} onPick={launch} wallRoom={wallRoom} />;
     if (id === "room_details") return <RoomSettings />;
     switch (id as ActivityTabId) {
       case "vision_board":

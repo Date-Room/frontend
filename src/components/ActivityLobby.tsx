@@ -109,12 +109,33 @@ const CARDS: ShelfCard[] = [
   },
 ];
 
+/** The Together room's standing surfaces — promoted above the shelf there,
+ *  because that room isn't "what are we doing tonight": the walls ARE the
+ *  room, and the shelf is for tonight. */
+const WALL_META: Record<string, { blurb: string; grad: string }> = {
+  vision_board: {
+    blurb: "The life you're dreaming up together. Pin the ones that matter.",
+    grad: "radial-gradient(120% 120% at 25% 15%, #2c2418 0%, #100d09 70%)",
+  },
+  fridge_notes: {
+    blurb: "Little notes that stay up between calls, like on the kitchen fridge.",
+    grad: "radial-gradient(120% 120% at 75% 20%, #30241b 0%, #110e0a 70%)",
+  },
+  bookshelf: {
+    blurb: "Books, links and things to watch, saved for later.",
+    grad: "radial-gradient(120% 120% at 50% 90%, #2a2216 0%, #0f0d09 70%)",
+  },
+};
+
 export function ActivityLobby({
   tabs,
   onPick,
+  wallRoom = false,
 }: {
   tabs: LobbyTab[];
   onPick: (id: string) => void;
+  /** Together rooms: walls become first-class tiles above the shelf. */
+  wallRoom?: boolean;
 }) {
   const [open, setOpen] = useState<string | null>(null);
   const chaperon = useChaperonController();
@@ -138,9 +159,51 @@ export function ActivityLobby({
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
       <div className="flex flex-col items-center gap-1 text-center">
-        <p className="font-serif text-2xl italic text-cream">What are we doing tonight?</p>
-        <p className="text-xs text-muted-foreground">Nothing is loaded until one of you picks. Either of you can start anything.</p>
+        <p className="font-serif text-2xl italic text-cream">
+          {wallRoom && walls.length > 0 ? "Your room" : "What are we doing tonight?"}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {wallRoom && walls.length > 0
+            ? "The walls stay up between dates. The shelf below is for tonight."
+            : "Nothing is loaded until one of you picks. Either of you can start anything."}
+        </p>
       </div>
+
+      {wallRoom && walls.length > 0 && (
+        <ul
+          className="dr-shelf grid list-none gap-3 p-0"
+          style={{ gridTemplateColumns: `repeat(${Math.min(walls.length, 3)}, minmax(0, 1fr))` }}
+        >
+          {walls.map((t) => {
+            const meta = WALL_META[t.id];
+            return (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  onClick={() => start(t.id)}
+                  className="dr-shelf-card focus-ring block w-full overflow-hidden rounded-2xl border border-white/[0.10] text-left"
+                >
+                  <span className="dr-shelf-frame relative block h-[64px] overflow-hidden" style={{ background: meta?.grad }}>
+                    <span className="dr-shelf-glyph absolute right-3 top-1/2 -translate-y-1/2 text-4xl" aria-hidden>{t.icon}</span>
+                    <span className="absolute inset-0" style={{ background: "linear-gradient(to top, rgb(0 0 0 / 0.55), transparent 65%)" }} aria-hidden />
+                  </span>
+                  <span className="flex flex-col gap-1 p-3">
+                    <span className="font-serif text-sm text-cream">{t.label}</span>
+                    {meta && <span className="hidden text-[11px] leading-snug text-cream/70 sm:block">{meta.blurb}</span>}
+                    <span className="text-[9px] uppercase tracking-[0.18em]" style={{ color: "var(--room-accent)" }}>Open →</span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {wallRoom && walls.length > 0 && (
+        <p className="text-center text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+          Tonight
+        </p>
+      )}
 
       <ul className="dr-shelf grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2">
         {cards.map((c) => {
@@ -234,7 +297,7 @@ export function ActivityLobby({
         })}
       </ul>
 
-      {walls.length > 0 && (
+      {!wallRoom && walls.length > 0 && (
         <div className="flex flex-wrap justify-center gap-2">
           {walls.map((t) => (
             <button
