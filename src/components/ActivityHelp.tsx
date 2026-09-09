@@ -72,11 +72,13 @@ const ACTIVITY_HELP: Record<string, HelpContent> = {
   },
   "2_truths": {
     title: "Two Truths & a Lie",
-    tagline: "Spot the lie.",
+    tagline: "Press one. Stake your call.",
     sections: [
       { heading: "How to play", bullets: [
-        "One of you writes two truths and one lie.",
-        "The other guesses which one is the lie, then you swap roles.",
+        "One of you writes two truths and one lie, then seals them.",
+        "The other may press ONE statement: the writer has to say more about it, out loud.",
+        "Then stake your call: 1 point plays it safe; 2 points means a wrong call hands two points to the liar.",
+        "The truths seal green one at a time before the lie turns over. Swap roles each round.",
       ] },
     ],
   },

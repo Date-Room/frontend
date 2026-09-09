@@ -10,6 +10,7 @@ import {
   reduceOhtg,
 } from "@/lib/activities/oneHasToGo";
 import { useCinematic } from "@/lib/stagecraft/cinematic";
+import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 
 /**
@@ -43,11 +44,13 @@ export function OneHasToGo() {
   );
 
   const readsBar = (
-    <div className="flex justify-center gap-6 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-      <span>Reads · you {myReads}</span>
-      <span>·</span>
-      <span>{partnerName} {theirReads}</span>
-    </div>
+    <Scoreboard
+      label="Reads"
+      entries={[
+        { name: "You", value: myReads, accent: true },
+        { name: partnerName, value: theirReads },
+      ]}
+    />
   );
 
   const accentBtn = "rounded-full text-primary-foreground transition hover:opacity-90 disabled:opacity-50";

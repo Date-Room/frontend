@@ -122,7 +122,7 @@ const ITEM_TAGLINES: Record<string, string> = {
   questions: "Pick 24, swap decks, take turns.",
   this_or_that: "Pick blind, reveal together.",
   the_36: "Three sets of twelve. Get closer.",
-  "2_truths": "Spot the lie. Swap roles.",
+  "2_truths": "Press one. Stake your call.",
   truth_or_dare: "They deal. You deliver. Warm to Bare.",
   one_has_to_go: "Cut one. Guess theirs. Defend it.",
   pick_a_door: "Choose blind. Answer what's behind it.",

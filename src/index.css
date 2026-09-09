@@ -1536,3 +1536,39 @@
 @media (prefers-reduced-motion: reduce) {
   .dr-coin--spin { animation: none; }
 }
+
+/* Gameshow moments — lock-in pulse, green seal flash, lie flip, score bump */
+.dr-ttcard { transform-style: preserve-3d; }
+.dr-lockin { animation: dr-lockin 0.9s ease-in-out 2; }
+.dr-ttcard--sealed { animation: dr-seal-true 1.1s ease-out both; }
+.dr-ttcard--flip { animation: dr-lie-flip 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.dr-score-plate { transition: border-color 0.3s ease, background-color 0.3s ease; }
+.dr-score-plate--bump { animation: dr-score-bump 1.3s ease-out; }
+
+@keyframes dr-lockin {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--room-accent) 0%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--room-accent) 45%, transparent); }
+}
+@keyframes dr-seal-true {
+  0% { background-color: rgb(52 211 153 / 0.55); }
+  18% { background-color: rgb(52 211 153 / 0.08); }
+  36% { background-color: rgb(52 211 153 / 0.55); }
+  54% { background-color: rgb(52 211 153 / 0.08); }
+  72% { background-color: rgb(52 211 153 / 0.45); }
+  100% { background-color: rgb(52 211 153 / 0.10); }
+}
+@keyframes dr-lie-flip {
+  0% { transform: rotateX(0deg); }
+  50% { transform: rotateX(90deg) scale(1.02); }
+  100% { transform: rotateX(0deg); }
+}
+@keyframes dr-score-bump {
+  0% { transform: scale(1); }
+  20% { transform: scale(1.12); background-color: rgb(52 211 153 / 0.28); border-color: rgb(52 211 153 / 0.7); }
+  60% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dr-lockin, .dr-ttcard--sealed, .dr-ttcard--flip, .dr-score-plate--bump { animation: none; }
+  .dr-ttcard--sealed { background-color: rgb(52 211 153 / 0.10); }
+}
