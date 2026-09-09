@@ -41,6 +41,8 @@ export type MusicCtxValue = {
   next: () => void;
   removeTrack: (id: string) => void;
   reorderTracks: (from: number, to: number) => void;
+  /** Append a saved playlist as one list write (starts it if idle). */
+  loadPlaylist: (tracks: DjTrack[]) => void;
   clearQueue: () => void;
   close: () => void;
   closed: boolean;
