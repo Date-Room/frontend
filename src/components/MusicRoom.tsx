@@ -14,6 +14,7 @@ import {
   Volume2,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
@@ -26,6 +27,11 @@ import {
   scPlayerSrc,
   type ScWidget,
 } from "@/lib/soundcloud";
+import {
+  SpotifyResolveError,
+  extractSpotifyTrackUrl,
+  resolveSpotifyToYoutube,
+} from "@/lib/spotify";
 import { cn } from "@/lib/utils";
 import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/types/youtubeIframeApi";
 import { extractId, fetchOEmbed, loadYT, type DjTrack, type OEmbed } from "@/components/DJ";
@@ -985,6 +991,7 @@ export function MusicLibrary() {
   const room = useRoomSession();
   const [url, setUrl] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -995,11 +1002,34 @@ export function MusicLibrary() {
     const raw = url.trim();
     const id = extractId(raw);
     const sc = id ? null : extractScUrl(raw);
+    const spotify = id || sc ? null : extractSpotifyTrackUrl(raw);
+    if (spotify) {
+      // Spotify plays through YouTube: resolve the same song, then queue it.
+      setUrlError(null);
+      setResolving(true);
+      void resolveSpotifyToYoutube(spotify)
+        .then((hit) => {
+          m.playId(hit.video_id);
+          toast.success(`Queued "${hit.yt_title}" for your Spotify link.`);
+          setUrl("");
+          setAdding(false);
+        })
+        .catch((err) => {
+          const reason = err instanceof SpotifyResolveError ? err.reason : null;
+          setUrlError(
+            reason === "search-unavailable"
+              ? "Song lookup is down right now — paste the YouTube link for it instead."
+              : "Couldn't match that Spotify song. Paste its YouTube link instead.",
+          );
+        })
+        .finally(() => setResolving(false));
+      return;
+    }
     if (!id && !sc) {
       setUrlError(
         isScShortLink(raw)
           ? "That's a SoundCloud share link — open it and paste the full soundcloud.com track URL."
-          : "Drop a YouTube or SoundCloud link.",
+          : "Drop a YouTube, SoundCloud or Spotify link.",
       );
       return;
     }
@@ -1036,16 +1066,17 @@ export function MusicLibrary() {
             autoFocus
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="Paste a YouTube or SoundCloud link…"
+            placeholder="Paste a YouTube, SoundCloud or Spotify link…"
             className="focus-ring bg-secondary/60 border-white/[0.10] focus-visible:border-primary/40"
           />
           {urlError && <p className="px-1 text-xs text-rose">{urlError}</p>}
           <button
             type="submit"
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+            disabled={resolving}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
             style={{ backgroundColor: "var(--room-accent)" }}
           >
-            <Plus className="h-4 w-4" /> Add song
+            <Plus className="h-4 w-4" /> {resolving ? "Finding it…" : "Add song"}
           </button>
         </form>
       </div>
