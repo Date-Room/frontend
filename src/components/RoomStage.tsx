@@ -227,6 +227,25 @@ export function RoomStage({
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  // First-open explainer: the first time this person ever stages an activity
+  // that has help, show the how-to-play card before they play (play-testers
+  // never found the ? button — "press" went unexplained). The lobby, chat and
+  // room management are self-evident and stay quiet. Same storage key as the
+  // legacy tray so nobody sees a card twice. Storage failures (private mode)
+  // skip the auto-show rather than nagging on every open.
+  useEffect(() => {
+    setHelpOpen(false);
+    if (!staged || !hasActivityHelp(staged)) return;
+    if (staged === "lobby" || staged === "chat" || staged === "room_details") return;
+    try {
+      const key = `dr_activity_help_seen:${staged}`;
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, "1");
+      setHelpOpen(true);
+    } catch {
+      /* storage unavailable — help stays reachable from the ? button */
+    }
+  }, [staged]);
   // Two-level launcher (mirrors mobile): null = category list, else drilled in.
   const [catId, setCatId] = useState<string | null>(null);
 

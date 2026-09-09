@@ -10,6 +10,7 @@ import {
 } from "@/lib/activities/twoTruths";
 import { useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
+import { StagePrompt } from "@/lib/stagecraft/StagePrompt";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 
 /**
@@ -243,6 +244,21 @@ export function TwoTruths() {
           {status}
         </p>
       </div>
+
+      {guessing && !isStoryteller && dealtRank >= 4 && round.pressed == null && !skippedPress && (
+        <StagePrompt
+          id={`tt-press-${state.rounds_played}`}
+          lead="Your one press"
+          text={`Tap a card to press it: ${partnerName} has to say more about it, out loud. Then you call the lie.`}
+        />
+      )}
+      {guessing && !isStoryteller && (round.pressed != null || skippedPress) && (
+        <StagePrompt
+          id={`tt-call-${state.rounds_played}`}
+          lead={round.pressed != null ? "✓ Press spent" : "Press skipped"}
+          text="Pick your stake below, then tap the statement you think is the lie."
+        />
+      )}
 
       <div className="relative flex flex-1 flex-col justify-center gap-3">
         {statements.map((text, i) => {

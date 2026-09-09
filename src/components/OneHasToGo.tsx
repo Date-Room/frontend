@@ -11,6 +11,7 @@ import {
 } from "@/lib/activities/oneHasToGo";
 import { useCinematic } from "@/lib/stagecraft/cinematic";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
+import { StagePrompt } from "@/lib/stagecraft/StagePrompt";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 
 /**
@@ -183,6 +184,14 @@ export function OneHasToGo() {
           {status}
         </p>
       </div>
+
+      {guessing && !iGuessed && (
+        <StagePrompt
+          id={`ohtg-guess-${state.round}`}
+          lead="✓ Your cut is sealed"
+          text={`Now tap the one you think ${partnerName} cut.`}
+        />
+      )}
 
       <div className={["dr-table relative grid grid-cols-2 gap-3", guessing && !iGuessed ? "dr-table--reading" : ""].join(" ")}>
         {round.options.map((opt, i) => {

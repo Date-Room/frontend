@@ -1609,3 +1609,54 @@
   .dr-shelf-card, .dr-shelf-glyph, .dr-shelf-frame img { transition: none; }
   .dr-shelf-card:hover { transform: none; }
 }
+
+/* StagePrompt — the unmissable instruction band (play-testers missed the
+   small status line and stalled after locking a pick). Slides across, then
+   settles and stays for the whole phase. */
+.dr-stage-prompt {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.35rem 0.6rem;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--room-accent, #d4826a) 55%, transparent);
+  background: color-mix(in srgb, var(--room-accent, #d4826a) 14%, transparent);
+  text-align: center;
+  overflow: hidden;
+  animation: dr-stage-prompt-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.dr-stage-prompt::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.10) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: dr-stage-prompt-sheen 2.6s ease-in-out 0.5s 2;
+}
+.dr-stage-prompt-lead {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--room-accent, #d4826a);
+}
+.dr-stage-prompt-text {
+  font-family: var(--font-serif, Georgia, serif);
+  font-style: italic;
+  font-size: 1rem;
+  line-height: 1.35;
+  color: hsl(var(--cream, 40 30% 92%));
+}
+@keyframes dr-stage-prompt-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes dr-stage-prompt-sheen { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .dr-stage-prompt { animation: none; }
+  .dr-stage-prompt::after { animation: none; }
+}
