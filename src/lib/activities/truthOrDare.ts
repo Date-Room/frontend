@@ -1,25 +1,31 @@
 /**
- * Truth or Dare — TS port of mobile's `tod_module.dart` + `tod_cards.dart`.
- * Card IDs are part of the wire format (the dealer shares a shuffled
- * `deck_order` of IDs); this pool must match mobile by ID so both clients show
- * the same card text. Truths 0–49, dares 50–99.
+ * Truth or Dare — the night redesign. Your date deals and DECIDES truth or
+ * dare for you (you never pick your own card, that asymmetry is the game).
+ * The deck escalates across three named heats (Warm → Bold → Bare), stakes
+ * are take / double (two tokens) / burn (two per night), the judge rules
+ * delivered or dodged, and everything avoided lands in a Vault that reopens
+ * at the end of the night as the conversation.
+ *
+ * Card ids 0-99 are kept from the original pool (truths 0-49, dares 50-99);
+ * heat tiers are authored over those ids so content stays stable. NOTE: the
+ * v1 hands/skips/trades wire format (mobile's tod_module) is retired on web;
+ * a web↔mobile Truth or Dare game is incompatible until mobile ports this.
  */
 
 export type TodKind = "truth" | "dare";
 export type TodCard = { id: number; kind: TodKind; text: string };
-export type TodHand = { cards: number[]; skips_used: number };
-export type TodTrade = { proposer_id: string; started_at: string } | null;
-export type TodState = {
-  hands: Record<string, TodHand>;
-  deck_cursor: number;
-  deck_order: number[];
-  revealed: string[];
-  trade: TodTrade;
-};
-export type TodEvent = { type: string; payload: Record<string, unknown>; userId: string };
+export type TodHeat = 1 | 2 | 3;
 
-export const HAND_SIZE = 3;
-export const SKIPS_PER_PLAYER = 2;
+export const TOD_HEATS: Record<TodHeat, { name: string; note: string }> = {
+  1: { name: "Warm", note: "Easy in. Nothing to lose yet." },
+  2: { name: "Bold", note: "The deck stops being polite." },
+  3: { name: "Bare", note: "Last heat. No hiding." },
+};
+
+/** Turns per heat (one per player), so a night is 6 cards. */
+export const TOD_TURNS_PER_HEAT = 2;
+export const TOD_NIGHT_TURNS = TOD_TURNS_PER_HEAT * 3;
+export const TOD_BURNS_PER_NIGHT = 2;
 
 const TRUTHS = [
   "What first made you trust me?",
@@ -136,113 +142,211 @@ export function lookupTodCard(id: number): TodCard | null {
   return TOD_POOL[id] ?? null;
 }
 
-/** Whichever client deals first shuffles all IDs and hands HAND_SIZE to each. */
-export function makeDeal(userIds: string[]): { deck_order: number[]; hand_for: Record<string, number[]> } {
-  const order = [...Array(TOD_POOL.length).keys()];
-  for (let i = order.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [order[i], order[j]] = [order[j], order[i]];
+/** Authored heat tiers over the stable card ids. Every id appears exactly
+ *  once; Bare is deliberately scarce so heat 3 stays scarce. */
+export const TOD_HEAT_IDS: Record<TodHeat, Record<TodKind, number[]>> = {
+  1: {
+    truth: [6, 7, 10, 11, 15, 16, 17, 18, 20, 21, 25, 29, 30, 35, 36, 38, 40, 41, 44],
+    dare: [50, 53, 54, 56, 59, 60, 62, 63, 65, 66, 67, 68, 71, 72, 74, 76, 77, 78, 80, 82, 84, 85, 86, 88, 92, 97, 98, 99],
+  },
+  2: {
+    truth: [0, 1, 5, 9, 12, 13, 14, 19, 22, 23, 26, 28, 31, 33, 34, 37, 43, 45, 48],
+    dare: [51, 55, 57, 58, 61, 64, 69, 73, 75, 79, 81, 83, 89, 90, 91, 94, 95],
+  },
+  3: {
+    truth: [2, 3, 4, 8, 24, 27, 32, 39, 42, 46, 47, 49],
+    dare: [52, 70, 87, 93, 96],
+  },
+};
+
+export function heatOfCard(id: number): TodHeat {
+  for (const heat of [1, 2, 3] as TodHeat[]) {
+    if (TOD_HEAT_IDS[heat].truth.includes(id) || TOD_HEAT_IDS[heat].dare.includes(id)) return heat;
   }
-  const hand_for: Record<string, number[]> = {};
-  userIds.forEach((uid, idx) => {
-    hand_for[uid] = order.slice(idx * HAND_SIZE, idx * HAND_SIZE + HAND_SIZE);
-  });
-  return { deck_order: order, hand_for };
+  return 1;
+}
+
+/**
+ * The next card for (heat, kind), skipping anything already used this couple.
+ * Falls back down the heats, then to any unused card of that kind, so a
+ * drained tier never blocks the night.
+ */
+export function nextTodCard(used: number[], heat: TodHeat, kind: TodKind): number | null {
+  const seen = new Set(used);
+  const tiers: TodHeat[] = heat === 3 ? [3, 2, 1] : heat === 2 ? [2, 1, 3] : [1, 2, 3];
+  for (const t of tiers) {
+    const hit = TOD_HEAT_IDS[t][kind].find((id) => !seen.has(id));
+    if (hit != null) return hit;
+  }
+  return TOD_POOL.find((c) => c.kind === kind && !seen.has(c.id))?.id ?? null;
+}
+
+export type TodPhase = "deck" | "decide" | "stakes" | "perform" | "judged" | "done";
+
+export type TodState = {
+  phase: TodPhase;
+  /** 0-based turn; performer alternates each turn. */
+  turn: number;
+  performer_id: string | null;
+  judge_id: string | null;
+  kind: TodKind | null;
+  card_id: number | null;
+  doubled: boolean;
+  delivered: boolean | null;
+  tokens: Record<string, number>;
+  burns_used: Record<string, number>;
+  /** Card ids burned or dodged, resurfaced at the end of the night. */
+  vault: number[];
+  /** Card ids consumed across nights, so a reshuffle deals fresh cards. */
+  used: number[];
+};
+
+export type TodEvent = { type: string; payload: Record<string, unknown>; userId: string };
+
+export function todHeatForTurn(turn: number): TodHeat {
+  return (Math.min(Math.floor(turn / TOD_TURNS_PER_HEAT), 2) + 1) as TodHeat;
 }
 
 export function initialTodState(): TodState {
-  return { hands: {}, deck_cursor: 0, deck_order: [], revealed: [], trade: null };
+  return {
+    phase: "deck",
+    turn: 0,
+    performer_id: null,
+    judge_id: null,
+    kind: null,
+    card_id: null,
+    doubled: false,
+    delivered: null,
+    tokens: {},
+    burns_used: {},
+    vault: [],
+    used: [],
+  };
+}
+
+function asCountMap(v: unknown): Record<string, number> {
+  if (!v || typeof v !== "object") return {};
+  const out: Record<string, number> = {};
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof val === "number" && Number.isInteger(val) && val >= 0) out[k] = val;
+  }
+  return out;
+}
+
+function asIdList(v: unknown): number[] {
+  return Array.isArray(v) ? v.filter((x): x is number => typeof x === "number" && Number.isInteger(x)) : [];
 }
 
 export function todFromJson(s: Record<string, unknown> | null): TodState {
   if (!s) return initialTodState();
-  const hands: Record<string, TodHand> = {};
-  if (s.hands && typeof s.hands === "object") {
-    for (const [k, v] of Object.entries(s.hands as Record<string, unknown>)) {
-      const h = v as Record<string, unknown>;
-      hands[k] = {
-        cards: Array.isArray(h?.cards) ? (h.cards as number[]) : [],
-        skips_used: typeof h?.skips_used === "number" ? h.skips_used : 0,
-      };
-    }
-  }
-  const trade = s.trade as Record<string, unknown> | undefined;
+  const phase = s.phase;
   return {
-    hands,
-    deck_cursor: typeof s.deck_cursor === "number" ? s.deck_cursor : 0,
-    deck_order: Array.isArray(s.deck_order) ? (s.deck_order as number[]) : [],
-    revealed: Array.isArray(s.revealed) ? (s.revealed as string[]) : [],
-    trade: trade ? { proposer_id: String(trade.proposer_id ?? ""), started_at: String(trade.started_at ?? "") } : null,
-  };
-}
-
-function advanceHand(s: TodState, userId: string): TodState {
-  const h = s.hands[userId];
-  if (!h || h.cards.length === 0) return s;
-  const cards = h.cards.slice(1);
-  let cursor = s.deck_cursor;
-  if (cursor < s.deck_order.length) {
-    cards.push(s.deck_order[cursor]);
-    cursor += 1;
-  }
-  return {
-    ...s,
-    hands: { ...s.hands, [userId]: { ...h, cards } },
-    deck_cursor: cursor,
-    revealed: s.revealed.filter((id) => id !== userId),
+    phase:
+      phase === "decide" || phase === "stakes" || phase === "perform" || phase === "judged" || phase === "done"
+        ? phase
+        : "deck",
+    turn: typeof s.turn === "number" && s.turn >= 0 ? s.turn : 0,
+    performer_id: typeof s.performer_id === "string" ? s.performer_id : null,
+    judge_id: typeof s.judge_id === "string" ? s.judge_id : null,
+    kind: s.kind === "truth" || s.kind === "dare" ? s.kind : null,
+    card_id: typeof s.card_id === "number" ? s.card_id : null,
+    doubled: s.doubled === true,
+    delivered: typeof s.delivered === "boolean" ? s.delivered : null,
+    tokens: asCountMap(s.tokens),
+    burns_used: asCountMap(s.burns_used),
+    vault: asIdList(s.vault),
+    used: asIdList(s.used),
   };
 }
 
 export function reduceTod(current: TodState, event: TodEvent): TodState {
   const me = event.userId;
   switch (event.type) {
-    case "deal": {
-      if (current.deck_order.length > 0) return current;
-      const order = Array.isArray(event.payload.deck_order) ? (event.payload.deck_order as number[]) : null;
-      const handForRaw = event.payload.hand_for as Record<string, unknown> | undefined;
-      if (!order || !handForRaw) return current;
-      const hands: Record<string, TodHand> = {};
-      let dealt = 0;
-      for (const [k, v] of Object.entries(handForRaw)) {
-        const cards = Array.isArray(v) ? (v as number[]) : [];
-        hands[k] = { cards, skips_used: 0 };
-        dealt += cards.length;
-      }
-      return { ...current, deck_order: order, hands, deck_cursor: dealt };
+    // Whoever taps "I'll face the first card" becomes the first performer;
+    // their date becomes the dealer/judge.
+    case "start_night": {
+      if (current.phase !== "deck") return current;
+      return { ...current, phase: "decide", performer_id: me };
     }
-    case "draw":
-      return current.revealed.includes(me) ? current : { ...current, revealed: [...current.revealed, me] };
-    case "done":
-      return advanceHand(current, me);
-    case "skip": {
-      const h = current.hands[me];
-      if (!h || h.skips_used >= SKIPS_PER_PLAYER) return current;
-      const advanced = advanceHand(current, me);
-      const ah = advanced.hands[me];
-      if (!ah) return advanced;
-      return { ...advanced, hands: { ...advanced.hands, [me]: { ...ah, skips_used: h.skips_used + 1 } } };
-    }
-    case "propose_trade":
-      if (current.trade != null) return current;
-      return { ...current, trade: { proposer_id: me, started_at: new Date().toISOString() } };
-    case "decline_trade":
-      return { ...current, trade: null };
-    case "accept_trade": {
-      const trade = current.trade;
-      if (!trade || me === trade.proposer_id) return current;
-      const p = current.hands[trade.proposer_id];
-      const a = current.hands[me];
-      if (!p || !a) return current;
-      if (p.cards.length === 0 || a.cards.length === 0) return { ...current, trade: null };
-      const pCards = [...p.cards];
-      const aCards = [...a.cards];
-      [pCards[0], aCards[0]] = [aCards[0], pCards[0]];
+    // The judge picks truth or dare AND carries the deterministic card pick
+    // (validated here) so both clients land on the same card.
+    case "choose_kind": {
+      if (current.phase !== "decide" || current.performer_id == null || me === current.performer_id) return current;
+      const kind = event.payload.kind;
+      if (kind !== "truth" && kind !== "dare") return current;
+      const cardId = typeof event.payload.card_id === "number" ? event.payload.card_id : null;
+      const card = cardId != null ? lookupTodCard(cardId) : null;
+      if (!card || card.kind !== kind || current.used.includes(card.id)) return current;
       return {
         ...current,
-        hands: { ...current.hands, [trade.proposer_id]: { ...p, cards: pCards }, [me]: { ...a, cards: aCards } },
-        revealed: current.revealed.filter((id) => id !== trade.proposer_id && id !== me),
-        trade: null,
+        phase: "stakes",
+        judge_id: me,
+        kind,
+        card_id: card.id,
+        doubled: false,
+        delivered: null,
+        used: [...current.used, card.id],
       };
+    }
+    case "take": {
+      if (current.phase !== "stakes" || me !== current.performer_id) return current;
+      return { ...current, phase: "perform", doubled: event.payload.doubled === true };
+    }
+    case "burn": {
+      if (current.phase !== "stakes" || me !== current.performer_id || current.card_id == null) return current;
+      if ((current.burns_used[me] ?? 0) >= TOD_BURNS_PER_NIGHT) return current;
+      return {
+        ...current,
+        phase: "judged",
+        delivered: false,
+        burns_used: { ...current.burns_used, [me]: (current.burns_used[me] ?? 0) + 1 },
+        vault: [...current.vault, current.card_id],
+      };
+    }
+    // Only the judge rules. Delivered pays 1 token (2 if doubled); dodged
+    // sends the card to the vault.
+    case "rule": {
+      if (current.phase !== "perform" || current.performer_id == null || me === current.performer_id) return current;
+      const delivered = event.payload.delivered === true;
+      const performer = current.performer_id;
+      return {
+        ...current,
+        phase: "judged",
+        delivered,
+        tokens: delivered
+          ? { ...current.tokens, [performer]: (current.tokens[performer] ?? 0) + (current.doubled ? 2 : 1) }
+          : current.tokens,
+        vault: delivered || current.card_id == null ? current.vault : [...current.vault, current.card_id],
+      };
+    }
+    case "next_turn": {
+      if (current.phase !== "judged") return current;
+      const turn = current.turn + 1;
+      if (turn >= TOD_NIGHT_TURNS) {
+        return { ...current, phase: "done", kind: null, card_id: null };
+      }
+      // Performer and judge swap seats each turn.
+      return {
+        ...current,
+        phase: "decide",
+        turn,
+        performer_id: current.judge_id ?? current.performer_id,
+        judge_id: current.performer_id,
+        kind: null,
+        card_id: null,
+        doubled: false,
+        delivered: null,
+      };
+    }
+    case "end_night": {
+      if (current.phase !== "judged") return current;
+      return { ...current, phase: "done", kind: null, card_id: null };
+    }
+    // A fresh night: scores reset, but `used` survives so the deck deals
+    // cards this couple has never seen.
+    case "restart": {
+      if (current.phase !== "done") return current;
+      return { ...initialTodState(), used: current.used, vault: [] };
     }
     default:
       return current;

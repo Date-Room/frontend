@@ -123,7 +123,7 @@ const ITEM_TAGLINES: Record<string, string> = {
   this_or_that: "Pick blind, reveal together.",
   the_36: "Three sets of twelve. Get closer.",
   "2_truths": "Spot the lie. Swap roles.",
-  truth_or_dare: "Three cards each. Two skips.",
+  truth_or_dare: "They deal. You deliver. Warm to Bare.",
   one_has_to_go: "Cut one. Guess theirs. Defend it.",
   pick_a_door: "Choose blind. Answer what's behind it.",
   rank_it: "Order five things. Compare priorities.",
