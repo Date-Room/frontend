@@ -36,6 +36,13 @@ function loadRailOpen(): boolean {
 export function ChaperonMount() {
   const ctrl = useChaperonController();
   const [setupOpen, setSetupOpen] = useState(false);
+  // The lobby shelf's Chaperon tile opens the same setup sheet via a window
+  // event, so discoverability doesn't hang on the small in-call shield.
+  useEffect(() => {
+    const on = () => setSetupOpen(true);
+    window.addEventListener("dr:chaperon:open-setup", on);
+    return () => window.removeEventListener("dr:chaperon:open-setup", on);
+  }, []);
   // Ratings keyed by event_id so the toast and the rail stay in sync (rate a
   // whisper once, from either surface).
   const [ratings, setRatings] = useState<Record<string, "up" | "down">>({});

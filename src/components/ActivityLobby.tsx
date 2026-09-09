@@ -1,35 +1,113 @@
-import type { ReactNode } from "react";
+import { useState } from "react";
 import { Clock } from "lucide-react";
+import { useChaperonController } from "@/context/ChaperonContext";
 
 /**
- * The lobby — the room's neutral state. Nothing is preloaded and nothing is
- * presumed: a date opens on the question "what do you two feel like?", with
- * every activity as a peer (games, watching, music, or just talking).
- * Choosing here stages the activity for you; your date follows via the
- * activity notifier, same as any stage switch.
+ * The lobby shelf — the room's neutral state, as modes of being together
+ * rather than a feature list: Watch, Listen, Play a Game, Just Talk, the
+ * Chaperon, and one teased keepsake (Photo Booth). Image-led card language
+ * (lit vignettes with a scrim; a real photo can drop into any tile's `image`
+ * slot later with no code changes). One tile opens at a time into a drawer
+ * of startable picks. Choices stay per-person; the partner follows via the
+ * activity notifier, never by having their screen yanked.
  */
 
 type LobbyTab = { id: string; label: string; icon: string };
 
-const GAME_META: Record<string, { tagline: string; minutes: string }> = {
-  questions: { tagline: "Draft topics. The night escalates.", minutes: "45–60 min" },
-  the_36: { tagline: "The 36 questions, in stoppable stretches.", minutes: "10 min per stretch" },
-  truth_or_dare: { tagline: "They deal. You deliver. Warm to Bare.", minutes: "15–20 min" },
-  "2_truths": { tagline: "Press one. Stake your call.", minutes: "10–15 min" },
-  one_has_to_go: { tagline: "Cut one. Guess theirs. Defend it.", minutes: "10–15 min" },
-  pick_a_door: { tagline: "Choose blind. Answer what's behind it.", minutes: "15–20 min" },
-  rank_it: { tagline: "Order five things. Compare priorities.", minutes: "15–20 min" },
-  this_or_that: { tagline: "Pick fast. Call theirs.", minutes: "5–10 min" },
+type Pick_ = { id: string; name: string; line: string; minutes?: string };
+
+const GAME_PICKS: Pick_[] = [
+  { id: "this_or_that", name: "This or That", line: "Five snap choices, seven seconds each.", minutes: "5–10 min" },
+  { id: "2_truths", name: "Two Truths & a Lie", line: "Three stories. One never happened.", minutes: "10–15 min" },
+  { id: "rank_it", name: "Rank It", line: "Order five things, then find the clash.", minutes: "15–20 min" },
+  { id: "one_has_to_go", name: "One Has To Go", line: "Cut one. Guess theirs. Defend it.", minutes: "10–15 min" },
+  { id: "pick_a_door", name: "Pick a Door", line: "The room dims before the question lands.", minutes: "15–20 min" },
+  { id: "truth_or_dare", name: "Truth or Dare", line: "They deal. You deliver. Warm to Bare.", minutes: "15–20 min" },
+];
+
+const TALK_PICKS: Pick_[] = [
+  { id: "questions", name: "Open Book", line: "Pick topics, not lists. Fifteen or twenty-one questions.", minutes: "45–60 min" },
+  { id: "the_36", name: "Closer", line: "The 36 questions, in stretches you can stop.", minutes: "10 min per stretch" },
+  { id: "chat", name: "Side chat", line: "Type while you talk. It runs behind anything." },
+];
+
+type ShelfCard = {
+  id: string;
+  name: string;
+  blurb: string;
+  tag: string;
+  minutes: string;
+  glyph: string;
+  /** Vignette gradient; a real photo can replace it via `image`. */
+  grad: string;
+  image?: string;
+  soon?: boolean;
+  detail: string;
 };
 
-const MEDIA_META: Record<string, string> = {
-  watch: "Sync up something to watch together.",
-  dj: "Take turns picking the soundtrack.",
-  chat: "A side chat while you talk.",
-  vision_board: "Pin the life you're building.",
-  fridge_notes: "Sticky notes for you two.",
-  bookshelf: "Books, links, things to watch.",
-};
+const CARDS: ShelfCard[] = [
+  {
+    id: "watch",
+    name: "Watch Together",
+    blurb: "Same film, same second. Press play once and both screens stay in step.",
+    tag: "Synced",
+    minutes: "a film's worth",
+    glyph: "🎬",
+    grad: "radial-gradient(120% 120% at 20% 10%, #3a2a1a 0%, #14100c 70%)",
+    detail: "Paste a link and it plays for both of you. Pausing pauses for both, and either of you can call a break without losing the place.",
+  },
+  {
+    id: "dj",
+    name: "Listen Together",
+    blurb: "A shared record player. One queue, both rooms, nobody DJs alone.",
+    tag: "Synced",
+    minutes: "as long as you like",
+    glyph: "🎧",
+    grad: "radial-gradient(120% 120% at 80% 10%, #33231c 0%, #120e0b 70%)",
+    detail: "Take turns adding a track and say one line about why. It keeps playing behind anything else in here.",
+  },
+  {
+    id: "games",
+    name: "Play a Game",
+    blurb: "Short rounds with a reveal at the end. Warm and silly, or close and honest.",
+    tag: "Six ready",
+    minutes: "10–20 min each",
+    glyph: "🃏",
+    grad: "radial-gradient(120% 120% at 50% 0%, #2e2417 0%, #100d09 70%)",
+    detail: "Pick one and it opens on your stage. Your date sees what you started and joins from theirs.",
+  },
+  {
+    id: "talk",
+    name: "Just Talk",
+    blurb: "Questions that do the awkward part for you, at whatever depth you choose.",
+    tag: "Two ready",
+    minutes: "20–60 min",
+    glyph: "🕯️",
+    grad: "radial-gradient(120% 120% at 30% 90%, #362518 0%, #130f0a 70%)",
+    detail: "Draft topics and let the questions arrive, or take the slow route through the 36.",
+  },
+  {
+    id: "chaperon",
+    name: "Chaperon",
+    blurb: "A third chair at the table. She nudges when it goes quiet, then sits back down.",
+    tag: "Chaperone",
+    minutes: "runs alongside",
+    glyph: "🛡️",
+    grad: "radial-gradient(120% 120% at 70% 80%, #2b2016 0%, #0f0c09 70%)",
+    detail: "She watches for the things you'd want a good friend to notice, whispers only to you, and leaves a debrief at the end that's yours alone. Protect is on every stranger date; Coach is the wing-woman upgrade.",
+  },
+  {
+    id: "booth",
+    name: "Photo Booth",
+    blurb: "Catch the face they made. Four frames, both cameras, kept only if you both say so.",
+    tag: "Keepsake",
+    minutes: "≈ 5 min",
+    glyph: "📸",
+    grad: "radial-gradient(120% 120% at 50% 100%, #3a2c15 0%, #14100a 70%)",
+    soon: true,
+    detail: "A countdown, four frames from each side, then a strip for the room's shelf. Either of you can bin it before it saves.",
+  },
+];
 
 export function ActivityLobby({
   tabs,
@@ -38,90 +116,142 @@ export function ActivityLobby({
   tabs: LobbyTab[];
   onPick: (id: string) => void;
 }) {
-  const games = tabs.filter((t) => t.id in GAME_META);
-  const walls = tabs.filter((t) => ["vision_board", "fridge_notes", "bookshelf"].includes(t.id));
-  const media = tabs.filter((t) => ["watch", "dj", "chat"].includes(t.id));
+  const [open, setOpen] = useState<string | null>(null);
+  const chaperon = useChaperonController();
+  const has = (id: string) => tabs.some((t) => t.id === id);
 
-  const section = (label: string, children: ReactNode) => (
-    <div className="flex flex-col gap-2">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>
-        {label}
-      </p>
-      {children}
-    </div>
-  );
+  const gamePicks = GAME_PICKS.filter((p) => has(p.id));
+  const talkPicks = TALK_PICKS.filter((p) => has(p.id));
+  const walls = tabs.filter((t) => ["vision_board", "fridge_notes", "bookshelf"].includes(t.id));
+
+  const cards = CARDS.filter((c) => {
+    if (c.id === "watch" || c.id === "dj") return has(c.id);
+    if (c.id === "games") return gamePicks.length > 0;
+    if (c.id === "talk") return talkPicks.length > 0;
+    if (c.id === "chaperon") return Boolean(chaperon?.enabled);
+    return true;
+  });
+
+  const start = (id: string) => onPick(id);
+  const openChaperonSetup = () => window.dispatchEvent(new CustomEvent("dr:chaperon:open-setup"));
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
       <div className="flex flex-col items-center gap-1 text-center">
-        <p className="font-serif text-2xl italic text-cream">What do you two feel like?</p>
-        <p className="text-xs text-muted-foreground">Play something, watch something, or just talk. Nothing starts until you choose it.</p>
+        <p className="font-serif text-2xl italic text-cream">What are we doing tonight?</p>
+        <p className="text-xs text-muted-foreground">Nothing is loaded until one of you picks. Either of you can start anything.</p>
       </div>
 
-      {games.length > 0 &&
-        section(
-          "Play something",
-          <div className="grid grid-cols-2 gap-2.5">
-            {games.map((t) => {
-              const meta = GAME_META[t.id];
-              return (
+      <ul className="dr-shelf grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2">
+        {cards.map((c) => {
+          const isOpen = open === c.id;
+          return (
+            <li key={c.id} className={isOpen ? "sm:col-span-2" : ""}>
+              <article className={["dr-shelf-card overflow-hidden rounded-2xl border", isOpen ? "border-primary/50" : "border-white/[0.10]"].join(" ")}>
                 <button
-                  key={t.id}
                   type="button"
-                  onClick={() => onPick(t.id)}
-                  className="focus-ring flex flex-col gap-1 rounded-2xl border border-white/[0.10] bg-white/[0.03] p-3.5 text-left transition hover:-translate-y-0.5 hover:border-primary/50 hover:bg-white/[0.05]"
+                  aria-expanded={isOpen}
+                  onClick={() => setOpen(isOpen ? null : c.id)}
+                  className="focus-ring block w-full text-left"
                 >
-                  <span className="flex items-center gap-2">
-                    <span className="text-xl" aria-hidden>{t.icon}</span>
-                    <span className="font-serif text-sm text-cream">{t.label}</span>
+                  <span className="dr-shelf-frame relative block h-[96px] overflow-hidden" style={{ background: c.grad }}>
+                    {c.image && <img src={c.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
+                    <span className="dr-shelf-glyph absolute right-3 top-1/2 -translate-y-1/2 text-5xl" aria-hidden>{c.glyph}</span>
+                    <span className="absolute inset-0" style={{ background: "linear-gradient(to top, rgb(0 0 0 / 0.55), transparent 65%)" }} aria-hidden />
+                    <span className="absolute left-2.5 top-2.5 rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] backdrop-blur-sm" style={{ color: "var(--room-accent)", borderColor: "color-mix(in srgb, var(--room-accent) 40%, transparent)", background: "rgb(0 0 0 / 0.4)" }}>
+                      {c.tag}
+                    </span>
+                    {c.soon && (
+                      <span className="absolute right-2.5 top-2.5 rounded-full border border-white/20 bg-black/40 px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] text-muted-foreground backdrop-blur-sm">
+                        Soon
+                      </span>
+                    )}
                   </span>
-                  <span className="text-[11px] leading-snug text-muted-foreground">{meta.tagline}</span>
-                  <span className="mt-0.5 flex items-center gap-1 text-[9px] uppercase tracking-[0.18em] text-muted-foreground/80">
-                    <Clock className="h-3 w-3" aria-hidden /> ≈ {meta.minutes}
+                  <span className="flex flex-col gap-1 p-3.5">
+                    <span className="font-serif text-base text-cream">{c.name}</span>
+                    <span className="text-xs leading-relaxed text-cream/75">{c.blurb}</span>
+                    <span className="mt-0.5 flex items-center gap-1.5 text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                      <Clock className="h-3 w-3" aria-hidden /> {c.minutes}
+                      <span className="ml-auto" style={{ color: "var(--room-accent)" }}>{isOpen ? "Close" : "Open"}</span>
+                    </span>
                   </span>
                 </button>
-              );
-            })}
-          </div>,
-        )}
 
-      {media.length > 0 &&
-        section(
-          "Or settle in",
-          <div className="flex flex-col gap-2">
-            {media.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => onPick(t.id)}
-                className="focus-ring flex items-center gap-3 rounded-2xl border border-white/[0.10] bg-white/[0.03] p-3.5 text-left transition hover:-translate-y-0.5 hover:border-primary/50 hover:bg-white/[0.05]"
-              >
-                <span className="text-xl" aria-hidden>{t.icon}</span>
-                <span className="flex-1">
-                  <span className="block font-serif text-sm text-cream">{t.label}</span>
-                  <span className="block text-[11px] text-muted-foreground">{MEDIA_META[t.id]}</span>
-                </span>
-              </button>
-            ))}
-          </div>,
-        )}
+                {isOpen && (
+                  <div className="border-t border-white/[0.08] p-3.5 animate-fade-in">
+                    <p className="text-xs leading-relaxed text-cream/80">{c.detail}</p>
 
-      {walls.length > 0 &&
-        section(
-          "Your walls",
-          <div className="flex flex-wrap gap-2">
-            {walls.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => onPick(t.id)}
-                className="focus-ring flex items-center gap-2 rounded-full border border-white/[0.12] px-3.5 py-2 text-xs text-cream transition hover:border-primary/50"
-              >
-                <span aria-hidden>{t.icon}</span> {t.label}
-              </button>
-            ))}
-          </div>,
-        )}
+                    {(c.id === "games" || c.id === "talk") && (
+                      <ul className="mt-3 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2">
+                        {(c.id === "games" ? gamePicks : talkPicks).map((p) => (
+                          <li key={p.id}>
+                            <button
+                              type="button"
+                              onClick={() => start(p.id)}
+                              className="focus-ring flex w-full flex-col gap-0.5 rounded-xl border border-white/[0.12] p-3 text-left transition hover:-translate-y-0.5 hover:border-primary/50 hover:bg-white/[0.04]"
+                            >
+                              <span className="text-sm text-cream">{p.name}</span>
+                              <span className="text-[11px] leading-snug text-muted-foreground">{p.line}</span>
+                              <span className="mt-0.5 text-[9px] uppercase tracking-[0.16em]" style={{ color: "var(--room-accent)" }}>
+                                {p.minutes ? `${p.minutes} · ` : ""}Start →
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {(c.id === "watch" || c.id === "dj") && (
+                      <button
+                        type="button"
+                        onClick={() => start(c.id)}
+                        className="focus-ring mt-3 rounded-full px-5 py-2 text-sm text-primary-foreground transition hover:opacity-90"
+                        style={{ backgroundColor: "var(--room-accent)" }}
+                      >
+                        Open it →
+                      </button>
+                    )}
+
+                    {c.id === "chaperon" && (
+                      <button
+                        type="button"
+                        onClick={openChaperonSetup}
+                        className="focus-ring mt-3 rounded-full px-5 py-2 text-sm text-primary-foreground transition hover:opacity-90"
+                        style={{ backgroundColor: "var(--room-accent)" }}
+                      >
+                        Open the chaperon setup →
+                      </button>
+                    )}
+
+                    {c.soon && (
+                      <p className="mt-3 text-[11px] text-muted-foreground">Not built yet. It has a shelf waiting.</p>
+                    )}
+                  </div>
+                )}
+              </article>
+            </li>
+          );
+        })}
+      </ul>
+
+      {walls.length > 0 && (
+        <div className="flex flex-wrap justify-center gap-2">
+          {walls.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => start(t.id)}
+              className="focus-ring flex items-center gap-2 rounded-full border border-white/[0.12] px-3.5 py-2 text-xs text-cream transition hover:border-primary/50"
+            >
+              <span aria-hidden>{t.icon}</span> {t.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <p className="text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70">
+        Whatever you start, there is always a way back to this shelf.
+      </p>
     </div>
   );
 }

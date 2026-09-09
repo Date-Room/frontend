@@ -1597,3 +1597,15 @@
 .dr-breathe { animation: dr-breathe 6s ease-in-out infinite; }
 @keyframes dr-breathe { 50% { transform: scale(1.08); opacity: 0.75; } }
 @media (prefers-reduced-motion: reduce) { .dr-breathe { animation: none; } }
+
+/* Lobby shelf — lit vignettes, not clicked buttons */
+.dr-shelf-card { background: rgb(255 255 255 / 0.02); transition: border-color 0.25s ease, transform 0.25s ease; }
+.dr-shelf-card:hover { transform: translateY(-2px); }
+.dr-shelf-glyph { opacity: 0.35; filter: saturate(0.85); transition: opacity 0.4s ease, transform 0.5s ease; }
+.dr-shelf-card:hover .dr-shelf-glyph { opacity: 0.6; transform: translateY(-50%) scale(1.08); }
+.dr-shelf-frame img { filter: saturate(0.9) brightness(0.92); transition: filter 0.4s ease, transform 0.6s ease; }
+.dr-shelf-card:hover .dr-shelf-frame img { filter: saturate(1) brightness(1); transform: scale(1.04); }
+@media (prefers-reduced-motion: reduce) {
+  .dr-shelf-card, .dr-shelf-glyph, .dr-shelf-frame img { transition: none; }
+  .dr-shelf-card:hover { transform: none; }
+}
