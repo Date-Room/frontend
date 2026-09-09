@@ -46,9 +46,10 @@ const ACTIVITY_HELP: Record<string, HelpContent> = {
       { heading: "How to play", bullets: [
         "Pick the night's length (15 or 21 questions), then take turns claiming topics. Each topic deals three questions: an opener, a specific, a costly one.",
         "You each write one question of your own. It replaces a card, and it buys you a veto of one topic your date chose.",
-        "One card at a time, answered out loud. React with an emoji, or pass (twice a night).",
+        "One card at a time, out loud. You answer the cards your date chose or wrote — say \"That's my answer\", and they rule it: answered, half of it, or dodged. React with an emoji, or pass (twice a night).",
       ] },
       { heading: "Good to know", bullets: [
+        "Rulings are noticing, not scoring. Dodged and passed questions come back at the end as worth returning to.",
         "The deck runs Warm, then Real, then Close. Close is explicit; choose those topics on purpose.",
         "Everything survives to the recap, and later nights deal questions you haven't seen.",
       ] },

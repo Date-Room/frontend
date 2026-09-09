@@ -84,14 +84,43 @@ describe("reduceOb (Open Book)", () => {
     expect(buildObDeck(s)).toEqual(deck);
   });
 
+  it("locks the answer, then only the card's owner rules it", () => {
+    let s = upToPlay();
+    const deck = buildObDeck(s);
+    const owner = deck[0].by;
+    const answerer = owner === A ? B : A;
+    // Rulings need a locked answer first, and you can't answer your own card.
+    expect(play(s, "rule", owner, { index: 0, verdict: "answered" })).toBe(s);
+    expect(play(s, "my_answer", owner, { index: 0 })).toBe(s);
+    s = play(s, "my_answer", answerer, { index: 0 });
+    expect(s.answered).toBe(true);
+    expect(play(s, "my_answer", answerer, { index: 0 })).toBe(s);
+    // Only the owner rules, and only with a real verdict.
+    expect(play(s, "rule", answerer, { index: 0, verdict: "answered" })).toBe(s);
+    expect(play(s, "rule", owner, { index: 0, verdict: "brilliant" })).toBe(s);
+    s = play(s, "rule", owner, { index: 0, verdict: "half" });
+    expect(s.rulings["0"]).toBe("half");
+    expect(s.card).toBe(1);
+    expect(s.answered).toBe(false);
+    // Passing is the answerer's move, made before the answer locks.
+    const owner1 = deck[1].by;
+    const answerer1 = owner1 === A ? B : A;
+    expect(play(s, "pass", owner1, { index: 1 })).toBe(s);
+    s = play(s, "my_answer", answerer1, { index: 1 });
+    expect(play(s, "pass", answerer1, { index: 1 })).toBe(s);
+  });
+
   it("plays through with a shared pass pool and reactions, then restarts keeping seen", () => {
     let s = upToPlay();
-    const deckLen = buildObDeck(s).length;
+    const deck = buildObDeck(s);
+    const deckLen = deck.length;
+    const answererOf = (i: number) => (deck[i].by === A ? B : A);
     s = play(s, "react", A, { index: 0, emoji: "🔥" });
     expect(s.reacts["0"][A]).toBe("🔥");
-    s = play(s, "pass", B, { index: 0 });
-    s = play(s, "pass", A, { index: 1 });
-    expect(play(s, "pass", B, { index: 2 })).toBe(s);
+    s = play(s, "pass", answererOf(0), { index: 0 });
+    s = play(s, "pass", answererOf(1), { index: 1 });
+    expect(play(s, "pass", answererOf(2), { index: 2 })).toBe(s);
+    // Legacy advance (pre-rulings clients) still turns the card, un-ruled.
     for (let i = 2; i < deckLen; i++) s = play(s, "advance", A, { index: i });
     expect(s.phase).toBe("done");
     const seenTotal = Object.values(s.seen).flat().length;
@@ -103,11 +132,21 @@ describe("reduceOb (Open Book)", () => {
   });
 
   it("round-trips through json", () => {
-    const s = upToPlay();
+    let s = upToPlay();
+    const deck = buildObDeck(s);
+    const answerer = deck[0].by === A ? B : A;
+    s = play(s, "my_answer", answerer, { index: 0 });
+    s = play(s, "rule", deck[0].by, { index: 0, verdict: "dodged" });
     const back = obFromJson(JSON.parse(JSON.stringify(s)));
     expect(back.phase).toBe("play");
     expect(back.claims).toHaveLength(obSlots(15));
+    expect(back.rulings["0"]).toBe("dodged");
+    expect(back.answered).toBe(false);
     expect(buildObDeck(back)).toEqual(buildObDeck(s));
+    // Legacy payloads without the ruling fields parse safely.
+    const legacy = obFromJson({ phase: "play", target: 15 });
+    expect(legacy.rulings).toEqual({});
+    expect(legacy.answered).toBe(false);
   });
 });
 

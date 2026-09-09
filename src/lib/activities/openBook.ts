@@ -321,6 +321,9 @@ export type ObPhase = "setup" | "draft" | "write" | "veto" | "play" | "done";
 export type ObClaim = { user: string; topic: string; q: [number, number, number] };
 export type ObVeto = { binned: string; swap: string; q: [number, number, number] };
 
+/** The listener's ruling on an answer — noticing, not scoring (from Closer). */
+export type ObVerdict = "answered" | "half" | "dodged";
+
 export type ObState = {
   phase: ObPhase;
   target: 15 | 21;
@@ -330,6 +333,10 @@ export type ObState = {
   writes: Record<string, string>;
   vetoes: Record<string, ObVeto>;
   card: number;
+  /** The current card's answerer said "That's my answer" — awaiting a ruling. */
+  answered: boolean;
+  /** cardIndex (as string) -> the card owner's ruling on the answer. */
+  rulings: Record<string, ObVerdict>;
   /** Shared pool: card indices passed on, max OB_PASSES per night. */
   passes: number[];
   /** cardIndex (as string) -> userId -> emoji. */
@@ -354,6 +361,8 @@ export function initialObState(): ObState {
     writes: {},
     vetoes: {},
     card: 0,
+    answered: false,
+    rulings: {},
     passes: [],
     reacts: {},
     seen: {},
@@ -473,7 +482,7 @@ export function reduceOb(current: ObState, event: ObEvent): ObState {
       if (!validQ(swap, event.payload.q)) return current;
       const vetoes = { ...current.vetoes, [me]: { binned, swap, q: event.payload.q as [number, number, number] } };
       const done = Object.keys(vetoes).length >= 2;
-      const next = { ...current, vetoes, phase: done ? ("play" as const) : ("veto" as const), card: 0 };
+      const next = { ...current, vetoes, phase: done ? ("play" as const) : ("veto" as const), card: 0, answered: false };
       return done ? { ...next, seen: consumeSeen(next) } : next;
     }
     case "react": {
@@ -487,6 +496,37 @@ export function reduceOb(current: ObState, event: ObEvent): ObState {
         reacts: { ...current.reacts, [key]: { ...(current.reacts[key] ?? {}), [me]: emoji } },
       };
     }
+    // The Closer mechanic, ported: the card's non-owner answers out loud and
+    // says "That's my answer"; only then does the card's OWNER rule it —
+    // answered, half of it, or dodged it — and the ruling turns the card.
+    case "my_answer": {
+      if (current.phase !== "play" || current.answered) return current;
+      const idx = typeof event.payload.index === "number" ? event.payload.index : -1;
+      if (idx !== current.card) return current;
+      const c = buildObDeck(current)[idx];
+      if (!c || me === c.by) return current;
+      return { ...current, answered: true };
+    }
+    case "rule": {
+      if (current.phase !== "play" || !current.answered) return current;
+      const idx = typeof event.payload.index === "number" ? event.payload.index : -1;
+      if (idx !== current.card) return current;
+      const v = event.payload.verdict;
+      if (v !== "answered" && v !== "half" && v !== "dodged") return current;
+      const deck = buildObDeck(current);
+      const c = deck[idx];
+      if (!c || me !== c.by) return current;
+      const nextCard = current.card + 1;
+      return {
+        ...current,
+        rulings: { ...current.rulings, [String(idx)]: v },
+        answered: false,
+        card: nextCard,
+        phase: nextCard >= deck.length ? "done" : "play",
+      };
+    }
+    // Legacy advance (pre-rulings clients) still turns the card, un-ruled, so
+    // a mixed-version room can't stall.
     case "advance":
     case "pass": {
       if (current.phase !== "play") return current;
@@ -494,11 +534,18 @@ export function reduceOb(current: ObState, event: ObEvent): ObState {
       if (idx !== current.card) return current;
       const isPass = event.type === "pass";
       if (isPass && current.passes.length >= OB_PASSES) return current;
+      // Passing is the answerer's move, made before an answer is locked.
+      if (isPass && current.answered) return current;
+      if (isPass) {
+        const c = buildObDeck(current)[idx];
+        if (c && me === c.by) return current;
+      }
       const deckLen = buildObDeck(current).length;
       const nextCard = current.card + 1;
       return {
         ...current,
         card: nextCard,
+        answered: false,
         passes: isPass ? [...current.passes, idx] : current.passes,
         phase: nextCard >= deckLen ? "done" : "play",
       };
@@ -566,6 +613,16 @@ export function obFromJson(s: Record<string, unknown> | null): ObState {
     writes: asStrMap(s.writes),
     vetoes,
     card: typeof s.card === "number" && s.card >= 0 ? s.card : 0,
+    answered: s.answered === true,
+    rulings: (() => {
+      const out: Record<string, ObVerdict> = {};
+      if (s.rulings && typeof s.rulings === "object") {
+        for (const [k, v] of Object.entries(s.rulings as Record<string, unknown>)) {
+          if (v === "answered" || v === "half" || v === "dodged") out[k] = v;
+        }
+      }
+      return out;
+    })(),
     passes: Array.isArray(s.passes) ? s.passes.filter((x): x is number => typeof x === "number") : [],
     reacts,
     seen,

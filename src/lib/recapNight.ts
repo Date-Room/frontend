@@ -109,8 +109,9 @@ export function nightOutcome(
       if (t.phase === "setup" || t.phase === "draft") return { outcome: "The topics were still being drafted." };
       const deckLen = t.phase === "play" || t.phase === "done" ? buildObDeck(t).length : t.target;
       const asked = t.phase === "done" ? deckLen : Math.min(t.card, deckLen);
+      const dodged = Object.values(t.rulings).filter((v) => v === "dodged").length;
       return {
-        outcome: `${asked} of ${deckLen} questions asked${t.passes.length ? `, ${t.passes.length} passed for later` : ""}.`,
+        outcome: `${asked} of ${deckLen} questions asked${t.passes.length ? `, ${t.passes.length} passed for later` : ""}${dodged ? `, ${dodged} ruled dodged` : ""}.`,
         figure: { value: String(asked), label: "questions asked" },
       };
     }
