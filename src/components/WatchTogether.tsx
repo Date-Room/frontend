@@ -27,6 +27,14 @@ import {
   youtubeThumbnail,
   youtubeWatchUrl,
 } from "@/lib/watchHistory";
+import {
+  WATCH_HISTORY_NAME,
+  fetchMediaLibrary,
+  mediaLibraryAvailable,
+  mergeWatchHistory,
+  syncWatchHistoryToAccount,
+  type MediaItem,
+} from "@/lib/mediaLibrary";
 import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/types/youtubeIframeApi";
 
 /**
@@ -96,6 +104,42 @@ export function WatchTogether() {
 
   const [url, setUrl] = useState("");
   const [history, setHistory] = useState<WatchHistoryEntry[]>(() => loadWatchHistory());
+  // Account-synced history ("your shelf follows you"): pull the saved copy,
+  // merge it into the dropdown, and push the merge back up. All best-effort;
+  // localStorage stays the device fallback for guests and free accounts.
+  const remoteItemsRef = useRef<MediaItem[] | null>(null);
+  useEffect(() => {
+    if (!mediaLibraryAvailable()) return;
+    let cancelled = false;
+    void fetchMediaLibrary()
+      .then((lib) => {
+        if (cancelled) return;
+        const saved = lib.collections.find(
+          (c) => c.kind === "watch" && c.name === WATCH_HISTORY_NAME,
+        );
+        remoteItemsRef.current = saved?.items ?? [];
+        if (saved?.items.length) {
+          const merged = mergeWatchHistory(loadWatchHistory(), saved.items);
+          setHistory(
+            merged.map((i) => ({
+              videoId: i.media_id,
+              url: i.url ?? youtubeWatchUrl(i.media_id),
+              addedAt: i.added_at ? Date.parse(i.added_at) : Date.now(),
+              title: i.title,
+            })),
+          );
+        }
+        // First visit from this device after signing in: the local history
+        // climbs up to the account.
+        void syncWatchHistoryToAccount(remoteItemsRef.current);
+      })
+      .catch(() => {
+        /* offline / unauthenticated — device history stands */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // Backfill names for any past entries saved before we tracked titles.
   useEffect(() => {
     let cancelled = false;
@@ -604,6 +648,7 @@ export function WatchTogether() {
       { event_type: "queued_video", payload: { text: `youtu.be/${id}` } },
     );
     setHistory(addWatchHistory(sourceUrl ?? youtubeWatchUrl(id), id));
+    void syncWatchHistoryToAccount(remoteItemsRef.current);
   }
 
   const submit = (e: React.FormEvent) => {

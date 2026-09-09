@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/types/youtubeIframeApi";
 import { extractId, fetchOEmbed, loadYT, type DjTrack, type OEmbed } from "@/components/DJ";
 import { EmptyState } from "@/components/EmptyState";
+import { PlaylistShelf } from "@/components/PlaylistShelf";
 import {
   MusicCtx,
   useMusicRoom,
@@ -286,6 +287,25 @@ export function MusicRoomProvider({
         if (!room.canPersist) return;
         const nextQueue = e.payload.queue;
         if (Array.isArray(nextQueue)) persistDj({ queue: nextQueue });
+        return;
+      }
+      if (e.type === "load_list") {
+        // Partner loaded a saved playlist — mirror the whole list at once.
+        if (!room.canPersist) return;
+        const nextQueue = e.payload.queue;
+        const start = (e.payload.start ?? null) as DjTrack | null;
+        if (!Array.isArray(nextQueue)) return;
+        if (start && nowPlaying == null) {
+          persistDj({
+            now_playing: start,
+            queue: nextQueue,
+            playing: true,
+            timestamp_seconds: 0,
+            silence: false,
+          });
+        } else {
+          persistDj({ queue: nextQueue });
+        }
         return;
       }
       if (e.type === "play" && p?.playVideo) {
@@ -599,6 +619,46 @@ export function MusicRoomProvider({
     },
     [persistDj, tracks, session],
   );
+  // A saved playlist lands as ONE list write (per-track enqueues would race
+  // each other's queue snapshots). Already-queued videos are skipped; if
+  // nothing is playing, the first fresh track starts.
+  const loadPlaylist = useCallback(
+    (incoming: DjTrack[]) => {
+      const have = new Set(tracks.map((t) => t.video_id).filter(Boolean));
+      if (nowPlaying?.video_id) have.add(nowPlaying.video_id);
+      const fresh = incoming.filter((t) => t.video_id && !have.has(t.video_id));
+      if (fresh.length === 0) return;
+      const list = [...tracks, ...fresh];
+      const start = nowPlaying == null ? fresh[0] : null;
+      void session?.sendEvent("load_list", { queue: list, start });
+      const recap = {
+        event_type: "queued_track",
+        payload: { text: `${fresh.length} song${fresh.length === 1 ? "" : "s"} from a saved playlist` },
+      };
+      if (start) {
+        persistDj(
+          { now_playing: start, queue: list, playing: true, timestamp_seconds: 0, silence: false },
+          recap,
+        );
+      } else {
+        persistDj({ queue: list }, recap);
+      }
+      // Backfill titles for tracks the library saved without one.
+      for (const t of fresh) {
+        if (t.title !== "Loading…" || !t.video_id) continue;
+        void fetchOEmbed(t.video_id).then((m) => {
+          if (m) {
+            persistDj({
+              queue: list.map((x) =>
+                x.id === t.id ? { ...x, title: m.title, channel_title: m.author_name } : x,
+              ),
+            });
+          }
+        });
+      }
+    },
+    [persistDj, tracks, nowPlaying, session],
+  );
 
   useEffect(() => {
     const p = playerRef.current;
@@ -690,6 +750,7 @@ export function MusicRoomProvider({
     next,
     removeTrack,
     reorderTracks,
+    loadPlaylist,
     clearQueue,
     close,
     closed,
@@ -716,6 +777,7 @@ export function MusicRoomProvider({
 
 export function MusicLibrary() {
   const m = useMusicRoom();
+  const room = useRoomSession();
   const [url, setUrl] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -787,6 +849,7 @@ export function MusicLibrary() {
               {m.tracks.length} song{m.tracks.length === 1 ? "" : "s"} · drag to reorder
             </p>
             <div className="flex items-center gap-3">
+              <PlaylistShelf tracks={m.tracks} senderId={room.senderId} onLoad={m.loadPlaylist} />
               <button
                 type="button"
                 onClick={() => setConfirmClear(true)}
@@ -841,7 +904,13 @@ export function MusicLibrary() {
           </ul>
         </div>
       ) : (
-        <EmptyState variant="music" title="Music" onAdd={() => setAdding(true)} addLabel="Add a song" />
+        <div className="flex flex-1 flex-col">
+          <div className="flex justify-end px-1">
+            {/* An empty room is exactly where a saved playlist matters most. */}
+            <PlaylistShelf tracks={m.tracks} senderId={room.senderId} onLoad={m.loadPlaylist} />
+          </div>
+          <EmptyState variant="music" title="Music" onAdd={() => setAdding(true)} addLabel="Add a song" />
+        </div>
       )}
 
       {confirmClear && (
