@@ -191,7 +191,7 @@ export function RoomStage({
 }: {
   roomId: string;
   items: StageItem[];
-  renderContent: (id: string) => ReactNode;
+  renderContent: (id: string, launch: (id: string) => void) => ReactNode;
   partnerStatus: string;
   partnerName?: string;
   partnerInRoom?: boolean;
@@ -201,10 +201,12 @@ export function RoomStage({
   onCallIn: () => void;
   onLeaveCall: () => void;
 }) {
-  const fallback = items.find((i) => i.isWall)?.id ?? items[0]?.id ?? "";
+  // The lobby is the neutral default: nothing preloaded, nothing presumed.
+  const fallback =
+    items.find((i) => i.id === "lobby")?.id ?? items.find((i) => i.isWall)?.id ?? items[0]?.id ?? "";
   const [staged, setStaged] = useState<string>(() => {
     try {
-      const saved = localStorage.getItem(`dr:stage:${roomId}`);
+      const saved = localStorage.getItem(`dr:stage2:${roomId}`);
       return saved && items.some((i) => i.id === saved) ? saved : fallback;
     } catch {
       return fallback;
@@ -212,7 +214,7 @@ export function RoomStage({
   });
   useEffect(() => {
     try {
-      localStorage.setItem(`dr:stage:${roomId}`, staged);
+      localStorage.setItem(`dr:stage2:${roomId}`, staged);
     } catch {
       /* ignore */
     }
@@ -553,6 +555,16 @@ export function RoomStage({
             <span className="text-xs font-medium uppercase tracking-[0.16em] text-cream/80">
               {stagedItem?.title ?? "Stage"}
             </span>
+            {staged !== "lobby" && items.some((i) => i.id === "lobby") && (
+              <button
+                type="button"
+                onClick={() => commitStage("lobby")}
+                aria-label="Back to the lobby"
+                className="ml-auto flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/5 hover:text-cream"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+            )}
             {staged && hasActivityHelp(staged) && (
               <button
                 type="button"
@@ -570,7 +582,7 @@ export function RoomStage({
           >
             {staged ? (
               <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
-                {renderContent(staged)}
+                {renderContent(staged, commitStage)}
               </ActivityBoundary>
             ) : null}
           </div>
