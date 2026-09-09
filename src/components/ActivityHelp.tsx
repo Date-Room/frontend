@@ -113,7 +113,8 @@ const ACTIVITY_HELP: Record<string, HelpContent> = {
     sections: [
       { heading: "How to play", bullets: [
         "Three doors, each hiding a question. Pick one before you know what's behind it.",
-        "Both chosen doors open. Answer yours out loud, then swap.",
+        "Whoever picked first answers first: their door opens on both screens, they tap \"I'm ready\", answer out loud, then pass it over.",
+        "Then the second door swings open and it's the other person's turn.",
         "Picking the same door means you answer it together.",
       ] },
       { heading: "Good to know", bullets: ["The unpicked door stays closed. Its question keeps for another date."] },

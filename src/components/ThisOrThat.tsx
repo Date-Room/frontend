@@ -13,6 +13,7 @@ import {
 } from "@/lib/activities/thisOrThat";
 import { useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
+import { StagePrompt } from "@/lib/stagecraft/StagePrompt";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 
 /**
@@ -260,6 +261,14 @@ export function ThisOrThat() {
         <p key={title} className="font-serif text-xl italic text-cream animate-fade-in">{title}</p>
         <p key={status} aria-live="polite" className="min-h-[1rem] max-w-sm text-xs text-muted-foreground animate-fade-in">{status}</p>
       </div>
+
+      {!revealing && myPick != null && myPrediction == null && (
+        <StagePrompt
+          id={`tot-call-${state.run}-${state.round}`}
+          lead="✓ Your pick is locked"
+          text={`Now tap the side you think ${partnerName} took.`}
+        />
+      )}
 
       <div className="relative flex flex-1 flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
         {half("a")}
