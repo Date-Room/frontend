@@ -119,7 +119,7 @@ const ITEM_TAGLINES: Record<string, string> = {
   vision_board: "The life you're building.",
   fridge_notes: "Sticky notes for you two.",
   bookshelf: "Books, links, things to watch.",
-  questions: "Pick 24, swap decks, take turns.",
+  questions: "Draft topics. The night escalates.",
   this_or_that: "Pick fast. Call theirs.",
   the_36: "Three sets of twelve. Get closer.",
   "2_truths": "Press one. Stake your call.",

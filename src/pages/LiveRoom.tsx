@@ -133,7 +133,7 @@ const WALL_TABS: TabDef[] = [
 ];
 
 const ACTIVITY_TABS: TabDef[] = [
-  { id: "questions", label: "Questions", icon: "💬", curatableId: "questions" },
+  { id: "questions", label: "Open Book", icon: "📖", curatableId: "questions" },
   { id: "this_or_that", label: "This or That", icon: "⚖️", curatableId: "this_or_that" },
   { id: "the_36", label: "The 36", icon: "🫶", curatableId: "the_36" },
   { id: "2_truths", label: "2 Truths", icon: "🎭", curatableId: "2_truths" },
