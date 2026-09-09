@@ -101,7 +101,7 @@ export function QuestionDeck() {
         beats={[
           "Take turns claiming topics. Each topic asks three questions: an opener, a specific, a costly one.",
           `You each write one question of your own. It replaces a card, and it buys you a veto of one topic ${partnerName} chose.`,
-          "One card at a time, out loud. React, answer, or pass (twice a night). Everything survives to the recap.",
+          `One card at a time, out loud. You answer the cards ${partnerName} chose; say "That's my answer" and they rule it: answered, half of it, or dodged. Pass twice a night. Everything survives to the recap.`,
         ]}
       >
         <div className="flex gap-3">
@@ -286,20 +286,60 @@ export function QuestionDeck() {
 
   // ── Done ──
   if (state.phase === "done") {
+    // How each of you showed up: verdicts received on the cards you answered
+    // (you answer the cards your date chose or wrote).
+    const tally = (answeredByMe: boolean) => {
+      const t = { answered: 0, half: 0, dodged: 0 };
+      deck.forEach((c, i) => {
+        const mineToAnswer = c.by !== senderId;
+        if (mineToAnswer !== answeredByMe) return;
+        const v = state.rulings[String(i)];
+        if (v) t[v] += 1;
+      });
+      return t;
+    };
+    const myTally = tally(true);
+    const theirTally = tally(false);
+    const showTallies = Object.keys(state.rulings).length > 0;
+    const comeBack = deck
+      .map((c, i) => ({ c, i }))
+      .filter(({ i }) => state.passes.includes(i) || state.rulings[String(i)] === "dodged");
+    const tallyLine = (t: { answered: number; half: number; dodged: number }) =>
+      `${t.answered} answered · ${t.half} half · ${t.dodged} dodged`;
+    const VERDICT_CHIP: Record<string, [string, string]> = {
+      answered: ["answered", "text-emerald-300"],
+      half: ["half of it", "text-amber-300"],
+      dodged: ["dodged", "text-destructive"],
+    };
     return (
       <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
         <div className="flex flex-col items-center gap-1 text-center">
           <p className="font-serif text-2xl italic text-cream">The whole night</p>
           <p className="max-w-sm text-xs text-muted-foreground">
             {deck.length - state.passes.length} of {deck.length} answered.{" "}
-            {state.passes.length
-              ? "The passed ones are worth coming back to."
-              : "You didn't pass on a single one."}
+            {comeBack.length
+              ? "The passed and dodged ones are worth coming back to."
+              : "Nothing passed, nothing dodged."}
           </p>
         </div>
+        {showTallies && (
+          <div className="flex flex-col items-center gap-1 text-center">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+              How you showed up
+            </p>
+            <p className="text-xs text-cream/85">
+              <span className="text-primary">You</span> · {tallyLine(myTally)}
+            </p>
+            <p className="text-xs text-cream/85">
+              <span className="text-rose">{partnerName}</span> · {tallyLine(theirTally)}
+            </p>
+          </div>
+        )}
         <div className="flex flex-1 flex-col gap-2">
           {deck.map((c, i) => {
             const passed = state.passes.includes(i);
+            const verdict = state.rulings[String(i)];
+            const chip = verdict ? VERDICT_CHIP[verdict] : null;
             const rx = Object.values(state.reacts[String(i)] ?? {});
             return (
               <div
@@ -317,6 +357,7 @@ export function QuestionDeck() {
                   {rx.map((e, j) => (
                     <span key={j} className="text-sm">{e}</span>
                   ))}
+                  {chip && <span className={chip[1]}>{chip[0]}</span>}
                   {passed && <span className="text-destructive">passed</span>}
                 </p>
               </div>
@@ -422,30 +463,83 @@ export function QuestionDeck() {
               })}
             </div>
 
-            {typed.complete && (
-              <div className="flex gap-2 animate-fade-in">
-                <Button
-                  onClick={() =>
-                    emit("advance", { index: state.card }, {
-                      event_type: "asked",
-                      payload: { text: card.written ? "a written question" : `${card.topicName} · ${card.heat}` },
-                    })
-                  }
-                  className={accentBtn}
-                  style={accentStyle}
-                >
-                  {state.card + 1 >= deck.length ? "That's the night" : "Answered"}
-                </Button>
-                <Button
-                  onClick={() => emit("pass", { index: state.card })}
-                  disabled={state.passes.length >= OB_PASSES}
-                  variant="outline"
-                  className={quietBtn}
-                >
-                  Pass ({OB_PASSES - state.passes.length} left)
-                </Button>
-              </div>
-            )}
+            {typed.complete &&
+              (card.by !== senderId ? (
+                // The card is theirs — I answer it.
+                !state.answered ? (
+                  <div className="flex flex-col items-center gap-2 animate-fade-in">
+                    <p className="text-xs text-muted-foreground">This one's for you. Out loud.</p>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => emit("my_answer", { index: state.card })}
+                        className={accentBtn}
+                        style={accentStyle}
+                      >
+                        That&apos;s my answer
+                      </Button>
+                      <Button
+                        onClick={() => emit("pass", { index: state.card })}
+                        disabled={state.passes.length >= OB_PASSES}
+                        variant="outline"
+                        className={quietBtn}
+                      >
+                        Pass ({OB_PASSES - state.passes.length} left)
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground animate-pulse">
+                    {partnerName} heard you. They&apos;re ruling it…
+                  </p>
+                )
+              ) : // The card is mine — they answer, then I rule it.
+              !state.answered ? (
+                <p className="text-sm text-muted-foreground animate-fade-in">
+                  {partnerName} answers this one. Listen.
+                </p>
+              ) : (
+                <div className="flex flex-col items-center gap-2 animate-fade-in">
+                  <p className="text-xs text-muted-foreground">Did they? Your ruling is noticing, not scoring.</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button
+                      onClick={() =>
+                        emit("rule", { index: state.card, verdict: "answered" }, {
+                          event_type: "ruled",
+                          payload: { text: `answered · ${card.written ? "a written question" : card.topicName}` },
+                        })
+                      }
+                      className="rounded-full border border-emerald-400/60 bg-emerald-400/10 text-emerald-300 hover:bg-emerald-400/20"
+                      variant="outline"
+                    >
+                      Answered
+                    </Button>
+                    <Button
+                      onClick={() =>
+                        emit("rule", { index: state.card, verdict: "half" }, {
+                          event_type: "ruled",
+                          payload: { text: `half of it · ${card.written ? "a written question" : card.topicName}` },
+                        })
+                      }
+                      className="rounded-full border border-amber-300/50 bg-amber-300/10 text-amber-300 hover:bg-amber-300/20"
+                      variant="outline"
+                    >
+                      Half of it
+                    </Button>
+                    <Button
+                      onClick={() =>
+                        emit("rule", { index: state.card, verdict: "dodged" }, {
+                          event_type: "ruled",
+                          payload: { text: `dodged · ${card.written ? "a written question" : card.topicName}` },
+                        })
+                      }
+                      className="rounded-full border border-destructive/60 bg-destructive/10 text-destructive hover:bg-destructive/20"
+                      variant="outline"
+                    >
+                      Dodged it
+                    </Button>
+                  </div>
+                </div>
+              ))}
 
             <ol className="flex flex-wrap justify-center gap-1" aria-hidden>
               {deck.map((c, i) => (
