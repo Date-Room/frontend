@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useReducedActivity } from "@/lib/activities/useReducedActivity";
 import {
@@ -6,22 +6,21 @@ import {
   initialPickADoorState,
   pickADoorFromJson,
   pickADoorIsFinished,
+  pickADoorSameDoor,
+  pickADoorStageOwner,
   reducePickADoor,
 } from "@/lib/activities/pickADoor";
 import { prefersReducedMotion, useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { useTypewriter } from "@/lib/stagecraft/typewriter";
+import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 
 /**
- * Pick a Door — game-show reveal. Both pick blind; the panel dims; only the
- * chosen doors stay lit; they swing open and each question rises on a plaque
- * that types itself in. One thing on screen at a time: question → "I'm ready"
- * → say-it-out-loud countdown → the partner's door as its own beat.
- *
- * The cinematic is presentation only — the shared reducer is untouched, and
- * a reload mid-reveal skips the show (see stagecraft rules).
+ * Pick a Door — game-show reveal, now strictly turn-based: the reveal stages
+ * live in shared state, only the door's owner can say "I'm ready" or pass it
+ * over, and one tap moves both screens (live-tested fix: local beats let both
+ * players start their countdowns at once and never see each other's card).
  */
 
-/** Timed from the moment both picks land (the reveal broadcast). */
 const REVEAL_STEPS: CinematicStep[] = [
   { id: "dimming", at: 0 },
   { id: "opening", at: 1100 },
@@ -30,9 +29,6 @@ const REVEAL_STEPS: CinematicStep[] = [
 
 const ANSWER_SECONDS = 45;
 
-/** Local presentation beats once the plaque stage is reached. */
-type Beat = "mine" | "answering" | "theirs" | "theirs-done";
-
 export function PickADoor() {
   const { state, emit, senderId } = useReducedActivity(
     "pick_a_door",
@@ -40,30 +36,41 @@ export function PickADoor() {
     pickADoorFromJson,
     reducePickADoor,
   );
+  const partnerName = usePartnerName();
 
   const accentBtn = "rounded-full text-primary-foreground transition hover:opacity-90 disabled:opacity-50";
   const accentStyle = { backgroundColor: "var(--room-accent)" } as const;
 
   const revealing = !pickADoorIsFinished(state) && state.phase === "revealing";
-  const { stage, witnessed } = useCinematic(revealing, REVEAL_STEPS);
+  const { stage: cin, witnessed } = useCinematic(revealing, REVEAL_STEPS);
 
-  const [beat, setBeat] = useState<Beat>("mine");
+  // The shared answer ring, restarted whenever an answering stage begins.
+  const answering = revealing && (state.stage === 1 || state.stage === 3);
   const [seconds, setSeconds] = useState(ANSWER_SECONDS);
-  const roundRef = useRef(state.round);
   useEffect(() => {
-    if (roundRef.current !== state.round) {
-      roundRef.current = state.round;
-      setBeat("mine");
+    if (!answering) {
       setSeconds(ANSWER_SECONDS);
+      return;
     }
-  }, [state.round]);
-
-  // The say-it-out-loud countdown. Runs out gracefully — no auto-advance.
-  useEffect(() => {
-    if (beat !== "answering") return;
     const id = window.setInterval(() => setSeconds((s) => (s > 0 ? s - 1 : 0)), 1000);
     return () => window.clearInterval(id);
-  }, [beat]);
+  }, [answering, state.stage, state.round]);
+
+  // The second door earns its own swing when the shared stage reaches it.
+  const [secondOpened, setSecondOpened] = useState(false);
+  useEffect(() => {
+    if (state.stage < 2) {
+      setSecondOpened(false);
+      return;
+    }
+    if (secondOpened) return;
+    if (prefersReducedMotion()) {
+      setSecondOpened(true);
+      return;
+    }
+    const t = window.setTimeout(() => setSecondOpened(true), 1500);
+    return () => window.clearTimeout(t);
+  }, [state.stage, secondOpened]);
 
   if (pickADoorIsFinished(state)) {
     return (
@@ -84,41 +91,56 @@ export function PickADoor() {
   const otherEntry = Object.entries(state.picks).find(([uid]) => uid !== senderId);
   const theirPick = otherEntry?.[1];
   const iPicked = myPick != null;
-  const sameDoor = revealing && myPick === theirPick;
-  const mine = myPick != null ? round.doors[myPick] : null;
-  const theirs = theirPick != null ? round.doors[theirPick] : null;
+  const sameDoor = revealing && pickADoorSameDoor(state);
+  const stageOwner = revealing ? pickADoorStageOwner(state) : null;
+  const iOwnStage = stageOwner === senderId;
+  const stageDoorIdx = sameDoor
+    ? myPick
+    : stageOwner != null
+      ? state.picks[stageOwner]
+      : undefined;
+  const stageDoor = stageDoorIdx != null ? round.doors[stageDoorIdx] : null;
 
-  const dimmed = revealing && witnessed && stage != null;
-  const onPlaque = revealing && witnessed && stage === "question";
-  const showDoors = !revealing || (witnessed && stage === "dimming");
-  const onBigDoor = revealing && witnessed && stage === "opening";
+  const dimmed = revealing && witnessed && cin != null;
+  const onPlaque = revealing && (witnessed ? cin === "question" : true);
+  const showDoors = !revealing || (witnessed && (cin === "dimming" || cin === "opening"));
+  const secondIntro = onPlaque && state.stage >= 2 && !secondOpened;
+  const typed = useTypewriter(stageDoor?.question ?? "", onPlaque && !secondIntro);
 
-  const nextRound = () => emit("next_round", { round: state.round });
+  const lastStage = sameDoor ? 1 : 3;
   const finishLabel = state.round + 1 >= DOOR_ROUNDS.length ? "Finish" : "Next round";
+
+  const ownerWord = sameDoor ? "Together" : iOwnStage ? "Your door" : `${partnerName}'s door`;
 
   const status = !revealing
     ? iPicked
       ? "Locked in · waiting for them…"
       : "You don't know what's behind them. Choose anyway."
-    : !witnessed
-      ? "Answer what's behind yours out loud, then swap."
-      : stage === "dimming"
-        ? "Both doors are locked."
-        : stage === "opening"
-          ? "The doors are opening…"
-          : beat === "mine"
-            ? sameDoor
-              ? "You landed on the same door."
-              : "Behind your door."
-            : beat === "answering"
-              ? "Say it out loud. No typing, no take-backs."
-              : "Now theirs. Same rules.";
+    : !onPlaque
+      ? witnessed && cin === "opening"
+        ? "The doors are opening…"
+        : "Both doors are locked."
+      : sameDoor
+        ? state.stage === 0
+          ? "You landed on the same door. Answer it together."
+          : "Both of you. Out loud."
+        : state.stage === 0 || state.stage === 2
+          ? iOwnStage
+            ? "Behind your door. Take a breath."
+            : `${partnerName} reads their question first.`
+          : iOwnStage
+            ? "Say it out loud. No typing, no take-backs."
+            : `Listen. ${partnerName} is answering.`;
 
-  const title = !revealing || (witnessed && (stage === "dimming" || stage === "opening"))
-    ? "Pick a door"
+  const title = !revealing || !onPlaque
+    ? revealing
+      ? "The doors open"
+      : "Pick a door"
     : sameDoor
       ? "One door, two answers"
-      : "The doors open";
+      : state.stage <= 1
+        ? "The first door"
+        : "The second door";
 
   return (
     <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in", dimmed ? "dr-stageroom--dim" : ""].join(" ")}>
@@ -128,8 +150,8 @@ export function PickADoor() {
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Round {state.round + 1} of {DOOR_ROUNDS.length} · {round.title}
         </p>
-        <p className="font-serif text-xl italic text-cream">{title}</p>
-        <p key={status} className="text-xs text-muted-foreground animate-fade-in">{status}</p>
+        <p key={title} className="font-serif text-xl italic text-cream animate-fade-in">{title}</p>
+        <p key={status} aria-live="polite" className="min-h-[1rem] text-xs text-muted-foreground animate-fade-in">{status}</p>
       </div>
 
       {showDoors && (
@@ -139,7 +161,7 @@ export function PickADoor() {
             const isTheirs = revealing && theirPick === i;
             const chosen = isMine || isTheirs;
             const shut = revealing && !chosen;
-            const opening = stage === "opening" && chosen;
+            const opening = witnessed && cin === "opening" && chosen;
             const clickable = !iPicked && !revealing;
             return (
               <button
@@ -150,10 +172,7 @@ export function PickADoor() {
                   emit(
                     "pick",
                     { round: state.round, door: i },
-                    {
-                      event_type: "opened_door",
-                      payload: { text: `${round.title} · ${door.name}` },
-                    },
+                    { event_type: "opened_door", payload: { text: `${round.title} · ${door.name}` } },
                   );
                 }}
                 disabled={!clickable}
@@ -176,14 +195,6 @@ export function PickADoor() {
                       {isMine && !revealing && (
                         <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/40 text-[10px] tracking-[0.2em]">your door</span>
                       )}
-                      {revealing && isMine && (
-                        <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/40 text-[10px] tracking-[0.2em]">
-                          {sameDoor ? "both of you" : "you"}
-                        </span>
-                      )}
-                      {revealing && isTheirs && !sameDoor && (
-                        <span className="px-2 py-0.5 rounded-full bg-rose/20 text-rose border border-rose/40 text-[10px] tracking-[0.2em]">them</span>
-                      )}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {shut ? "Still closed. Its secret keeps." : "Something's behind it."}
@@ -196,49 +207,78 @@ export function PickADoor() {
         </div>
       )}
 
-      {onBigDoor && mine && (
-        <div className="relative flex flex-1 flex-col items-center justify-center gap-4">
+      {revealing && witnessed && cin === "opening" && stageDoor && (
+        <div className="relative flex flex-col items-center gap-2">
           <div className="dr-beam" aria-hidden />
-          <BigDoor label={sameDoor ? "Together" : "Your door"} name={mine.name} />
         </div>
       )}
 
-      {onPlaque && mine && theirs && (
-        <StagePlaques
-          sameDoor={sameDoor}
-          mine={mine}
-          theirs={theirs}
-          beat={beat}
-          seconds={seconds}
-          onReady={() => setBeat("answering")}
-          onPass={() => setBeat(sameDoor ? "theirs-done" : "theirs")}
-          onFinish={nextRound}
-          finishLabel={finishLabel}
-        />
-      )}
+      {onPlaque && stageDoor && (
+        <div className="dr-stage relative flex flex-1 flex-col items-center justify-center gap-4 text-center">
+          <div className="dr-beam" aria-hidden />
 
-      {revealing && !witnessed && mine && theirs && (
-        <SettledReveal
-          round={state.round}
-          sameDoor={sameDoor}
-          myPick={myPick!}
-          theirPick={theirPick!}
-          onNext={nextRound}
-          finishLabel={finishLabel}
-        />
-      )}
+          {secondIntro ? (
+            <BigDoor label={ownerWord} name={stageDoor.name} />
+          ) : (
+            <>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--room-accent)" }}>
+                {ownerWord} · {stageDoor.name}
+              </p>
+              <blockquote key={`${state.round}-${state.stage <= 1 ? "a" : "b"}`} className={["dr-plaque w-full max-w-md text-left", typed.complete ? "dr-plaque--settled" : ""].join(" ")}>
+                <span className="dr-plaque-glyph" aria-hidden>{stageDoor.emoji}</span>
+                <p className="font-serif italic text-xl sm:text-2xl leading-snug text-cream">
+                  {typed.shown}
+                  {!typed.complete && <span className="dr-caret" aria-hidden />}
+                </p>
+              </blockquote>
 
-      {!revealing && (
-        <div className="relative min-h-[2.5rem] flex items-center justify-center">
-          {iPicked && <p className="text-sm text-muted-foreground animate-pulse">waiting for them to pick a door…</p>}
+              {(state.stage === 0 || state.stage === 2) && typed.complete && (
+                iOwnStage || sameDoor ? (
+                  <Button
+                    onClick={() => emit("advance_stage", { round: state.round, stage: state.stage + 1 })}
+                    className={accentBtn + " animate-fade-in"}
+                    style={accentStyle}
+                  >
+                    {sameDoor ? "We're ready" : "I'm ready to answer"}
+                  </Button>
+                ) : (
+                  <p className="text-sm text-muted-foreground animate-pulse">
+                    waiting for {partnerName} to be ready…
+                  </p>
+                )
+              )}
+
+              {answering && (
+                <div className="flex flex-col items-center gap-3 animate-fade-in">
+                  <div className="dr-ring" style={{ ["--p" as string]: seconds / ANSWER_SECONDS }}>
+                    <span className="font-serif">{seconds}</span>
+                  </div>
+                  {state.stage === lastStage ? (
+                    <Button onClick={() => emit("next_round", { round: state.round })} className={accentBtn} style={accentStyle}>
+                      {finishLabel}
+                    </Button>
+                  ) : iOwnStage ? (
+                    <Button
+                      onClick={() => emit("advance_stage", { round: state.round, stage: state.stage + 1 })}
+                      variant="outline"
+                      className="rounded-full border-white/20 text-cream hover:bg-white/5"
+                    >
+                      Pass it over
+                    </Button>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">your door comes next</p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-/** The hero moment: a large door that swings open with light spilling
- *  through. Plays on mount (CSS animations), sized for the panel. */
+/** The hero swing before a plaque. Plays on mount (CSS animations). */
 function BigDoor({ label, name }: { label: string; name: string }) {
   return (
     <div className="flex flex-col items-center gap-4 animate-fade-in">
@@ -251,154 +291,6 @@ function BigDoor({ label, name }: { label: string; name: string }) {
         <span className="dr-bigdoor-leaf dr-bigdoor-leaf--r" />
       </div>
       <p className="text-xs text-muted-foreground animate-pulse">opening…</p>
-    </div>
-  );
-}
-
-/** The lit stage: one plaque at a time, question typing itself in. */
-function StagePlaques({
-  sameDoor,
-  mine,
-  theirs,
-  beat,
-  seconds,
-  onReady,
-  onPass,
-  onFinish,
-  finishLabel,
-}: {
-  sameDoor: boolean;
-  mine: { emoji: string; name: string; question: string };
-  theirs: { emoji: string; name: string; question: string };
-  beat: Beat;
-  seconds: number;
-  onReady: () => void;
-  onPass: () => void;
-  onFinish: () => void;
-  finishLabel: string;
-}) {
-  const showingTheirs = beat === "theirs" || beat === "theirs-done";
-  const door = showingTheirs ? theirs : mine;
-  const owner = sameDoor ? "Together" : showingTheirs ? "Their door" : "Your door";
-
-  // Their door earns its own swing before its plaque appears.
-  const [theirsOpened, setTheirsOpened] = useState(false);
-  useEffect(() => {
-    if (!showingTheirs || theirsOpened) return;
-    if (prefersReducedMotion()) {
-      setTheirsOpened(true);
-      return;
-    }
-    const t = window.setTimeout(() => setTheirsOpened(true), 1500);
-    return () => window.clearTimeout(t);
-  }, [showingTheirs, theirsOpened]);
-
-  const doorIntro = showingTheirs && !theirsOpened;
-  const typed = useTypewriter(door.question, !doorIntro);
-
-  if (doorIntro) {
-    return (
-      <div className="dr-stage relative flex flex-1 flex-col items-center justify-center gap-4 text-center">
-        <div className="dr-beam" aria-hidden />
-        <BigDoor label="Their door" name={theirs.name} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="dr-stage relative flex flex-1 flex-col items-center justify-center gap-4 text-center">
-      <div className="dr-beam" aria-hidden />
-      <p className="text-[10px] font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--room-accent)" }}>
-        {owner} · {door.name}
-      </p>
-      <blockquote key={door.name} className={["dr-plaque", typed.complete ? "dr-plaque--settled" : ""].join(" ")}>
-        <span className="dr-plaque-glyph" aria-hidden>{door.emoji}</span>
-        <p className="font-serif italic text-xl sm:text-2xl leading-snug text-cream">
-          {typed.shown}
-          {!typed.complete && <span className="dr-caret" aria-hidden />}
-        </p>
-      </blockquote>
-
-      {beat === "mine" && typed.complete && (
-        <Button onClick={onReady} className="rounded-full text-primary-foreground hover:opacity-90 animate-fade-in" style={{ backgroundColor: "var(--room-accent)" }}>
-          I&apos;m ready to answer
-        </Button>
-      )}
-
-      {beat === "answering" && (
-        <div className="flex flex-col items-center gap-3 animate-fade-in">
-          <div className="dr-ring" style={{ ["--p" as string]: seconds / ANSWER_SECONDS }}>
-            <span className="font-serif">{seconds}</span>
-          </div>
-          <Button
-            onClick={sameDoor ? onFinish : onPass}
-            variant="outline"
-            className="rounded-full border-white/20 text-cream hover:bg-white/5"
-          >
-            {sameDoor ? finishLabel : "Pass it over"}
-          </Button>
-        </div>
-      )}
-
-      {(beat === "theirs" || beat === "theirs-done") && typed.complete && (
-        <Button onClick={onFinish} className="rounded-full text-primary-foreground hover:opacity-90 animate-fade-in" style={{ backgroundColor: "var(--room-accent)" }}>
-          {finishLabel}
-        </Button>
-      )}
-    </div>
-  );
-}
-
-/** Hydrated mid-reveal (reload / late join): no show, both questions settled. */
-function SettledReveal({
-  round: roundIndex,
-  sameDoor,
-  myPick,
-  theirPick,
-  onNext,
-  finishLabel,
-}: {
-  round: number;
-  sameDoor: boolean;
-  myPick: number;
-  theirPick: number;
-  onNext: () => void;
-  finishLabel: string;
-}) {
-  const round = DOOR_ROUNDS[roundIndex];
-  const opened = sameDoor ? [myPick] : [myPick, theirPick];
-  return (
-    <div className="relative flex flex-1 flex-col justify-center gap-3">
-      {round.doors.map((door, i) => {
-        const isOpen = opened.includes(i);
-        return (
-          <div
-            key={i}
-            className={["rounded-2xl border p-4", isOpen ? "border-primary bg-primary/10" : "border-white/[0.08] bg-white/[0.02] opacity-40"].join(" ")}
-          >
-            <p className="text-sm font-medium uppercase tracking-[0.18em] text-cream flex items-center gap-2">
-              <span className="text-xl" aria-hidden>{isOpen ? door.emoji : "🚪"}</span>
-              {door.name}
-              {isOpen && i === myPick && (
-                <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/40 text-[10px] tracking-[0.2em]">
-                  {sameDoor ? "both of you" : "you"}
-                </span>
-              )}
-              {isOpen && !sameDoor && i === theirPick && (
-                <span className="px-2 py-0.5 rounded-full bg-rose/20 text-rose border border-rose/40 text-[10px] tracking-[0.2em]">them</span>
-              )}
-            </p>
-            <p className="mt-1.5 text-sm leading-relaxed text-cream/90">
-              {isOpen ? door.question : "Still closed. Its secret keeps."}
-            </p>
-          </div>
-        );
-      })}
-      <div className="flex justify-center pt-2">
-        <Button onClick={onNext} className="rounded-full text-primary-foreground hover:opacity-90" style={{ backgroundColor: "var(--room-accent)" }}>
-          {finishLabel}
-        </Button>
-      </div>
     </div>
   );
 }
