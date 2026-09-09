@@ -99,13 +99,13 @@ const CARDS: ShelfCard[] = [
   {
     id: "booth",
     name: "Photo Booth",
-    blurb: "Catch the face they made. Four frames, both cameras, kept only if you both say so.",
+    blurb: "Catch the face they made. One framed shot, both cameras, saved only to your own devices.",
     tag: "Keepsake",
-    minutes: "≈ 5 min",
+    minutes: "≈ 1 min",
     glyph: "📸",
     grad: "radial-gradient(120% 120% at 50% 100%, #3a2c15 0%, #14100a 70%)",
-    soon: true,
-    detail: "A countdown, four frames from each side, then a strip for the room's shelf. Either of you can bin it before it saves.",
+    detail:
+      "A synced 3-2-1 on both screens, then one framed keepsake with both your faces and the date. It saves straight to each of your devices — nothing is uploaded, nothing is kept by us. The four-frame strip is coming.",
   },
 ];
 
@@ -284,6 +284,25 @@ export function ActivityLobby({
                       >
                         Open the chaperon setup →
                       </button>
+                    )}
+
+                    {c.id === "booth" && (
+                      <div className="mt-3 flex flex-col items-start gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            window.dispatchEvent(new CustomEvent("dr:booth:capture"));
+                            setOpen(null);
+                          }}
+                          className="focus-ring rounded-full px-5 py-2 text-sm text-primary-foreground transition hover:opacity-90"
+                          style={{ backgroundColor: "var(--room-accent)" }}
+                        >
+                          Take the shot →
+                        </button>
+                        <p className="text-[11px] text-muted-foreground">
+                          The call needs to be running — the countdown lands on both screens.
+                        </p>
+                      </div>
                     )}
 
                     {c.soon && (
