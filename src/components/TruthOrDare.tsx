@@ -15,6 +15,7 @@ import {
   type TodKind,
 } from "@/lib/activities/truthOrDare";
 import { prefersReducedMotion } from "@/lib/stagecraft/cinematic";
+import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
 import { useTypewriter } from "@/lib/stagecraft/typewriter";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 
@@ -49,15 +50,18 @@ export function TruthOrDare() {
   const quietBtn = "rounded-full border-white/20 text-cream hover:bg-white/5";
 
   const tokensBar = (
-    <div className="flex justify-center gap-6 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-      <span>Tokens · you {myTokens}</span>
-      <span>·</span>
-      <span>{partnerName} {theirTokens}</span>
+    <div className="flex flex-col items-center gap-1.5">
+      <Scoreboard
+        label="Tokens"
+        entries={[
+          { name: "You", value: myTokens, accent: true },
+          { name: partnerName, value: theirTokens },
+        ]}
+      />
       {state.vault.length > 0 && (
-        <>
-          <span>·</span>
-          <span>Vault {state.vault.length}</span>
-        </>
+        <span className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+          Vault · {state.vault.length}
+        </span>
       )}
     </div>
   );
