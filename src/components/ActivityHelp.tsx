@@ -122,13 +122,16 @@ const ACTIVITY_HELP: Record<string, HelpContent> = {
   },
   truth_or_dare: {
     title: "Truth or Dare",
-    tagline: "Three cards each — a mix of truths and dares.",
+    tagline: "They deal. You deliver. Warm to Bare.",
     sections: [
-      { heading: "Needs both of you", bullets: ["One person deals once you're both in the room."] },
       { heading: "How to play", bullets: [
-        "Tap your card to flip it, then do the truth or dare.",
-        "Done moves to your next card.",
-        "You get 2 skips, and you can Trade your top card with your partner.",
+        "Your date chooses truth or dare for you. You never pick your own card.",
+        "The card appears; take it, double it for two tokens, or burn it (twice a night).",
+        "Say it out loud. Your date rules delivered or dodged.",
+        "The deck heats up: Warm, then Bold, then Bare. Six cards a night.",
+      ] },
+      { heading: "The vault", bullets: [
+        "Anything burned or dodged isn't gone. It comes back at the end of the night, and you talk about it.",
       ] },
     ],
   },
