@@ -1592,3 +1592,8 @@
   .dr-half, .dr-half--swell, .dr-half--tug-l, .dr-half--tug-r { transform: none; transition: none; }
   .dr-half--lit { animation: none; }
 }
+
+/* Closer — the breathing ring for the four minutes */
+.dr-breathe { animation: dr-breathe 6s ease-in-out infinite; }
+@keyframes dr-breathe { 50% { transform: scale(1.08); opacity: 0.75; } }
+@media (prefers-reduced-motion: reduce) { .dr-breathe { animation: none; } }

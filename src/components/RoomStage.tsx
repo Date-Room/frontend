@@ -121,7 +121,7 @@ const ITEM_TAGLINES: Record<string, string> = {
   bookshelf: "Books, links, things to watch.",
   questions: "Draft topics. The night escalates.",
   this_or_that: "Pick fast. Call theirs.",
-  the_36: "Three sets of twelve. Get closer.",
+  the_36: "The 36 questions, without the homework.",
   "2_truths": "Press one. Stake your call.",
   truth_or_dare: "They deal. You deliver. Warm to Bare.",
   one_has_to_go: "Cut one. Guess theirs. Defend it.",

@@ -67,12 +67,17 @@ const ACTIVITY_HELP: Record<string, HelpContent> = {
     ],
   },
   the_36: {
-    title: "The 36 Questions",
-    tagline: "Three sets that gradually build closeness.",
+    title: "Closer",
+    tagline: "The 36 questions, without the homework.",
     sections: [
       { heading: "How to play", bullets: [
-        "Work through the questions in order, together.",
-        "Each set goes a little deeper than the last.",
+        "Commit to a stretch of 3, 6 or 12 questions, never all 36. Every stretch ends on a real off-ramp; stopping saves your place.",
+        "You both answer each question out loud, in turns. Say \"That's my answer\" when you're done, and your date rules it: answered, half of it, or dodged it.",
+        "Each stretch you both keep one line you heard. The night can close on four minutes of silent eye contact.",
+      ] },
+      { heading: "Good to know", bullets: [
+        "The 90-second clock is a suggestion; it counts past zero and never cuts you off.",
+        "Set three goes to heavy places. Rulings are noticing, not scoring, and dodged questions come back at the end as worth returning to.",
       ] },
     ],
   },

@@ -7,7 +7,7 @@ import { WatchTogether } from "@/components/WatchTogether";
 import { ThisOrThat } from "@/components/ThisOrThat";
 import { DJ } from "@/components/DJ";
 import { QuestionDeck } from "@/components/QuestionDeck";
-import { The36 } from "@/components/The36";
+import { Closer } from "@/components/Closer";
 import { TwoTruths } from "@/components/TwoTruths";
 import { TruthOrDare } from "@/components/TruthOrDare";
 import { OneHasToGo } from "@/components/OneHasToGo";
@@ -44,7 +44,7 @@ const CATEGORIES: Category[] = [
     activities: [
       { id: "questions", label: "Open Book", tagline: "Draft topics. The night escalates.", ready: true },
       { id: "this_or_that", label: "This or That", tagline: "Pick fast. Call theirs.", ready: true },
-      { id: "the_36", label: "The 36", tagline: "Three sets of twelve. Get closer.", ready: true },
+      { id: "the_36", label: "Closer", tagline: "The 36 questions, without the homework.", ready: true },
       { id: "2_truths", label: "2 Truths and a Lie", tagline: "Press one. Stake your call.", ready: true },
       { id: "truth_or_dare", label: "Truth or Dare", tagline: "They deal. You deliver. Warm to Bare.", ready: true },
       { id: "one_has_to_go", label: "One Has To Go", tagline: "Cut one. Guess theirs. Defend it.", ready: true },
@@ -361,7 +361,7 @@ function ActivityView({ id, onLeave }: { id: string; onLeave: () => void }) {
     case "questions":
       return <QuestionDeck />;
     case "the_36":
-      return <The36 />;
+      return <Closer />;
     case "2_truths":
       return <TwoTruths />;
     case "truth_or_dare":

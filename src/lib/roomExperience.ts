@@ -52,7 +52,7 @@ export const CURATABLE_ACTIVITIES: CuratableActivityMeta[] = [
   { id: "dj", label: "Music / DJ", tagline: "Take turns picking the soundtrack.", emoji: "🎧", category: "music" },
   { id: "questions", label: "Open Book", tagline: "Draft topics. The night escalates.", emoji: "📖", category: "games" },
   { id: "this_or_that", label: "This or That", tagline: "Pick fast. Call theirs.", emoji: "⚖️", category: "games" },
-  { id: "the_36", label: "The 36", tagline: "Three sets of twelve. Get closer.", emoji: "🫶", category: "games" },
+  { id: "the_36", label: "Closer", tagline: "The 36 questions, without the homework.", emoji: "🫶", category: "games" },
   { id: "2_truths", label: "2 Truths and a Lie", tagline: "Press one. Stake your call.", emoji: "🎭", category: "games" },
   { id: "truth_or_dare", label: "Truth or Dare", tagline: "They deal. You deliver. Warm to Bare.", emoji: "🔥", category: "games" },
   { id: "one_has_to_go", label: "One Has To Go", tagline: "Cut one. Guess theirs. Defend it.", emoji: "🗑️", category: "games" },
