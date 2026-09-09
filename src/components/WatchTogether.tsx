@@ -35,6 +35,7 @@ import {
   syncWatchHistoryToAccount,
   type MediaItem,
 } from "@/lib/mediaLibrary";
+import { directVideoTitle, extractDirectVideoUrl, hlsSupported } from "@/lib/directVideo";
 import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/types/youtubeIframeApi";
 
 /**
@@ -99,6 +100,7 @@ export function WatchTogether() {
   const dTs = typeof durable?.timestamp_seconds === "number" ? (durable.timestamp_seconds as number) : 0;
   const lastController =
     typeof durable?.last_controller === "string" ? (durable.last_controller as string) : null;
+  const dSrcUrl = typeof durable?.src_url === "string" ? (durable.src_url as string) : null;
   const lastControllerRef = useRef(lastController);
   lastControllerRef.current = lastController;
 
@@ -237,6 +239,17 @@ export function WatchTogether() {
     return p.getPlayerState() === PS.PLAYING;
   }
 
+  function wDriftCorrect(ts: number, tolerance = 1.5) {
+    const localTime = wTime();
+    if (Math.abs(ts - localTime) <= tolerance) return;
+    suppress(2000);
+    try {
+      wSeek(ts);
+    } catch {
+      void 0;
+    }
+  }
+
   function driftCorrect(p: YoutubeIframeApiPlayer, ts: number, tolerance = 1.5) {
     const localTime = p.getCurrentTime?.() ?? 0;
     if (Math.abs(ts - localTime) <= tolerance) return;
@@ -251,22 +264,17 @@ export function WatchTogether() {
   // Near-perfect resume sync: both sides start playback on a shared instant.
   const schedulerRef = useRef<SyncScheduler | null>(null);
   const startPlaybackAt = useCallback((videoTime: number, asController: boolean) => {
-    const p = playerRef.current;
-    if (!p) return;
     isControllerRef.current = asController;
     suppress(2500);
     try {
-      p.seekTo?.(videoTime, true);
-      if (volumeRef.current > 0) {
-        p.unMute?.();
-        p.setVolume?.(volumeRef.current);
-      }
-      p.playVideo?.();
+      wSeek(videoTime);
+      wPlay();
     } catch {
       void 0;
     }
     setPlaying(true);
     setLivePlaying(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     const sched = new SyncScheduler(room.channel, "watch", userId);
@@ -286,6 +294,52 @@ export function WatchTogether() {
   // `playing` intent when autoplay is blocked or we're mid-catch-up.
   const [livePlaying, setLivePlaying] = useState<boolean>(false);
 
+  // Direct-link engine — a plain <video> for MP4/WebM/MOV (and native HLS)
+  // URLs; its currentTime/play/pause are the sync API, so the same shared
+  // protocol drives it. When a direct video is up, the YT player unmounts.
+  const [directUrl, setDirectUrl] = useState<string | null>(dSrcUrl);
+  const directActive = Boolean(directUrl);
+  const directActiveRef = useRef(directActive);
+  directActiveRef.current = directActive;
+  const directRef = useRef<HTMLVideoElement | null>(null);
+  const directUrlRef = useRef(directUrl);
+  directUrlRef.current = directUrl;
+
+  /* Engine facade — control paths dispatch to whichever engine owns the
+     current video. Plain functions over refs, safe inside stale closures. */
+  const wPlay = () => {
+    if (directActiveRef.current) {
+      const v = directRef.current;
+      if (!v) return;
+      if (volumeRef.current > 0) {
+        v.muted = false;
+        v.volume = volumeRef.current / 100;
+      }
+      void v.play().catch(() => setLivePlaying(false));
+    } else {
+      playerRef.current?.unMute?.();
+      playerRef.current?.playVideo?.();
+    }
+  };
+  const wPause = () => {
+    if (directActiveRef.current) directRef.current?.pause();
+    else playerRef.current?.pauseVideo?.();
+  };
+  const wSeek = (sec: number) => {
+    if (directActiveRef.current) {
+      const v = directRef.current;
+      if (v) v.currentTime = Math.max(0, sec);
+    } else playerRef.current?.seekTo?.(Math.max(0, sec), true);
+  };
+  const wTime = (): number =>
+    directActiveRef.current
+      ? (directRef.current?.currentTime ?? 0)
+      : (playerRef.current?.getCurrentTime?.() ?? 0);
+  const wIsPlaying = (): boolean =>
+    directActiveRef.current
+      ? Boolean(directRef.current && !directRef.current.paused)
+      : playerIsPlaying(playerRef.current);
+
   // Volume is per-viewer (not shared), persisted locally. Player starts muted
   // for autoplay-sync; touching volume (a user gesture) unmutes it.
   const [volume, setVolume] = useState(() => {
@@ -303,6 +357,11 @@ export function WatchTogether() {
       localStorage.setItem("dr:watch:volume", String(volume));
     } catch {
       void 0;
+    }
+    const dv = directRef.current;
+    if (dv) {
+      dv.volume = volume / 100;
+      dv.muted = volume === 0;
     }
     const p = playerRef.current;
     if (!p) return;
@@ -374,10 +433,19 @@ export function WatchTogether() {
   }, []);
 
   function persistWatch(
-    next: { video_id: string | null; playing: boolean; timestamp_seconds: number },
+    next: {
+      video_id: string | null;
+      playing: boolean;
+      timestamp_seconds: number;
+      src_url?: string | null;
+    },
     recapEvent?: { event_type: string; payload?: Record<string, unknown> },
   ) {
-    void session?.persist({ ...next, last_controller: userId }, recapEvent);
+    // Default src_url to the live one — play/pause/seek writes must not
+    // silently clear a direct video for the partner. Loading a YouTube
+    // video (or stopping) passes src_url: null explicitly.
+    const src_url = next.src_url !== undefined ? next.src_url : directUrlRef.current;
+    void session?.persist({ ...next, src_url, last_controller: userId }, recapEvent);
   }
 
   // Mirror durable state for late-joiners / refreshes (source of truth when the
@@ -387,6 +455,10 @@ export function WatchTogether() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dVideo]);
   useEffect(() => {
+    if (dSrcUrl !== directUrl) setDirectUrl(dSrcUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dSrcUrl]);
+  useEffect(() => {
     if (dPlaying === playing) return;
     // Ignore stale durable pauses while we're the active controller and still playing.
     if (lastController === userId && playing && !dPlaying) return;
@@ -394,7 +466,7 @@ export function WatchTogether() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dPlaying, lastController, userId]);
 
-  const shouldMount = Boolean(videoId);
+  const shouldMount = Boolean(videoId) && !directActive;
   const weLeadPlayback = lastController === userId || lastController === null;
   const weLeadPlaybackRef = useRef(weLeadPlayback);
   weLeadPlaybackRef.current = weLeadPlayback;
@@ -529,21 +601,20 @@ export function WatchTogether() {
   // seek to their durable timestamp so we jump straight into sync — this is what
   // the old "tap to sync & catch up" button did, now fully automatic.
   useEffect(() => {
-    const p = playerRef.current;
-    if (!p || isSuppressed()) return;
+    if (isSuppressed()) return;
     try {
       if (playing) {
-        if (!playerIsPlaying(p)) {
+        if (!wIsPlaying()) {
           suppress(1500);
           if (lastController !== userId) {
             const target = dTsRef.current;
-            if (target > 0) p.seekTo?.(target, true);
+            if (target > 0) wSeek(target);
           }
-          p.playVideo?.();
+          wPlay();
         }
-      } else if (playerIsPlaying(p)) {
+      } else if (wIsPlaying()) {
         suppress(500);
-        p.pauseVideo?.();
+        wPause();
       }
     } catch {
       void 0;
@@ -551,16 +622,34 @@ export function WatchTogether() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing]);
 
+  // Direct video: when the element (re)mounts for a URL, catch up to the
+  // shared position and honour the synced playing state. Autoplay may be
+  // blocked before a first gesture; the bar's play button recovers.
+  useEffect(() => {
+    const v = directRef.current;
+    if (!v || !directUrl) return;
+    suppress(2500);
+    const onLoaded = () => {
+      if (dTsRef.current > 0) v.currentTime = dTsRef.current;
+      if (playingRef.current) {
+        void v.play().catch(() => setLivePlaying(false));
+      }
+    };
+    v.muted = volumeRef.current === 0;
+    v.volume = volumeRef.current / 100;
+    v.addEventListener("loadedmetadata", onLoaded);
+    setVideoTitle(directVideoTitle(directUrl));
+    return () => v.removeEventListener("loadedmetadata", onLoaded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [directUrl]);
+
   // Heartbeat: controller emits a `tick` every 2s for drift correction.
   useEffect(() => {
     if (!playing) return;
     const id = setInterval(() => {
-      const p = playerRef.current;
-      if (!p?.getPlayerState || !window.YT) return;
       if (!isControllerRef.current) return;
-      if (p.getPlayerState() === window.YT.PlayerState.PLAYING) {
-        const t = p.getCurrentTime?.() ?? 0;
-        void session?.sendEvent("tick", { timestamp_seconds: t });
+      if (wIsPlaying()) {
+        void session?.sendEvent("tick", { timestamp_seconds: wTime() });
       }
     }, 2000);
     return () => clearInterval(id);
@@ -577,7 +666,23 @@ export function WatchTogether() {
 
       if (e.type === "load") {
         const v = typeof e.payload.video_id === "string" ? e.payload.video_id : null;
+        const su = typeof e.payload.src_url === "string" ? e.payload.src_url : null;
         const ts = typeof e.payload.timestamp_seconds === "number" ? e.payload.timestamp_seconds : 0;
+        if (su) {
+          // Partner queued a direct video.
+          suppress(5000);
+          setDirectUrl(su);
+          setVideoId(null);
+          setPlaying(true);
+          if (room.canPersist) {
+            persistWatch(
+              { video_id: null, src_url: su, playing: true, timestamp_seconds: ts },
+              { event_type: "queued_video", payload: { text: directVideoTitle(su) } },
+            );
+          }
+          return;
+        }
+        setDirectUrl(null);
         if (v && v === videoId && p) {
           suppress(3000);
           setPlaying(true);
@@ -593,7 +698,7 @@ export function WatchTogether() {
         // need durable writes (they fire many times a second).
         if (room.canPersist) {
           persistWatch(
-            { video_id: v, playing: true, timestamp_seconds: ts },
+            { video_id: v, src_url: null, playing: true, timestamp_seconds: ts },
             v ? { event_type: "queued_video", payload: { text: `youtu.be/${v}` } } : undefined,
           );
         }
@@ -601,54 +706,64 @@ export function WatchTogether() {
       }
       if (e.type === "play") {
         const leader = lastControllerRef.current === userId;
-        if (leader && videoId && playerIsPlaying(p ?? null)) {
-          if (p && ts != null) driftCorrect(p, ts);
+        if (leader && (videoId || directActiveRef.current) && wIsPlaying()) {
+          if (ts != null) wDriftCorrect(ts);
           return;
         }
         setPlaying(true);
-        if (p?.playVideo) {
-          suppress(5000);
-          try {
-            if (ts != null) driftCorrect(p, ts, 0.5);
-            if (!playerIsPlaying(p)) p.playVideo();
-          } catch {
-            void 0;
-          }
+        suppress(5000);
+        try {
+          if (ts != null) wDriftCorrect(ts, 0.5);
+          if (!wIsPlaying()) wPlay();
+        } catch {
+          void 0;
         }
       } else if (e.type === "pause") {
         const leader = lastControllerRef.current === userId;
-        if (leader && videoId && playerIsPlaying(p ?? null)) {
+        if (leader && (videoId || directActiveRef.current) && wIsPlaying()) {
           return;
         }
         setPlaying(false);
-        if (p?.pauseVideo) {
-          suppress(2000);
-          try {
-            p.pauseVideo();
-            if (ts != null) driftCorrect(p, ts, 0.5);
-          } catch {
-            void 0;
-          }
+        suppress(2000);
+        try {
+          wPause();
+          if (ts != null) wDriftCorrect(ts, 0.5);
+        } catch {
+          void 0;
         }
       } else if (e.type === "seek" || e.type === "tick") {
-        if (p?.getCurrentTime && ts != null) {
-          driftCorrect(p, ts);
-        }
+        if (ts != null) wDriftCorrect(ts);
       }
     });
   }, [session, userId, videoId, room.canPersist]);
 
   function queueVideo(id: string, sourceUrl?: string) {
     isControllerRef.current = true;
+    setDirectUrl(null);
     setVideoId(id);
     setPlaying(true);
     void session?.sendEvent("load", { video_id: id, timestamp_seconds: 0 });
     persistWatch(
-      { video_id: id, playing: true, timestamp_seconds: 0 },
+      { video_id: id, src_url: null, playing: true, timestamp_seconds: 0 },
       { event_type: "queued_video", payload: { text: `youtu.be/${id}` } },
     );
     setHistory(addWatchHistory(sourceUrl ?? youtubeWatchUrl(id), id));
     void syncWatchHistoryToAccount(remoteItemsRef.current);
+  }
+
+  // Direct videos are deliberately NOT written to history or the account
+  // shelf — a personal clip stays between the two of you.
+  function queueDirect(u: string) {
+    isControllerRef.current = true;
+    setVideoId(null);
+    setDirectUrl(u);
+    setPlaying(true);
+    setVideoTitle(directVideoTitle(u));
+    void session?.sendEvent("load", { video_id: null, src_url: u, timestamp_seconds: 0 });
+    persistWatch(
+      { video_id: null, src_url: u, playing: true, timestamp_seconds: 0 },
+      { event_type: "queued_video", payload: { text: directVideoTitle(u) } },
+    );
   }
 
   const submit = (e: React.FormEvent) => {
@@ -656,12 +771,22 @@ export function WatchTogether() {
     const trimmed = url.trim();
     if (!trimmed) return;
     const id = extractId(trimmed);
-    if (!id) {
-      toast.error("That doesn't look like a YouTube link.");
+    if (id) {
+      queueVideo(id, trimmed);
+      setUrl("");
       return;
     }
-    queueVideo(id, trimmed);
-    setUrl("");
+    const direct = extractDirectVideoUrl(trimmed);
+    if (direct) {
+      queueDirect(direct);
+      setUrl("");
+      return;
+    }
+    toast.error(
+      /\.m3u8/i.test(trimmed) && !hlsSupported()
+        ? "This browser can't play HLS streams natively. A plain .mp4 link works everywhere."
+        : "That doesn't look like a YouTube link or a video file link.",
+    );
   };
 
   const playFromHistory = (entry: WatchHistoryEntry) => {
@@ -671,11 +796,10 @@ export function WatchTogether() {
   // DateRoom-driven play/pause (the iframe's own controls are off). Broadcasts
   // + persists so the partner stays in sync.
   const togglePlayback = () => {
-    const p = playerRef.current;
-    if (!p || !videoId) return;
+    if (!videoId && !directActive) return;
     const next = !livePlaying;
     isControllerRef.current = true;
-    const time = p.getCurrentTime?.() ?? 0;
+    const time = wTime();
     if (next) {
       // Resume = shared future instant so both sides start together. The peer
       // gets a sync_start; we start locally after the same lead. Falls back to
@@ -695,7 +819,7 @@ export function WatchTogether() {
       // Pause immediately; the partner pauses + seeks to this exact frame.
       suppress(600);
       try {
-        p.pauseVideo?.();
+        wPause();
       } catch {
         void 0;
       }
@@ -706,25 +830,24 @@ export function WatchTogether() {
   };
 
   const stopVideo = () => {
-    const p = playerRef.current;
     suppress(400);
     try {
-      p?.pauseVideo?.();
+      wPause();
     } catch {
       void 0;
     }
     void session?.sendEvent("pause", { timestamp_seconds: 0 });
     setPlaying(false);
     setVideoId(null);
-    persistWatch({ video_id: null, playing: false, timestamp_seconds: 0 });
+    setDirectUrl(null);
+    persistWatch({ video_id: null, src_url: null, playing: false, timestamp_seconds: 0 });
   };
 
   const seekTo = (t: number) => {
-    const p = playerRef.current;
     const target = Math.max(0, t);
     suppress(1500);
     try {
-      p?.seekTo?.(target, true);
+      wSeek(target);
     } catch {
       void 0;
     }
@@ -733,26 +856,33 @@ export function WatchTogether() {
     setPosition(target);
   };
   const seekBy = (delta: number) => {
-    const p = playerRef.current;
-    seekTo((p?.getCurrentTime?.() ?? position) + delta);
+    seekTo(wTime() + delta || position + delta);
   };
   const seekFraction = (f: number) => {
     const p = playerRef.current as (YoutubeIframeApiPlayer & { getDuration?: () => number }) | null;
-    const d = duration || p?.getDuration?.() || 0;
+    const d = duration || (directActive ? directRef.current?.duration ?? 0 : p?.getDuration?.() || 0);
     if (d) seekTo(f * d);
   };
 
   // Position / duration for the control-bar progress.
   useEffect(() => {
-    if (!videoId) {
+    if (!videoId && !directUrl) {
       setPosition(0);
       setDuration(0);
       return;
     }
     const id = setInterval(() => {
-      const p = playerRef.current as (YoutubeIframeApiPlayer & { getDuration?: () => number }) | null;
-      if (!p?.getCurrentTime) return;
       try {
+        if (directActiveRef.current) {
+          const v = directRef.current;
+          if (!v) return;
+          setPosition(v.currentTime ?? 0);
+          if (Number.isFinite(v.duration) && v.duration > 0) setDuration(v.duration);
+          setLivePlaying(!v.paused);
+          return;
+        }
+        const p = playerRef.current as (YoutubeIframeApiPlayer & { getDuration?: () => number }) | null;
+        if (!p?.getCurrentTime) return;
         setPosition(p.getCurrentTime() ?? 0);
         const d = p.getDuration?.() ?? 0;
         if (d) setDuration(d);
@@ -761,7 +891,7 @@ export function WatchTogether() {
       }
     }, 500);
     return () => clearInterval(id);
-  }, [videoId]);
+  }, [videoId, directUrl]);
 
   const pct = duration > 0 ? Math.min(100, (position / duration) * 100) : 0;
 
@@ -786,13 +916,17 @@ export function WatchTogether() {
         />
       </button>
       <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-1.5 pr-12">
-        <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-black">
-          {/* eslint-disable-next-line jsx-a11y/alt-text */}
-          <img
-            src={`https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`}
-            className="h-full w-full object-cover"
-            onError={(e) => (e.currentTarget.style.display = "none")}
-          />
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black text-base">
+          {videoId ? (
+            /* eslint-disable-next-line jsx-a11y/alt-text */
+            <img
+              src={`https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`}
+              className="h-full w-full object-cover"
+              onError={(e) => (e.currentTarget.style.display = "none")}
+            />
+          ) : (
+            <span aria-hidden>🎬</span>
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-cream">{videoTitle ?? "Watching"}</p>
@@ -967,12 +1101,36 @@ export function WatchTogether() {
                 className="absolute inset-0 overflow-hidden [&_iframe]:!absolute [&_iframe]:!inset-0 [&_iframe]:!h-full [&_iframe]:!w-full"
               />
             )}
+            {directUrl && (
+              /* Direct link — a native element, driven by the shared controls
+                 (no native chrome, same as the YT player). */
+              <video
+                key={directUrl}
+                ref={directRef}
+                src={directUrl}
+                playsInline
+                preload="metadata"
+                className="absolute inset-0 h-full w-full bg-black object-contain"
+                onClick={togglePlayback}
+                onPlay={() => setLivePlaying(true)}
+                onPause={() => setLivePlaying(false)}
+                onEnded={() => {
+                  setPlaying(false);
+                  persistWatch({ video_id: null, playing: false, timestamp_seconds: 0 });
+                }}
+                onError={() => toast.error("That video link couldn't be played.")}
+              />
+            )}
             {/* No shield — the user can click the video directly to play/pause.
                 YouTube's onStateChange reports that interaction and we sync it to
                 the partner just like the bottom-bar controls. */}
-            {!videoId && (
+            {!videoId && !directUrl && (
               <div className="absolute inset-0">
-                <EmptyState variant="watch" title="Watch" subtitle="Paste a YouTube link above to begin." />
+                <EmptyState
+                  variant="watch"
+                  title="Watch"
+                  subtitle="Paste a YouTube link — or a direct video file link (.mp4), for something of your own."
+                />
               </div>
             )}
           </div>
@@ -980,7 +1138,7 @@ export function WatchTogether() {
 
         {/* In fullscreen the bar rides inside this layer (an inline flex child)
             so it isn't clipped away with the rest of the page. */}
-        {fullscreen && videoId && (
+        {fullscreen && (videoId || directUrl) && (
           <div className="relative w-full shrink-0 border-t border-white/10 bg-card/70 backdrop-blur-sm">
             {barInner}
           </div>
@@ -992,7 +1150,7 @@ export function WatchTogether() {
           where the bar moves inside the fullscreen layer above). Portalled to
           <body> so the stage's transform/overflow doesn't trap the fixed
           positioning. */}
-      {videoId &&
+      {(videoId || directUrl) &&
         !fullscreen &&
         createPortal(
           <div
