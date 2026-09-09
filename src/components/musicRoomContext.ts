@@ -33,6 +33,8 @@ export type MusicCtxValue = {
   enableAudio: () => void;
   reactions: Reaction[];
   playId: (id: string) => void;
+  /** Queue a SoundCloud track by its soundcloud.com URL. */
+  playScUrl: (url: string) => void;
   playTrack: (id: string) => void;
   togglePlayPause: () => void;
   restartCurrent: () => void;
