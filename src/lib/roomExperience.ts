@@ -101,6 +101,13 @@ export function resolveCuratedActivities(
   pkg: RoomPackage,
   curated: CuratableActivityId[] | null | undefined,
 ): CuratableActivityId[] {
+  // Subscription (Together / Crew) rooms are permanent: the tier IS the
+  // entitlement, and a curated list stored at creation would freeze the menu
+  // forever — rooms made before a game shipped would never see it
+  // (live-tested: a Together room showed only the old games).
+  if (isSubscriptionPackage(pkg)) {
+    return availableActivityIdsForPackage(pkg);
+  }
   const allowed = new Set(availableActivityIdsForPackage(pkg));
   if (!curated?.length) {
     return availableActivityIdsForPackage(pkg);
