@@ -1,517 +1,473 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Bookmark, BookmarkCheck, PenLine, Repeat2, X } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useReducedActivity } from "@/lib/activities/useReducedActivity";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { Textarea } from "@/components/ui/textarea";
-import { getQuestions, getReactions, getLimits } from "@/lib/catalogRuntime";
-import { useRoomSession } from "@/context/RoomSessionContext";
-import { useActivitySession } from "@/hooks/useActivitySession";
-import { cn } from "@/lib/utils";
+  OB_PASSES,
+  OB_REACTIONS,
+  OB_TOPICS,
+  OB_WRITE_MAX,
+  OB_WRITE_MIN,
+  buildObDeck,
+  initialObState,
+  obFromJson,
+  obSlots,
+  obTopic,
+  reduceOb,
+  rollTopicQuestions,
+} from "@/lib/activities/openBook";
+import { useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
+import { GameLanding } from "@/lib/stagecraft/GameLanding";
+import { useTypewriter } from "@/lib/stagecraft/typewriter";
+import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 
-const CUSTOM_INDEX_BASE = 1_000_000;
+/**
+ * Open Book (activity id "questions") — draft topics, not questions. See
+ * lib/activities/openBook.ts for the rules. This component keeps the old
+ * QuestionDeck name/file so the launcher wiring stays untouched.
+ */
 
-type DeckState = {
-  hands: Record<string, number[]>;
-  next_index: number;
-  revisit: number[];
-  trade: { proposer: string; offered: number; at: string } | null;
-  skips: Record<string, number>;
-  customs: Record<string, { text: string; by: string }>;
-  customs_used: Record<string, number>;
+const DEAL_STEPS: CinematicStep[] = [
+  { id: "shuffle", at: 0 },
+  { id: "bins", at: 1000 },
+  { id: "card", at: 2600 },
+];
+
+const HEAT_STYLE: Record<string, string> = {
+  Warm: "text-muted-foreground",
+  Real: "text-amber-300",
+  Close: "text-rose",
 };
 
-type FloatingEmoji = { id: number; emoji: string };
-
-function emptyState(): DeckState {
-  return {
-    hands: {},
-    next_index: 6,
-    revisit: [],
-    trade: null,
-    skips: {},
-    customs: {},
-    customs_used: {},
-  };
-}
-
-function hydrateState(raw: Record<string, unknown> | null): DeckState {
-  if (!raw) return emptyState();
-  return {
-    hands: (raw.hands ?? {}) as Record<string, number[]>,
-    next_index: typeof raw.next_index === "number" ? raw.next_index : 6,
-    revisit: Array.isArray(raw.revisit) ? raw.revisit : [],
-    trade: raw.trade as DeckState["trade"] ?? null,
-    skips: (raw.skips ?? {}) as Record<string, number>,
-    customs: (raw.customs ?? {}) as Record<string, { text: string; by: string }>,
-    customs_used: (raw.customs_used ?? {}) as Record<string, number>,
-  };
-}
-
-function resolveText(
-  pool: string[],
-  idx: number,
-  customs: Record<string, { text: string; by: string }>,
-): string {
-  if (idx >= CUSTOM_INDEX_BASE) {
-    const entry = customs[String(idx)];
-    if (entry) return entry.text;
-  }
-  if (pool.length === 0) return "…";
-  return pool[idx % pool.length];
-}
-
 export function QuestionDeck() {
-  const room = useRoomSession();
-  const me = room.senderId;
-  const { session, state: durable, ready } = useActivitySession("questions");
-  const pool = useMemo(() => getQuestions(), []);
-  const limits = useMemo(() => getLimits(), []);
-  const reactions = useMemo(() => [...getReactions()], []);
+  const { state, emit, senderId } = useReducedActivity(
+    "questions",
+    initialObState,
+    obFromJson,
+    reduceOb,
+  );
+  const partnerName = usePartnerName();
+  const [draftText, setDraftText] = useState("");
+  const [binPick, setBinPick] = useState<string | null>(null);
+  const [swapPick, setSwapPick] = useState<string | null>(null);
 
-  const [state, setState] = useState<DeckState>(emptyState);
-  const stateRef = useRef(state);
-  stateRef.current = state;
-  const seeded = useRef(false);
+  const accentBtn = "rounded-full text-primary-foreground transition hover:opacity-90 disabled:opacity-50";
+  const accentStyle = { backgroundColor: "var(--room-accent)" } as const;
+  const quietBtn = "rounded-full border-white/20 text-cream hover:bg-white/5";
 
-  const [floats, setFloats] = useState<FloatingEmoji[]>([]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [customOpen, setCustomOpen] = useState(false);
-  const [customDraft, setCustomDraft] = useState("");
-  const [customError, setCustomError] = useState<string | null>(null);
+  const playing = state.phase === "play";
+  const { stage, witnessed } = useCinematic(playing, DEAL_STEPS);
+  const dealRank = playing ? (witnessed ? { shuffle: 0, bins: 1, card: 2 }[stage ?? "shuffle"] ?? 0 : 2) : -1;
 
-  // Seed from persisted state, or from empty once hydration resolves (new room)
-  useEffect(() => {
-    if (seeded.current) return;
-    if (!ready) return;
-    const init = durable ? hydrateState(durable) : emptyState();
-    stateRef.current = init;
-    setState(init);
-    seeded.current = true;
-  }, [durable, ready]);
+  const deck = state.phase === "play" || state.phase === "done" ? buildObDeck(state) : [];
+  const card = deck[Math.min(state.card, Math.max(deck.length - 1, 0))];
+  const onCard = playing && dealRank >= 2 && card != null;
+  const typed = useTypewriter(card?.q ?? "", onCard || state.phase === "done");
 
-  // Deal initial hand if we don't have one yet
-  useEffect(() => {
-    if (!seeded.current) return;
-    const s = stateRef.current;
-    if (s.hands[me] && s.hands[me].length > 0) return;
-    const others = Object.keys(s.hands);
-    const taken = new Set(others.flatMap((k) => s.hands[k] ?? []));
-    let nextIdx = s.next_index;
-    const hand: number[] = [];
-    for (let i = 0; hand.length < 3 && i < 100; i++) {
-      if (!taken.has(nextIdx)) hand.push(nextIdx);
-      else hand.push(nextIdx);
-      nextIdx++;
-    }
-    const next: DeckState = {
-      ...s,
-      hands: { ...s.hands, [me]: hand },
-      next_index: nextIdx,
-    };
-    stateRef.current = next;
-    setState(next);
-    persist(next);
-  }, [seeded.current, me]); // eslint-disable-line react-hooks/exhaustive-deps
+  const slots = obSlots(state.target);
+  const starterTurn = state.claims.length % 2 === 0;
+  const iAmStarter = state.starter_id === senderId;
+  const myTurn = state.phase === "draft" && (starterTurn ? iAmStarter : !iAmStarter);
+  const iWrote = senderId in state.writes;
+  const iVetoed = senderId in state.vetoes;
+  const myVeto = state.vetoes[senderId];
+  const theirVeto = Object.entries(state.vetoes).find(([uid]) => uid !== senderId)?.[1];
 
-  // Listen for state_sync events from the other side
-  useEffect(() => {
-    if (!session) return;
-    return session.onEvent((e) => {
-      if (e.type === "state_sync" && e.userId !== me) {
-        const synced = hydrateState(e.payload as Record<string, unknown>);
-        // Merge: keep our own hand if it exists, take their updates
-        const merged: DeckState = {
-          ...synced,
-          hands: { ...synced.hands, ...(stateRef.current.hands[me] ? { [me]: stateRef.current.hands[me] } : {}) },
-        };
-        // Accept trade-related changes fully from syncer
-        if (synced.trade !== undefined) merged.trade = synced.trade;
-        stateRef.current = merged;
-        setState(merged);
-      }
-    });
-  }, [session, me]);
+  const claimTopic = (id: string) => {
+    const t = obTopic(id);
+    if (!t || !myTurn) return;
+    emit(
+      "claim",
+      { topic: id, q: rollTopicQuestions(t, state.seen[id] ?? []) },
+      { event_type: "claimed", payload: { text: `claimed ${t.name}` } },
+    );
+  };
 
-  // Listen for reactions
-  useEffect(() => {
-    if (!session) return;
-    return session.onReaction((r) => {
-      if (r.from === me) return;
-      spawnFloat(r.kind);
-    });
-  }, [session, me]);
+  const confirmVeto = () => {
+    if (!binPick || !swapPick) return;
+    const t = obTopic(swapPick);
+    if (!t) return;
+    emit("veto", { binned: binPick, swap: swapPick, q: rollTopicQuestions(t, state.seen[swapPick] ?? []) });
+    setBinPick(null);
+    setSwapPick(null);
+  };
 
-  function persist(s: DeckState) {
-    void session?.persist(s as unknown as Record<string, unknown>);
-  }
-
-  function sync(s: DeckState) {
-    stateRef.current = s;
-    setState(s);
-    persist(s);
-    void session?.sendEvent("state_sync", s as unknown as Record<string, unknown>);
-  }
-
-  function spawnFloat(emoji: string) {
-    const id = Date.now() + Math.random();
-    setFloats((f) => [...f, { id, emoji }]);
-    window.setTimeout(() => setFloats((f) => f.filter((x) => x.id !== id)), 2200);
-  }
-
-  function sendReaction(emoji: string) {
-    if (emoji === "🤔") {
-      const s = stateRef.current;
-      const hand = s.hands[me] ?? [];
-      const cur = hand[0];
-      if (cur != null && !s.revisit.includes(cur)) {
-        sync({ ...s, revisit: [...s.revisit, cur] });
-      }
-      return;
-    }
-    spawnFloat(emoji);
-    void session?.sendReaction(emoji);
-  }
-
-  function handleAnswered() {
-    const s = stateRef.current;
-    const hand = s.hands[me] ?? [];
-    const drawn = s.next_index;
-    const newHand = [hand[1], hand[2], drawn].filter((v) => v != null) as number[];
-    sync({
-      ...s,
-      hands: { ...s.hands, [me]: newHand },
-      next_index: drawn + 1,
-    });
-  }
-
-  function handleSkip() {
-    const s = stateRef.current;
-    const skipsUsed = s.skips[me] ?? 0;
-    if (skipsUsed >= limits.skipLimit) return;
-    const hand = s.hands[me] ?? [];
-    const drawn = s.next_index;
-    const newHand = [hand[1], hand[2], drawn].filter((v) => v != null) as number[];
-    sync({
-      ...s,
-      hands: { ...s.hands, [me]: newHand },
-      next_index: drawn + 1,
-      skips: { ...s.skips, [me]: skipsUsed + 1 },
-    });
-  }
-
-  function proposeTrade() {
-    const s = stateRef.current;
-    if (s.trade) return;
-    const hand = s.hands[me] ?? [];
-    sync({
-      ...s,
-      trade: { proposer: me, offered: hand[0], at: new Date().toISOString() },
-    });
-  }
-
-  function declineTrade() {
-    sync({ ...stateRef.current, trade: null });
-  }
-
-  function acceptTradeWith(slotIndex: number) {
-    const s = stateRef.current;
-    if (!s.trade) return;
-    const myHand = [...(s.hands[me] ?? [])];
-    const myCard = myHand[slotIndex];
-    myHand[slotIndex] = s.trade.offered;
-    const proposerHand = [...(s.hands[s.trade.proposer] ?? [])];
-    proposerHand[0] = myCard;
-    sync({
-      ...s,
-      hands: { ...s.hands, [me]: myHand, [s.trade.proposer]: proposerHand },
-      trade: null,
-    });
-  }
-
-  function bringBack(qIdx: number) {
-    const s = stateRef.current;
-    const hand = s.hands[me] ?? [];
-    const newHand = [qIdx, hand[1], hand[2]].filter((v) => v != null) as number[];
-    sync({ ...s, hands: { ...s.hands, [me]: newHand } });
-    setDrawerOpen(false);
-  }
-
-  function submitCustomQuestion() {
-    const text = customDraft.trim();
-    if (!text) { setCustomError("Type something first."); return; }
-    if (text.length > 240) { setCustomError("Keep it under 240 characters."); return; }
-    const s = stateRef.current;
-    const used = s.customs_used[me] ?? 0;
-    if (used >= limits.customQuestionLimit) {
-      setCustomError(`You've used all ${limits.customQuestionLimit}.`);
-      return;
-    }
-    const customId = CUSTOM_INDEX_BASE + Date.now();
-    const otherIds = Object.keys(s.hands).filter((k) => k !== me);
-    const otherId = otherIds[0];
-    if (!otherId) { setCustomError("No partner in the room yet."); return; }
-    const otherHand = [...(s.hands[otherId] ?? [])];
-    const newOtherHand = [customId, otherHand[1], otherHand[2]].filter((v) => v != null) as number[];
-    sync({
-      ...s,
-      hands: { ...s.hands, [otherId]: newOtherHand },
-      customs: { ...s.customs, [String(customId)]: { text, by: me } },
-      customs_used: { ...s.customs_used, [me]: used + 1 },
-    });
-    setCustomDraft("");
-    setCustomError(null);
-    setCustomOpen(false);
-  }
-
-  // Derived
-  const myHand = state.hands[me] ?? [];
-  const current = myHand[0] ?? 0;
-  const upcoming = myHand.slice(1, 3);
-  const skipsUsed = state.skips[me] ?? 0;
-  const skipsLeft = Math.max(0, limits.skipLimit - skipsUsed);
-  const customsUsed = state.customs_used[me] ?? 0;
-  const customLeft = Math.max(0, limits.customQuestionLimit - customsUsed);
-  const incomingTrade = state.trade && state.trade.proposer !== me;
-  const outgoingTrade = state.trade && state.trade.proposer === me;
-
-  const otherIds = Object.keys(state.hands).filter((k) => k !== me);
-  const proposerName = state.trade
-    ? (otherIds[0] ? "Your partner" : "Someone")
-    : "";
-
-  const isCustomFromOther = current >= CUSTOM_INDEX_BASE && state.customs[String(current)]?.by !== me;
-  const customAuthor = isCustomFromOther ? "your partner" : null;
-
-  if (!seeded.current) {
+  // ── Landing / setup ──
+  if (state.phase === "setup") {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-        warming the deck…
-      </div>
+      <GameLanding
+        title="Open Book"
+        promise="No lists to scroll. You draft topics, each one deals three questions, and the night escalates from warm to close."
+        minutes="≈ 45–60 min"
+        beats={[
+          "Take turns claiming topics. Each topic asks three questions: an opener, a specific, a costly one.",
+          `You each write one question of your own. It replaces a card, and it buys you a veto of one topic ${partnerName} chose.`,
+          "One card at a time, out loud. React, answer, or pass (twice a night). Everything survives to the recap.",
+        ]}
+      >
+        <div className="flex gap-3">
+          {[15, 21].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => emit("choose_length", { target: n })}
+              className="focus-ring flex flex-col items-center gap-0.5 rounded-2xl border border-white/15 px-6 py-3 transition hover:border-primary/50 hover:bg-white/[0.04]"
+            >
+              <span className="font-serif text-2xl text-cream">{n}</span>
+              <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                {n / 3} topics · {n === 15 ? "≈ 45 min" : "the long way round"}
+              </span>
+            </button>
+          ))}
+        </div>
+        <p className="text-[11px] text-muted-foreground">Whoever picks the length drafts first.</p>
+      </GameLanding>
     );
   }
 
-  return (
-    <div className="flex h-full flex-col gap-5 overflow-y-auto p-5 sm:p-6">
-      {/* Top actions: custom question + revisit */}
-      <div className="flex items-center justify-between gap-2">
-        <Sheet open={customOpen} onOpenChange={setCustomOpen}>
-          <SheetTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => { setCustomError(null); setCustomDraft(""); setCustomOpen(true); }}
-              disabled={customLeft <= 0}
-              className="rounded-full border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-50"
-            >
-              <PenLine className="w-3.5 h-3.5 mr-1.5" />
-              Write your own ({customLeft})
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="bg-card border-border">
-            <SheetHeader>
-              <SheetTitle className="font-serif text-cream">Write a question for them</SheetTitle>
-            </SheetHeader>
-            <div className="mt-4 space-y-3">
-              <Textarea
-                value={customDraft}
-                onChange={(e) => setCustomDraft(e.target.value)}
-                placeholder="Type the question you want them to answer…"
-                rows={3}
-                maxLength={240}
-                className="bg-secondary border-border"
-              />
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{Math.max(0, customLeft - 1)} more after this one</span>
-                <span>{customDraft.length}/240</span>
-              </div>
-              {customError && <p className="text-rose text-sm">{customError}</p>}
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setCustomOpen(false)} className="rounded-full">Cancel</Button>
-                <Button
-                  onClick={submitCustomQuestion}
-                  disabled={!customDraft.trim() || customLeft <= 0}
-                  className="rounded-full text-primary-foreground hover:opacity-90"
-                  style={{ backgroundColor: "var(--room-accent)" }}
-                >
-                  Send to them
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                It'll replace their current card. They'll see it's from you.
-              </p>
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="sm" className="rounded-full">
-              <Bookmark className="w-3.5 h-3.5 mr-1.5" />
-              Revisit ({state.revisit.length})
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="bg-card border-border">
-            <SheetHeader>
-              <SheetTitle className="font-serif text-cream">Saved to revisit</SheetTitle>
-            </SheetHeader>
-            <div className="mt-6 space-y-3 overflow-y-auto max-h-[calc(100vh-8rem)]">
-              {state.revisit.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Tap 🤔 on a question to save it for later.
-                </p>
-              )}
-              {state.revisit.map((qIdx) => (
-                <div key={qIdx} className="flex flex-col gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
-                  <p className="font-serif italic text-cream leading-snug">
-                    "{resolveText(pool, qIdx, state.customs)}"
-                  </p>
-                  <Button
-                    size="sm"
-                    onClick={() => bringBack(qIdx)}
-                    className="self-start rounded-full text-primary-foreground hover:opacity-90"
-                    style={{ backgroundColor: "var(--room-accent)" }}
-                  >
-                    Bring it back
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
-
-      {/* Main card area */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 relative">
-        {/* Current card */}
-        <div className="relative w-full max-w-md">
-          <div
-            className={cn(
-              "relative flex min-h-[220px] items-center justify-center rounded-3xl border border-white/[0.08] bg-card/60 p-6 text-center transition-opacity duration-300 sm:min-h-[260px] sm:p-10",
-              incomingTrade && "opacity-40",
-            )}
-          >
-            {state.revisit.includes(current) && (
-              <BookmarkCheck className="absolute top-3 right-3 w-4 h-4 text-primary" />
-            )}
-            {isCustomFromOther && (
-              <div className="absolute left-3 top-3 flex items-center gap-1 text-[10px] uppercase tracking-[0.2em] text-primary">
-                <PenLine className="w-3 h-3" />
-                from {customAuthor}
-              </div>
-            )}
-            <p className="font-serif text-xl leading-snug text-cream italic sm:text-3xl">
-              "{resolveText(pool, current, state.customs)}"
-            </p>
-
-            {/* Floating reactions */}
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-full overflow-hidden">
-              {floats.map((f) => (
-                <span
-                  key={f.id}
-                  className="absolute bottom-2 left-1/2 -translate-x-1/2 text-3xl animate-float-up"
-                  style={{ left: `${30 + Math.random() * 40}%` }}
-                >
-                  {f.emoji}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Incoming trade overlay */}
-          {incomingTrade && state.trade && (
-            <div className="absolute inset-0 rounded-3xl bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center gap-3 p-4 text-center">
-              <p className="text-sm text-cream">{proposerName} wants to swap.</p>
-              <p className="font-serif italic text-cream/80 text-sm">
-                "{resolveText(pool, state.trade.offered, state.customs)}"
-              </p>
-              <p className="text-xs text-muted-foreground">Pick one of your cards to send.</p>
-              <Button variant="outline" size="sm" onClick={declineTrade} className="rounded-full mt-1">
-                <X className="w-3.5 h-3.5 mr-1.5" /> Not this one
-              </Button>
-            </div>
-          )}
+  // ── Draft ──
+  if (state.phase === "draft") {
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
+        <div className="flex flex-col items-center gap-1 text-center">
+          <p className="font-serif text-xl italic text-cream">
+            {myTurn ? "Your topic" : `${partnerName} is choosing`}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {slots - state.claims.length} pick{slots - state.claims.length === 1 ? "" : "s"} left between you. Each topic deals three questions.
+          </p>
         </div>
-
-        {/* Reactions row */}
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Tap to react</p>
-          <div className="flex gap-2">
-            {reactions.map((emoji) => (
-              <button
-                key={emoji}
-                onClick={() => sendReaction(emoji)}
-                className="h-10 w-10 rounded-full border border-white/10 bg-white/[0.03] text-xl transition hover:bg-white/[0.06]"
-                aria-label={`React ${emoji}`}
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Upcoming hand */}
-        <div className="w-full max-w-md grid grid-cols-2 gap-3">
-          {upcoming.map((qIdx, slot) => {
-            const handSlot = slot + 1;
-            const tappable = !!incomingTrade;
+        <div className="grid flex-1 grid-cols-2 content-start gap-2.5">
+          {OB_TOPICS.map((t) => {
+            const claim = state.claims.find((c) => c.topic === t.id);
+            const byMe = claim?.user === senderId;
+            const taken = claim != null;
             return (
               <button
-                key={`${qIdx}-${slot}`}
-                disabled={!tappable}
-                onClick={() => tappable && acceptTradeWith(handSlot)}
-                className={cn(
-                  "relative min-h-[80px] rounded-2xl border border-white/[0.08] bg-white/[0.02] p-3 text-left font-serif text-xs italic text-cream/80 transition sm:text-sm",
-                  tappable && "cursor-pointer hover:border-primary/50 hover:bg-primary/10",
-                  !tappable && "opacity-70",
-                )}
+                key={t.id}
+                type="button"
+                disabled={!myTurn || taken}
+                onClick={() => claimTopic(t.id)}
+                className={[
+                  "focus-ring flex flex-col gap-0.5 rounded-2xl border p-3 text-left transition",
+                  byMe
+                    ? "border-primary bg-primary/10"
+                    : taken
+                      ? "border-rose/50 bg-rose/5 opacity-80"
+                      : "border-white/[0.10] bg-white/[0.03]",
+                  myTurn && !taken ? "hover:-translate-y-0.5 hover:border-primary/50 cursor-pointer" : "",
+                ].join(" ")}
               >
-                {state.revisit.includes(qIdx) && (
-                  <BookmarkCheck className="absolute top-2 right-2 w-3 h-3 text-primary" />
-                )}
-                "{resolveText(pool, qIdx, state.customs)}"
+                <span className={["text-[9px] uppercase tracking-[0.2em]", HEAT_STYLE[t.heat]].join(" ")}>{t.heat}</span>
+                <span className="font-serif text-sm text-cream leading-tight">{t.name}</span>
+                <span className="text-[11px] leading-snug text-muted-foreground">{t.note}</span>
+                <span className="mt-0.5 text-[9px] uppercase tracking-[0.18em] text-muted-foreground/80">
+                  {byMe ? "yours" : taken ? `${partnerName}'s` : "3 questions"}
+                </span>
               </button>
             );
           })}
         </div>
-        {incomingTrade && (
-          <button onClick={() => acceptTradeWith(0)} className="text-xs text-primary underline">
-            Send my current card instead
-          </button>
+      </div>
+    );
+  }
+
+  // ── Write ──
+  if (state.phase === "write") {
+    return (
+      <div className="flex h-full min-h-0 flex-col items-center justify-center gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
+        <div className="flex flex-col items-center gap-1 text-center">
+          <p className="font-serif text-xl italic text-cream">One of your own</p>
+          <p className="max-w-sm text-xs text-muted-foreground">
+            It replaces a card rather than adding one, and it buys you a veto of one of {partnerName}&apos;s topics.
+          </p>
+        </div>
+        {iWrote ? (
+          <p className="text-sm text-muted-foreground animate-pulse">sealed · waiting for {partnerName}&apos;s question…</p>
+        ) : (
+          <>
+            <textarea
+              rows={3}
+              maxLength={OB_WRITE_MAX}
+              value={draftText}
+              onChange={(e) => setDraftText(e.target.value)}
+              placeholder={`Ask ${partnerName} the thing you wouldn't put in a message…`}
+              className="w-full max-w-md rounded-2xl border border-white/15 bg-secondary/60 p-4 text-sm text-cream outline-none focus:border-primary/50"
+            />
+            <p className="text-[10px] text-muted-foreground">{draftText.length}/{OB_WRITE_MAX}</p>
+            <Button
+              onClick={() => emit("write", { text: draftText })}
+              disabled={draftText.trim().length < OB_WRITE_MIN}
+              className={accentBtn}
+              style={accentStyle}
+            >
+              Seal my question
+            </Button>
+          </>
         )}
       </div>
+    );
+  }
 
-      {/* Bottom actions */}
-      <div className="flex gap-3 justify-center flex-wrap items-center">
-        <Button variant="outline" onClick={proposeTrade} disabled={!!state.trade} className="rounded-full">
-          <Repeat2 className="w-4 h-4 mr-2" />
-          {outgoingTrade ? "Waiting for swap…" : "Propose trade"}
-        </Button>
-        <div className="flex flex-col items-center gap-0.5">
-          <Button
-            variant="outline"
-            onClick={handleSkip}
-            disabled={!!incomingTrade || skipsLeft <= 0}
-            className={cn("rounded-full", skipsLeft <= 0 && "opacity-50")}
-          >
-            Skip {skipsLeft > 0 ? `(${skipsLeft} left)` : ""}
-          </Button>
-          {skipsLeft <= 0 && <span className="text-[10px] text-muted-foreground">No skips left</span>}
+  // ── Veto ──
+  if (state.phase === "veto") {
+    const theirClaims = state.claims.filter((c) => c.user !== senderId);
+    const takenIds = new Set([
+      ...state.claims.map((c) => c.topic),
+      ...Object.values(state.vetoes).map((v) => v.swap),
+    ]);
+    const options = OB_TOPICS.filter((t) => !takenIds.has(t.id));
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
+        <div className="flex flex-col items-center gap-1 text-center">
+          <p className="font-serif text-xl italic text-cream">
+            {iVetoed ? "Veto sealed" : `Bin one of ${partnerName}'s`}
+          </p>
+          <p className="max-w-sm text-xs text-muted-foreground">
+            {iVetoed
+              ? `waiting for ${partnerName}'s veto… one of yours goes the same way.`
+              : "Writing a question bought you this. Choose what replaces it."}
+          </p>
         </div>
-        <Button
-          onClick={handleAnswered}
-          disabled={!!incomingTrade}
-          className="rounded-full text-primary-foreground hover:opacity-90"
-          style={{ backgroundColor: "var(--room-accent)" }}
-        >
-          <Check className="w-4 h-4 mr-2" /> Answered
-        </Button>
+        {!iVetoed && (
+          <>
+            <div className="flex flex-wrap justify-center gap-2">
+              {theirClaims.map((c) => {
+                const t = obTopic(c.topic)!;
+                const gone = Object.values(state.vetoes).some((v) => v.binned === c.topic);
+                return (
+                  <button
+                    key={c.topic}
+                    type="button"
+                    disabled={gone}
+                    onClick={() => setBinPick(c.topic)}
+                    className={[
+                      "focus-ring rounded-full border px-3 py-1.5 text-xs transition",
+                      binPick === c.topic
+                        ? "border-destructive/60 text-destructive line-through"
+                        : "border-white/15 text-cream hover:border-destructive/50",
+                      gone ? "opacity-40" : "",
+                    ].join(" ")}
+                  >
+                    {t.name}
+                  </button>
+                );
+              })}
+            </div>
+            {binPick && (
+              <>
+                <p className="text-center text-[10px] uppercase tracking-[0.22em] text-muted-foreground">replace it with</p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {options.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setSwapPick(t.id)}
+                      className={[
+                        "focus-ring rounded-full border px-3 py-1.5 text-xs transition",
+                        swapPick === t.id ? "border-primary text-primary" : "border-white/15 text-cream hover:border-primary/50",
+                      ].join(" ")}
+                    >
+                      {t.name} <span className={["ml-1", HEAT_STYLE[t.heat]].join(" ")}>· {t.heat}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            <div className="flex justify-center">
+              <Button onClick={confirmVeto} disabled={!binPick || !swapPick} className={accentBtn} style={accentStyle}>
+                Deal the night
+              </Button>
+            </div>
+          </>
+        )}
       </div>
+    );
+  }
+
+  // ── Done ──
+  if (state.phase === "done") {
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
+        <div className="flex flex-col items-center gap-1 text-center">
+          <p className="font-serif text-2xl italic text-cream">The whole night</p>
+          <p className="max-w-sm text-xs text-muted-foreground">
+            {deck.length - state.passes.length} of {deck.length} answered.{" "}
+            {state.passes.length
+              ? "The passed ones are worth coming back to."
+              : "You didn't pass on a single one."}
+          </p>
+        </div>
+        <div className="flex flex-1 flex-col gap-2">
+          {deck.map((c, i) => {
+            const passed = state.passes.includes(i);
+            const rx = Object.values(state.reacts[String(i)] ?? {});
+            return (
+              <div
+                key={i}
+                className={[
+                  "rounded-2xl border p-3",
+                  passed ? "border-dashed border-white/15 opacity-70" : "border-white/[0.08] bg-white/[0.02]",
+                ].join(" ")}
+              >
+                <p className="text-sm leading-relaxed text-cream/90">&ldquo;{c.q}&rdquo;</p>
+                <p className="mt-1 flex flex-wrap items-center gap-2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                  <span className={c.by === senderId ? "text-primary" : "text-rose"}>
+                    {c.written ? `written by ${c.by === senderId ? "you" : partnerName}` : `${c.topicName} · ${c.by === senderId ? "yours" : `${partnerName}'s`}`}
+                  </span>
+                  {rx.map((e, j) => (
+                    <span key={j} className="text-sm">{e}</span>
+                  ))}
+                  {passed && <span className="text-destructive">passed</span>}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex justify-center">
+          <Button
+            onClick={() =>
+              emit("restart", {}, {
+                event_type: "night",
+                payload: { text: `${deck.length - state.passes.length} of ${deck.length} answered` },
+              })
+            }
+            className={accentBtn}
+            style={accentStyle}
+          >
+            New night
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Play ──
+  return (
+    <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in", "dr-stageroom--dim"].join(" ")}>
+      <div className="dr-stageroom-shade" aria-hidden />
+
+      <div className="relative flex flex-col items-center gap-1 text-center">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Card {Math.min(state.card + 1, deck.length)} of {deck.length}
+        </p>
+        <p className="font-serif text-xl italic text-cream">
+          {dealRank < 2 ? "Shuffling" : card?.heat === "Close" ? "Deeper in" : card?.topicName}
+        </p>
+      </div>
+
+      {dealRank < 2 ? (
+        <div className="relative flex flex-1 flex-col items-center justify-center gap-4">
+          <div className="flex gap-1.5" aria-hidden>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <span
+                key={i}
+                className="dr-tod-back relative h-14 w-10 animate-fade-in rounded-lg"
+                style={{ position: "relative", animationDelay: `${i * 110}ms` }}
+              />
+            ))}
+          </div>
+          {dealRank >= 1 && (
+            <div className="flex flex-col items-center gap-1 text-xs text-muted-foreground animate-fade-in">
+              {theirVeto && (
+                <p>
+                  {partnerName} binned <span className="text-rose">{obTopic(theirVeto.binned)?.name}</span> from your side.
+                </p>
+              )}
+              {myVeto && (
+                <p>
+                  You binned <span className="text-primary">{obTopic(myVeto.binned)?.name}</span> from theirs.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        card && (
+          <div className="relative flex flex-1 flex-col items-center justify-center gap-4">
+            <div className="dr-beam" aria-hidden />
+            <blockquote
+              key={state.card}
+              className={["dr-plaque w-full max-w-md text-left", typed.complete ? "dr-plaque--settled" : ""].join(" ")}
+              style={card.written ? { borderColor: "color-mix(in srgb, var(--room-accent) 70%, transparent)" } : undefined}
+            >
+              <span className="dr-plaque-glyph" aria-hidden>{card.written ? "✍" : "?"}</span>
+              <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: "var(--room-accent)" }}>
+                {card.written
+                  ? `written by ${card.by === senderId ? "you" : partnerName}`
+                  : `${card.topicName} · ${card.heat} · ${card.by === senderId ? "yours" : `${partnerName}'s`}`}
+              </p>
+              <p aria-live="polite" className="mt-2 font-serif text-lg sm:text-xl italic leading-snug text-cream">
+                {typed.shown}
+                {!typed.complete && <span className="dr-caret" aria-hidden />}
+              </p>
+            </blockquote>
+
+            <div className="flex gap-2">
+              {OB_REACTIONS.map((r) => {
+                const mineNow = state.reacts[String(state.card)]?.[senderId] === r;
+                return (
+                  <button
+                    key={r}
+                    type="button"
+                    aria-label={`React ${r}`}
+                    onClick={() => emit("react", { index: state.card, emoji: r })}
+                    className={[
+                      "focus-ring flex h-10 w-10 items-center justify-center rounded-full border text-lg transition hover:-translate-y-0.5",
+                      mineNow ? "border-primary bg-primary/15 scale-110" : "border-white/15",
+                    ].join(" ")}
+                  >
+                    {r}
+                  </button>
+                );
+              })}
+            </div>
+
+            {typed.complete && (
+              <div className="flex gap-2 animate-fade-in">
+                <Button
+                  onClick={() =>
+                    emit("advance", { index: state.card }, {
+                      event_type: "asked",
+                      payload: { text: card.written ? "a written question" : `${card.topicName} · ${card.heat}` },
+                    })
+                  }
+                  className={accentBtn}
+                  style={accentStyle}
+                >
+                  {state.card + 1 >= deck.length ? "That's the night" : "Answered"}
+                </Button>
+                <Button
+                  onClick={() => emit("pass", { index: state.card })}
+                  disabled={state.passes.length >= OB_PASSES}
+                  variant="outline"
+                  className={quietBtn}
+                >
+                  Pass ({OB_PASSES - state.passes.length} left)
+                </Button>
+              </div>
+            )}
+
+            <ol className="flex flex-wrap justify-center gap-1" aria-hidden>
+              {deck.map((c, i) => (
+                <li
+                  key={i}
+                  className={[
+                    "rounded-full",
+                    c.written ? "h-2 w-2.5" : "h-1 w-2.5",
+                    i === state.card
+                      ? "bg-[var(--room-accent)]"
+                      : state.passes.includes(i)
+                        ? "bg-destructive/70"
+                        : i < state.card
+                          ? "bg-white/40"
+                          : "bg-white/10",
+                  ].join(" ")}
+                />
+              ))}
+            </ol>
+          </div>
+        )
+      )}
     </div>
   );
 }

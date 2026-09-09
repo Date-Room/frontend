@@ -50,7 +50,7 @@ export const CURATABLE_ACTIVITIES: CuratableActivityMeta[] = [
   { id: "fridge", label: "Bookshelf", tagline: "Books, links, and a shared watch list.", emoji: "📚", category: "walls" },
   { id: "watch", label: "Watch party", tagline: "Sync up a video and watch together.", emoji: "🎬", category: "watch" },
   { id: "dj", label: "Music / DJ", tagline: "Take turns picking the soundtrack.", emoji: "🎧", category: "music" },
-  { id: "questions", label: "21 Questions", tagline: "Pick a deck, swap, take turns.", emoji: "💬", category: "games" },
+  { id: "questions", label: "Open Book", tagline: "Draft topics. The night escalates.", emoji: "📖", category: "games" },
   { id: "this_or_that", label: "This or That", tagline: "Pick fast. Call theirs.", emoji: "⚖️", category: "games" },
   { id: "the_36", label: "The 36", tagline: "Three sets of twelve. Get closer.", emoji: "🫶", category: "games" },
   { id: "2_truths", label: "2 Truths and a Lie", tagline: "Press one. Stake your call.", emoji: "🎭", category: "games" },

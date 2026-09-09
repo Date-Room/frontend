@@ -42,7 +42,7 @@ const CATEGORIES: Category[] = [
     label: "Games",
     Icon: Gamepad2,
     activities: [
-      { id: "questions", label: "21 Questions", tagline: "Pick 24, swap decks, take turns.", ready: true },
+      { id: "questions", label: "Open Book", tagline: "Draft topics. The night escalates.", ready: true },
       { id: "this_or_that", label: "This or That", tagline: "Pick fast. Call theirs.", ready: true },
       { id: "the_36", label: "The 36", tagline: "Three sets of twelve. Get closer.", ready: true },
       { id: "2_truths", label: "2 Truths and a Lie", tagline: "Press one. Stake your call.", ready: true },

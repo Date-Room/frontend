@@ -40,13 +40,17 @@ const ACTIVITY_HELP: Record<string, HelpContent> = {
     ],
   },
   questions: {
-    title: "Questions",
-    tagline: "Take turns opening up.",
+    title: "Open Book",
+    tagline: "Draft topics. The night escalates.",
     sections: [
       { heading: "How to play", bullets: [
-        "A prompt shows for both of you.",
-        "Answer out loud, then move to the next card.",
-        "Swap decks anytime for a different vibe.",
+        "Pick the night's length (15 or 21 questions), then take turns claiming topics. Each topic deals three questions: an opener, a specific, a costly one.",
+        "You each write one question of your own. It replaces a card, and it buys you a veto of one topic your date chose.",
+        "One card at a time, answered out loud. React with an emoji, or pass (twice a night).",
+      ] },
+      { heading: "Good to know", bullets: [
+        "The deck runs Warm, then Real, then Close. Close is explicit; choose those topics on purpose.",
+        "Everything survives to the recap, and later nights deal questions you haven't seen.",
       ] },
     ],
   },
