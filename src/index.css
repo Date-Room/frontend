@@ -1572,3 +1572,23 @@
   .dr-lockin, .dr-ttcard--sealed, .dr-ttcard--flip, .dr-score-plate--bump { animation: none; }
   .dr-ttcard--sealed { background-color: rgb(52 211 153 / 0.10); }
 }
+
+/* This or That — the halves tug */
+.dr-half { transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1), border-color 0.4s ease, opacity 0.5s ease, filter 0.5s ease, background-color 0.4s ease; }
+.dr-half--lit { animation: dr-half-lit 0.7s ease both; }
+.dr-half--swell { transform: scale(1.03); }
+.dr-half--tug-l { transform: translateX(-8px); }
+.dr-half--tug-r { transform: translateX(8px); }
+@keyframes dr-half-lit {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, #d4826a 0%, transparent); }
+  40% { box-shadow: 0 0 0 6px color-mix(in srgb, #d4826a 40%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, #d4826a 0%, transparent); }
+}
+@media (max-width: 640px) {
+  .dr-half--tug-l { transform: translateY(-6px); }
+  .dr-half--tug-r { transform: translateY(6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dr-half, .dr-half--swell, .dr-half--tug-l, .dr-half--tug-r { transform: none; transition: none; }
+  .dr-half--lit { animation: none; }
+}

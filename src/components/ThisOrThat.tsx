@@ -1,225 +1,304 @@
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { getPairs } from "@/lib/catalogRuntime";
-import { useRoomSession } from "@/context/RoomSessionContext";
-import { useActivitySession } from "@/hooks/useActivitySession";
-import { useEffect, useMemo, useState } from "react";
+import { useReducedActivity } from "@/lib/activities/useReducedActivity";
+import {
+  TOT_CLOCK_SECONDS,
+  TOT_ROUNDS_PER_RUN,
+  initialTotState,
+  reduceTot,
+  totFromJson,
+  totRunDone,
+  totSetForRun,
+  type TotSide,
+} from "@/lib/activities/thisOrThat";
+import { useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
+import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
+import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 
 /**
- * This or That — ported to the shared `this_or_that` activity (mobile parity):
- *  - durable state `{ prompt_index, picks: { <userId>: "left" | "right" } }`
- *  - broadcast events `pick { pick }` and `next_prompt { prompt_index }`.
- * Web's a/b maps to mobile's left/right at the boundary.
+ * This or That — the run. Two halves own the room; a 7s clock pressures the
+ * pick (expiring costs nothing, the hesitation is the insight); you call
+ * their side before the reveal; the halves tug on the verdict — same side
+ * and both tags land on one swelling half, split and they pull apart.
  */
 
-const REVEAL_HOLD_MS = 1800;
-
-type Choice = "left" | "right";
-const sideToChoice = (s: "a" | "b"): Choice => (s === "a" ? "left" : "right");
-const choiceToSide = (c: Choice | undefined): "a" | "b" | undefined =>
-  c === "left" ? "a" : c === "right" ? "b" : undefined;
-
-function asPicks(v: unknown): Record<string, Choice> {
-  if (!v || typeof v !== "object") return {};
-  const out: Record<string, Choice> = {};
-  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
-    if (val === "left" || val === "right") out[k] = val;
-  }
-  return out;
-}
+const REVEAL_STEPS: CinematicStep[] = [
+  { id: "dim", at: 0 },
+  { id: "theirs", at: 900 },
+  { id: "verdict", at: 2100 },
+];
 
 export function ThisOrThat() {
-  const room = useRoomSession();
-  const me = room.senderId;
-  const { session, state: durable } = useActivitySession("this_or_that");
-  const pairs = useMemo(() => getPairs(), []);
+  const { state, emit, senderId } = useReducedActivity(
+    "this_or_that",
+    initialTotState,
+    totFromJson,
+    reduceTot,
+  );
+  const partnerName = usePartnerName();
 
-  const [promptIndex, setPromptIndex] = useState(0);
-  const [picks, setPicks] = useState<Record<string, Choice>>({});
+  const set = totSetForRun(state.run);
+  const roundIndex = Math.min(state.round, TOT_ROUNDS_PER_RUN - 1);
+  const pair = set[roundIndex];
+  const board = totRunDone(state);
 
-  // Adopt durable state: replace picks on a round change, merge within a round.
+  const myPick = state.picks[senderId];
+  const myPrediction = state.predictions[senderId];
+  const otherPickEntry = Object.entries(state.picks).find(([uid]) => uid !== senderId);
+  const theirPick = otherPickEntry?.[1];
+  const revealing = !board && state.phase === "revealing";
+
+  const { stage, witnessed } = useCinematic(revealing, REVEAL_STEPS);
+  const revealRank = revealing ? (witnessed ? { dim: 0, theirs: 1, verdict: 2 }[stage ?? "dim"] ?? 0 : 2) : -1;
+  const theirsLit = revealRank >= 1;
+  const settled = revealRank >= 2;
+
+  const myReads = state.reads[senderId] ?? 0;
+  const theirReads = Object.entries(state.reads).reduce((n, [k, v]) => (k === senderId ? n : n + v), 0);
+  const roundsDone = state.log.length + (revealing ? 1 : 0);
+
+  // The 7s clock: purely local, purely cosmetic — expiring costs nothing.
+  const [clock, setClock] = useState(TOT_CLOCK_SECONDS);
+  const startedAt = useRef(Date.now());
   useEffect(() => {
-    if (!durable) return;
-    const pi = typeof durable.prompt_index === "number" ? durable.prompt_index : 0;
-    const dp = asPicks(durable.picks);
-    setPromptIndex((prevPi) => {
-      if (pi !== prevPi) {
-        setPicks(dp);
-        return pi;
-      }
-      setPicks((prev) => ({ ...prev, ...dp }));
-      return prevPi;
-    });
-  }, [durable]);
+    if (board || revealing || myPick != null) return;
+    startedAt.current = Date.now();
+    setClock(TOT_CLOCK_SECONDS);
+    const id = window.setInterval(() => setClock((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.round, state.run, board, myPick != null]);
 
-  // Live partner events. When a partner event lands AND we can
-  // persist, write the converged state to durable — so the round /
-  // pick survives a reload even if only one side is signed in
-  // (matches mobile's "persist on partner's behalf" semantics).
-  // `promptIndex` is referenced inline rather than `idx` because
-  // `idx` is declared below this effect — closing over it would
-  // hit a TDZ on first render.
-  useEffect(() => {
-    if (!session) return;
-    return session.onEvent((e) => {
-      const isPartner = e.userId !== me;
-      if (e.type === "pick") {
-        const c = e.payload.pick;
-        if (c !== "left" && c !== "right") return;
-        setPicks((prev) => {
-          const next = { ...prev, [e.userId]: c };
-          if (isPartner && room.canPersist) {
-            void session.persist({ prompt_index: promptIndex, picks: next });
-          }
-          return next;
-        });
-      } else if (e.type === "next_prompt") {
-        const ni = typeof e.payload.prompt_index === "number" ? e.payload.prompt_index : 0;
-        setPromptIndex(ni);
-        setPicks({});
-        if (isPartner && room.canPersist) {
-          void session.persist({ prompt_index: ni, picks: {} });
-        }
-      }
-    });
-  }, [session, me, promptIndex, room.canPersist]);
+  const sameSide = revealing && myPick != null && myPick === theirPick;
+  const iReadThem = revealing && myPrediction != null && myPrediction === theirPick;
+  const theyReadMe =
+    revealing && otherPickEntry != null && state.predictions[otherPickEntry[0]] === myPick;
 
-  const idx = promptIndex;
-  const pair = pairs[idx % Math.max(1, pairs.length)];
-  const myPick = choiceToSide(picks[me]);
-  const otherEntry = Object.entries(picks).find(([uid]) => uid !== me);
-  const theirPick = choiceToSide(otherEntry?.[1]);
-  const bothPicked = Object.keys(picks).length >= 2;
-  const isMatch = bothPicked && myPick && theirPick && myPick === theirPick;
+  const accentBtn = "rounded-full text-primary-foreground transition hover:opacity-90 disabled:opacity-50";
+  const accentStyle = { backgroundColor: "var(--room-accent)" } as const;
 
-  const [revealComplete, setRevealComplete] = useState(false);
-  useEffect(() => {
-    if (!bothPicked) {
-      setRevealComplete(false);
-      return;
-    }
-    const t = window.setTimeout(() => setRevealComplete(true), REVEAL_HOLD_MS);
-    return () => window.clearTimeout(t);
-  }, [bothPicked, idx]);
+  const scoreboard = (
+    <Scoreboard
+      label="Reads"
+      entries={[
+        { name: "You", value: myReads, accent: true },
+        { name: partnerName, value: theirReads },
+      ]}
+    />
+  );
 
-  if (pairs.length === 0 || !pair) {
+  if (board) {
+    const players = Object.keys(state.reads);
+    const longestFor = (uid: string) => {
+      let best = { ms: -1, i: 0 };
+      state.log.forEach((r, i) => {
+        const v = r.ms[uid] ?? -1;
+        if (v > best.ms) best = { ms: v, i };
+      });
+      return best;
+    };
+    const mySlow = longestFor(senderId);
+    const theirUid = players.find((p) => p !== senderId) ?? otherPickEntry?.[0];
+    const theirSlow = theirUid ? longestFor(theirUid) : null;
     return (
-      <div className="flex flex-col h-full items-center justify-center p-8 text-muted-foreground text-sm">
-        Loading prompts…
+      <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in">
+        <div className="flex flex-col items-center gap-1 text-center">
+          <p className="font-serif text-2xl italic text-cream">How you two line up</p>
+          <p className="max-w-sm text-xs text-muted-foreground">
+            {state.same_count >= 4
+              ? "You want almost the same life. Check the one you didn't."
+              : state.same_count <= 1
+                ? "You disagree on nearly everything and you're still here."
+                : `Same side ${state.same_count} of ${TOT_ROUNDS_PER_RUN}. The splits are the interesting part.`}
+          </p>
+        </div>
+        {scoreboard}
+        <div className="flex flex-1 flex-col gap-2">
+          {state.log.map((r, i) => {
+            const p = set[i];
+            const mine = r.picks[senderId];
+            const theirs = Object.entries(r.picks).find(([uid]) => uid !== senderId)?.[1];
+            const same = mine != null && mine === theirs;
+            const sideLabel = (s: TotSide | undefined) => (s === "a" ? p.a : s === "b" ? p.b : null);
+            return (
+              <div
+                key={i}
+                className={[
+                  "rounded-2xl border p-3",
+                  same ? "border-emerald-400/40 bg-emerald-400/5" : "border-white/[0.10] bg-white/[0.03]",
+                ].join(" ")}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="flex-1 text-sm text-cream/90">
+                    {p.a.label} <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">or</span> {p.b.label}
+                  </span>
+                  <span className="rounded-full border border-primary/50 px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] text-primary">
+                    you · {sideLabel(mine)?.emoji}
+                  </span>
+                  <span className="rounded-full border border-rose/50 px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] text-rose">
+                    {partnerName} · {sideLabel(theirs)?.emoji}
+                  </span>
+                </div>
+                {!same && <p className="mt-1.5 text-xs text-muted-foreground">{p.split}</p>}
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex flex-col items-center gap-1 text-center text-xs text-muted-foreground">
+          {mySlow.ms > 800 && (
+            <p>
+              You hesitated longest on {set[mySlow.i].a.label} or {set[mySlow.i].b.label} · {(mySlow.ms / 1000).toFixed(1)}s. The pause said something.
+            </p>
+          )}
+          {theirSlow && theirSlow.ms > 800 && (
+            <p>
+              {partnerName} paused longest on {set[theirSlow.i].a.label} or {set[theirSlow.i].b.label} · {(theirSlow.ms / 1000).toFixed(1)}s.
+            </p>
+          )}
+        </div>
+        <div className="flex justify-center">
+          <Button onClick={() => emit("new_run")} className={accentBtn} style={accentStyle}>
+            Run a new set
+          </Button>
+        </div>
       </div>
     );
   }
 
-  const choose = (side: "a" | "b") => {
-    if (myPick) return;
-    const c = sideToChoice(side);
-    const next = { ...picks, [me]: c };
-    setPicks(next);
-    void session?.sendEvent("pick", { pick: c });
-    // Recap-worthy: each pick reads as "Sasha · picked — Mountains · vs · Beaches".
-    void session?.persist(
-      { prompt_index: idx, picks: next },
-      {
-        event_type: "picked",
-        payload: {
-          text: `${pair.a.label}  ·  vs  ·  ${pair.b.label}`,
-          choice: c,
-        },
-      },
-    );
+  const title = revealing
+    ? settled
+      ? sameSide ? "Same side" : "Split"
+      : theirsLit
+        ? `${partnerName}'s side`
+        : "Both locked"
+    : myPick == null
+      ? "Pick fast"
+      : myPrediction == null
+        ? `Now call ${partnerName}'s`
+        : "Locked in";
+
+  const status = revealing
+    ? settled
+      ? `${sameSide ? pair.together : pair.split}${iReadThem ? " And you read them right." : ` You had ${partnerName} on the other side.`}`
+      : theirsLit
+        ? "Watch which one lights."
+        : "Neither of you can change it now."
+    : myPick == null
+      ? "Don't think it through. The clock is the point."
+      : myPrediction == null
+        ? `Before you see it — which side did ${partnerName} take?`
+        : `waiting for ${partnerName}…`;
+
+  const tap = (side: TotSide) => {
+    if (revealing) return;
+    if (myPick == null) {
+      emit("pick", { round: state.round, side, ms: Date.now() - startedAt.current });
+    } else if (myPrediction == null) {
+      emit(
+        "predict",
+        { round: state.round, side },
+        { event_type: "called", payload: { text: `${pair.a.label} or ${pair.b.label}` } },
+      );
+    }
   };
 
-  const nextRound = () => {
-    const ni = (idx + 1) % pairs.length;
-    setPromptIndex(ni);
-    setPicks({});
-    void session?.sendEvent("next_prompt", { prompt_index: ni });
-    void session?.persist({ prompt_index: ni, picks: {} });
-  };
-
-  const Card = ({ side, opt }: { side: "a" | "b"; opt: { label: string; emoji: string } }) => {
-    const chosenByMe = myPick === side;
-    const chosenByOther = bothPicked && theirPick === side;
-    const reveal = bothPicked;
-    const dimmed = reveal && !chosenByMe && !chosenByOther;
+  const half = (side: TotSide) => {
+    const opt = side === "a" ? pair.a : pair.b;
+    const isMine = myPick === side;
+    const isMyCall = myPrediction === side;
+    const isTheirs = revealing && theirsLit && theirPick === side;
+    const litSame = settled && sameSide && isMine;
+    const fadedOut = revealing && theirsLit && !isMine && !isTheirs;
+    const clickable = !revealing && (myPick == null || myPrediction == null);
     return (
       <button
-        onClick={() => choose(side)}
-        disabled={!!myPick}
+        type="button"
+        disabled={!clickable}
+        onClick={() => tap(side)}
         className={[
-          "focus-ring group relative flex-1 rounded-2xl border p-6 sm:p-8 min-h-[180px] md:min-h-[260px] flex flex-col items-center justify-center gap-4 text-center transition-all duration-500",
-          chosenByMe && chosenByOther
-            ? "border-primary bg-primary/15 scale-[1.02]"
-            : chosenByMe
-              ? "border-primary bg-primary/10"
-              : chosenByOther
-                ? "border-rose bg-rose/10"
-                : reveal
-                  ? "border-white/[0.08] bg-white/[0.02]"
-                  : "border-white/[0.10] bg-white/[0.02] hover:border-primary/50 hover:-translate-y-0.5",
-          dimmed ? "opacity-30 grayscale" : "",
-          myPick && !chosenByMe && !reveal ? "opacity-50" : "",
+          "dr-half focus-ring relative flex min-h-[9rem] flex-1 flex-col items-center justify-center gap-2 rounded-2xl border p-5 text-center",
+          litSame
+            ? "dr-half--swell border-emerald-400/60 bg-emerald-400/10"
+            : isMine && isTheirs
+              ? "border-emerald-400/60 bg-emerald-400/10"
+              : isMine
+                ? "border-primary bg-primary/10"
+                : isTheirs
+                  ? "border-rose/60 bg-rose/10 dr-half--lit"
+                  : fadedOut
+                    ? "border-white/[0.08] bg-white/[0.02] opacity-30 saturate-50"
+                    : "border-white/[0.10] bg-white/[0.03]",
+          settled && !sameSide && (isMine || isTheirs) ? (side === "a" ? "dr-half--tug-l" : "dr-half--tug-r") : "",
+          clickable ? "hover:-translate-y-1 hover:border-primary/50 cursor-pointer" : "",
         ].join(" ")}
       >
-        <div
-          className={[
-            "text-5xl sm:text-6xl transition-transform duration-500",
-            reveal && (chosenByMe || chosenByOther) ? "scale-110" : "",
-          ].join(" ")}
-        >
-          {opt.emoji}
-        </div>
-        <div className="text-xl font-medium text-cream">{opt.label}</div>
-        {reveal && (chosenByMe || chosenByOther) && (
-          <div className="flex gap-2 mt-1 text-[10px] uppercase tracking-[0.25em] font-medium">
-            {chosenByMe && (
-              <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/40">you</span>
-            )}
-            {chosenByOther && (
-              <span className="px-2 py-0.5 rounded-full bg-rose/20 text-rose border border-rose/40">them</span>
-            )}
-          </div>
-        )}
+        <span className="text-4xl" aria-hidden>{opt.emoji}</span>
+        <span className="font-serif text-lg sm:text-xl italic leading-tight text-cream">{opt.label}</span>
+        <span className="flex min-h-[1.3rem] flex-wrap justify-center gap-1.5">
+          {isMine && (
+            <span className="rounded-full border border-primary/60 px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-primary">you</span>
+          )}
+          {isMyCall && !revealing && (
+            <span className="rounded-full border border-rose/50 border-dashed px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-rose">your call</span>
+          )}
+          {isTheirs && (
+            <span className="rounded-full border border-rose/60 px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-rose">{partnerName}</span>
+          )}
+        </span>
       </button>
     );
   };
 
   return (
-    <div className="flex flex-col h-full gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground text-center">
-        Round {idx + 1} · pick one
+    <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in", revealing && witnessed && !settled ? "dr-stageroom--dim" : ""].join(" ")}>
+      <div className="dr-stageroom-shade" aria-hidden />
+
+      <div className="relative flex flex-col items-center gap-1 text-center">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Round {Math.min(roundsDone + (revealing ? 0 : 1), TOT_ROUNDS_PER_RUN)} of {TOT_ROUNDS_PER_RUN} · {pair.tier}
+        </p>
+        <p key={title} className="font-serif text-xl italic text-cream animate-fade-in">{title}</p>
+        <p key={status} aria-live="polite" className="min-h-[1rem] max-w-sm text-xs text-muted-foreground animate-fade-in">{status}</p>
       </div>
-      <div className="flex-1 flex flex-col md:flex-row items-stretch gap-3 max-w-3xl mx-auto w-full">
-        <Card side="a" opt={pair.a} />
-        <div className="flex items-center justify-center text-muted-foreground/70">
-          <span className="px-2 text-[10px] uppercase tracking-[0.32em]">or</span>
-        </div>
-        <Card side="b" opt={pair.b} />
+
+      <div className="relative flex flex-1 flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+        {half("a")}
+        <span className="self-center text-[10px] uppercase tracking-[0.3em] text-muted-foreground/70">or</span>
+        {half("b")}
       </div>
-      <div className="min-h-[3.5rem] flex items-center justify-center">
-        {bothPicked ? (
-          revealComplete ? (
-            <div className="flex flex-col items-center gap-3 fade-in-slow">
-              <p className={["text-lg font-medium", isMatch ? "text-primary" : "text-cream/80"].join(" ")}>
-                {isMatch ? "you both leaned the same way" : "different paths"}
-              </p>
-              <Button
-                onClick={nextRound}
-                className="rounded-full text-primary-foreground hover:opacity-90"
-                style={{ backgroundColor: "var(--room-accent)" }}
-              >
-                Next round
-              </Button>
-            </div>
-          ) : (
-            <p
-              className={["text-lg font-medium animate-pulse", isMatch ? "text-primary" : "text-cream/80"].join(" ")}
-            >
-              {isMatch ? "✨ same pick" : "split"}
+
+      <div className="relative flex min-h-[4.5rem] flex-col items-center justify-center gap-2">
+        {!revealing && myPick == null && (
+          <div className="dr-ring" style={{ ["--p" as string]: clock / TOT_CLOCK_SECONDS }}>
+            <span className="font-serif">{clock}</span>
+          </div>
+        )}
+        {settled && (
+          <div className="flex flex-col items-center gap-2 animate-fade-in">
+            <p className={["text-xs", theyReadMe ? "text-rose" : "text-muted-foreground"].join(" ")}>
+              {theyReadMe ? `👀 ${partnerName} read you too.` : `${partnerName} thought you'd go the other way.`}
             </p>
-          )
-        ) : myPick ? (
-          <p className="text-sm text-muted-foreground">waiting for them to pick…</p>
-        ) : null}
+            {scoreboard}
+            <Button
+              onClick={() =>
+                emit(
+                  "next_round",
+                  { round: state.round },
+                  {
+                    event_type: "pair",
+                    payload: {
+                      text: `${pair.a.label} or ${pair.b.label} · ${sameSide ? "same side" : "split"}${iReadThem ? " · read them right" : ""}`,
+                    },
+                  },
+                )
+              }
+              className={accentBtn}
+              style={accentStyle}
+            >
+              {state.round + 1 >= TOT_ROUNDS_PER_RUN ? "See how you line up" : "Next pair"}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );
