@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -28,11 +28,8 @@ import {
   useRoomCustomization,
 } from "@/context/RoomCustomizationContext";
 import { RoomStage, type StageItem } from "@/components/RoomStage";
-import { ChatWithBoundary } from "@/components/Chat";
-import { WatchTogether } from "@/components/WatchTogether";
-import { VisionBoard } from "@/components/VisionBoard";
-import { FridgeNotes } from "@/components/FridgeNotes";
-import { Bookshelf } from "@/components/Bookshelf";
+import { renderActivity } from "@/components/ActivityContent";
+import { ACTIVITIES, activityById, type ActivityId } from "@/lib/activityRegistry";
 import { WelcomeBackGate } from "@/components/WelcomeBackGate";
 import type { PresenceState } from "@/lib/realtime/roomChannel";
 import {
@@ -41,17 +38,6 @@ import {
   partnerPresenceEntry,
   presenceSenderId,
 } from "@/lib/partnerPresence";
-import { ThisOrThat } from "@/components/ThisOrThat";
-import { DJ } from "@/components/DJ";
-import { MusicLibrary } from "@/components/MusicRoom";
-import { RoomSettings } from "@/components/RoomSettings";
-import { QuestionDeck } from "@/components/QuestionDeck";
-import { The36 } from "@/components/The36";
-import { TwoTruths } from "@/components/TwoTruths";
-import { TruthOrDare } from "@/components/TruthOrDare";
-import { OneHasToGo } from "@/components/OneHasToGo";
-import { PickADoor } from "@/components/PickADoor";
-import { RankIt } from "@/components/RankIt";
 import { toast } from "sonner";
 import { authClient } from "@/lib/authClient";
 // (DATE_NAME removed — header shows the brand wordmark)
@@ -101,52 +87,12 @@ function LiveRoomAmbianceBackdrop({ preset }: { preset: LobbyMood }) {
   );
 }
 
-/* ───────────────── Tab definitions ───────────────── */
+/* ───────────────── Tab definitions ─────────────────
+ * The activity list lives in src/lib/activityRegistry.ts; the room's tabs are
+ * every registry activity except room management, which the launcher appends
+ * to the stage items itself. */
 
-type ActivityTabId =
-  | "vision_board"
-  | "fridge_notes"
-  | "bookshelf"
-  | "questions"
-  | "this_or_that"
-  | "the_36"
-  | "2_truths"
-  | "truth_or_dare"
-  | "one_has_to_go"
-  | "pick_a_door"
-  | "rank_it"
-  | "watch"
-  | "dj"
-  | "chat";
-
-type TabDef = {
-  id: ActivityTabId;
-  label: string;
-  icon: string;
-  curatableId: CuratableActivityId | null;
-};
-
-const WALL_TABS: TabDef[] = [
-  { id: "vision_board", label: "Vision Board", icon: "✨", curatableId: "vision_board" },
-  { id: "fridge_notes", label: "Fridge Note", icon: "🧲", curatableId: null },
-  { id: "bookshelf", label: "Bookshelf", icon: "📚", curatableId: "fridge" },
-];
-
-const ACTIVITY_TABS: TabDef[] = [
-  { id: "questions", label: "Questions", icon: "💬", curatableId: "questions" },
-  { id: "this_or_that", label: "This or That", icon: "⚖️", curatableId: "this_or_that" },
-  { id: "the_36", label: "The 36", icon: "🫶", curatableId: "the_36" },
-  { id: "2_truths", label: "2 Truths", icon: "🎭", curatableId: "2_truths" },
-  { id: "truth_or_dare", label: "Truth or Dare", icon: "🔥", curatableId: "truth_or_dare" },
-  { id: "one_has_to_go", label: "One Has To Go", icon: "🗑️", curatableId: "one_has_to_go" },
-  { id: "pick_a_door", label: "Pick a Door", icon: "🚪", curatableId: "pick_a_door" },
-  { id: "rank_it", label: "Rank It", icon: "📊", curatableId: "rank_it" },
-  { id: "watch", label: "Watch", icon: "📺", curatableId: "watch" },
-  { id: "dj", label: "Music", icon: "🎵", curatableId: "dj" },
-  { id: "chat", label: "Chat", icon: "💭", curatableId: null },
-];
-
-const ALL_TABS: TabDef[] = [...WALL_TABS, ...ACTIVITY_TABS];
+const ALL_TABS = ACTIVITIES.filter((a) => a.id !== "room_details");
 
 /* ───────────────── RoomShell ───────────────── */
 
@@ -181,7 +127,7 @@ function RoomShell({
   const room: Room | undefined = rooms?.find((r) => r.id === roomId);
   const isPersistent = room?.persistence === "persistent";
 
-  const [tab, setTab] = useState<ActivityTabId>("questions");
+  const [tab, setTab] = useState<ActivityId>("questions");
   const wallRoom = isSubscriptionPackage(roomPackage);
   const isPermanentRoom = isPersistent || wallRoom;
 
@@ -203,7 +149,7 @@ function RoomShell({
   const partnerPresent = partnerInfo.inRoom;
 
   const enterLiveMode = useCallback(
-    (nextTab?: ActivityTabId) => {
+    (nextTab?: ActivityId) => {
       userPrefersAtHomeRef.current = false;
       if (nextTab) setTab(nextTab);
       setLiveMode(true);
@@ -418,12 +364,7 @@ function RoomShell({
   );
   const visibleTabs = useMemo(
     () => ALL_TABS.filter((t) => {
-      if (t.id === "fridge_notes") return wallRoom;
-      if (t.id === "bookshelf" || t.curatableId === "vision_board" || t.curatableId === "fridge") {
-        if (!wallRoom) return false;
-        if (t.curatableId === null) return true;
-        return isActivityEnabled(t.curatableId, curated, roomPackage);
-      }
+      if (t.isWall && !wallRoom) return false;
       return t.curatableId === null || isActivityEnabled(t.curatableId, curated, roomPackage);
     }),
     [curated, roomPackage, wallRoom],
@@ -431,8 +372,7 @@ function RoomShell({
 
   const tabBarDividerBefore = useMemo(() => {
     if (!wallRoom) return null;
-    const wallIds = new Set(WALL_TABS.map((t) => t.id));
-    return visibleTabs.find((t) => !wallIds.has(t.id))?.id ?? null;
+    return visibleTabs.find((t) => !t.isWall)?.id ?? null;
   }, [visibleTabs, wallRoom]);
 
   // If current tab was hidden, fall back
@@ -451,53 +391,14 @@ function RoomShell({
   };
 
   // Together-room stage — one big surface that mounts the chosen activity.
-  const canvasItems: StageItem[] = [
-    ...visibleTabs.map((tb) => ({
-      id: tb.id,
-      title: tb.label,
-      icon: tb.icon,
-      isWall: WALL_TABS.some((w) => w.id === tb.id),
-    })),
-    // Room info + customization, reachable from the Room menu.
-    { id: "room_details", title: "Room info", icon: "⚙️", isWall: false },
-  ];
-  const renderRoomActivity = (id: string): ReactNode => {
-    if (id === "room_details") return <RoomSettings />;
-    switch (id as ActivityTabId) {
-      case "vision_board":
-        return <VisionBoard />;
-      case "fridge_notes":
-        return <FridgeNotes active />;
-      case "bookshelf":
-        return <Bookshelf />;
-      case "questions":
-        return <QuestionDeck />;
-      case "this_or_that":
-        return <ThisOrThat />;
-      case "the_36":
-        return <The36 />;
-      case "2_truths":
-        return <TwoTruths />;
-      case "truth_or_dare":
-        return <TruthOrDare />;
-      case "one_has_to_go":
-        return <OneHasToGo />;
-      case "pick_a_door":
-        return <PickADoor />;
-      case "rank_it":
-        return <RankIt />;
-      case "watch":
-        return <WatchTogether />;
-      case "dj":
-        // Persistent room: the stage is the library; the player lives in the
-        // bottom bar (MusicRoomProvider in RoomStage owns the engine).
-        return <MusicLibrary />;
-      case "chat":
-        return <ChatWithBoundary />;
-      default:
-        return null;
-    }
-  };
+  // Room info + customization stays reachable from the Room menu regardless
+  // of curation.
+  const canvasItems: StageItem[] = [...visibleTabs, activityById("room_details")].map((a) => ({
+    id: a.id,
+    title: a.label,
+    icon: a.emoji,
+    isWall: Boolean(a.isWall),
+  }));
 
   // One unified room layout for every room type — the Together-room stage,
   // tray, walls and call PiP. Session (time-limited) rooms differ only in that
@@ -568,7 +469,7 @@ function RoomShell({
         <RoomStage
           roomId={roomId}
           items={canvasItems}
-          renderContent={renderRoomActivity}
+          renderContent={renderActivity}
           partnerStatus={partnerStatus}
           partnerName={partnerInfo.name}
           partnerInRoom={partnerInfo.inRoom}

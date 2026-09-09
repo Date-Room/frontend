@@ -12,53 +12,23 @@
  * so guests on any device see the same menu as the host.
  */
 import type { RoomPackage } from "@/lib/rooms";
+import {
+  CURATABLE_ACTIVITIES,
+  type ActivityCategory,
+  type CuratableActivityId,
+  type CuratableActivityMeta,
+} from "@/lib/activityRegistry";
 
-export type CuratableActivityId =
-  | "questions"
-  | "this_or_that"
-  | "the_36"
-  | "2_truths"
-  | "truth_or_dare"
-  | "one_has_to_go"
-  | "pick_a_door"
-  | "rank_it"
-  | "watch"
-  | "dj"
-  | "vision_board"
-  | "fridge";
-
-export type ActivityCategory = "games" | "watch" | "music" | "walls";
-
-export type CuratableActivityMeta = {
-  id: CuratableActivityId;
-  label: string;
-  tagline: string;
-  emoji: string;
-  category: ActivityCategory;
-};
+// The activity list itself lives in the registry; this module owns the
+// package/curation gating. Re-exported so existing consumers keep working.
+export { CURATABLE_ACTIVITIES };
+export type { ActivityCategory, CuratableActivityId, CuratableActivityMeta };
 
 export type RoomPlanSnapshot = {
   package: RoomPackage;
   curatedActivityIds: CuratableActivityId[];
   maxParticipants?: number;
 };
-
-/** The curatable date activities. `chat` and room management are always
- *  available and intentionally excluded here. */
-export const CURATABLE_ACTIVITIES: CuratableActivityMeta[] = [
-  { id: "vision_board", label: "Vision Board", tagline: "Pin the life you're building together.", emoji: "✨", category: "walls" },
-  { id: "fridge", label: "Bookshelf", tagline: "Books, links, and a shared watch list.", emoji: "📚", category: "walls" },
-  { id: "watch", label: "Watch party", tagline: "Sync up a video and watch together.", emoji: "🎬", category: "watch" },
-  { id: "dj", label: "Music / DJ", tagline: "Take turns picking the soundtrack.", emoji: "🎧", category: "music" },
-  { id: "questions", label: "21 Questions", tagline: "Pick a deck, swap, take turns.", emoji: "💬", category: "games" },
-  { id: "this_or_that", label: "This or That", tagline: "Pick blind, reveal together.", emoji: "⚖️", category: "games" },
-  { id: "the_36", label: "The 36", tagline: "Three sets of twelve. Get closer.", emoji: "🫶", category: "games" },
-  { id: "2_truths", label: "2 Truths and a Lie", tagline: "Spot the lie. Swap roles.", emoji: "🎭", category: "games" },
-  { id: "truth_or_dare", label: "Truth or Dare", tagline: "Three cards each. Two skips.", emoji: "🔥", category: "games" },
-  { id: "one_has_to_go", label: "One Has To Go", tagline: "Cut one. Guess theirs. Defend it.", emoji: "🗑️", category: "games" },
-  { id: "pick_a_door", label: "Pick a Door", tagline: "Choose blind. Answer what's behind it.", emoji: "🚪", category: "games" },
-  { id: "rank_it", label: "Rank It", tagline: "Order five things. Compare priorities.", emoji: "📊", category: "games" },
-];
 
 /** Free Try tier: only these three are available. */
 export const TRY_ACTIVITY_IDS: CuratableActivityId[] = ["watch", "dj", "questions"];

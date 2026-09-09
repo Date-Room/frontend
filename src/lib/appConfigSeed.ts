@@ -1,16 +1,16 @@
 /**
  * Canonical product config seeded into catalog (`app_config` row).
  */
+import { ACTIVITIES, type ActivityId } from "@/lib/activityRegistry";
 
-export const ACTIVITY_TAB_SEEDS = [
-  { id: "questions", label: "Questions", icon: "💬" },
-  { id: "thisorthat", label: "This or That", icon: "⚖️" },
-  { id: "watch", label: "Watch", icon: "📺" },
-  { id: "dj", label: "DJ", icon: "🎵" },
-  { id: "chat", label: "Chat", icon: "💭" },
-] as const;
+export type ActivityTabId = Exclude<ActivityId, "room_details">;
 
-export type ActivityTabId = (typeof ACTIVITY_TAB_SEEDS)[number]["id"];
+/** In-room activity tabs, derived from the activity registry so the seeded
+ *  catalog can't drift from what the app actually stages. */
+export const ACTIVITY_TAB_SEEDS: { id: ActivityTabId; label: string; icon: string }[] =
+  ACTIVITIES.filter((a): a is typeof a & { id: ActivityTabId } => a.id !== "room_details").map(
+    (a) => ({ id: a.id, label: a.label, icon: a.emoji }),
+  );
 
 export type PricingPlanSeed = {
   price: number;
