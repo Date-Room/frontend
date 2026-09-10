@@ -14,6 +14,7 @@ import {
   reduceRankIt,
 } from "@/lib/activities/rankIt";
 import { useCinematic } from "@/lib/stagecraft/cinematic";
+import { setHelpNow } from "@/lib/activityHelpNow";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 
 /**
@@ -55,6 +56,19 @@ export function RankIt() {
     [round, insights],
   );
   const { stage, witnessed } = useCinematic(revealing, steps);
+
+  // "Right now" help snapshot (see lib/activityHelpNow).
+  useEffect(() => {
+    const finished = rankItIsFinished(state);
+    const snap = finished
+      ? { now: "That's the set. Tap Play again for another run.", step: 3 }
+      : state.phase === "revealing"
+        ? { now: "Watch the orders compare — the widest gap is the conversation.", step: 2 }
+        : mine
+          ? { now: `Locked. Waiting for ${partnerName} to lock theirs.`, step: 1 }
+          : { now: "Drag the five into YOUR order, best at the top. Then lock it.", step: 0 };
+    setHelpNow("rank_it", snap);
+  }, [state, mine, partnerName]);
 
   if (rankItIsFinished(state)) {
     return (

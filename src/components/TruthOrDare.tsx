@@ -17,6 +17,7 @@ import {
 import { prefersReducedMotion } from "@/lib/stagecraft/cinematic";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
 import { useTypewriter } from "@/lib/stagecraft/typewriter";
+import { setHelpNow } from "@/lib/activityHelpNow";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 
 /**
@@ -44,6 +45,31 @@ export function TruthOrDare() {
   const myTokens = state.tokens[senderId] ?? 0;
   const theirTokens = Object.entries(state.tokens).reduce((n, [k, v]) => (k === senderId ? n : n + v), 0);
   const myBurnsLeft = TOD_BURNS_PER_NIGHT - (state.burns_used[senderId] ?? 0);
+
+  // "Right now" help snapshot (see lib/activityHelpNow).
+  useEffect(() => {
+    const snap =
+      state.phase === "done"
+        ? state.vault.length > 0
+          ? { now: "The vault opens — talk through what got burned or dodged.", step: 4 }
+          : { now: "That's the night. Shuffle a new one when you like.", step: 4 }
+        : state.phase === "deck"
+          ? { now: "Tap the deck to start the turn.", step: 0 }
+          : state.phase === "decide"
+            ? iPerform
+              ? { now: `${partnerName} is choosing truth or dare FOR you. Wait for the coin.`, step: 0 }
+              : { now: `Choose for ${partnerName}: truth or dare.`, step: 0 }
+            : state.phase === "stakes"
+              ? iPerform
+                ? { now: "Your card. Take it (1 token), Double it (2), or Burn it away.", step: 1 }
+                : { now: `${partnerName} decides: take, double, or burn.`, step: 1 }
+              : state.phase === "perform"
+                ? iPerform
+                  ? { now: "Do it or answer it — out loud, on camera.", step: 2 }
+                  : { now: `Watch closely. You rule this next: delivered or dodged.`, step: 3 }
+                : { now: "The ruling is in. Next turn.", step: 3 };
+    setHelpNow("truth_or_dare", snap);
+  }, [state.phase, state.vault.length, iPerform, partnerName]);
 
   const accentBtn = "rounded-full text-primary-foreground transition hover:opacity-90 disabled:opacity-50";
   const accentStyle = { backgroundColor: "var(--room-accent)" } as const;

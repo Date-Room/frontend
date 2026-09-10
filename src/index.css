@@ -1672,3 +1672,12 @@
   50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--room-accent, #d4826a) 45%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) { .dr-sound-tile { animation: none; } }
+
+/* Help button pulse — two soft rings when the game's "right now" step
+   changes, then still. A reminder, never a nag. */
+.dr-help-pulse { animation: dr-help-pulse 1.2s ease-in-out 2; color: var(--room-accent); }
+@keyframes dr-help-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--room-accent, #d4826a) 0%, transparent); }
+  50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--room-accent, #d4826a) 40%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .dr-help-pulse { animation: none; } }

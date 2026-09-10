@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useReducedActivity } from "@/lib/activities/useReducedActivity";
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/lib/activities/oneHasToGo";
 import { useCinematic } from "@/lib/stagecraft/cinematic";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
+import { setHelpNow } from "@/lib/activityHelpNow";
 import { StagePrompt } from "@/lib/stagecraft/StagePrompt";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 
@@ -103,6 +105,20 @@ export function OneHasToGo() {
   const survivorNames = onVerdict
     ? round.options.filter((_, i) => i !== myCut && i !== theirCut).map((o) => o.label)
     : [];
+
+  // "Right now" help snapshot (see lib/activityHelpNow).
+  useEffect(() => {
+    const snap = revealing
+      ? { now: "The cuts fall. Say why yours had to go, then tap Next round.", step: 2 }
+      : guessing
+        ? iGuessed
+          ? { now: `Locked. Waiting for ${partnerName}…`, step: 1 }
+          : { now: `Now tap the one you think ${partnerName} cut.`, step: 1 }
+        : iCut
+          ? { now: `Sealed. Waiting for ${partnerName} to cut.`, step: 0 }
+          : { now: "Tap the one you'd get rid of forever.", step: 0 };
+    setHelpNow("one_has_to_go", snap);
+  }, [revealing, guessing, iGuessed, iCut, partnerName]);
 
   const title = !revealing
     ? guessing

@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
 import { ActivityHelp, hasActivityHelp } from "@/components/ActivityHelp";
+import { useHelpNow } from "@/lib/activityHelpNow";
 import { MusicPlayerBar, MusicRoomProvider } from "@/components/MusicRoom";
 import { ActivityBoundary } from "@/components/RoomErrorBoundary";
 import { useRoomSession } from "@/context/RoomSessionContext";
@@ -227,6 +228,21 @@ export function RoomStage({
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  // The ? button pulses briefly when the game's "right now" step changes —
+  // a reminder of where help lives at exactly the moments its answer is new.
+  const helpSnap = useHelpNow(staged);
+  const [helpPulse, setHelpPulse] = useState(false);
+  const prevStepRef = useRef<number | null>(null);
+  useEffect(() => {
+    const step = helpSnap?.step ?? null;
+    if (step != null && prevStepRef.current != null && step !== prevStepRef.current) {
+      setHelpPulse(true);
+      const t = window.setTimeout(() => setHelpPulse(false), 2600);
+      prevStepRef.current = step;
+      return () => window.clearTimeout(t);
+    }
+    prevStepRef.current = step;
+  }, [helpSnap?.step]);
   // First-open explainer: the first time this person ever stages an activity
   // that has help, show the how-to-play card before they play (play-testers
   // never found the ? button — "press" went unexplained). The lobby, chat and
@@ -589,7 +605,10 @@ export function RoomStage({
                 type="button"
                 onClick={() => setHelpOpen(true)}
                 aria-label="How this works"
-                className="ml-auto flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/5 hover:text-cream"
+                className={[
+                  "ml-auto flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/5 hover:text-cream",
+                  helpPulse ? "dr-help-pulse" : "",
+                ].join(" ")}
               >
                 <HelpCircle className="h-4 w-4" />
               </button>

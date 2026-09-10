@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useReducedActivity } from "@/lib/activities/useReducedActivity";
@@ -8,6 +8,7 @@ import {
   reduceTwoTruths,
   twoTruthsFromJson,
 } from "@/lib/activities/twoTruths";
+import { setHelpNow } from "@/lib/activityHelpNow";
 import { useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
 import { StagePrompt } from "@/lib/stagecraft/StagePrompt";
@@ -57,6 +58,28 @@ export function TwoTruths() {
 
   const round = state.round;
   const isStoryteller = round?.storyteller_id === senderId;
+
+  // "Right now" help snapshot (see lib/activityHelpNow).
+  useEffect(() => {
+    const phase = round?.phase ?? null;
+    const snap =
+      phase == null
+        ? { now: "Start a round — one of you writes, the other reads.", step: 0 }
+        : phase === "composing"
+          ? isStoryteller
+            ? { now: "Write two truths and one lie. Mark the lie, then seal them.", step: 0 }
+            : { now: `${partnerName} is writing. Get your poker face ready.`, step: 1 }
+          : phase === "guessing"
+            ? isStoryteller
+              ? round?.pressed != null
+                ? { now: "You've been pressed — say more about that one, out loud.", step: 2 }
+                : { now: `${partnerName} is reading you. Give nothing away.`, step: 2 }
+              : round?.pressed == null && !skippedPress
+                ? { now: `Your one press: tap a statement and ${partnerName} must say more. Or skip to the call.`, step: 2 }
+                : { now: "Choose your bet (1 safe, 2 bold), then tap the statement you think is the lie.", step: 3 }
+            : { now: "The truths seal green, then the lie flips over.", step: 4 };
+    setHelpNow("2_truths", snap);
+  }, [round?.phase, round?.pressed, isStoryteller, skippedPress, partnerName]);
   const myScore = state.scores[senderId] ?? 0;
   const theirScore = Object.entries(state.scores).reduce((n, [k, v]) => (k === senderId ? n : n + v), 0);
 
