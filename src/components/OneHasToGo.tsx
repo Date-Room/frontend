@@ -15,6 +15,8 @@ import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
 import { setHelpNow } from "@/lib/activityHelpNow";
 import { StagePrompt } from "@/lib/stagecraft/StagePrompt";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
  * One Has To Go — table-cards reveal. Four big cards on the table; you cut
@@ -39,6 +41,7 @@ export function OneHasToGo() {
     reduceOhtg,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
 
   const myReads = state.reads[senderId] ?? 0;
   const theirReads = Object.entries(state.reads).reduce(
@@ -329,9 +332,13 @@ export function OneHasToGo() {
                   : `${listOf(survivorNames)} live on. Tell ${partnerName} why ${round.options[myCut].label} had to go.`}
               </p>
               {readsBar}
-              <Button onClick={nextRound} className={accentBtn} style={accentStyle}>
-                {state.round + 1 >= OHTG_ROUNDS.length ? "Finish" : "Next round"}
-              </Button>
+              {tryRoom && state.round + 1 >= TRY_CAPS.one_has_to_go_rounds ? (
+                <TryCurtain line="Seven more rounds wait in a date room, ending with The Dangerous One." />
+              ) : (
+                <Button onClick={nextRound} className={accentBtn} style={accentStyle}>
+                  {state.round + 1 >= OHTG_ROUNDS.length ? "Finish" : "Next round"}
+                </Button>
+              )}
             </div>
           </div>
         ) : revealing ? null : guessing ? (

@@ -20,6 +20,8 @@ import { useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { GameLanding } from "@/lib/stagecraft/GameLanding";
 import { useTypewriter } from "@/lib/stagecraft/typewriter";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
  * Open Book (activity id "questions") — draft topics, not questions. See
@@ -47,6 +49,8 @@ export function QuestionDeck() {
     reduceOb,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
+  const obCapped = tryRoom && state.phase === "play" && state.card >= TRY_CAPS.open_book_cards;
   const [draftText, setDraftText] = useState("");
   const [binPick, setBinPick] = useState<string | null>(null);
   const [swapPick, setSwapPick] = useState<string | null>(null);
@@ -495,7 +499,10 @@ export function QuestionDeck() {
               })}
             </div>
 
-            {typed.complete &&
+            {obCapped && (
+              <TryCurtain line="Three cards were the taste. The full drafted night lives in a date room." />
+            )}
+            {!obCapped && typed.complete &&
               (card.by !== senderId ? (
                 // The card is theirs — I answer it.
                 !state.answered ? (

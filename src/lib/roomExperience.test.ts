@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   CURATABLE_ACTIVITIES,
-  TRY_ACTIVITY_IDS,
+  TRY_DEFAULT_GAME_IDS,
+  TRY_GAME_LIMIT,
+  TRY_UTILITY_IDS,
   resolveCuratedActivities,
 } from "./roomExperience";
 
@@ -27,8 +29,22 @@ describe("resolveCuratedActivities", () => {
     expect(resolved).toEqual(["watch", "pick_a_door"]);
   });
 
-  it("try tier is capped to its three regardless of curation", () => {
-    const resolved = resolveCuratedActivities("single_pass", null);
-    expect(resolved).toEqual([...TRY_ACTIVITY_IDS]);
+  it("try tier: utilities always ride, first two chosen games survive", () => {
+    const resolved = resolveCuratedActivities("single_pass", [
+      "pick_a_door",
+      "truth_or_dare",
+      "rank_it",
+    ] as never[]);
+    expect(resolved).toEqual([...TRY_UTILITY_IDS, "pick_a_door", "truth_or_dare"]);
+    expect(resolved.filter((id) => !TRY_UTILITY_IDS.includes(id))).toHaveLength(TRY_GAME_LIMIT);
+    // No curation falls back to the default taste; walls never allowed.
+    expect(resolveCuratedActivities("single_pass", null)).toEqual([
+      ...TRY_UTILITY_IDS,
+      ...TRY_DEFAULT_GAME_IDS,
+    ]);
+    expect(resolveCuratedActivities("single_pass", ["vision_board"] as never[])).toEqual([
+      ...TRY_UTILITY_IDS,
+      ...TRY_DEFAULT_GAME_IDS,
+    ]);
   });
 });

@@ -22,6 +22,8 @@ import { GameLanding } from "@/lib/stagecraft/GameLanding";
 import { useTypewriter } from "@/lib/stagecraft/typewriter";
 import { setHelpNow } from "@/lib/activityHelpNow";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
  * Closer (activity id "the_36") — the 36 questions in stoppable stretches.
@@ -49,6 +51,7 @@ export function Closer() {
     reduceCloser,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
 
   const [stretchPick, setStretchPick] = useState<3 | 6 | 12>(3);
   const [startAt, setStartAt] = useState(0);
@@ -130,7 +133,7 @@ export function Closer() {
         ]}
       >
         <div className="flex gap-2.5">
-          {([3, 6, 12] as const).map((v) => (
+          {(tryRoom ? ([3] as const) : ([3, 6, 12] as const)).map((v) => (
             <button
               key={v}
               type="button"
@@ -330,11 +333,13 @@ export function Closer() {
           </p>
         ))}
         <div className="flex flex-wrap justify-center gap-2">
-          {!atEnd && (
+          {!atEnd && tryRoom ? (
+            <TryCurtain line="Your place is saved at this question. The next stretch continues in a date room." />
+          ) : !atEnd ? (
             <Button onClick={() => emit("continue")} disabled={iVoted} className={accentBtn} style={accentStyle}>
               {iVoted ? `waiting for ${partnerName}…` : `${state.stretch} more`}
             </Button>
-          )}
+          ) : null}
           {atEnd ? (
             <Button onClick={() => emit("start_eyes", { at: new Date().toISOString() })} className={accentBtn} style={accentStyle}>
               The last four minutes

@@ -60,8 +60,12 @@ export const CURATABLE_ACTIVITIES: CuratableActivityMeta[] = [
   { id: "rank_it", label: "Rank It", tagline: "Order five things. Compare priorities.", emoji: "📊", category: "games" },
 ];
 
-/** Free Try tier: only these three are available. */
-export const TRY_ACTIVITY_IDS: CuratableActivityId[] = ["watch", "dj", "questions"];
+/** Free Try tier — the tasting menu. Utilities always ride along; hosts
+ *  choose any TRY_GAME_LIMIT games from the full library, and each chosen
+ *  game plays only its first chunk in-room (see lib/tryDemo). */
+export const TRY_UTILITY_IDS: CuratableActivityId[] = ["watch", "dj"];
+export const TRY_GAME_LIMIT = 2;
+export const TRY_DEFAULT_GAME_IDS: CuratableActivityId[] = ["this_or_that", "the_36"];
 
 /** Together / Crew persistent rooms only. */
 export const SUBSCRIPTION_WALL_ACTIVITY_IDS: CuratableActivityId[] = ["vision_board", "fridge"];
@@ -74,7 +78,9 @@ export function isSubscriptionPackage(pkg: RoomPackage | null | undefined): bool
 
 /** Activity ids the host is *allowed* to pick for a given package. */
 export function availableActivityIdsForPackage(pkg: RoomPackage): CuratableActivityId[] {
-  if (isTryPackage(pkg)) return [...TRY_ACTIVITY_IDS];
+  if (isTryPackage(pkg)) {
+    return CURATABLE_ACTIVITIES.filter((a) => a.category !== "walls").map((a) => a.id);
+  }
   if (isSubscriptionPackage(pkg)) {
     return CURATABLE_ACTIVITIES.map((a) => a.id);
   }
@@ -88,6 +94,9 @@ export function isTryPackage(pkg: RoomPackage): boolean {
 /** Default curation when a host first lands on the package — everything
  *  they're entitled to is pre-selected. */
 export function defaultCuratedForPackage(pkg: RoomPackage): CuratableActivityId[] {
+  // Try preselects the default taste (utilities + 2 games), not the whole
+  // menu — the host swaps games in and out from there.
+  if (isTryPackage(pkg)) return normalizeTryCuration(null);
   return availableActivityIdsForPackage(pkg);
 }
 
@@ -97,10 +106,22 @@ export function activityMeta(id: CuratableActivityId): CuratableActivityMeta {
 
 /** Resolve the effective activity menu for a room — package caps what
  *  can appear; host curation picks within that cap. */
+/** Mirror of the backend's Try normalization: utilities + first 2 games. */
+export function normalizeTryCuration(
+  curated: CuratableActivityId[] | null | undefined,
+): CuratableActivityId[] {
+  const allowed = new Set(availableActivityIdsForPackage("single_pass"));
+  const utilities = new Set<string>(TRY_UTILITY_IDS);
+  const games = (curated ?? []).filter((id) => allowed.has(id) && !utilities.has(id));
+  const kept = games.length ? games.slice(0, TRY_GAME_LIMIT) : [...TRY_DEFAULT_GAME_IDS];
+  return [...TRY_UTILITY_IDS, ...kept];
+}
+
 export function resolveCuratedActivities(
   pkg: RoomPackage,
   curated: CuratableActivityId[] | null | undefined,
 ): CuratableActivityId[] {
+  if (isTryPackage(pkg)) return normalizeTryCuration(curated);
   // Subscription (Together / Crew) rooms are permanent: the tier IS the
   // entitlement, and a curated list stored at creation would freeze the menu
   // forever — rooms made before a game shipped would never see it

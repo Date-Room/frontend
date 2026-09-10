@@ -16,6 +16,8 @@ import { useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
 import { StagePrompt } from "@/lib/stagecraft/StagePrompt";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
  * This or That — the run. Two halves own the room; a 7s clock pressures the
@@ -38,6 +40,7 @@ export function ThisOrThat() {
     reduceTot,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
 
   const set = totSetForRun(state.run);
   const roundIndex = Math.min(state.round, TOT_ROUNDS_PER_RUN - 1);
@@ -173,9 +176,13 @@ export function ThisOrThat() {
           )}
         </div>
         <div className="flex justify-center">
-          <Button onClick={() => emit("new_run")} className={accentBtn} style={accentStyle}>
-            Run a new set
-          </Button>
+          {tryRoom ? (
+            <TryCurtain line="A date room deals a fresh set of five, and the sets keep coming." />
+          ) : (
+            <Button onClick={() => emit("new_run")} className={accentBtn} style={accentStyle}>
+              Run a new set
+            </Button>
+          )}
         </div>
       </div>
     );

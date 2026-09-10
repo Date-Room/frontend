@@ -19,6 +19,8 @@ import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
 import { useTypewriter } from "@/lib/stagecraft/typewriter";
 import { setHelpNow } from "@/lib/activityHelpNow";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
  * Truth or Dare — the night. Your date deals and decides truth or dare for
@@ -38,6 +40,7 @@ export function TruthOrDare() {
     reduceTod,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
 
   const heat = todHeatForTurn(state.turn);
   const iPerform = state.performer_id === senderId;
@@ -383,9 +386,13 @@ export function TruthOrDare() {
               <div className="flex flex-col items-center gap-3 animate-fade-in">
                 {tokensBar}
                 <div className="flex gap-2">
+                  {tryRoom && state.turn + 1 >= TRY_CAPS.truth_or_dare_turns ? (
+                    <TryCurtain line="One card each was the taste. Six a night, Warm to Bare, in a date room." />
+                  ) : (
                   <Button onClick={() => emit("next_turn")} className={accentBtn} style={accentStyle}>
                     {state.turn + 1 >= TOD_NIGHT_TURNS ? "See the night" : "Next card"}
                   </Button>
+                  )}
                   {state.turn + 1 < TOD_NIGHT_TURNS && (
                     <Button onClick={() => emit("end_night")} variant="outline" className={quietBtn}>
                       End the night

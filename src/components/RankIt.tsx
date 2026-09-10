@@ -16,6 +16,8 @@ import {
 import { useCinematic } from "@/lib/stagecraft/cinematic";
 import { setHelpNow } from "@/lib/activityHelpNow";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
  * Rank It — hosted reveal. Order by real drag (arrows stay as the keyboard
@@ -40,6 +42,7 @@ export function RankIt() {
     reduceRankIt,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
 
   const round = RANK_ROUNDS[state.round];
   const mine = state.rankings[senderId];
@@ -155,6 +158,7 @@ export function RankIt() {
           insights={insights}
           partnerName={partnerName}
           finishLabel={state.round + 1 >= RANK_ROUNDS.length ? "Finish" : "Next round"}
+          curtain={tryRoom && state.round + 1 >= TRY_CAPS.rank_it_rounds}
           onNext={() => {
             const w = round.items[insights.widest];
             emit(
@@ -435,6 +439,7 @@ function FlipBoard({
   insights,
   partnerName,
   onNext,
+  curtain = false,
   finishLabel,
 }: {
   roundIndex: number;
@@ -443,6 +448,7 @@ function FlipBoard({
   insights: ReturnType<typeof rankInsights>;
   partnerName: string;
   onNext: () => void;
+  curtain?: boolean;
   finishLabel: string;
 }) {
   const round = RANK_ROUNDS[roundIndex];
@@ -520,9 +526,13 @@ function FlipBoard({
             </>
           )}
         </p>
+        {curtain ? (
+          <TryCurtain line="Six more rankings wait in a date room." />
+        ) : (
         <Button onClick={onNext} className={accentBtn} style={accentStyle}>
           {finishLabel}
         </Button>
+        )}
       </div>
     </div>
   );

@@ -13,6 +13,8 @@ import { useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
 import { StagePrompt } from "@/lib/stagecraft/StagePrompt";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
  * 2 Truths and a Lie — press and stakes. Statements deal in one at a time;
@@ -48,6 +50,7 @@ export function TwoTruths() {
     reduceTwoTruths,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
 
   const [drafts, setDrafts] = useState(["", "", ""]);
   const [lie, setLie] = useState<number | null>(null);
@@ -408,9 +411,13 @@ export function TwoTruths() {
         {settled && (
           <div className="flex flex-col items-center gap-3 animate-fade-in">
             {scoreboard}
-            <Button onClick={() => emit("reveal_and_swap")} className={accentBtn} style={accentStyle}>
-              Next round — swap
-            </Button>
+            {tryRoom && state.rounds_played + 1 >= TRY_CAPS.two_truths_rounds ? (
+              <TryCurtain line="You both got one lie in. The rematch lives in a date room." />
+            ) : (
+              <Button onClick={() => emit("reveal_and_swap")} className={accentBtn} style={accentStyle}>
+                Next round — swap
+              </Button>
+            )}
           </div>
         )}
       </div>

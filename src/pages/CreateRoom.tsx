@@ -39,6 +39,8 @@ import { createRoom, updateRoom, type RoomPackage, type RoomPersistence } from "
 import {
   CURATABLE_ACTIVITIES,
   availableActivityIdsForPackage,
+  TRY_GAME_LIMIT,
+  TRY_UTILITY_IDS,
   defaultCuratedForPackage,
   isTryPackage,
   activityMeta,
@@ -296,12 +298,19 @@ export default function CreateRoom() {
     [planMeta.package],
   );
 
+  const tryPlan = isTryPackage(planMeta.package);
   function toggleActivity(id: CuratableActivityId) {
     if (!availableActivityIds.has(id)) return;
+    // Try: Watch + Music always ride along — not toggleable off.
+    if (tryPlan && (TRY_UTILITY_IDS as string[]).includes(id)) return;
     setCuratedActivities((cur) => {
       if (cur.includes(id)) {
         const next = cur.filter((x) => x !== id);
         return next.length ? next : cur; // keep at least one
+      }
+      if (tryPlan) {
+        const games = cur.filter((x) => !(TRY_UTILITY_IDS as string[]).includes(x));
+        if (games.length >= TRY_GAME_LIMIT) return cur; // pick 2 — swap one out first
       }
       return [...cur, id];
     });
@@ -807,9 +816,9 @@ export default function CreateRoom() {
               <div className="mb-6 flex items-start gap-3 rounded-2xl border border-primary/25 bg-primary/[0.07] px-4 py-3.5">
                 <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
                 <p className="text-xs leading-relaxed text-cream/85">
-                  <span className="font-semibold text-cream">Try plan:</span> Watch party, Music and
-                  21 Questions are included. Unlock the full library — games, deeper decks and more —
-                  with a Date Pack, Long Pack, or Together.
+                  <span className="font-semibold text-cream">Try plan:</span> Watch and Music are
+                  included. Pick any {TRY_GAME_LIMIT} games to taste — you play each one's opening
+                  rounds free, and the whole night unlocks with a Date Pack, Long Pack, or Together.
                 </p>
               </div>
             )}
@@ -872,7 +881,9 @@ export default function CreateRoom() {
             </div>
 
             <p className="mt-5 text-center text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-              {curatedActivities.length} selected
+              {tryPlan
+                ? `${curatedActivities.filter((id) => !(TRY_UTILITY_IDS as string[]).includes(id)).length} of ${TRY_GAME_LIMIT} games picked`
+                : `${curatedActivities.length} selected`}
             </p>
 
             <div className="mt-6 flex justify-center">
