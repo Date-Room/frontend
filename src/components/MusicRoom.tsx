@@ -785,7 +785,9 @@ export function MusicRoomProvider({
     } catch {
       /* ignore */
     }
-    setNeedsAudioGesture(false);
+    // Deliberately NOT clearing needsAudioGesture here: the engines' PLAYING
+    // events do that. Clearing on the press hid the recovery tile while the
+    // retry was still blocked (Safari), leaving silence with no way out.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [volume]);
 
@@ -984,12 +986,12 @@ export function MusicRoomProvider({
         <div
           className={
             needsAudioGesture && playing
-              ? "fixed bottom-20 right-3 z-50 overflow-hidden rounded-xl border border-white/20 shadow-2xl animate-fade-in"
+              ? "dr-sound-tile fixed bottom-24 left-3 z-[80] overflow-hidden rounded-xl border-2 shadow-2xl animate-fade-in"
               : "pointer-events-none fixed bottom-2 right-2"
           }
           style={
             needsAudioGesture && playing
-              ? { width: 240, height: 150 }
+              ? { width: 280, height: 158, borderColor: "var(--room-accent)" }
               : { width: 320, height: 180, opacity: 0.001, zIndex: -1 }
           }
           aria-hidden={!(needsAudioGesture && playing)}
@@ -1462,13 +1464,22 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
       </button>
 
       {m.needsAudioGesture && m.playing && (
-        <button
-          onClick={m.enableAudio}
-          className="mt-1.5 w-full rounded-full py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
-          style={{ backgroundColor: "var(--room-accent)" }}
-        >
-          Tap to enable audio
-        </button>
+        m.nowPlaying?.source === "soundcloud" ? (
+          <button
+            onClick={m.enableAudio}
+            className="mt-1.5 w-full rounded-full py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+            style={{ backgroundColor: "var(--room-accent)" }}
+          >
+            Tap to enable audio
+          </button>
+        ) : (
+          <p
+            className="mt-1.5 w-full rounded-full py-1.5 text-center text-xs font-medium"
+            style={{ backgroundColor: "color-mix(in srgb, var(--room-accent) 18%, transparent)", color: "var(--room-accent)" }}
+          >
+            Sound is blocked — tap the small video, bottom left ↙
+          </p>
+        )
       )}
     </div>
   );

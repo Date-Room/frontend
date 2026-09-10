@@ -1660,3 +1660,12 @@
   .dr-stage-prompt { animation: none; }
   .dr-stage-prompt::after { animation: none; }
 }
+
+/* Safari sound-recovery tile — pulses a few times so it's findable when it
+   appears next to the player bar, then settles. */
+.dr-sound-tile { animation: dr-sound-pulse 1.5s ease-in-out 4; }
+@keyframes dr-sound-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--room-accent, #d4826a) 0%, transparent); }
+  50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--room-accent, #d4826a) 45%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .dr-sound-tile { animation: none; } }
