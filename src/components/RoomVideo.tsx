@@ -8,6 +8,7 @@ import {
   useLocalParticipant,
   useIsSpeaking,
   useRoomContext,
+  isTrackReference,
 } from "@livekit/components-react";
 import { Track, DisconnectReason, RoomEvent, VideoPresets, setLogLevel, type RoomOptions } from "livekit-client";
 import { toast } from "sonner";
@@ -289,13 +290,18 @@ function Tile({
   /** Show the whole camera frame (no crop) so both sides see the same thing. */
   contain?: boolean;
 }) {
-  const cameraOff = !participant || participant.publication?.isMuted;
+  // A placeholder ref (no publication yet) can't feed <VideoTrack> — treat it
+  // like a muted camera and show the avatar instead.
+  const videoTrackRef =
+    participant && isTrackReference(participant) && !participant.publication.isMuted
+      ? participant
+      : undefined;
   const lowPower = useLowPowerMode();
   return (
     <div className="relative w-full h-full overflow-hidden rounded-2xl bg-black border border-white/[0.08]"
       style={{ boxShadow: "0 12px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)" }}
     >
-      {cameraOff || !participant ? (
+      {!videoTrackRef ? (
         participant ? (
           <SpeakingAvatar trackRef={participant} label={label} />
         ) : (
@@ -306,7 +312,7 @@ function Tile({
       ) : (
         <>
           <VideoTrack
-            trackRef={participant}
+            trackRef={videoTrackRef}
             className={`w-full h-full ${contain ? "object-contain" : "object-cover"} ${isLocal ? "scale-x-[-1]" : ""}`}
             style={{ filter: lowPower ? LITE_CSS : BEAUTY_CSS }}
           />

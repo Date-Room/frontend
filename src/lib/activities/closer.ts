@@ -66,6 +66,10 @@ export const CL_EYES_UNLOCK = 6;
 export const CL_NOTE_MAX = 140;
 
 export type ClVerdict = "answered" | "half" | "dodged";
+
+export function isClVerdict(v: unknown): v is ClVerdict {
+  return v === "answered" || v === "half" || v === "dodged";
+}
 export type ClPhase = "setup" | "turns" | "keep" | "landing" | "eyes" | "done";
 
 export type ClRuling = { q: number; answerer: string; verdict: ClVerdict };
@@ -156,8 +160,8 @@ export function reduceCloser(current: ClState, event: ClEvent): ClState {
       if (current.phase !== "turns" || current.sub !== "ruling" || current.answerer_id == null) return current;
       if (me === current.answerer_id) return current;
       const v = event.payload.verdict;
-      if (v !== "answered" && v !== "half" && v !== "dodged") return current;
-      const rulings = [...current.rulings, { q: current.n, answerer: current.answerer_id, verdict: v }];
+      if (!isClVerdict(v)) return current;
+      const rulings: ClRuling[] = [...current.rulings, { q: current.n, answerer: current.answerer_id, verdict: v }];
       if (current.turn === 0) {
         return { ...current, rulings, turn: 1, sub: "answering", answerer_id: null };
       }
