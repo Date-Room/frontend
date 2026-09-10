@@ -14,6 +14,8 @@ import { setHelpNow } from "@/lib/activityHelpNow";
 import { prefersReducedMotion, useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { useTypewriter } from "@/lib/stagecraft/typewriter";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
  * Pick a Door — game-show reveal, now strictly turn-based: the reveal stages
@@ -38,6 +40,8 @@ export function PickADoor() {
     reducePickADoor,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
+  const padCapped = tryRoom && state.round + 1 >= TRY_CAPS.pick_a_door_rounds;
 
   const accentBtn = "rounded-full text-primary-foreground transition hover:opacity-90 disabled:opacity-50";
   const accentStyle = { backgroundColor: "var(--room-accent)" } as const;
@@ -291,9 +295,13 @@ export function PickADoor() {
                     <span className="font-serif">{seconds}</span>
                   </div>
                   {state.stage === lastStage ? (
-                    <Button onClick={() => emit("next_round", { round: state.round })} className={accentBtn} style={accentStyle}>
-                      {finishLabel}
-                    </Button>
+                    padCapped ? (
+                      <TryCurtain line="Six more doors wait in a date room, up to The Big One." />
+                    ) : (
+                      <Button onClick={() => emit("next_round", { round: state.round })} className={accentBtn} style={accentStyle}>
+                        {finishLabel}
+                      </Button>
+                    )
                   ) : iOwnStage ? (
                     <Button
                       onClick={() => emit("advance_stage", { round: state.round, stage: state.stage + 1 })}
