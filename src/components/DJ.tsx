@@ -11,6 +11,7 @@ import {
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
 import { getLimits } from "@/lib/catalogRuntime";
+import { ensureYtShim } from "@/lib/ytEmbedPlayer";
 import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/types/youtubeIframeApi";
 import { cn } from "@/lib/utils";
 
