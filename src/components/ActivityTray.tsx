@@ -278,7 +278,7 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
                 <div key={`${p.sender_id}-${p.slot}`} className="flex items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-cream truncate">
-                      {p.name || (isSelf ? "You" : "Guest")} {isSelf && <span className="text-muted-foreground text-xs">· you</span>}
+                      {(typeof p.name === "string" && p.name) || (isSelf ? "You" : "Guest")} {isSelf && <span className="text-muted-foreground text-xs">· you</span>}
                     </p>
                     <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                       Seat {String(p.slot || "?").toUpperCase()} {p.is_host ? "· host" : ""}

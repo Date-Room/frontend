@@ -126,7 +126,7 @@ export function parseVisionBoard(raw: Record<string, unknown> | null): VisionBoa
   if (!raw || !Array.isArray(raw.items)) return emptyVisionBoard();
   const items = raw.items
     .filter((x): x is Record<string, unknown> => typeof x === "object" && x !== null)
-    .map((x) => ({
+    .map((x): VisionBoardItem => ({
       id: String(x.id ?? crypto.randomUUID()),
       image_url: String(x.image_url ?? ""),
       caption: String(x.caption ?? ""),
@@ -138,9 +138,7 @@ export function parseVisionBoard(raw: Record<string, unknown> | null): VisionBoa
       z: typeof x.z === "number" ? x.z : 1,
       gradient: typeof x.gradient === "string" ? x.gradient : undefined,
       media_type:
-        x.media_type === "image" || x.media_type === "pdf" || x.media_type === "none"
-          ? x.media_type
-          : undefined,
+        x.media_type === "image" ? "image" : x.media_type === "pdf" ? "pdf" : x.media_type === "none" ? "none" : undefined,
       filename: typeof x.filename === "string" ? x.filename : undefined,
       added_by: typeof x.added_by === "string" ? x.added_by : undefined,
       added_by_name: typeof x.added_by_name === "string" ? x.added_by_name : undefined,
@@ -155,9 +153,9 @@ export function parseFridge(raw: Record<string, unknown> | null): FridgeState {
   if (!raw || !Array.isArray(raw.items)) return emptyFridge();
   const items = raw.items
     .filter((x): x is Record<string, unknown> => typeof x === "object" && x !== null)
-    .map((x) => ({
+    .map((x): FridgeItem => ({
       id: String(x.id ?? crypto.randomUUID()),
-      kind: (x.kind === "link" || x.kind === "watch" ? x.kind : "book") as FridgeItemKind,
+      kind: x.kind === "link" ? "link" : x.kind === "watch" ? "watch" : "book",
       title: String(x.title ?? ""),
       author: typeof x.author === "string" ? x.author : undefined,
       url: typeof x.url === "string" ? x.url : undefined,

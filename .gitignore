@@ -36,3 +36,4 @@ dateroom/backend/.venv/
 *.sln
 *.sw?
 .claude/
+*.tsbuildinfo

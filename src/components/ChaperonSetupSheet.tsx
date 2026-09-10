@@ -7,9 +7,9 @@ import {
   applyCoachBeta,
   COACH_PRICE_BLURB,
   getCoachBetaStatus,
-  type ChaperonStartConfig,
   type CoachBetaStatus,
 } from "@/lib/chaperon";
+import type { ChaperonStartConfig } from "@/hooks/useChaperon";
 
 const PREFS_KEY = "dr_chaperon_prefs";
 
