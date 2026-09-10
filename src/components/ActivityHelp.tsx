@@ -1,191 +1,160 @@
 import { X } from "lucide-react";
+import { useHelpNow } from "@/lib/activityHelpNow";
 
-type HelpSection = { heading: string; bullets: string[] };
-type HelpContent = { title: string; tagline: string; sections: HelpSection[] };
+/**
+ * Per-activity help, redesigned from play-test feedback ("too wordy",
+ * "what does press mean?"). Structure over prose:
+ *  - a RIGHT NOW banner — one imperative line for this exact moment,
+ *    published by the game from its own reducer state (activityHelpNow),
+ *  - a short step map of the whole game, with the current step highlighted
+ *    (a you-are-here pin, not a manual),
+ *  - plain language: any flavorful term (press, stake, burn, cut…) carries
+ *    its meaning in the same sentence, because idioms don't travel.
+ * Static copy says "your date" (names are only known inside the room; the
+ * RIGHT NOW line, built in-game, uses the partner's real name).
+ */
 
-/** Per-activity guidance — what it is, the rules, and the controls. Kept out of
- *  the activities themselves; surfaced from the stage header's help icon. */
+type HelpStep = { glyph: string; name: string; text: string };
+type HelpContent = { title: string; tagline: string; steps: HelpStep[]; note?: string };
+
 const ACTIVITY_HELP: Record<string, HelpContent> = {
-  vision_board: {
-    title: "Vision Board",
-    tagline: "Collect the life you're dreaming up together.",
-    sections: [
-      { heading: "What it is", bullets: ["A shared gallery of photos, notes and goals — trips, a home, a feeling."] },
-      { heading: "How to use it", bullets: [
-        "Type a caption, optionally add a photo or PDF, then Add.",
-        "Tap any dream to view, edit, or remove it.",
-        "Pin up to 2 dreams — they pop out and float on the room.",
-      ] },
+  pick_a_door: {
+    title: "Pick a Door",
+    tagline: "Choose blind. Answer what's behind it.",
+    steps: [
+      { glyph: "🚪", name: "Pick a door", text: "Three doors, no clues. Tap one and wait for it to lock." },
+      { glyph: "💬", name: "First door opens", text: "Whoever picked first reads their question and answers it out loud." },
+      { glyph: "🔁", name: "Second door opens", text: "Then the other door swings open and it's the other person's turn." },
+      { glyph: "📜", name: "What stayed shut", text: "A door nobody picked stays closed. Its question keeps for another date." },
     ],
-  },
-  fridge_notes: {
-    title: "Fridge",
-    tagline: "Little notes for each other, like on the kitchen fridge.",
-    sections: [
-      { heading: "How to use it", bullets: [
-        "Write a note and tap Add — it stays for both of you.",
-        "Tick “Greet on entry” to show it first when they arrive.",
-        "Pin up to 2 notes to float them on the room.",
-      ] },
-    ],
-  },
-  bookshelf: {
-    title: "Bookshelf",
-    tagline: "Books, links and things to watch together.",
-    sections: [
-      { heading: "How to use it", bullets: [
-        "Add a book, link, or watch item with a title.",
-        "Mark things finished as you go.",
-      ] },
-    ],
-  },
-  questions: {
-    title: "Open Book",
-    tagline: "Draft topics. The night escalates.",
-    sections: [
-      { heading: "How to play", bullets: [
-        "Pick the night's length (15 or 21 questions), then take turns claiming topics. Each topic deals three questions: an opener, a specific, a costly one.",
-        "You each write one question of your own. It replaces a card, and it buys you a veto of one topic your date chose.",
-        "One card at a time, out loud. You answer the cards your date chose or wrote — say \"That's my answer\", and they rule it: answered, half of it, or dodged. React with an emoji, or pass (twice a night).",
-      ] },
-      { heading: "Good to know", bullets: [
-        "Rulings are noticing, not scoring. Dodged and passed questions come back at the end as worth returning to.",
-        "The deck runs Warm, then Real, then Close. Close is explicit; choose those topics on purpose.",
-        "Everything survives to the recap, and later nights deal questions you haven't seen.",
-      ] },
-    ],
+    note: "Pick the same door and you answer it together.",
   },
   this_or_that: {
     title: "This or That",
-    tagline: "Pick fast. Call theirs.",
-    sections: [
-      { heading: "How to play", bullets: [
-        "Five pairs that start easy and stop being easy.",
-        "Pick your side fast — the 7-second clock isn't a penalty, it just stops overthinking. Long pauses get noticed.",
-        "Before the reveal, call which side your date took. Right calls score a read.",
-        "The board at the end keeps every pair, where you split hardest, and where each of you hesitated.",
-      ] },
-    ],
-  },
-  the_36: {
-    title: "Closer",
-    tagline: "The 36 questions, without the homework.",
-    sections: [
-      { heading: "How to play", bullets: [
-        "Commit to a stretch of 3, 6 or 12 questions, never all 36. Every stretch ends on a real off-ramp; stopping saves your place.",
-        "You both answer each question out loud, in turns. Say \"That's my answer\" when you're done, and your date rules it: answered, half of it, or dodged it.",
-        "Each stretch you both keep one line you heard. The night can close on four minutes of silent eye contact.",
-      ] },
-      { heading: "Good to know", bullets: [
-        "The 90-second clock is a suggestion; it counts past zero and never cuts you off.",
-        "Set three goes to heavy places. Rulings are noticing, not scoring, and dodged questions come back at the end as worth returning to.",
-      ] },
-    ],
-  },
-  "2_truths": {
-    title: "Two Truths & a Lie",
-    tagline: "Press one. Stake your call.",
-    sections: [
-      { heading: "How to play", bullets: [
-        "One of you writes two truths and one lie, then seals them.",
-        "The other may press ONE statement: the writer has to say more about it, out loud.",
-        "Then stake your call: 1 point plays it safe; 2 points means a wrong call hands two points to the liar.",
-        "The truths seal green one at a time before the lie turns over. Swap roles each round.",
-      ] },
+    tagline: "Pick fast. Guess theirs.",
+    steps: [
+      { glyph: "✋", name: "Pick your side", text: "Two options. Tap the one you want before the 7 seconds run out." },
+      { glyph: "👀", name: "Guess their side", text: "Before it shows, tap the side you think your date chose." },
+      { glyph: "✨", name: "The reveal", text: "Their side lights up. Same side or split — both are interesting." },
+      { glyph: "📊", name: "The board", text: "At the end: how often you matched, and how often you guessed each other right." },
     ],
   },
   one_has_to_go: {
     title: "One Has To Go",
     tagline: "Cut one. Guess theirs. Defend it.",
-    sections: [
-      { heading: "How to play", bullets: [
-        "Four things appear. You each secretly eliminate one, forever.",
-        "Before the reveal, guess which one your date cut.",
-        "Then the cuts show, and you defend your decision out loud.",
-      ] },
-      { heading: "The score", bullets: [
-        "Reads count how often you guess each other right. It's not a compatibility score; it's how well you're figuring each other out.",
-      ] },
+    steps: [
+      { glyph: "✂️", name: "Cut one", text: "Four things. Tap the one you'd get rid of forever — your cut is secret for now." },
+      { glyph: "👀", name: "Guess their cut", text: "Tap the one you think your date got rid of." },
+      { glyph: "🃏", name: "The reveal", text: "Both cuts fall off the table. Guessing right earns you a read — a point for knowing them well." },
+      { glyph: "💬", name: "Defend it", text: "Say out loud why yours had to go. That's the fun part." },
     ],
   },
-  pick_a_door: {
-    title: "Pick a Door",
-    tagline: "Choose blind. Answer what's behind it.",
-    sections: [
-      { heading: "How to play", bullets: [
-        "Three doors, each hiding a question. Pick one before you know what's behind it.",
-        "Whoever picked first answers first: their door opens on both screens, they tap \"I'm ready\", answer out loud, then pass it over.",
-        "Then the second door swings open and it's the other person's turn.",
-        "Picking the same door means you answer it together.",
-      ] },
-      { heading: "Good to know", bullets: ["The unpicked door stays closed. Its question keeps for another date."] },
-    ],
-  },
-  rank_it: {
-    title: "Rank It",
-    tagline: "Order five things. Compare priorities.",
-    sections: [
-      { heading: "How to play", bullets: [
-        "Use the arrows to put five things in your order, best first.",
-        "Lock it in. Your date can't see your order until you both have.",
-        "The reveal shows both rankings side by side.",
-      ] },
-      { heading: "The point", bullets: [
-        "Where you're furthest apart is highlighted. That's not a problem, it's the conversation: tell each other why.",
-      ] },
+  "2_truths": {
+    title: "Two Truths & a Lie",
+    tagline: "Spot the lie. Dare to bet on it.",
+    steps: [
+      { glyph: "✍️", name: "Write & mark", text: "One of you writes two true things and one made-up one, marks the lie, and seals them." },
+      { glyph: "👂", name: "Read theirs", text: "The other sees the three statements land one at a time." },
+      { glyph: "✋", name: "Press one", text: "You get ONE press — like a detective pressing for the truth: pick a statement and your date must say more about it, out loud." },
+      { glyph: "🎯", name: "Bet & accuse", text: "Choose your bet: 1 point plays it safe, 2 points means a wrong guess hands 2 to the liar. Then tap the statement you think is the lie." },
+      { glyph: "✨", name: "The flip", text: "The true ones seal green, then the lie turns over. Swap roles next round." },
     ],
   },
   truth_or_dare: {
     title: "Truth or Dare",
-    tagline: "They deal. You deliver. Warm to Bare.",
-    sections: [
-      { heading: "How to play", bullets: [
-        "Your date chooses truth or dare for you. You never pick your own card.",
-        "The card appears; take it, double it for two tokens, or burn it (twice a night).",
-        "Say it out loud. Your date rules delivered or dodged.",
-        "The deck heats up: Warm, then Bold, then Bare. Six cards a night.",
-      ] },
-      { heading: "The vault", bullets: [
-        "Anything burned or dodged isn't gone. It comes back at the end of the night, and you talk about it.",
-      ] },
+    tagline: "Your date deals. You deliver.",
+    steps: [
+      { glyph: "🃏", name: "They deal", text: "Your date picks truth or dare FOR you — you never choose your own card." },
+      { glyph: "✋", name: "Take, double or burn", text: "Take it for 1 token. Double it for 2. Or burn it — throw the card away (you can only burn twice a night)." },
+      { glyph: "💬", name: "Say it out loud", text: "Do the dare or answer the truth, out loud, on camera." },
+      { glyph: "⚖️", name: "The ruling", text: "Your date decides: delivered, or dodged (a dodge means you wriggled out of really answering)." },
+      { glyph: "🔒", name: "The vault", text: "Burned and dodged cards aren't gone — they come back at the end of the night to talk about." },
     ],
+  },
+  rank_it: {
+    title: "Rank It",
+    tagline: "Order five things. Compare.",
+    steps: [
+      { glyph: "↕️", name: "Put them in order", text: "Drag five things into YOUR order, best at the top. Your date can't see yours." },
+      { glyph: "🔒", name: "Lock it in", text: "When you're happy, lock it. The reveal waits until you've both locked." },
+      { glyph: "✨", name: "The reveal", text: "Both orders show side by side, and the board flips between them." },
+      { glyph: "💬", name: "Talk the gap", text: "The item you disagree on most gets highlighted. Tell each other why — that's the point." },
+    ],
+  },
+  questions: {
+    title: "Open Book",
+    tagline: "Draft topics. The night deepens.",
+    steps: [
+      { glyph: "🌙", name: "Choose the night", text: "Pick how long: 15 or 21 questions." },
+      { glyph: "🗂️", name: "Claim topics", text: "Take turns claiming topics — each one deals three questions, easy to deep." },
+      { glyph: "✍️", name: "Write one & veto", text: "You each write one question of your own. Writing also lets you veto — throw out — one topic your date chose." },
+      { glyph: "💬", name: "Answer & rule", text: "You answer the cards your date picked. Say \"That's my answer\", and they rule it: answered, half of it, or dodged (dodged = you slipped around the real question)." },
+    ],
+    note: "Rulings are noticing, not scoring. Dodged and passed questions come back at the end.",
+  },
+  the_36: {
+    title: "Closer",
+    tagline: "The 36 questions, one stretch at a time.",
+    steps: [
+      { glyph: "🎚️", name: "Pick a stretch", text: "Commit to 3, 6 or 12 questions — never all 36 at once. Stopping saves your place." },
+      { glyph: "💬", name: "Answer in turns", text: "You both answer each question out loud. Say \"That's my answer\" when you're done." },
+      { glyph: "⚖️", name: "They rule it", text: "Your date rules what they heard: answered, half of it, or dodged. It's noticing, not scoring." },
+      { glyph: "📝", name: "Keep one line", text: "After each stretch, you each save one line you heard from the other." },
+    ],
+    note: "The night can end with four minutes of quiet eye contact. It unlocks after six questions.",
   },
   watch: {
     title: "Watch Together",
-    tagline: "A YouTube video, kept in sync.",
-    sections: [
-      { heading: "How to use it", bullets: [
-        "Paste a YouTube link to start.",
-        "Play, pause and seek from the DateRoom controls — both sides stay in sync.",
-        "Tap the video to play/pause.",
-      ] },
+    tagline: "Same video, same second.",
+    steps: [
+      { glyph: "🔗", name: "Paste a link", text: "A YouTube link, or a direct video file link (.mp4) for something of your own." },
+      { glyph: "▶️", name: "Play together", text: "Play, pause and skip from the bottom bar — both screens stay in step." },
     ],
   },
   dj: {
     title: "Music",
-    tagline: "A shared playlist you both control.",
-    sections: [
-      { heading: "How to use it", bullets: [
-        "Add songs with a YouTube link — they queue up in a shared list.",
-        "Drag to reorder; tap a song to play it.",
-        "The player sits at the bottom: play/pause, back, next, repeat and volume.",
-        "Close hides the player but keeps the list — Clear list empties it.",
-      ] },
+    tagline: "One playlist, both rooms.",
+    steps: [
+      { glyph: "🔗", name: "Add songs", text: "Paste YouTube, SoundCloud or Spotify links — they join a shared list." },
+      { glyph: "▶️", name: "Play together", text: "Anyone can play, pause, skip or reorder. It keeps playing while you do other things." },
+      { glyph: "💾", name: "Save the list", text: "The Playlists menu saves this list to your account for any future room." },
     ],
   },
   chat: {
     title: "Chat",
     tagline: "A side chat while you play.",
-    sections: [{ heading: "How to use it", bullets: ["Type a message and send — it's just between the two of you."] }],
+    steps: [{ glyph: "💬", name: "Type away", text: "Just between the two of you." }],
   },
   room_details: {
     title: "Room",
     tagline: "Invite people and set the mood.",
-    sections: [
-      { heading: "How to use it", bullets: [
-        "Copy the Room ID + Passcode, or the invite link, to bring someone in.",
-        "Pick a background — it also sets the room's colour.",
-      ] },
+    steps: [
+      { glyph: "✉️", name: "Invite", text: "Copy the Room ID + Passcode, or the invite link." },
+      { glyph: "🎨", name: "Set the mood", text: "Pick a background — it also sets the room's colour." },
+    ],
+  },
+  vision_board: {
+    title: "Vision Board",
+    tagline: "Collect the life you're dreaming up.",
+    steps: [
+      { glyph: "📌", name: "Add a dream", text: "Type a caption, add a photo if you like, then Add." },
+      { glyph: "⭐", name: "Pin the big ones", text: "Pin up to 2 — they float on the room." },
+    ],
+  },
+  fridge_notes: {
+    title: "Fridge",
+    tagline: "Little notes that stay up between calls.",
+    steps: [
+      { glyph: "🧲", name: "Leave a note", text: "Write it and tap Add — it stays for both of you." },
+      { glyph: "👋", name: "Greet on entry", text: "Tick it to show a note first when they arrive." },
+    ],
+  },
+  bookshelf: {
+    title: "Bookshelf",
+    tagline: "Things to read, watch and share, kept for later.",
+    steps: [
+      { glyph: "📚", name: "Add something", text: "A book, a link, or something to watch." },
+      { glyph: "✅", name: "Mark it done", text: "Tick things off as you get to them." },
     ],
   },
 };
@@ -196,6 +165,7 @@ export function hasActivityHelp(id: string): boolean {
 
 export function ActivityHelp({ id, onClose }: { id: string; onClose: () => void }) {
   const help = ACTIVITY_HELP[id];
+  const now = useHelpNow(id);
   if (!help) return null;
   return (
     <div
@@ -203,10 +173,10 @@ export function ActivityHelp({ id, onClose }: { id: string; onClose: () => void 
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-2xl border border-white/10 bg-card p-6 shadow-2xl animate-scale-in"
+        className="flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl border border-white/10 bg-card shadow-2xl animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start justify-between gap-3 p-6 pb-0">
           <div>
             <h2 className="font-serif text-xl text-cream">{help.title}</h2>
             <p className="mt-1 text-sm text-muted-foreground">{help.tagline}</p>
@@ -221,20 +191,61 @@ export function ActivityHelp({ id, onClose }: { id: string; onClose: () => void 
           </button>
         </div>
 
-        <div className="mt-5 space-y-4">
-          {help.sections.map((s) => (
-            <div key={s.heading}>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">{s.heading}</p>
-              <ul className="mt-1.5 space-y-1.5">
-                {s.bullets.map((b, i) => (
-                  <li key={i} className="flex gap-2 text-sm leading-relaxed text-cream/85">
-                    <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-primary/70" />
-                    <span>{b}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+        <div className="min-h-0 flex-1 overflow-y-auto p-6 pt-4">
+          {now && (
+            <p
+              className="mb-4 rounded-xl px-3 py-2 text-[12px] font-semibold uppercase tracking-[0.14em]"
+              style={{
+                color: "var(--room-accent)",
+                backgroundColor: "color-mix(in srgb, var(--room-accent) 14%, transparent)",
+                border: "1px solid color-mix(in srgb, var(--room-accent) 45%, transparent)",
+              }}
+              aria-live="polite"
+            >
+              Right now: {now.now}
+            </p>
+          )}
+          <ol className="space-y-2">
+            {help.steps.map((s, i) => {
+              const current = now != null && now.step === i;
+              return (
+                <li
+                  key={s.name}
+                  className={[
+                    "rounded-xl border p-3 transition",
+                    current
+                      ? "border-[color-mix(in_srgb,var(--room-accent)_70%,transparent)] bg-[color-mix(in_srgb,var(--room-accent)_8%,transparent)]"
+                      : "border-transparent",
+                  ].join(" ")}
+                >
+                  <p className="flex items-center gap-2 font-serif text-base text-cream">
+                    <span aria-hidden>{s.glyph}</span>
+                    {s.name}
+                    {current && (
+                      <span
+                        className="ml-auto rounded-full px-2 py-0.5 text-[9px] font-sans font-semibold uppercase tracking-[0.16em]"
+                        style={{ color: "var(--room-accent)", border: "1px solid color-mix(in srgb, var(--room-accent) 50%, transparent)" }}
+                      >
+                        you are here
+                      </span>
+                    )}
+                  </p>
+                  <p className="mt-1 pl-7 text-sm leading-relaxed text-cream/80">{s.text}</p>
+                </li>
+              );
+            })}
+          </ol>
+          {help.note && <p className="mt-4 text-xs leading-relaxed text-muted-foreground">{help.note}</p>}
+        </div>
+
+        <div className="p-6 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="focus-ring w-full rounded-full border border-white/20 py-2.5 text-sm text-cream transition hover:bg-white/5"
+          >
+            Back to the room
+          </button>
         </div>
       </div>
     </div>

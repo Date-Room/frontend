@@ -10,6 +10,7 @@ import {
   pickADoorStageOwner,
   reducePickADoor,
 } from "@/lib/activities/pickADoor";
+import { setHelpNow } from "@/lib/activityHelpNow";
 import { prefersReducedMotion, useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { useTypewriter } from "@/lib/stagecraft/typewriter";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
@@ -55,6 +56,42 @@ export function PickADoor() {
     const id = window.setInterval(() => setSeconds((s) => (s > 0 ? s - 1 : 0)), 1000);
     return () => window.clearInterval(id);
   }, [answering, state.stage, state.round]);
+
+  // Publish the "right now" help line + you-are-here step (self-contained so
+  // it can run before the finished early-return; hooks must not be skipped).
+  useEffect(() => {
+    const finished = state.round >= DOOR_ROUNDS.length;
+    const iPickedNow = senderId in state.picks;
+    const same = pickADoorSameDoor(state);
+    const owner = pickADoorStageOwner(state);
+    const mine = owner === senderId;
+    const snap = finished
+      ? { now: "That's all the rounds. Tap Play again for another run.", step: 3 }
+      : state.phase === "picking"
+        ? iPickedNow
+          ? { now: `Locked. Waiting for ${partnerName} to pick.`, step: 0 }
+          : { now: "Tap one of the three doors. No clues.", step: 0 }
+        : same
+          ? state.stage === 0
+            ? { now: "Same door! Tap We're ready, then answer it together.", step: 1 }
+            : { now: "Answer together, out loud. Then either of you taps Next round.", step: 1 }
+          : state.stage === 0
+            ? mine
+              ? { now: "Your door is open. Read it, then tap I'm ready to answer.", step: 1 }
+              : { now: `${partnerName} reads their door first.`, step: 1 }
+            : state.stage === 1
+              ? mine
+                ? { now: "Answer out loud. Done? Tap Pass it over.", step: 1 }
+                : { now: `Listen — ${partnerName} is answering.`, step: 1 }
+              : state.stage === 2
+                ? mine
+                  ? { now: "Your door now. Read it, then tap I'm ready to answer.", step: 2 }
+                  : { now: `${partnerName}'s second door. Listen.`, step: 2 }
+                : mine
+                  ? { now: "Answer out loud. Then either of you taps Next round.", step: 2 }
+                  : { now: `Listen — then either of you taps Next round.`, step: 2 };
+    setHelpNow("pick_a_door", snap);
+  }, [state, senderId, partnerName]);
 
   // The second door earns its own swing when the shared stage reaches it.
   const [secondOpened, setSecondOpened] = useState(false);

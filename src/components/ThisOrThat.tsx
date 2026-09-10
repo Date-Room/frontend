@@ -11,6 +11,7 @@ import {
   totSetForRun,
   type TotSide,
 } from "@/lib/activities/thisOrThat";
+import { setHelpNow } from "@/lib/activityHelpNow";
 import { useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
 import { StagePrompt } from "@/lib/stagecraft/StagePrompt";
@@ -57,6 +58,20 @@ export function ThisOrThat() {
   const myReads = state.reads[senderId] ?? 0;
   const theirReads = Object.entries(state.reads).reduce((n, [k, v]) => (k === senderId ? n : n + v), 0);
   const roundsDone = state.log.length + (revealing ? 1 : 0);
+
+  // "Right now" help snapshot (see lib/activityHelpNow).
+  useEffect(() => {
+    const snap = board
+      ? { now: "See how you lined up, then tap Run a new set.", step: 3 }
+      : revealing
+        ? { now: "Watch which side lights up, then tap Next pair.", step: 2 }
+        : myPick == null
+          ? { now: "Tap the side YOU want — the 7 seconds are ticking.", step: 0 }
+          : myPrediction == null
+            ? { now: `Your pick is locked. Now tap the side you think ${partnerName} chose.`, step: 1 }
+            : { now: `Locked. Waiting for ${partnerName}…`, step: 1 };
+    setHelpNow("this_or_that", snap);
+  }, [board, revealing, myPick, myPrediction, partnerName]);
 
   // The 7s clock: purely local, purely cosmetic — expiring costs nothing.
   const [clock, setClock] = useState(TOT_CLOCK_SECONDS);
