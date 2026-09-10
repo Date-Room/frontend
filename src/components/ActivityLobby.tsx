@@ -158,7 +158,7 @@ export function ActivityLobby({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
-      <div className="flex flex-col items-center gap-1 text-center">
+      <div className="flex shrink-0 flex-col items-center gap-1 text-center">
         <p className="font-serif text-2xl italic text-cream">
           {wallRoom && walls.length > 0 ? "Your room" : "What are we doing tonight?"}
         </p>

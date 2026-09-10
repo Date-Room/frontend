@@ -103,7 +103,7 @@ export function ThisOrThat() {
     const theirSlow = theirUid ? longestFor(theirUid) : null;
     return (
       <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in">
-        <div className="flex flex-col items-center gap-1 text-center">
+        <div className="flex shrink-0 flex-col items-center gap-1 text-center">
           <p className="font-serif text-2xl italic text-cream">How you two line up</p>
           <p className="max-w-sm text-xs text-muted-foreground">
             {state.same_count >= 4
@@ -254,7 +254,7 @@ export function ThisOrThat() {
     <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in", revealing && witnessed && !settled ? "dr-stageroom--dim" : ""].join(" ")}>
       <div className="dr-stageroom-shade" aria-hidden />
 
-      <div className="relative flex flex-col items-center gap-1 text-center">
+      <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Round {Math.min(roundsDone + (revealing ? 0 : 1), TOT_ROUNDS_PER_RUN)} of {TOT_ROUNDS_PER_RUN} · {pair.tier}
         </p>

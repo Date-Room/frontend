@@ -128,7 +128,7 @@ export function QuestionDeck() {
   if (state.phase === "draft") {
     return (
       <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
-        <div className="flex flex-col items-center gap-1 text-center">
+        <div className="flex shrink-0 flex-col items-center gap-1 text-center">
           <p className="font-serif text-xl italic text-cream">
             {myTurn ? "Your topic" : `${partnerName} is choosing`}
           </p>
@@ -175,7 +175,7 @@ export function QuestionDeck() {
   if (state.phase === "write") {
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
-        <div className="flex flex-col items-center gap-1 text-center">
+        <div className="flex shrink-0 flex-col items-center gap-1 text-center">
           <p className="font-serif text-xl italic text-cream">One of your own</p>
           <p className="max-w-sm text-xs text-muted-foreground">
             It replaces a card rather than adding one, and it buys you a veto of one of {partnerName}&apos;s topics.
@@ -218,7 +218,7 @@ export function QuestionDeck() {
     const options = OB_TOPICS.filter((t) => !takenIds.has(t.id));
     return (
       <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
-        <div className="flex flex-col items-center gap-1 text-center">
+        <div className="flex shrink-0 flex-col items-center gap-1 text-center">
           <p className="font-serif text-xl italic text-cream">
             {iVetoed ? "Veto sealed" : `Bin one of ${partnerName}'s`}
           </p>
@@ -313,7 +313,7 @@ export function QuestionDeck() {
     };
     return (
       <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
-        <div className="flex flex-col items-center gap-1 text-center">
+        <div className="flex shrink-0 flex-col items-center gap-1 text-center">
           <p className="font-serif text-2xl italic text-cream">The whole night</p>
           <p className="max-w-sm text-xs text-muted-foreground">
             {deck.length - state.passes.length} of {deck.length} answered.{" "}
@@ -323,7 +323,7 @@ export function QuestionDeck() {
           </p>
         </div>
         {showTallies && (
-          <div className="flex flex-col items-center gap-1 text-center">
+          <div className="flex shrink-0 flex-col items-center gap-1 text-center">
             <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
               How you showed up
             </p>
@@ -387,7 +387,7 @@ export function QuestionDeck() {
     <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in", "dr-stageroom--dim"].join(" ")}>
       <div className="dr-stageroom-shade" aria-hidden />
 
-      <div className="relative flex flex-col items-center gap-1 text-center">
+      <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Card {Math.min(state.card + 1, deck.length)} of {deck.length}
         </p>
