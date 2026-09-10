@@ -12,6 +12,7 @@ describe("activity help coverage", () => {
       "one_has_to_go",
       "pick_a_door",
       "rank_it",
+      "guacamole",
       "watch",
       "dj",
       "chat",

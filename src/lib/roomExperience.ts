@@ -22,6 +22,7 @@ export type CuratableActivityId =
   | "one_has_to_go"
   | "pick_a_door"
   | "rank_it"
+  | "guacamole"
   | "watch"
   | "dj"
   | "vision_board"
@@ -58,6 +59,7 @@ export const CURATABLE_ACTIVITIES: CuratableActivityMeta[] = [
   { id: "one_has_to_go", label: "One Has To Go", tagline: "Cut one. Guess theirs. Defend it.", emoji: "🗑️", category: "games" },
   { id: "pick_a_door", label: "Pick a Door", tagline: "Choose blind. Answer what's behind it.", emoji: "🚪", category: "games" },
   { id: "rank_it", label: "Rank It", tagline: "Order five things. Compare priorities.", emoji: "📊", category: "games" },
+  { id: "guacamole", label: "Guacamole Panic", tagline: "Fast fingers, hidden bowls, loud sabotage.", emoji: "🥑", category: "games" },
 ];
 
 /** Free Try tier — the tasting menu. Utilities always ride along; hosts

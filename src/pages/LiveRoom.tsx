@@ -46,6 +46,7 @@ import { DJ } from "@/components/DJ";
 import { MusicLibrary } from "@/components/MusicRoom";
 import { RoomSettings } from "@/components/RoomSettings";
 import { ActivityLobby } from "@/components/ActivityLobby";
+import { GuacamolePanic } from "@/components/GuacamolePanic";
 import { QuestionDeck } from "@/components/QuestionDeck";
 import { Closer } from "@/components/Closer";
 import { TwoTruths } from "@/components/TwoTruths";
@@ -116,6 +117,7 @@ type ActivityTabId =
   | "one_has_to_go"
   | "pick_a_door"
   | "rank_it"
+  | "guacamole"
   | "watch"
   | "dj"
   | "chat";
@@ -142,6 +144,7 @@ const ACTIVITY_TABS: TabDef[] = [
   { id: "one_has_to_go", label: "One Has To Go", icon: "🗑️", curatableId: "one_has_to_go" },
   { id: "pick_a_door", label: "Pick a Door", icon: "🚪", curatableId: "pick_a_door" },
   { id: "rank_it", label: "Rank It", icon: "📊", curatableId: "rank_it" },
+  { id: "guacamole", label: "Guacamole Panic", icon: "🥑", curatableId: "guacamole" },
   { id: "watch", label: "Watch", icon: "📺", curatableId: "watch" },
   { id: "dj", label: "Music", icon: "🎵", curatableId: "dj" },
   { id: "chat", label: "Chat", icon: "💭", curatableId: null },
@@ -490,6 +493,8 @@ function RoomShell({
         return <PickADoor />;
       case "rank_it":
         return <RankIt />;
+      case "guacamole":
+        return <GuacamolePanic />;
       case "watch":
         return <WatchTogether />;
       case "dj":
