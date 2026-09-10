@@ -21,6 +21,10 @@ export type YoutubeIframeApiPlayer = {
 
 export type YoutubePlayerConstructorOptions = {
   videoId?: string;
+  /** Privacy-enhanced embed domain (youtube-nocookie.com) — not on browser
+   *  tracker lists, so privacy-hardened Safari keeps sending the referrer
+   *  YouTube now requires (missing referrer = player error 153). */
+  host?: string;
   width?: string | number;
   height?: string | number;
   playerVars?: Record<string, string | number>;
