@@ -1058,8 +1058,11 @@ export function MusicRoomProvider({
             style={{ width: "100%", height: "100%" }}
           />
           {needsAudioGesture && playing && (
-            <p className="pointer-events-none absolute inset-x-0 top-0 bg-black/75 px-2 py-1.5 text-center text-[11px] font-medium text-cream">
-              Tap the speaker icon below to unmute
+            /* Below the video: YouTube's MINI layout puts its controls (and
+               the speaker button) along the TOP edge — live-tested: a top
+               caption covered the very button it pointed at. */
+            <p className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/75 px-2 py-1.5 text-center text-[11px] font-medium text-cream">
+              Tap the speaker icon to unmute
             </p>
           )}
         </div>
