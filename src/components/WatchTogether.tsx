@@ -37,6 +37,7 @@ import {
 } from "@/lib/mediaLibrary";
 import { directVideoTitle, extractDirectVideoUrl, hlsSupported } from "@/lib/directVideo";
 import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/types/youtubeIframeApi";
+import { ensureYtShim } from "@/lib/ytEmbedPlayer";
 
 /**
  * Watch — ported to the shared `watch` activity protocol (mobile parity):
@@ -72,21 +73,11 @@ function extractId(raw: string): string | null {
   return null;
 }
 
-let ytApiPromise: Promise<void> | null = null;
+// The controller is our own postMessage shim — privacy-hardened browsers
+// block youtube.com/iframe_api outright (live-tested on Safari), so no
+// external script is loaded at all.
 function loadYT() {
-  if (ytApiPromise) return ytApiPromise;
-  ytApiPromise = new Promise((res) => {
-    if (window.YT?.Player) return res();
-    const t = document.createElement("script");
-    t.src = "https://www.youtube.com/iframe_api";
-    document.head.appendChild(t);
-    const prev = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      prev?.();
-      res();
-    };
-  });
-  return ytApiPromise;
+  return ensureYtShim();
 }
 
 export function WatchTogether() {
