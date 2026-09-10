@@ -501,6 +501,19 @@ export function MusicRoomProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, userId, room.canPersist, nowPlaying, tracks, currentIdx]);
 
+  // Autoplay watchdog: the play intent is set optimistically, but Safari
+  // blocks unmuted playback started outside a user gesture. If the engine
+  // still isn't running shortly after we meant to play, offer the tap-to-
+  // enable-audio recovery (a real click, so the retry is allowed).
+  useEffect(() => {
+    if (!playing || watchActive) return;
+    const t = window.setTimeout(() => {
+      if (playingRef.current && !engIsPlaying()) setNeedsAudioGesture(true);
+    }, 1800);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, videoId, scUrl, watchActive]);
+
   // Drift heartbeat — only the current controller emits.
   useEffect(() => {
     if (!isController || !playing) return;
@@ -1344,7 +1357,7 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
           <button
             type="button"
             onClick={m.previous}
-            disabled={!m.videoId}
+            disabled={!m.nowPlaying}
             aria-label="Previous / restart"
             className="flex h-9 w-9 items-center justify-center rounded-full text-cream transition hover:bg-white/10 disabled:opacity-40"
           >
@@ -1353,7 +1366,7 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
           <button
             type="button"
             onClick={m.togglePlayPause}
-            disabled={!m.videoId}
+            disabled={!m.nowPlaying}
             aria-label={m.playing ? "Pause" : "Play"}
             className="flex h-9 w-9 items-center justify-center rounded-full text-primary-foreground transition hover:brightness-105 active:scale-95 disabled:opacity-40"
             style={{ backgroundColor: "var(--room-accent)" }}
@@ -1363,7 +1376,7 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
           <button
             type="button"
             onClick={m.next}
-            disabled={!m.videoId}
+            disabled={!m.nowPlaying}
             aria-label="Next"
             className="flex h-9 w-9 items-center justify-center rounded-full text-cream transition hover:bg-white/10 disabled:opacity-40"
           >
@@ -1385,7 +1398,7 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
           {m.repeat === "one" ? <Repeat1 className="h-[18px] w-[18px]" /> : <Repeat className="h-[18px] w-[18px]" />}
         </button>
 
-        {m.videoId && (
+        {m.nowPlaying && (
           <div className="hidden shrink-0 items-center gap-2 pl-1 sm:flex">
             <Volume2 className="h-4 w-4 text-muted-foreground" />
             <input
