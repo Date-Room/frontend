@@ -23,6 +23,7 @@ const GAME_PICKS: Pick_[] = [
   { id: "one_has_to_go", name: "One Has To Go", line: "Cut one. Guess theirs. Defend it.", minutes: "10–15 min" },
   { id: "pick_a_door", name: "Pick a Door", line: "The room dims before the question lands.", minutes: "15–20 min" },
   { id: "truth_or_dare", name: "Truth or Dare", line: "They deal. You deliver. Warm to Bare.", minutes: "15–20 min" },
+  { id: "guacamole", name: "Guacamole Panic", line: "Fast fingers, hidden bowls, loud sabotage.", minutes: "2 min a batch" },
 ];
 
 const TALK_PICKS: Pick_[] = [

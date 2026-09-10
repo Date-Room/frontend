@@ -17,6 +17,7 @@ export const TRY_CAPS = {
   two_truths_rounds: 2, // one each — both get to lie once
   truth_or_dare_turns: 2, // one dealt card each
   open_book_cards: 3,
+  guacamole_batches: 1,
   // Closer: the 3-question stretch IS the natural cap (stretch options 6/12
   // hide in Try; the banked place is the conversion hook).
 } as const;

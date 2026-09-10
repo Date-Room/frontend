@@ -71,6 +71,16 @@ const ACTIVITY_HELP: Record<string, HelpContent> = {
       { glyph: "🔒", name: "The vault", text: "Burned and dodged cards aren't gone — they come back at the end of the night to talk about." },
     ],
   },
+  guacamole: {
+    title: "Guacamole Panic",
+    tagline: "Race the bowl. Watch their face.",
+    steps: [
+      { glyph: "🥑", name: "Match the button", text: "Ingredients fly in. Each wants ONE button: chop, smash, squeeze or stir. Wrong press = splat." },
+      { glyph: "⏱️", name: "Beat the clock", text: "75 seconds, same ingredients on both screens. Fill your bowl faster." },
+      { glyph: "👀", name: "Peek if you dare", text: "Their bowl is hidden — their face is the progress bar. Peeking freezes YOUR cooking, and they get told." },
+      { glyph: "😈", name: "The lime steal", text: "Once a batch you can steal their lime — it freezes them 3 seconds, loudly. They can do it to you too." },
+    ],
+  },
   rank_it: {
     title: "Rank It",
     tagline: "Order five things. Compare.",
