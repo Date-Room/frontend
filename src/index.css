@@ -1614,6 +1614,9 @@
    small status line and stalled after locking a pick). Slides across, then
    settles and stays for the whole phase. */
 .dr-stage-prompt {
+  /* Never flex-shrink: the game panels are h-full flex columns, and a
+     squeezed band clips its own text (live play-test screenshot). */
+  flex: none;
   position: relative;
   display: flex;
   flex-wrap: wrap;

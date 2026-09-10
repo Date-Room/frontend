@@ -175,7 +175,7 @@ export function OneHasToGo() {
     >
       <div className="dr-stageroom-shade" aria-hidden />
 
-      <div className="relative flex flex-col items-center gap-1 text-center">
+      <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Round {state.round + 1} of {OHTG_ROUNDS.length} · {round.title}
         </p>

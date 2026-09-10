@@ -126,7 +126,7 @@ export function TwoTruths() {
     const canSubmit = drafts.every((d) => d.trim().length > 2) && lie !== null;
     return (
       <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6">
-        <div className="flex flex-col items-center gap-1 text-center">
+        <div className="flex shrink-0 flex-col items-center gap-1 text-center">
           <p className="font-serif text-xl italic text-cream">Write three</p>
           <p className="text-xs text-muted-foreground">
             Two true, one made up. Mark the lie — {partnerName} never sees the mark.
@@ -238,7 +238,7 @@ export function TwoTruths() {
     <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in", revealing && unmask.witnessed && !settled ? "dr-stageroom--dim" : ""].join(" ")}>
       <div className="dr-stageroom-shade" aria-hidden />
 
-      <div className="relative flex flex-col items-center gap-1 text-center">
+      <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
         <p key={title} className="font-serif text-xl italic text-cream animate-fade-in">{title}</p>
         <p key={status} aria-live="polite" className="min-h-[1rem] max-w-sm text-xs text-muted-foreground animate-fade-in">
           {status}

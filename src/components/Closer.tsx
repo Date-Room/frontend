@@ -148,7 +148,7 @@ export function Closer() {
     const dodged = state.rulings.filter((r) => r.verdict === "dodged");
     return (
       <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
-        <div className="flex flex-col items-center gap-1 text-center">
+        <div className="flex shrink-0 flex-col items-center gap-1 text-center">
           <p className="font-serif text-2xl italic text-cream">{state.banked ? "Banked" : "The whole thing"}</p>
           <p className="max-w-sm text-xs text-muted-foreground">
             {state.banked
@@ -212,7 +212,7 @@ export function Closer() {
     return (
       <div className="dr-stageroom dr-stageroom--dim flex h-full min-h-0 flex-col items-center justify-center gap-6 p-6 animate-fade-in">
         <div className="dr-stageroom-shade" aria-hidden />
-        <div className="relative flex flex-col items-center gap-1 text-center">
+        <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
           <p className="font-serif text-2xl italic text-cream">Four minutes</p>
           <p className="text-xs text-muted-foreground">No talking. Look at each other until the time runs out.</p>
         </div>
@@ -233,7 +233,7 @@ export function Closer() {
     const window_ = clStretchWindow(state);
     return (
       <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
-        <div className="flex flex-col items-center gap-1 text-center">
+        <div className="flex shrink-0 flex-col items-center gap-1 text-center">
           <p className="font-serif text-xl italic text-cream">{iKept ? "Kept" : "Keep one"}</p>
           <p className="max-w-sm text-xs text-muted-foreground">
             {iKept
@@ -345,7 +345,7 @@ export function Closer() {
     <div className="dr-stageroom dr-stageroom--dim flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
       <div className="dr-stageroom-shade" aria-hidden />
 
-      <div className="relative flex flex-col items-center gap-1 text-center">
+      <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Question {state.n + 1} of {CL_TOTAL} · <span className={SET_TONE[q.set]}>Set {q.set} · {CL_SET_NAMES[q.set]}</span>
         </p>
