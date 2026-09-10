@@ -487,6 +487,10 @@ export function WatchTogether() {
       const mount = document.createElement("div");
       containerRef.current.appendChild(mount);
       playerRef.current = new yt.Player(mount, {
+        // Privacy-enhanced host: Safari's tracking protection strips the
+        // referrer to youtube.com, and YouTube refuses referrer-less embeds
+        // (error 153, live-tested). The nocookie domain isn't tracker-listed.
+        host: "https://www.youtube-nocookie.com",
         width: w,
         height: h,
         videoId: videoIdRef.current ?? undefined,

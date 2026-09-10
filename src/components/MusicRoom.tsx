@@ -274,6 +274,9 @@ export function MusicRoomProvider({
       containerRef.current.appendChild(mount);
       const recovering = recoveryRef.current;
       playerRef.current = new yt.Player(mount, {
+        // Privacy-enhanced host — see WatchTogether: referrer-less embeds
+        // fail with error 153 under Safari's tracking protection.
+        host: "https://www.youtube-nocookie.com",
         videoId: videoId ?? undefined,
         playerVars: {
           rel: 0,
