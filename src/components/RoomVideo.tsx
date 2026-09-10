@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -9,7 +9,7 @@ import {
   useIsSpeaking,
   useRoomContext,
 } from "@livekit/components-react";
-import { Track, DisconnectReason, RoomEvent, VideoPresets, type RoomOptions } from "livekit-client";
+import { Track, DisconnectReason, RoomEvent, VideoPresets, setLogLevel, type RoomOptions } from "livekit-client";
 import { toast } from "sonner";
 import "@livekit/components-styles";
 import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Maximize2, Minimize2, Minus, RotateCw } from "lucide-react";
@@ -28,6 +28,12 @@ import type { PresenceState } from "@/lib/realtime/roomChannel";
 // Adaptive stream + dynacast let LiveKit stop sending layers nobody is
 // watching; simulcast gives ambient mode a defined "lowest" layer to fall
 // back to. Stable reference so the Room isn't reconfigured on re-render.
+// Info-level livekit logs ("already connected to room …") flooded the
+// console once a second — connect re-attempts from re-renders, each a
+// guarded no-op. Handlers below are memoized to stop the churn at the
+// source; warnings and errors still surface.
+setLogLevel("warn");
+
 const LIVEKIT_ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
   dynacast: true,
@@ -773,6 +779,28 @@ export function RoomVideo({
     };
   }, []);
 
+  // Stable handler identities: inline arrows re-trigger LiveKitRoom's
+  // internal connect effect on every parent re-render (the once-a-second
+  // "already connected" churn).
+  const onLkError = useCallback((e: Error) => {
+    toast.error(e instanceof Error ? e.message : "Call error.");
+  }, []);
+  const onLkDeviceFailure = useCallback((failure?: unknown) => {
+    toast.error(
+      failure ? `Microphone/camera blocked (${String(failure)}).` : "Microphone/camera unavailable.",
+    );
+  }, []);
+  const onLkDisconnected = useCallback(
+    (reason?: DisconnectReason) => {
+      if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
+        toast.message("Call moved to your other device.");
+        onLeave?.();
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onLeave],
+  );
+
   if (error) {
     return <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">{error}</div>;
   }
@@ -794,23 +822,9 @@ export function RoomVideo({
       options={roomOptions}
       data-lk-theme="default"
       className="relative h-full w-full"
-      onError={(e) => {
-        // Surface connect/publish errors instead of silently swallowing them.
-        toast.error(e instanceof Error ? e.message : "Call error.");
-      }}
-      onMediaDeviceFailure={(failure) => {
-        toast.error(
-          failure ? `Microphone/camera blocked (${failure}).` : "Microphone/camera unavailable.",
-        );
-      }}
-      onDisconnected={(reason) => {
-        // Only one device per user per room — joining elsewhere takes over the
-        // call stream, so this (older) device leaves cleanly.
-        if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
-          toast.message("Call moved to your other device.");
-          onLeave?.();
-        }
-      }}
+      onError={onLkError}
+      onMediaDeviceFailure={onLkDeviceFailure}
+      onDisconnected={onLkDisconnected}
     >
       <MicKeepAlive />
       <AmbientController />
