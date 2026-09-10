@@ -976,12 +976,34 @@ export function MusicRoomProvider({
     <MusicCtx.Provider value={value}>
       {children}
       {shouldMountPlayer && (
+        /* Normally invisible. When Safari blocks audio, the player becomes a
+           small visible tile: a parent-page click can't carry user activation
+           into a cross-origin iframe (postMessage retries stay blocked), but
+           a tap ON the video itself is a gesture inside the iframe — YouTube
+           plays with sound, PLAYING fires, and the tile tucks away again. */
         <div
-          className="pointer-events-none fixed bottom-2 right-2"
-          style={{ width: 320, height: 180, opacity: 0.001, zIndex: -1 }}
-          aria-hidden
+          className={
+            needsAudioGesture && playing
+              ? "fixed bottom-20 right-3 z-50 overflow-hidden rounded-xl border border-white/20 shadow-2xl animate-fade-in"
+              : "pointer-events-none fixed bottom-2 right-2"
+          }
+          style={
+            needsAudioGesture && playing
+              ? { width: 240, height: 150 }
+              : { width: 320, height: 180, opacity: 0.001, zIndex: -1 }
+          }
+          aria-hidden={!(needsAudioGesture && playing)}
         >
-          <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+          <div
+            ref={containerRef}
+            className="[&_iframe]:!h-full [&_iframe]:!w-full"
+            style={{ width: "100%", height: "100%" }}
+          />
+          {needsAudioGesture && playing && (
+            <p className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/75 px-2 py-1.5 text-center text-[11px] font-medium text-cream">
+              Tap the video once for sound
+            </p>
+          )}
         </div>
       )}
       {shouldMountSc && (
