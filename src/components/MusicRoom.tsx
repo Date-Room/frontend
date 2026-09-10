@@ -182,6 +182,26 @@ export function MusicRoomProvider({
   const playingRef = useRef(playing);
   playingRef.current = playing;
 
+  // Recovery mode (Safari): when audio is blocked, rebuild the player inside
+  // the now-visible tile — muted, since muted autoplay is always permitted,
+  // with YouTube's native controls so the unmute tap happens INSIDE the
+  // iframe (the only place Safari accepts the gesture). Once unmuted, the
+  // player is kept as-is (recreating it would re-block) and the tile hides.
+  const recoveryRef = useRef(false);
+  const [playerEpoch, setPlayerEpoch] = useState(0);
+  useEffect(() => {
+    if (needsAudioGesture && playing && !scActive && videoId && !recoveryRef.current) {
+      recoveryRef.current = true;
+      try {
+        playerRef.current?.destroy?.();
+      } catch {
+        /* ignore */
+      }
+      playerRef.current = null;
+      setPlayerEpoch((n) => n + 1);
+    }
+  }, [needsAudioGesture, playing, scActive, videoId]);
+
   // Near-perfect resume sync — both sides start on a shared instant.
   const schedulerRef = useRef<SyncScheduler | null>(null);
   const startPlaybackAt = useCallback((videoTime: number) => {
@@ -252,16 +272,26 @@ export function MusicRoomProvider({
       // removeChild a node YT swapped out → "not a child" crash.
       const mount = document.createElement("div");
       containerRef.current.appendChild(mount);
+      const recovering = recoveryRef.current;
       playerRef.current = new yt.Player(mount, {
         videoId: videoId ?? undefined,
-        playerVars: { rel: 0, modestbranding: 1, playsinline: 1, controls: 0, enablejsapi: 1, origin: window.location.origin },
+        playerVars: {
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          // Recovery: YouTube's own chrome carries the in-iframe unmute tap.
+          controls: recovering ? 1 : 0,
+          mute: recovering ? 1 : 0,
+          enablejsapi: 1,
+          origin: window.location.origin,
+        },
         events: {
           onReady: () => {
             try {
               playerRef.current?.setVolume?.(volume);
               if (dTsRef.current) playerRef.current?.seekTo(dTsRef.current, true);
               if (playingRef.current) {
-                playerRef.current?.unMute?.();
+                if (!recoveryRef.current) playerRef.current?.unMute?.();
                 playerRef.current?.playVideo?.();
               } else {
                 // Persisted paused → stay paused on reload (don't autoplay).
@@ -280,7 +310,10 @@ export function MusicRoomProvider({
             }
             if (isSuppressed()) return;
             if (!isControllerRef.current && e.data === PS.UNSTARTED && playing) setNeedsAudioGesture(true);
-            if (e.data === PS.PLAYING) setNeedsAudioGesture(false);
+            if (e.data === PS.PLAYING && playerRef.current?.isMuted?.() !== true) {
+              setNeedsAudioGesture(false);
+              recoveryRef.current = false;
+            }
             if (!isControllerRef.current) return;
             const time = playerRef.current?.getCurrentTime?.() ?? 0;
             if (e.data === PS.PLAYING) {
@@ -304,7 +337,7 @@ export function MusicRoomProvider({
       playerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldMountPlayer, videoId]);
+  }, [shouldMountPlayer, videoId, playerEpoch]);
 
   // Controller-side state sync, shared by both engines. Kept in a ref so the
   // SoundCloud widget's once-bound listeners never go stale.
@@ -513,6 +546,26 @@ export function MusicRoomProvider({
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, videoId, scUrl, watchActive]);
+
+  // During recovery, watch for the in-iframe unmute — that's the success
+  // signal (PLAYING alone fires for the muted playback too).
+  useEffect(() => {
+    if (!needsAudioGesture) return;
+    const id = setInterval(() => {
+      if (!recoveryRef.current || scActiveRef.current) return;
+      const p = playerRef.current;
+      if (p?.isMuted?.() === false) {
+        recoveryRef.current = false;
+        setNeedsAudioGesture(false);
+        try {
+          p.setVolume?.(volumeRef.current);
+        } catch {
+          /* ignore */
+        }
+      }
+    }, 400);
+    return () => clearInterval(id);
+  }, [needsAudioGesture]);
 
   // Drift heartbeat — only the current controller emits.
   useEffect(() => {
@@ -1002,8 +1055,8 @@ export function MusicRoomProvider({
             style={{ width: "100%", height: "100%" }}
           />
           {needsAudioGesture && playing && (
-            <p className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/75 px-2 py-1.5 text-center text-[11px] font-medium text-cream">
-              Tap the video once for sound
+            <p className="pointer-events-none absolute inset-x-0 top-0 bg-black/75 px-2 py-1.5 text-center text-[11px] font-medium text-cream">
+              Tap the speaker icon below to unmute
             </p>
           )}
         </div>
@@ -1477,7 +1530,7 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
             className="mt-1.5 w-full rounded-full py-1.5 text-center text-xs font-medium"
             style={{ backgroundColor: "color-mix(in srgb, var(--room-accent) 18%, transparent)", color: "var(--room-accent)" }}
           >
-            Sound is blocked — tap the small video, bottom left ↙
+            Sound is blocked — unmute the small video, bottom left ↙
           </p>
         )
       )}
