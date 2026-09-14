@@ -7,6 +7,7 @@ import {
   guacFromJson,
   guacStealWindow,
   guacStream,
+  guacTaste,
   initialGuacState,
   reduceGuac,
   type GuacState,
@@ -51,6 +52,18 @@ describe("guacamole stream", () => {
       expect(["chop", "smash", "squeeze", "stir"]).toContain(ing.action);
     }
     expect(GUAC_BOWL_TARGET).toBeGreaterThan(10);
+  });
+});
+
+describe("guacTaste", () => {
+  it("reads the bowl from accuracy, and survives an empty one", () => {
+    expect(guacTaste({ score: 0, made: 19, splats: 1 })).toContain("Chef's kiss");
+    expect(guacTaste({ score: 0, made: 8, splats: 2 })).toContain("Genuinely good");
+    expect(guacTaste({ score: 0, made: 7, splats: 4 })).toContain("Edible");
+    expect(guacTaste({ score: 0, made: 5, splats: 5 })).toContain("Crunchy");
+    expect(guacTaste({ score: 0, made: 2, splats: 9 })).toContain("crime scene");
+    expect(guacTaste({ score: 0, made: 0, splats: 0 })).toContain("empty bowl");
+    expect(guacTaste(undefined)).toContain("empty bowl");
   });
 });
 

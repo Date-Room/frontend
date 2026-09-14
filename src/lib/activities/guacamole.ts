@@ -100,6 +100,24 @@ export type GuacPhase = "prep" | "countdown" | "cooking" | "reveal";
 
 export type GuacResult = { score: number; made: number; splats: number };
 
+/**
+ * How the guacamole actually tastes — a comedy verdict from accuracy.
+ * Deliberately a REVEAL line, not a live meter: a meter would punish the
+ * same fumble twice (splats already cost time and the streak), and mid-
+ * panic nobody has the attention to read one. Mistakes become the punch
+ * line instead of a penalty.
+ */
+export function guacTaste(r: GuacResult | undefined): string {
+  const tried = r ? r.made + r.splats : 0;
+  if (!r || tried === 0) return "An empty bowl 🫙";
+  const acc = r.made / tried;
+  if (acc >= 0.9) return "Chef's kiss 🤌";
+  if (acc >= 0.75) return "Genuinely good guac 😌";
+  if (acc >= 0.6) return "Edible 😅";
+  if (acc >= 0.4) return "Crunchy… why is it crunchy? 🥴";
+  return "A salsa crime scene 🚨";
+}
+
 export type GuacState = {
   phase: GuacPhase;
   /** 0-based batch index — seeds the stream, so every batch is new. */
