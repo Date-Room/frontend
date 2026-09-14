@@ -426,7 +426,7 @@ export function GuacamolePanic() {
           </span>
         ))}
         {pops.map((pop) => (
-          <span key={pop.id} className="dr-guac-pop" style={{ left: pop.x, top: pop.y }}>
+          <span key={pop.id} className="dr-guac-points" style={{ left: pop.x, top: pop.y }}>
             {pop.text}
           </span>
         ))}
