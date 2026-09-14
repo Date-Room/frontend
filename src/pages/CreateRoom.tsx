@@ -457,6 +457,14 @@ export default function CreateRoom() {
     };
   }, [searchParams, setSearchParams, refreshBilling]);
 
+  function browserTimeZone(): string | null {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+    } catch {
+      return null;
+    }
+  }
+
   async function createRoomAfterPlan() {
     // No guest name is collected here — the person joining sets their own name
     // (their profile name if signed in, or a typed name if anonymous).
@@ -474,6 +482,9 @@ export default function CreateRoom() {
       persistence: planMeta.persistence,
       package: planMeta.package,
       scheduled_for: scheduledFor,
+      // The zone the host picked the time in — lets the invite say
+      // "7:00 PM Nairobi time" instead of a bare UTC stamp.
+      scheduled_tz: scheduledFor ? browserTimeZone() : null,
       greeting_headline: headline.trim() || null,
       greeting_subtext: subtext.trim() || null,
       curated_activity_ids: curatedActivities,

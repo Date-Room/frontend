@@ -470,12 +470,11 @@ export default function PreRoom() {
     ? `Room with ${effectivePartnerName.trim()}`
     : "Our room";
 
-  // Share URL: `/i/CODE/PIN#k=<recap-invite>`.
-  const inviteUrl = room
-    ? `${window.location.origin}/i/${room.code}/${room.pin}${
-        room.recap_invite_token ? `#k=${room.recap_invite_token}` : ""
-      }`
-    : "";
+  // Share URL: `/i/CODE/PIN`. Deliberately no `#k=<recap-invite>` tail —
+  // the public by-code card already carries the same token (the Lobby
+  // reads it from there), and a 230-character link reads as spam in a
+  // chat. Short link, per-room preview card.
+  const inviteUrl = room ? `${window.location.origin}/i/${room.code}/${room.pin}` : "";
   const live = room ? room.state === "live" || room.state === "active" : false;
 
   async function copyValue(value: string, key: Exclude<CopiedKey, null>) {

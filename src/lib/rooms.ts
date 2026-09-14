@@ -32,6 +32,7 @@ export type Room = {
   livekit_room_name: string;
   package: RoomPackage;
   scheduled_for: string | null;
+  scheduled_tz?: string | null;
   started_at: string | null;
   ended_at: string | null;
   expires_at: string | null;
@@ -66,6 +67,7 @@ export type InviteCard = {
   host_display_name: string;
   host_photo_url: string | null;
   scheduled_for: string | null;
+  scheduled_tz?: string | null;
   expires_at: string | null;
   state: RoomStateName;
   greeting_headline: string | null;
@@ -96,6 +98,8 @@ export type CreateRoomRequest = {
   persistence: RoomPersistence;
   package: RoomPackage;
   scheduled_for?: string | null;
+  /** IANA zone `scheduled_for` was chosen in (e.g. "Africa/Nairobi"). */
+  scheduled_tz?: string | null;
   connection_id?: string | null;
   greeting_headline?: string | null;
   greeting_subtext?: string | null;
