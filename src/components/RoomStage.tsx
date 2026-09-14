@@ -157,6 +157,12 @@ const LANDSCAPE = { w: 576, h: 336 };
 // to hold the control row without covering the whole stage.
 const COMPACT_PORTRAIT = { w: 168, h: 252 };
 const COMPACT_LANDSCAPE = { w: 252, h: 168 };
+// Phone + an activity on the stage: the call tucks into a small bubble in
+// the TOP corner. Live-tested complaint — "the video is too large and
+// blocks activity" — because the compact window docked bottom-right, which
+// is exactly where every game puts its controls (the four cook buttons,
+// the This-or-That halves, every Next round).
+const COMPACT_BUBBLE = { w: 96, h: 96 };
 /** Default size is the biggest; drag-resize shrinks down to 2/3 of it. */
 const MIN_SCALE = 2 / 3;
 type Corner = "nw" | "ne" | "sw" | "se";
@@ -327,13 +333,29 @@ export function RoomStage({
   useEffect(() => {
     setExpanded(!compact);
   }, [compact]);
-  const base = expanded
-    ? portrait
-      ? PORTRAIT
-      : LANDSCAPE
-    : portrait
-      ? COMPACT_PORTRAIT
-      : COMPACT_LANDSCAPE;
+  // An activity (not the lobby or room settings) owns the stage.
+  const activityStaged = Boolean(staged) && staged !== "lobby" && staged !== "room_details";
+  // Tapping the bubble opens the call properly; staging something else
+  // tucks it away again.
+  const [callOpen, setCallOpen] = useState(false);
+  // Shrunk by hand on a view that doesn't auto-tuck (the lobby, room
+  // settings) — phones had no way down from 168x252 at all, which is why
+  // "it can only be minimized so much".
+  const [manualBubble, setManualBubble] = useState(false);
+  useEffect(() => {
+    setCallOpen(false);
+    setManualBubble(false);
+  }, [staged]);
+  const bubble = compact && (activityStaged ? !callOpen : manualBubble);
+  const base = bubble
+    ? COMPACT_BUBBLE
+    : expanded
+      ? portrait
+        ? PORTRAIT
+        : LANDSCAPE
+      : portrait
+        ? COMPACT_PORTRAIT
+        : COMPACT_LANDSCAPE;
   const effScale = compact ? 1 : scale;
   const size = base;
   const curW = Math.round(size.w * effScale);
@@ -389,14 +411,27 @@ export function RoomStage({
   );
   useEffect(() => {
     if (pos !== null || !callActive) return;
-    // Compact: tuck the bubble into the bottom-right (out of the stage's way).
-    // Large/desktop: top-right as before.
-    const x = Math.max(EDGE, window.innerWidth - curW - EDGE);
-    const y = compact
-      ? Math.max(TOP_PAD, window.innerHeight - curH - BOTTOM_PAD)
-      : TOP_PAD + 8;
-    setPos({ x, y });
-  }, [pos, callActive, compact, curW, curH]);
+    // Top-right on every viewport: the bottom of the stage belongs to the
+    // activity's controls, so the call never starts on top of them.
+    setPos({
+      x: Math.max(EDGE, window.innerWidth - curW - EDGE),
+      y: TOP_PAD + 8,
+    });
+  }, [pos, callActive, curW, curH]);
+
+  // Re-dock when the call changes mode (bubble ↔ open), so it can't be left
+  // sitting over the controls it just grew past.
+  const prevBubble = useRef(bubble);
+  useEffect(() => {
+    if (prevBubble.current === bubble) return;
+    prevBubble.current = bubble;
+    if (!callActive) return;
+    setPos({
+      x: Math.max(EDGE, window.innerWidth - curW - EDGE),
+      y: TOP_PAD + 8,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bubble, callActive]);
 
   // Keep the window on-screen when its size changes (expand/collapse/rotate).
   useEffect(() => {
@@ -438,6 +473,7 @@ export function RoomStage({
   const onMove = useCallback(
     (e: PointerEvent) => {
       if (!drag.current) return;
+      draggedRef.current = true;
       setPos(clamp(e.clientX - drag.current.dx, e.clientY - drag.current.dy, curW, curH));
     },
     [clamp, curW, curH],
@@ -447,8 +483,10 @@ export function RoomStage({
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onUp);
   }, [onMove]);
+  const draggedRef = useRef(false);
   function startDrag(e: React.PointerEvent) {
     if (!pos) return;
+    draggedRef.current = false;
     drag.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -620,7 +658,7 @@ export function RoomStage({
           </div>
           <div
             key={staged}
-            className="animate-stage-swell h-[clamp(400px,58vh,680px)] min-h-0 overflow-hidden"
+            className="animate-stage-swell h-[clamp(260px,calc(100dvh-15.5rem),680px)] min-h-0 overflow-hidden sm:h-[clamp(400px,58vh,680px)]"
           >
             {staged ? (
               <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
@@ -764,18 +802,48 @@ export function RoomStage({
           style={pos ? { left: pos.x, top: pos.y, width: curW, height: curH } : undefined}
         >
           <div
-            className="h-full w-full cursor-grab overflow-hidden rounded-xl active:cursor-grabbing"
+            className={cn(
+              "h-full w-full cursor-grab overflow-hidden active:cursor-grabbing",
+              bubble ? "rounded-full" : "rounded-xl",
+            )}
             onPointerDown={startDrag}
+            onClick={() => {
+              // A tap (not a drag) on the bubble opens the call properly.
+              if (!bubble || draggedRef.current) return;
+              setCallOpen(true);
+              setManualBubble(false);
+            }}
           >
             <RoomVideo
               variant="pip"
+              collapsed={bubble}
               onLeave={onLeaveCall}
-              // Compact bubble ↔ large call, shown as visible expand/shrink
-              // buttons in the (touch-always-visible) control bar.
+              // bubble ↔ compact window ↔ large call. On a phone the shrink
+              // control returns to the bubble rather than doing nothing.
               onExpand={expanded ? undefined : () => setExpanded(true)}
-              onCollapse={expanded ? () => setExpanded(false) : undefined}
+              onCollapse={
+                expanded
+                  ? () => setExpanded(false)
+                  : compact
+                    ? () => {
+                        // On a phone the shrink control always has somewhere
+                        // to go: down to the bubble.
+                        if (activityStaged) setCallOpen(false);
+                        else setManualBubble(true);
+                      }
+                    : undefined
+              }
             />
           </div>
+          {bubble && (
+            <span
+              className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-[9px] font-semibold uppercase tracking-[0.14em] text-cream/80 drop-shadow"
+              aria-hidden
+            >
+              tap
+            </span>
+          )}
+          {!bubble && (
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
@@ -785,6 +853,7 @@ export function RoomStage({
           >
             <RotateCw className="h-3.5 w-3.5" />
           </button>
+          )}
           {/* Corner resize handles — desktop only (invisible/unusable on touch;
               phones use the expand/shrink toggle instead). */}
           {!compact &&
