@@ -15,6 +15,7 @@ import {
   type ActivityEventResponse,
 } from "@/lib/activities/activityState";
 import { ApiError } from "@/lib/api";
+import { GetTheAppCard } from "@/components/GetTheAppCard";
 import { authClient } from "@/lib/authClient";
 import { getChaperonDebrief, type ChaperonDebriefResponse } from "@/lib/chaperon";
 import {
@@ -513,6 +514,9 @@ export default function Recap() {
             A fresh room and a date in the diary. Anything banked picks up where you left it.
           </p>
         </button>
+        {/* The app, offered only here: the date is over and it went well.
+            Renders nothing on desktop. */}
+        <GetTheAppCard />
       </div>
 
       {promoteError && <p className="mb-4 text-xs text-rose-300">{promoteError}</p>}
