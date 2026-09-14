@@ -13,6 +13,7 @@ import {
   guacFromJson,
   guacStealWindow,
   guacStream,
+  guacTaste,
   initialGuacState,
   reduceGuac,
   type GuacAction,
@@ -32,6 +33,9 @@ import { TryCurtain } from "@/components/TryCurtain";
  */
 
 type Banner = { id: number; text: string; tone: "good" | "bad" };
+/** Press feedback: an ingredient flying into the bowl, and its points. */
+type Flyer = { id: number; emoji: string; x: number; y: number; dx: number; dy: number };
+type Pop = { id: number; text: string; x: number; y: number };
 
 export function GuacamolePanic() {
   const room = useRoomSession();
@@ -62,7 +66,17 @@ export function GuacamolePanic() {
   const [score, setScore] = useState(0);
   const [made, setMade] = useState(0);
   const [splats, setSplats] = useState(0);
-  const [splatFlash, setSplatFlash] = useState(false);
+  // Every press answers back instantly (live-tested gap: at speed a good
+  // press and a splat looked identical). The wash and the button colour
+  // say right/wrong; the ingredient flying into the bowl or a blob landing
+  // on the floor heap says WHERE it went.
+  const [flash, setFlash] = useState<{ id: number; hit: boolean; action: GuacAction | null } | null>(null);
+  const [flyers, setFlyers] = useState<Flyer[]>([]);
+  const [pops, setPops] = useState<Pop[]>([]);
+  const fxSeq = useRef(0);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const bowlRef = useRef<HTMLDivElement>(null);
   const streakRef = useRef(0);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const deadlineRef = useRef(0);
@@ -121,16 +135,36 @@ export function GuacamolePanic() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cooking]);
 
-  function advance(hit: boolean) {
+  function advance(hit: boolean, action: GuacAction | null = null, emoji?: string) {
+    const fx = ++fxSeq.current;
+    setFlash({ id: fx, hit, action });
+    window.setTimeout(() => setFlash((f) => (f?.id === fx ? null : f)), 420);
+
     if (hit) {
       streakRef.current += 1;
+      const gain = 10 + (streakRef.current >= 5 ? 5 : 0);
       setMade((m) => m + 1);
-      setScore((s) => s + 10 + (streakRef.current >= 5 ? 5 : 0));
+      setScore((s) => s + gain);
+      // Measure card → bowl at press time so the flight lands wherever the
+      // layout put them (phone, desktop, fullscreen all differ).
+      const panel = panelRef.current?.getBoundingClientRect();
+      const card = cardRef.current?.getBoundingClientRect();
+      const bowl = bowlRef.current?.getBoundingClientRect();
+      if (panel && card) {
+        const x = card.left + card.width / 2 - panel.left;
+        const y = card.top + card.height / 2 - panel.top;
+        const dx = bowl ? bowl.left + bowl.width / 2 - panel.left - x : 0;
+        const dy = bowl ? bowl.top + bowl.height / 2 - panel.top - y : 140;
+        if (emoji) {
+          setFlyers((f) => [...f, { id: fx, emoji, x, y, dx, dy }]);
+          window.setTimeout(() => setFlyers((f) => f.filter((v) => v.id !== fx)), 640);
+        }
+        setPops((pp) => [...pp, { id: fx, text: `+${gain}`, x, y }]);
+        window.setTimeout(() => setPops((pp) => pp.filter((v) => v.id !== fx)), 720);
+      }
     } else {
       streakRef.current = 0;
       setSplats((s) => s + 1);
-      setSplatFlash(true);
-      window.setTimeout(() => setSplatFlash(false), 450);
     }
     setIdx((i) => {
       const next = i + 1;
@@ -216,7 +250,8 @@ export function GuacamolePanic() {
     if (!cooking || doneRef.current || frozen || peeking) return;
     const current = stream[idx];
     if (!current) return;
-    advance(action === current.action);
+    const hit = action === current.action;
+    advance(hit, action, hit ? current.emoji : undefined);
   };
 
   const doPeek = () => {
@@ -323,15 +358,19 @@ export function GuacamolePanic() {
             { label: partnerName, r: theirs, pct: theirPct, cls: "text-rose" },
           ].map((side) => (
             <div key={side.label} className="flex flex-col items-center gap-2">
-              <div className="dr-guac-bowl" aria-hidden>
-                <div className="dr-guac-fill" style={{ height: `${Math.round(side.pct * 100)}%` }} />
-                <span className="dr-guac-face">🥑</span>
+              <div className="flex items-end gap-2">
+                <div className="dr-guac-bowl" aria-hidden>
+                  <div className="dr-guac-fill" style={{ height: `${Math.round(side.pct * 100)}%` }} />
+                  <span className="dr-guac-face">🥑</span>
+                </div>
+                {(side.r?.splats ?? 0) > 0 && <TrashHeap count={side.r?.splats ?? 0} />}
               </div>
               <p className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${side.cls}`}>{side.label}</p>
               <p className="font-serif text-xl text-cream">{side.r?.score ?? "—"}</p>
               <p className="text-[11px] text-muted-foreground">
-                {side.r ? `${side.r.made} in · ${side.r.splats} splat${side.r.splats === 1 ? "" : "s"}` : "no result"}
+                {side.r ? `${side.r.made} in the bowl · ${side.r.splats} on the floor` : "no result"}
               </p>
+              <p className="max-w-[9rem] text-xs italic leading-snug text-cream/85">{guacTaste(side.r)}</p>
             </div>
           ))}
         </div>
@@ -355,8 +394,43 @@ export function GuacamolePanic() {
 
   // ── Countdown + cooking ──
   return (
-    <div className="relative flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
+    <div
+      ref={panelRef}
+      className="relative flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in"
+    >
       {bannersEl}
+
+      {/* Press feedback: a soft edge wash (green right / red wrong), the
+          ingredient flying into the bowl, and the points it earned. All
+          absolutely positioned, so none of it disturbs the layout. */}
+      {flash && (
+        <div
+          key={flash.id}
+          className={`dr-guac-wash dr-guac-wash--${flash.hit ? "hit" : "miss"}`}
+          aria-hidden
+        />
+      )}
+      <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" aria-hidden>
+        {flyers.map((f) => (
+          <span
+            key={f.id}
+            className="dr-guac-flyer"
+            style={{
+              left: f.x,
+              top: f.y,
+              ["--dx" as string]: `${f.dx}px`,
+              ["--dy" as string]: `${f.dy}px`,
+            }}
+          >
+            {f.emoji}
+          </span>
+        ))}
+        {pops.map((pop) => (
+          <span key={pop.id} className="dr-guac-pop" style={{ left: pop.x, top: pop.y }}>
+            {pop.text}
+          </span>
+        ))}
+      </div>
 
       <div className="flex shrink-0 items-center justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -403,10 +477,7 @@ export function GuacamolePanic() {
         ) : (
           <>
             {ingredient && (
-              <div
-                key={idx}
-                className={["dr-guac-card", splatFlash ? "dr-guac-card--splat" : ""].join(" ")}
-              >
+              <div key={idx} ref={cardRef} className="dr-guac-card">
                 <span className="text-6xl" aria-hidden>{ingredient.emoji}</span>
                 <p className="font-serif text-lg text-cream">{ingredient.name}</p>
                 <div className="dr-guac-timer" aria-hidden>
@@ -440,7 +511,7 @@ export function GuacamolePanic() {
 
       <div className="flex shrink-0 items-end justify-between gap-3">
         <div className="flex flex-col items-center gap-1">
-          <div className="dr-guac-bowl dr-guac-bowl--mini" aria-hidden>
+          <div ref={bowlRef} className="dr-guac-bowl dr-guac-bowl--mini" aria-hidden>
             <div className="dr-guac-fill" style={{ height: `${Math.round(myPct * 100)}%` }} />
           </div>
           <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">your bowl</p>
@@ -452,18 +523,48 @@ export function GuacamolePanic() {
               type="button"
               onClick={() => press(a.id)}
               disabled={!cooking || frozen || peeking || doneRef.current}
-              className="dr-guac-btn focus-ring flex flex-col items-center gap-1 rounded-2xl border border-white/[0.12] py-3 disabled:opacity-40"
+              className={[
+                "dr-guac-btn focus-ring flex flex-col items-center gap-1 rounded-2xl border border-white/[0.12] py-3 disabled:opacity-40",
+                flash && flash.action === a.id ? (flash.hit ? "dr-guac-btn--hit" : "dr-guac-btn--miss") : "",
+              ].join(" ")}
             >
               <span className="text-3xl" aria-hidden>{a.emoji}</span>
               <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cream">{a.label}</span>
             </button>
           ))}
         </div>
-        <div className="flex w-14 flex-col items-center gap-0.5">
-          <p className="font-serif text-2xl text-cream">{score}</p>
+        <div className="flex w-16 flex-col items-center gap-1">
+          <p className="font-serif text-2xl leading-none text-cream">{score}</p>
           <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">pts</p>
+          <TrashHeap count={splats} />
         </div>
       </div>
+    </div>
+  );
+}
+
+/** The floor heap — the mistake-side twin of the bowl. Blobs pile up as
+ *  you splat, glanceable without reading anything mid-panic. */
+function TrashHeap({ count }: { count: number }) {
+  const shown = Math.min(count, 8);
+  return (
+    <div
+      className="dr-guac-heap"
+      role="img"
+      aria-label={`${count} ingredient${count === 1 ? "" : "s"} on the floor`}
+    >
+      {Array.from({ length: shown }).map((_, i) => (
+        <span
+          key={i}
+          className="dr-guac-blob"
+          style={{
+            left: `${8 + ((i * 29) % 62)}%`,
+            bottom: `${(i % 3) * 26}%`,
+            transform: `rotate(${((i * 47) % 70) - 35}deg)`,
+          }}
+        />
+      ))}
+      {count > shown && <span className="dr-guac-heap-more">+{count - shown}</span>}
     </div>
   );
 }
