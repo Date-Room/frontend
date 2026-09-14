@@ -1740,7 +1740,7 @@
   50% { box-shadow: 0 0 0 6px rgb(252 211 77 / 0.25); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .dr-guac-card, .dr-guac-steal, .dr-guac-freeze, .dr-guac-wash, .dr-guac-pop, .dr-guac-blob { animation: none; }
+  .dr-guac-card, .dr-guac-steal, .dr-guac-freeze, .dr-guac-wash, .dr-guac-points, .dr-guac-blob { animation: none; }
   .dr-guac-flyer { display: none; }
   .dr-guac-fill { transition: none; }
 }
@@ -1782,15 +1782,20 @@
   }
 }
 
-.dr-guac-pop {
+/* NB: never reuse a @keyframes name — index.css is one global sheet, the
+   last definition wins, and a collision silently re-animates whatever else
+   claimed the name. (This popup was called dr-guac-pop and hijacked the
+   ingredient card's pop-in, ending it at opacity 0 — the card flashed for
+   0.22s and vanished, live-caught by Joshua.) */
+.dr-guac-points {
   position: absolute;
   font-size: 18px;
   font-weight: 700;
   color: #6ee7b7;
   text-shadow: 0 2px 8px rgb(0 0 0 / 0.55);
-  animation: dr-guac-pop 0.7s ease-out both;
+  animation: dr-guac-points-rise 0.7s ease-out both;
 }
-@keyframes dr-guac-pop {
+@keyframes dr-guac-points-rise {
   from { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
   30% { transform: translate(-50%, -110%) scale(1.1); opacity: 1; }
   to { transform: translate(-50%, -230%) scale(1); opacity: 0; }

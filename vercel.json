@@ -1,12 +1,39 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
-    { "source": "/((?!\\.well-known/).*)", "destination": "/index.html" }
+    {
+      "source": "/i/:code/card.jpg",
+      "destination": "https://backend-production-07bf.up.railway.app/i/:code/card.jpg"
+    },
+    {
+      "source": "/i/:code/:pin/card.jpg",
+      "destination": "https://backend-production-07bf.up.railway.app/i/:code/:pin/card.jpg"
+    },
+    {
+      "source": "/i/:path*",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(WhatsApp|facebookexternalhit|Facebot|Twitterbot|TelegramBot|Slackbot|LinkedInBot|Discordbot|Applebot|Pinterest|Embedly|Iframely|vkShare|Snapchat|SkypeUriPreview|Google-PageRenderer|redditbot).*"
+        }
+      ],
+      "destination": "https://backend-production-07bf.up.railway.app/i/:path*"
+    },
+    {
+      "source": "/((?!\\.well-known/).*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
       "source": "/.well-known/apple-app-site-association",
-      "headers": [{ "key": "Content-Type", "value": "application/json" }]
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        }
+      ]
     }
   ]
 }
