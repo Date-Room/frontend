@@ -57,7 +57,14 @@ type Inbound =
   | { type: "error"; code: string; message: string };
 
 const MAX_BACKOFF_MS = 30_000;
-const PING_INTERVAL_MS = 25_000;
+// Liveness. A flaky link often leaves the socket half-open: the browser
+// still reports OPEN, sends vanish, and no `close` ever fires — so nothing
+// would reconnect and nothing would re-sync (live-tested: a game stayed
+// dead for its whole length). Every inbound message counts as liveness;
+// if a ping goes unanswered past the grace, we declare the socket a zombie,
+// tear it down ourselves and reconnect. Worst-case detection ≈ 23s.
+const PING_INTERVAL_MS = 15_000;
+const PONG_GRACE_MS = 8_000;
 
 export class RoomChannel {
   readonly roomId: string;
@@ -83,6 +90,8 @@ export class RoomChannel {
   private outbox: Outbound[] = [];
   private backoff = 500;
   private reconnectTimer: number | null = null;
+  /** When we last heard ANYTHING from the server (pong or otherwise). */
+  private lastInbound = 0;
   private pingTimer: number | null = null;
   private disposed = false;
   private openResolver: (() => void) | null = null;
@@ -246,10 +255,37 @@ export class RoomChannel {
 
     if (this.pingTimer === null) {
       this.pingTimer = window.setInterval(() => {
-        // Cheap keepalive so intermediaries don't reap the socket on idle.
+        if (this.subscribed && Date.now() - this.lastInbound > PING_INTERVAL_MS + PONG_GRACE_MS) {
+          this.declareZombie();
+          return;
+        }
+        // Cheap keepalive so intermediaries don't reap the socket on idle —
+        // and the pong it earns is what the watchdog above listens for.
         this.send({ type: "ping" });
       }, PING_INTERVAL_MS);
     }
+  }
+
+  /** Half-open socket: nothing heard back for too long. The browser won't
+   *  close it for us (that can take minutes), so we do — detaching the old
+   *  handlers first so a late `close` can't schedule a second reconnect. */
+  private declareZombie() {
+    const sock = this.socket;
+    if (!sock) return;
+    sock.onopen = null;
+    sock.onmessage = null;
+    sock.onerror = null;
+    sock.onclose = null;
+    try {
+      sock.close();
+    } catch {
+      /* already gone */
+    }
+    this.socket = null;
+    this.subscribed = false;
+    this.presence = {};
+    this.setStatus("closed:zombie");
+    this.scheduleReconnect();
   }
 
   private scheduleReconnect() {
@@ -280,8 +316,10 @@ export class RoomChannel {
   }
 
   private handle(message: Inbound) {
+    this.lastInbound = Date.now();
     switch (message.type) {
       case "ready": {
+        this.lastInbound = Date.now();
         this.subscribed = true;
         this.setStatus("subscribed");
         this.backoff = 500;

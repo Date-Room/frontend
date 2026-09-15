@@ -134,3 +134,56 @@ describe("RoomChannel reconnect contract", () => {
     expect(statuses[statuses.length - 1]).toBe("closed:4401");
   });
 });
+
+describe("RoomChannel zombie watchdog", () => {
+  it("tears down a half-open socket that stops answering, and reconnects", async () => {
+    const ch = new RoomChannel("room-1");
+    const statuses: string[] = [];
+    ch.onStatus((s) => statuses.push(s));
+    let reconnects = 0;
+    ch.onReconnect(() => reconnects++);
+
+    const open = ch.open();
+    const s1 = FakeSocket.instances[0];
+    s1.serverOpen();
+    s1.serverReady();
+    await open;
+
+    // The server goes silent but the browser never fires close (half-open).
+    // Pings keep going out; no pong ever comes back.
+    vi.advanceTimersByTime(15_000); // first ping
+    expect(s1.sentTypes()).toContain("ping");
+    expect(ch.status).toBe("subscribed"); // still inside the grace
+    vi.advanceTimersByTime(15_000); // second tick: 30s silent > 15s + 8s grace
+    expect(ch.status).toBe("closed:zombie");
+    expect(s1.readyState).toBe(FakeSocket.CLOSED);
+
+    // …and it reconnects on its own, firing the re-sync hook.
+    vi.advanceTimersByTime(600);
+    const s2 = FakeSocket.instances[1];
+    expect(s2).toBeDefined();
+    s2.serverOpen();
+    s2.serverReady();
+    expect(ch.status).toBe("subscribed");
+    expect(reconnects).toBe(1);
+    ch.dispose();
+  });
+
+  it("stays quiet while the server is talking, even without pongs", async () => {
+    const ch = new RoomChannel("room-1");
+    const open = ch.open();
+    const s1 = FakeSocket.instances[0];
+    s1.serverOpen();
+    s1.serverReady();
+    await open;
+    // Any inbound traffic is liveness: a presence update every 10s keeps
+    // the watchdog happy indefinitely.
+    for (let i = 0; i < 6; i++) {
+      vi.advanceTimersByTime(10_000);
+      s1.onmessage?.({ data: JSON.stringify({ type: "presence.leave", id: "x" }) });
+    }
+    expect(ch.status).toBe("subscribed");
+    expect(FakeSocket.instances).toHaveLength(1);
+    ch.dispose();
+  });
+});
