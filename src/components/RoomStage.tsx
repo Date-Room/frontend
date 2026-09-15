@@ -34,6 +34,8 @@ import {
   Settings,
   Salad,
   type LucideIcon,
+  Loader2,
+  Check,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
 import { ActivityHelp, hasActivityHelp } from "@/components/ActivityHelp";
@@ -279,6 +281,30 @@ export function RoomStage({
   // a tappable notice for ~3s, then it settles back. (Activities are per-user,
   // so this is how you learn your partner did something.)
   const room = useRoomSession();
+
+  // Game-channel connection state — NOT the video call, which is a separate
+  // LiveKit connection that survives networks this WebSocket doesn't. Shown
+  // after a short grace so quick blips don't flicker, and followed by a
+  // brief "caught up" so the player knows the game re-synced (live-tested
+  // gap: taps into a void with no indication why).
+  const [channelStatus, setChannelStatus] = useState(room.channel.status);
+  useEffect(() => room.channel.onStatus(setChannelStatus), [room.channel]);
+  const [linkDown, setLinkDown] = useState(false);
+  const [caughtUp, setCaughtUp] = useState(false);
+  useEffect(() => {
+    if (channelStatus === "subscribed") {
+      setLinkDown((was) => {
+        if (was) {
+          setCaughtUp(true);
+          window.setTimeout(() => setCaughtUp(false), 2200);
+        }
+        return false;
+      });
+      return;
+    }
+    const t = window.setTimeout(() => setLinkDown(true), 1500);
+    return () => window.clearTimeout(t);
+  }, [channelStatus]);
   const [notif, setNotif] = useState<{ id: number; text: string; target: string } | null>(null);
   const notifTimer = useRef<number | undefined>(undefined);
   // Ids removed via the delete broadcast — dropped from pinned cards instantly.
@@ -875,6 +901,31 @@ export function RoomStage({
         )}
 
       {helpOpen && staged && <ActivityHelp id={staged} onClose={() => setHelpOpen(false)} />}
+
+      {(linkDown || caughtUp) && (
+        <div
+          role="status"
+          aria-live="polite"
+          className={cn(
+            "pointer-events-none fixed left-1/2 top-3 z-[90] flex -translate-x-1/2 items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium shadow-lg backdrop-blur-md animate-fade-in",
+            linkDown
+              ? "border-amber-300/50 bg-black/70 text-amber-200"
+              : "border-emerald-400/50 bg-black/70 text-emerald-200",
+          )}
+        >
+          {linkDown ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              Reconnecting to the room… your moves will catch up
+            </>
+          ) : (
+            <>
+              <Check className="h-3.5 w-3.5" aria-hidden />
+              Back on — caught up
+            </>
+          )}
+        </div>
+      )}
     </main>
     </MusicRoomProvider>
   );
