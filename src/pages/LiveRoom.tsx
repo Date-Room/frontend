@@ -12,7 +12,7 @@ import {
 import { isTryPackage, getRoomExperience, isActivityEnabled, getRoomPlan, saveRoomPlanFromServer, isSubscriptionPackage, type CuratableActivityId } from "@/lib/roomExperience";
 import { isWatchPartyRoom } from "@/lib/watchParty";
 import { getRoomExperienceApi, listMyRooms, type Room, type RoomPackage } from "@/lib/rooms";
-import { LogOut, Clock, Maximize2, Minimize2, Sparkles, ChevronLeft, Home } from "lucide-react";
+import { LogOut, Clock, Maximize2, Minimize2, Sparkles, ChevronLeft, Home, MessageSquareText } from "lucide-react";
 import { AmbientSceneStack } from "@/components/AmbientSceneStack";
 import type { LobbyMood } from "@/lib/ambiance";
 import { ambianceMeta, PLAIN_MOOD } from "@/lib/ambiance";
@@ -24,6 +24,7 @@ import { ChaperonProvider } from "@/context/ChaperonContext";
 import { CallPeersProvider, useCallPeers } from "@/context/CallPeersContext";
 import { ChaperonAnnounceBadge } from "@/components/ChaperonAnnounceBadge";
 import { TellUsSheet } from "@/components/TellUsSheet";
+import { ChatProvider } from "@/context/ChatContext";
 import type { ChaperonAnnouncement } from "@/lib/rooms";
 import { ChaperonMount } from "@/components/ChaperonMount";
 import {
@@ -588,9 +589,12 @@ function RoomShell({
             <button
               type="button"
               onClick={() => setTellUsOpen(true)}
-              className="text-xs uppercase tracking-[0.2em] text-muted-foreground transition hover:text-cream"
+              aria-label="Send feedback"
+              title="Send feedback"
+              className="focus-ring inline-flex items-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-cream/80 transition hover:border-primary/40 hover:bg-primary/10 hover:text-cream"
             >
-              Tell us
+              <MessageSquareText className="h-3.5 w-3.5 text-primary" aria-hidden />
+              <span className="hidden sm:inline">Feedback</span>
             </button>
             <button
               onClick={() => setShowLeaveConfirm(true)}
@@ -608,6 +612,7 @@ function RoomShell({
           roomId={roomId}
         />
 
+        <ChatProvider>
         <RoomStage
           roomId={roomId}
           items={canvasItems}
@@ -622,6 +627,7 @@ function RoomShell({
           onCallIn={() => enterLiveMode("vision_board")}
           onLeaveCall={exitLiveMode}
         />
+        </ChatProvider>
 
         {showLeaveConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in pointer-events-auto">

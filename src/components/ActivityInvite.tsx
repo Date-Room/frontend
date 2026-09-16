@@ -113,11 +113,13 @@ export function ActivityInvite({
   );
 }
 
-/** Two soft notes, only when the tab is in the background (otherwise the card
- *  itself is the signal). Guarded: no audio context, no sound, no error. */
-export function inviteChime(): void {
+/** Two soft notes. By default only when the tab is in the background (the
+ *  card itself is the signal); `always` plays regardless. Guarded: no audio
+ *  context, no sound, no error. */
+export function inviteChime(always = false): void {
   try {
-    if (typeof document === "undefined" || !document.hidden) return;
+    if (typeof document === "undefined") return;
+    if (!always && !document.hidden) return;
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctx) return;
     const ctx = new Ctx();
