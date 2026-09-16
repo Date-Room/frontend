@@ -136,14 +136,6 @@ export function updatePromoCode(id: string, body: Record<string, unknown>) {
   return api.patch<PromoCode>(`/v1/admin/promo-codes/${id}`, body);
 }
 
-export function listAdminRooms(state?: string) {
-  const q = state ? `?state=${encodeURIComponent(state)}` : "";
-  return api.get<Page<AdminRoomRow>>(`/v1/admin/rooms${q}`);
-}
-
-export function listAdminAudit() {
-  return api.get<Page<AdminAuditRow>>("/v1/admin/audit");
-}
 
 // --- Chaperon (AI observer) provider config -------------------------------
 
@@ -466,4 +458,80 @@ export function listCoachBetaApplicationsBy(status: "pending" | "granted" | "dec
   return api.get<CoachBetaApplicationsResponse>(
     `/v1/admin/chaperon/coach-beta/applications${qs({ status })}`,
   );
+}
+
+// --- Admin ramp: dashboard, search, feedback ------------------------------
+
+export type AdminStatsDeltas = {
+  days: number;
+  current: Record<string, number | null>;
+  prior: Record<string, number | null>;
+  now: { total_users: number; live_rooms: number; live_dates: number; live_persistent: number; active_subscriptions: number };
+  signups_by_source: Record<string, number>;
+};
+export function getAdminStatsDeltas(days = 30) {
+  return api.get<AdminStatsDeltas>(`/v1/admin/stats/deltas${qs({ days })}`);
+}
+
+export type AdminNeedsActionRow = {
+  id: string;
+  severity: "alert" | "warn";
+  title: string;
+  detail: string;
+  action: "end_sessions" | null;
+  href: string | null;
+  rooms: string[];
+};
+export function getAdminNeedsAction() {
+  return api.get<{ items: AdminNeedsActionRow[] }>("/v1/admin/needs-action");
+}
+
+export type AdminTimeseries = { days: number; points: { day: string; revenue_kes: number; rooms_opened: number }[] };
+export function getAdminTimeseries(days = 30) {
+  return api.get<AdminTimeseries>(`/v1/admin/timeseries${qs({ days })}`);
+}
+
+export type AdminSearchResult = {
+  users: { id: string; email: string; display_name: string }[];
+  rooms: { id: string; code: string; state: string }[];
+  promo_codes: { id: string; code: string; label: string }[];
+};
+export function adminSearch(q: string) {
+  return api.get<AdminSearchResult>(`/v1/admin/search${qs({ q })}`);
+}
+
+export type AdminFeedbackRow = {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  display_name: string;
+  email: string;
+  team: boolean;
+  surface: string;
+  activity_id: string | null;
+  kind: "confusing" | "broken" | "idea" | "loved";
+  text: string;
+  platform: string;
+  app_version: string | null;
+  status: "new" | "seen" | "done";
+  admin_note: string;
+  updated_at: string;
+};
+export function listAdminFeedback(params: { status?: string; kind?: string; cursor?: string; limit?: number }) {
+  return api.get<{ items: AdminFeedbackRow[]; next_cursor: string | null; total: number; counts: Record<string, number> }>(
+    `/v1/admin/feedback${qs(params)}`,
+  );
+}
+export function updateAdminFeedback(id: string, body: { status?: "new" | "seen" | "done"; admin_note?: string }) {
+  return api.patch<AdminFeedbackRow>(`/v1/admin/feedback/${id}`, body);
+}
+
+export function listAdminRooms(params: { state?: string; persistence?: string; cursor?: string; limit?: number }) {
+  return api.get<Page<AdminRoomRow> & { total?: number | null }>(`/v1/admin/rooms${qs(params)}`);
+}
+export function listAdminAudit(params: { action?: string; cursor?: string; limit?: number }) {
+  return api.get<Page<AdminAuditRow> & { total?: number | null }>(`/v1/admin/audit${qs(params)}`);
+}
+export function listAdminPromoCodes(params: { label?: string; cursor?: string; limit?: number }) {
+  return api.get<Page<PromoCode> & { total?: number | null }>(`/v1/admin/promo-codes${qs(params)}`);
 }

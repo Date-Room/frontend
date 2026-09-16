@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 
 const api = vi.hoisted(() => ({
   queue: { unreviewed: 2, items: [] as unknown[] },
@@ -29,6 +30,7 @@ vi.mock("@/lib/admin", async (orig) => {
     getBetaReviewQueue: vi.fn(async () => api.queue),
     postBetaVerdict: vi.fn(async (b: unknown) => { api.verdicts.push(b); }),
     listCoachBetaApplicationsBy: vi.fn(async () => ({ items: [], pending_count: 0 })),
+    listAdminFeedback: vi.fn(async () => ({ items: [], next_cursor: null, total: 0, counts: { new: 0, seen: 0, done: 0 } })),
   };
 });
 
@@ -64,8 +66,7 @@ describe("Review tab", () => {
   it("shows the pattern and the flag, saves a verdict with a tag and moves on", async () => {
     api.queue = { unreviewed: 2, items: [row(), row({ event_id: "e2", shared: false, check_id: "stall" })] };
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={qc}><AdminBeta /></QueryClientProvider>);
-    fireEvent.mouseDown(screen.getByRole("tab", { name: /Review/ }));
+    render(<QueryClientProvider client={qc}><MemoryRouter initialEntries={["/admin/beta?tab=review"]}><AdminBeta /></MemoryRouter></QueryClientProvider>);
     await waitFor(() => expect(screen.getByText("direct request, amount stated")).toBeTruthy());
     expect(screen.getByText(/Flagged by the tester/)).toBeTruthy();
     const save = screen.getByRole("button", { name: /Save & next/ }) as HTMLButtonElement;
@@ -81,8 +82,7 @@ describe("Review tab", () => {
   it("never renders words about a call, even if a stray field arrived", async () => {
     api.queue = { unreviewed: 1, items: [row({ shared: true, whisper: "[your date] just asked for $2,000." } as Record<string, unknown>)] };
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={qc}><AdminBeta /></QueryClientProvider>);
-    fireEvent.mouseDown(screen.getByRole("tab", { name: /Review/ }));
+    render(<QueryClientProvider client={qc}><MemoryRouter initialEntries={["/admin/beta?tab=review"]}><AdminBeta /></MemoryRouter></QueryClientProvider>);
     await waitFor(() => expect(screen.getByText("direct request, amount stated")).toBeTruthy());
     expect(screen.queryByText(/just asked/)).toBeNull();
     expect(document.body.textContent).not.toMatch(/\$2,000/);
@@ -109,8 +109,7 @@ describe("Status tab", () => {
       by_check: [{ check_id: "money_ask", signals: 9, shown: 7, agree_rate_pct: 80 }],
     };
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(<QueryClientProvider client={qc}><AdminBeta /></QueryClientProvider>);
-    fireEvent.mouseDown(screen.getByRole("tab", { name: /Status/ }));
+    render(<QueryClientProvider client={qc}><MemoryRouter initialEntries={["/admin/beta?tab=status"]}><AdminBeta /></MemoryRouter></QueryClientProvider>);
     await waitFor(() => expect(screen.getByText("2 sessions stuck open")).toBeTruthy());
     expect(screen.getByText(/worker f0ada6a/)).toBeTruthy();
     expect(screen.getAllByRole("button", { name: /Close sessions/ })).toHaveLength(1); // only the real action

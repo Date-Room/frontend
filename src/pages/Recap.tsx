@@ -19,6 +19,7 @@ import { GetTheAppCard } from "@/components/GetTheAppCard";
 import { authClient } from "@/lib/authClient";
 import { getChaperonDebrief, type ChaperonDebriefResponse } from "@/lib/chaperon";
 import { ChaperonReview } from "@/components/ChaperonReview";
+import { TellUsSheet } from "@/components/TellUsSheet";
 import {
   getBillingConfig,
   getEntitlement,
@@ -121,6 +122,7 @@ export default function Recap() {
   const participantId = params.get("participant_id") ?? undefined;
   const inviteToken = useMemo(() => readInviteToken(), []);
   const [claiming, setClaiming] = useState(false);
+  const [tellUsOpen, setTellUsOpen] = useState(false);
   const [promoting, setPromoting] = useState(false);
   const [promoteError, setPromoteError] = useState<string | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -360,6 +362,23 @@ export default function Recap() {
                 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-full bg-sky-400/80" /> talked
               </p>
             </div>
+          )}
+
+          {authClient.getSession() && id && (
+            <section className="mb-8">
+              <button
+                type="button"
+                onClick={() => setTellUsOpen(true)}
+                className="editorial-card flex w-full items-center justify-between px-6 py-4 text-left transition hover:border-primary/30"
+              >
+                <span>
+                  <span className="block font-serif text-lg text-cream">How was tonight, honestly?</span>
+                  <span className="block text-sm text-muted-foreground">Confusing, broken, an idea, or something you loved. One tap and a line.</span>
+                </span>
+                <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" />
+              </button>
+              <TellUsSheet open={tellUsOpen} onClose={() => setTellUsOpen(false)} surface="recap" roomId={id} />
+            </section>
           )}
 
           {/* Guests cannot have a chaperon at all: this is the honest hook.
