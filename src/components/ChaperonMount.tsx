@@ -12,6 +12,7 @@ import { useRoomSession } from "@/context/RoomSessionContext";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 import { getCoachBetaStatus } from "@/lib/chaperon";
 import { ChaperonRail } from "@/components/ChaperonRail";
+import { ChaperonTryCard } from "@/components/ChaperonTryCard";
 import {
   CHAPERON_STATUS_DEFAULT_OPEN,
   ChaperonStatusPanel,
@@ -260,6 +261,9 @@ export function ChaperonMount() {
             />
           </div>
         )}
+
+        {/* First chaperoned date: the try-me probe, once per browser. */}
+        <ChaperonTryCard partnerName={partnerName === "Them" ? null : partnerName} />
 
         {/* The running whisper log — collapsible; only when the reviewer opens it. */}
         {railOpen && (

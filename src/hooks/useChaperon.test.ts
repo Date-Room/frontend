@@ -9,11 +9,19 @@ vi.mock("@/lib/chaperon", async (importOriginal) => {
     createChaperonSession: vi.fn(),
     sendChaperonFeedback: vi.fn(),
     endChaperonSession: vi.fn(),
+    sendChaperonOutcomes: vi.fn(),
+    setChaperonProbe: vi.fn(),
   };
 });
 
-import { createChaperonSession, endChaperonSession } from "@/lib/chaperon";
-import { useChaperon } from "@/hooks/useChaperon";
+import {
+  createChaperonSession,
+  endChaperonSession,
+  sendChaperonFeedback,
+  sendChaperonOutcomes,
+  setChaperonProbe,
+} from "@/lib/chaperon";
+import { OUTCOME_FLUSH_MS, useChaperon } from "@/hooks/useChaperon";
 
 const SESSION = {
   id: "sess-1",
@@ -49,6 +57,9 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.mocked(createChaperonSession).mockResolvedValue(SESSION);
   vi.mocked(endChaperonSession).mockResolvedValue(SESSION);
+  vi.mocked(sendChaperonOutcomes).mockResolvedValue(undefined);
+  vi.mocked(sendChaperonFeedback).mockResolvedValue(undefined);
+  vi.mocked(setChaperonProbe).mockResolvedValue({ active: true });
 });
 
 afterEach(() => {
@@ -137,5 +148,87 @@ describe("useChaperon (agent-only)", () => {
 
     act(() => result.current.ingestAgentMessage(health()));
     expect(result.current.status).toBe("off"); // no resurrection after stop
+  });
+});
+
+
+function whisper(over: Record<string, unknown> = {}) {
+  return {
+    type: "chaperon.whisper",
+    session_id: "sess-1",
+    event_id: "e1",
+    check_id: "money_ask",
+    severity: "alert",
+    whisper: "careful",
+    confidence: 0.9,
+    ...over,
+  };
+}
+
+describe("outcomes, reactions, probe (PR 8)", () => {
+  it("reports shown and gate-suppressed whispers in one batched request", async () => {
+    const { result } = await startedHook();
+    act(() => {
+      result.current.ingestAgentMessage(whisper({ event_id: "e1" }));
+      // Same category inside the 20 s cooldown → the gate holds it.
+      result.current.ingestAgentMessage(whisper({ event_id: "e2", severity: "note", check_id: "stall" }));
+      result.current.ingestAgentMessage(whisper({ event_id: "e3", severity: "note", check_id: "stall" }));
+    });
+    expect(sendChaperonOutcomes).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(OUTCOME_FLUSH_MS + 1);
+    });
+    expect(sendChaperonOutcomes).toHaveBeenCalledTimes(1);
+    const [, body] = vi.mocked(sendChaperonOutcomes).mock.calls[0];
+    expect(body.shown).toEqual(["e1"]);
+    expect(body.suppressed).toEqual(["e2", "e3"]);
+  });
+
+  it("flushes pending outcomes when the session stops", async () => {
+    const { result } = await startedHook();
+    act(() => result.current.ingestAgentMessage(whisper({ event_id: "e9" })));
+    await act(async () => {
+      await result.current.stop();
+    });
+    expect(sendChaperonOutcomes).toHaveBeenCalledWith("sess-1", { shown: ["e9"], suppressed: [] });
+  });
+
+  it("sends a reason and the share tick with an unhelpful reaction", async () => {
+    const { result } = await startedHook();
+    act(() => result.current.ingestAgentMessage(whisper({ event_id: "e1" })));
+    act(() => result.current.sendFeedback(false, "e1", { reason: "not_happen", shareWithTeam: true }));
+    expect(sendChaperonFeedback).toHaveBeenCalledWith("sess-1", {
+      event_id: "e1",
+      helpful: false,
+      reason: "not_happen",
+      share_with_team: true,
+    });
+    // Old-style thumbs stay minimal.
+    act(() => result.current.sendFeedback(true, "e1"));
+    expect(sendChaperonFeedback).toHaveBeenLastCalledWith("sess-1", { event_id: "e1", helpful: true });
+  });
+
+  it("arms the probe on the server and flips to caught when the test lands", async () => {
+    const { result } = await startedHook();
+    expect(result.current.probe).toBe("idle");
+    await act(async () => {
+      await result.current.startProbe();
+    });
+    expect(setChaperonProbe).toHaveBeenCalledWith("sess-1", true);
+    expect(result.current.probe).toBe("armed");
+    act(() => result.current.ingestAgentMessage(whisper({ event_id: "p1", probe: true })));
+    expect(result.current.probe).toBe("caught");
+    expect(result.current.currentWhisper?.probe).toBe(true);
+  });
+
+  it("cancelling the probe tells the server and resets", async () => {
+    vi.mocked(setChaperonProbe).mockResolvedValue({ active: false });
+    const { result } = await startedHook();
+    await act(async () => {
+      await result.current.startProbe();
+    });
+    act(() => result.current.cancelProbe());
+    expect(setChaperonProbe).toHaveBeenLastCalledWith("sess-1", false);
+    expect(result.current.probe).toBe("idle");
   });
 });

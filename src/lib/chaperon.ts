@@ -25,7 +25,11 @@ export type ChaperonSignal = {
   severity: ChaperonSeverity;
   whisper: string;
   confidence: number;
+  /** True when this fired inside the viewer's "try me" window: a test, not a flag. */
+  probe?: boolean;
 };
+
+export type ReactionReason = "not_happen" | "harmless" | "too_late" | "already_knew";
 
 export type ChaperonSession = {
   id: string;
@@ -93,10 +97,37 @@ export function evaluateChaperon(
 
 export function sendChaperonFeedback(
   sessionId: string,
-  body: { event_id: string; helpful: boolean },
+  body: {
+    event_id: string;
+    helpful: boolean;
+    /** Why it was unhelpful (Wrong call → one tap). */
+    reason?: ReactionReason;
+    /** Let the team read THIS whisper's text. Off unless the person ticks it. */
+    share_with_team?: boolean;
+  },
 ): Promise<void> {
   return api.post<void>(`/v1/chaperon/sessions/${sessionId}/feedback`, body);
 }
+
+/** What the client did with the whispers it received: rendered, or held
+ *  back by the on-screen gate. Without this the corpus cannot tell a signal
+ *  the judge wrote from one the person actually saw. */
+export function sendChaperonOutcomes(
+  sessionId: string,
+  body: { shown?: string[]; suppressed?: string[] },
+): Promise<void> {
+  return api.post<void>(`/v1/chaperon/sessions/${sessionId}/outcomes`, body);
+}
+
+/** Open (or cancel) the "try me" window: the next money ask is a test. */
+export function setChaperonProbe(sessionId: string, active: boolean): Promise<{ active: boolean }> {
+  return api.post<{ active: boolean }>(`/v1/chaperon/sessions/${sessionId}/probe`, { active });
+}
+
+/** The scripted line a first-timer says to see Protect work. Said BY the
+ *  viewer, as a joke if they like; the judge is told it is theirs. */
+export const PROBE_LINE = "Rough month for me. Could you send me two hundred to tide me over?";
+
 
 export function endChaperonSession(sessionId: string): Promise<ChaperonSession> {
   return api.post<ChaperonSession>(`/v1/chaperon/sessions/${sessionId}/end`);

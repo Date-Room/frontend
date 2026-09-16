@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Calendar, ChevronRight, Lightbulb, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { CardPage } from "@/components/CardPage";
@@ -359,6 +359,32 @@ export default function Recap() {
                 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-full bg-sky-400/80" /> talked
               </p>
             </div>
+          )}
+
+          {/* Guests cannot have a chaperon at all: this is the honest hook.
+              (What the other person's chaperon saw is theirs, never shown.) */}
+          {!authClient.getSession() && (
+            <section className="mb-8 animate-float-up">
+              <div className="editorial-card p-6">
+                <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" aria-hidden />
+                  Chaperon
+                </p>
+                <h2 className="mt-2 font-serif text-xl leading-snug text-cream">
+                  Next time, have one watching out for you.
+                </h2>
+                <p className="mt-2 text-sm text-cream/80">
+                  A chaperon listens for scams, pressure and money asks, whispers only to you,
+                  and writes you a private review like this one. Free on your first date.
+                </p>
+                <Link
+                  to="/auth?src=recap_hook"
+                  className="btn-primary focus-ring mt-4 inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold"
+                >
+                  Sign in to get yours
+                </Link>
+              </div>
+            </section>
           )}
 
           {/* The chaperon's debrief — yours only; your date has their own. */}
