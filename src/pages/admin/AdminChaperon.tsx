@@ -125,7 +125,7 @@ export default function AdminChaperon() {
       <header className="flex items-center gap-3">
         <ShieldCheck className="h-6 w-6 text-emerald-400" />
         <div>
-          <h1 className="font-serif text-2xl font-medium text-cream">Chaperon AI</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-cream">Chaperon AI</h1>
           <p className="text-sm text-muted-foreground">
             Which model the whisper rail uses. Keys are set in the server env; this
             only picks the active provider.

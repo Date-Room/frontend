@@ -73,7 +73,7 @@ export default function AdminDashboard() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <h2 className="font-serif text-2xl font-medium text-cream">Dashboard</h2>
+          <h2 className="text-2xl font-semibold tracking-tight text-cream">Dashboard</h2>
           <p className="mt-1 text-sm text-muted-foreground/70">Platform pulse · last {days} days against the {days} before</p>
         </div>
         <div className="ml-auto inline-flex overflow-hidden rounded-lg border border-white/[0.14]">

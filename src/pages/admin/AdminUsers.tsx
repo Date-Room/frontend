@@ -119,7 +119,7 @@ export default function AdminUsers() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-serif text-2xl font-medium text-cream">Users</h2>
+        <h2 className="text-2xl font-semibold tracking-tight text-cream">Users</h2>
         <p className="text-muted-foreground/70 text-sm mt-1">Search, inspect tiers, grant products.</p>
       </div>
 

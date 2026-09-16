@@ -104,7 +104,7 @@ export default function AdminBeta() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="font-serif text-2xl font-medium text-cream">Beta console</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-cream">Beta console</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Structure only: what fired, what happened to it, how it was received. Never the words, never who.
         </p>
@@ -599,7 +599,7 @@ function StatusTab() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-lg border border-white/[0.08] bg-card/40">
-          <h2 className="border-b border-white/[0.08] px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">Judges \u00b7 last 7 days</h2>
+          <h2 className="border-b border-white/[0.08] px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">Judges · last 7 days</h2>
           {h.judges.length === 0 ? (
             <p className="px-4 py-4 text-sm text-muted-foreground/70">No evaluates yet.</p>
           ) : (

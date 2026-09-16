@@ -52,6 +52,41 @@
     font-family: 'Playfair Display', serif;
   }
 
+  /* Admin: a different room from the product on purpose. Night blue ground,
+     cool white text, an electric primary, neon state colours. Scoped to the
+     admin root so every admin page (all on tokens) flips at once and the
+     product keeps its warm palette. */
+  .theme-admin {
+    color-scheme: dark;
+    --background: 222 47% 5%;
+    --foreground: 210 40% 96%;
+    --card: 222 40% 9%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 44% 7%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 190 95% 55%;
+    --primary-foreground: 222 47% 6%;
+    --secondary: 222 30% 14%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 222 26% 16%;
+    --muted-foreground: 215 20% 68%;
+    --accent: 190 95% 55%;
+    --accent-foreground: 222 47% 6%;
+    --destructive: 350 85% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 222 24% 18%;
+    --input: 222 24% 16%;
+    --ring: 190 95% 55%;
+    --cream: 210 40% 96%;
+    --amber: 45 100% 60%;
+    --radius: 0.75rem;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .theme-admin h1, .theme-admin h2, .theme-admin h3, .theme-admin h4, .theme-admin h5, .theme-admin h6 {
+    font-family: 'DM Sans', sans-serif;
+    letter-spacing: -0.01em;
+  }
+
   html.light {
     color-scheme: light;
     --background: 35 40% 97%;

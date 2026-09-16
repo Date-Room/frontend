@@ -399,7 +399,7 @@ export default function AdminPromoCodes() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="font-serif text-2xl font-medium text-cream">Promo codes</h2>
+        <h2 className="text-2xl font-semibold tracking-tight text-cream">Promo codes</h2>
         <p className="text-muted-foreground text-sm mt-1">
           Generate single-use codes in batches, or create a custom code by hand.
         </p>
