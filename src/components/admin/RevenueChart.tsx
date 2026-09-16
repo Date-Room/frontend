@@ -52,7 +52,7 @@ export function RevenueChart({ points, unit = "", height = 200 }: { points: Poin
               width={Math.max(bw - 3, 1)}
               height={Math.max(h, 0)}
               rx="2"
-              fill={i === last || i === hover ? "hsl(190 95% 55%)" : "hsl(190 95% 55% / 0.45)"}
+              fill={i === last || i === hover ? "hsl(var(--neon))" : "hsl(var(--neon) / 0.5)"}
               onMouseEnter={() => setHover(i)}
               onMouseLeave={() => setHover(null)}
             />

@@ -423,7 +423,7 @@ export default function AdminPromoCodes() {
         className="rounded-xl border border-white/[0.14] bg-card/60 p-6 space-y-4 max-w-2xl"
       >
         <div className="flex items-center gap-2 text-white">
-          <Sparkles className="h-4 w-4 text-amber-300" aria-hidden />
+          <Sparkles className="h-4 w-4 text-fuchsia-300" aria-hidden />
           <h3 className="font-medium">Generate codes</h3>
         </div>
         <p className="text-sm text-muted-foreground">

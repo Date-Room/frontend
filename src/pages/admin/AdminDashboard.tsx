@@ -37,7 +37,7 @@ export function trend(current: number | null | undefined, prior: number | null |
 
 function Tile({ label, value, sub, t }: { label: string; value: string; sub?: string; t?: ReturnType<typeof trend> }) {
   return (
-    <div className="rounded-xl border border-white/[0.08] bg-card/40 px-4 py-3.5">
+    <div className="rounded-xl border border-white/[0.08] bg-card/40 neon-tile px-4 py-3.5">
       <p className="text-[11px] uppercase tracking-wider text-muted-foreground/70">{label}</p>
       <p className="text-[26px] font-semibold leading-tight tabular-nums">{value}</p>
       <p className="text-xs text-muted-foreground">
@@ -139,7 +139,7 @@ export default function AdminDashboard() {
           {needs.data?.items.length === 0 && <p className="px-4 py-6 text-sm text-muted-foreground/70">Nothing needs you right now.</p>}
           {(needs.data?.items ?? []).map((row: AdminNeedsActionRow) => (
             <div key={row.id} className="flex items-center gap-3 border-b border-white/[0.06] px-4 py-3 last:border-b-0">
-              <span className={cn("h-2 w-2 shrink-0 rounded-full", row.severity === "alert" ? "bg-rose-400" : "bg-amber-400")} />
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", row.severity === "alert" ? "bg-rose-400" : "bg-fuchsia-400")} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-cream">{row.title}</p>
                 <p className="text-xs text-muted-foreground">{row.detail}</p>

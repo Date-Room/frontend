@@ -57,7 +57,7 @@ export function AdminLayout() {
     <div className="theme-admin flex min-h-screen bg-background text-cream">
       <aside className="flex w-[232px] shrink-0 flex-col border-r border-white/[0.06] bg-black/20">
         <div className="flex items-center gap-2.5 px-5 pb-4 pt-6">
-          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-primary text-[13px] font-bold text-primary-foreground shadow-[0_0_18px_hsl(var(--primary)/0.45)]">
+          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-primary text-[13px] font-bold text-primary-foreground neon-glow">
             DR
           </span>
           <div>
@@ -80,7 +80,7 @@ export function AdminLayout() {
                   className={({ isActive }) =>
                     cn(
                       "flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition",
-                      isActive ? "bg-primary/[0.14] text-cream shadow-[inset_2px_0_0_hsl(var(--primary))]" : "text-muted-foreground hover:bg-white/[0.05] hover:text-cream",
+                      isActive ? "bg-primary/[0.14] text-cream neon-nav" : "text-muted-foreground hover:bg-white/[0.05] hover:text-cream",
                     )
                   }
                 >
