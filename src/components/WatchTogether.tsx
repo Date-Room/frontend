@@ -46,6 +46,12 @@ import { ensureYtShim } from "@/lib/ytEmbedPlayer";
  *    `{ video_id?, timestamp_seconds }`.
  * The controller (whoever last acted) emits a 2s `tick` so followers drift-correct.
  * Durable snapshots are written on load/play/pause/stop (not on every tick).
+ *
+ * Late join: durable state is the first source, but it is written only by
+ * signed-in members, and only if one was listening when the guest pressed
+ * load. So on mount we also ask the room (`sync_request`) and whoever has the
+ * video answers with a `sync` (video, position, playing). Mobile ignores both
+ * types (unknown events fall through its reducer), so mixed rooms are safe.
  */
 
 function extractId(raw: string): string | null {
@@ -213,6 +219,14 @@ export function WatchTogether() {
   }
   const dTsRef = useRef(dTs);
   dTsRef.current = dTs;
+  // Position carried by a `sync` reply for a player that hasn't mounted yet;
+  // consumed once by onReady / loadedmetadata, then falls back to durable.
+  const pendingSeekRef = useRef<number | null>(null);
+  const takeSeekTarget = (): number => {
+    const pending = pendingSeekRef.current;
+    pendingSeekRef.current = null;
+    return pending != null && pending > 0 ? pending : dTsRef.current;
+  };
 
   // Suppress window as an expiry timestamp (see original: overlapping setTimeout
   // clears would re-open the echo window early).
@@ -505,7 +519,8 @@ export function WatchTogether() {
               // Late joiners catch up locally — don't echo a play/pause burst to the room.
               suppress(3000);
               p.mute?.();
-              if (dTsRef.current) p.seekTo(dTsRef.current, true);
+              const seekTo = takeSeekTarget();
+              if (seekTo) p.seekTo(seekTo, true);
               if (playingRef.current) p.playVideo?.();
               else p.pauseVideo?.();
               captureTitle();
@@ -625,7 +640,8 @@ export function WatchTogether() {
     if (!v || !directUrl) return;
     suppress(2500);
     const onLoaded = () => {
-      if (dTsRef.current > 0) v.currentTime = dTsRef.current;
+      const seekTo = takeSeekTarget();
+      if (seekTo > 0) v.currentTime = seekTo;
       if (playingRef.current) {
         void v.play().catch(() => setLivePlaying(false));
       }
@@ -655,21 +671,42 @@ export function WatchTogether() {
     if (!session) return;
     return session.onEvent((e) => {
       if (e.userId === userId) return;
+      if (e.type === "sync_request") {
+        // A newcomer asked what's on. Answer only if we have something
+        // and we're the one driving (or nobody is), so a watch party
+        // doesn't answer in chorus.
+        const v = videoIdRef.current;
+        const su = directUrlRef.current;
+        if (!v && !su) return;
+        const lc = lastControllerRef.current;
+        if (lc && lc !== userId) return;
+        void session.sendEvent("sync", {
+          video_id: su ? null : v,
+          src_url: su,
+          timestamp_seconds: wTime(),
+          playing: playingRef.current,
+        });
+        return;
+      }
       isControllerRef.current = false;
       const ts = typeof e.payload.timestamp_seconds === "number" ? e.payload.timestamp_seconds : undefined;
       const p = playerRef.current;
 
-      if (e.type === "load") {
+      if (e.type === "load" || e.type === "sync") {
         const v = typeof e.payload.video_id === "string" ? e.payload.video_id : null;
         const su = typeof e.payload.src_url === "string" ? e.payload.src_url : null;
         const ts = typeof e.payload.timestamp_seconds === "number" ? e.payload.timestamp_seconds : 0;
+        // A fresh load always plays; a sync reply carries the real state.
+        const play = e.payload.playing !== false;
+        const sync = e.type === "sync";
+        if (sync && ts > 0) pendingSeekRef.current = ts;
         if (su) {
           // Partner queued a direct video.
           suppress(5000);
           setDirectUrl(su);
           setVideoId(null);
-          setPlaying(true);
-          if (room.canPersist) {
+          setPlaying(play);
+          if (room.canPersist && !sync) {
             persistWatch(
               { video_id: null, src_url: su, playing: true, timestamp_seconds: ts },
               { event_type: "queued_video", payload: { text: directVideoTitle(su) } },
@@ -680,18 +717,18 @@ export function WatchTogether() {
         setDirectUrl(null);
         if (v && v === videoId && p) {
           suppress(3000);
-          setPlaying(true);
+          setPlaying(play);
           driftCorrect(p, ts);
           return;
         }
         suppress(5000);
         setVideoId(v);
-        setPlaying(true);
+        setPlaying(play);
         // Persist on partner's behalf — keeps the chosen video alive
         // through a reload even when only one side is signed in.
         // Play/pause/seek/tick events are control noise and don't
         // need durable writes (they fire many times a second).
-        if (room.canPersist) {
+        if (room.canPersist && !sync) {
           persistWatch(
             { video_id: v, src_url: null, playing: true, timestamp_seconds: ts },
             v ? { event_type: "queued_video", payload: { text: `youtu.be/${v}` } } : undefined,
@@ -731,6 +768,13 @@ export function WatchTogether() {
       }
     });
   }, [session, userId, videoId, room.canPersist]);
+
+  // Ask the room what's on. Durable hydrate covers the signed-in case; this
+  // covers a guest who loaded the video while nobody else had Watch open.
+  useEffect(() => {
+    if (!session) return;
+    void session.sendEvent("sync_request", {});
+  }, [session]);
 
   function queueVideo(id: string, sourceUrl?: string) {
     isControllerRef.current = true;

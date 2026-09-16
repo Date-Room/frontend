@@ -41,7 +41,7 @@ export function isInvitable(id: string | null | undefined): id is string {
 }
 
 /** Sync events that happen without a person doing anything. */
-export const PASSIVE_EVENT_TYPES = new Set(["tick", "seek", "cursor", "typing", "presence", "pause", "state", "sync", "snapshot"]);
+export const PASSIVE_EVENT_TYPES = new Set(["tick", "seek", "cursor", "typing", "presence", "pause", "state", "sync", "sync_request", "snapshot"]);
 
 export type PartnerStage = { id: string; at: number };
 
