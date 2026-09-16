@@ -57,12 +57,12 @@ export function TellUsSheet({
       <div
         onClick={(e) => e.stopPropagation()}
         role="dialog"
-        aria-label="Tell us"
+        aria-label="Feedback"
         className="w-full space-y-4 rounded-t-3xl border border-white/10 bg-card/95 p-5 shadow-2xl backdrop-blur-xl sm:mx-4 sm:max-w-md sm:rounded-3xl"
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="font-serif text-2xl leading-tight text-cream">Tell us</h2>
+            <h2 className="font-serif text-2xl leading-tight text-cream">Feedback</h2>
             <p className="mt-1 text-[13px] text-muted-foreground">
               One tap and a line. It goes to the people building this, with nothing about your call.
             </p>

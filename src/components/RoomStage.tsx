@@ -49,6 +49,8 @@ import { useRoomSession } from "@/context/RoomSessionContext";
 import { useChaperonController } from "@/context/ChaperonContext";
 import { ChaperonSeam } from "@/components/ChaperonSeam";
 import { ActivityInvite, inviteChime } from "@/components/ActivityInvite";
+import { ChatToast } from "@/components/ChatToast";
+import { useChatRoom } from "@/context/ChatContext";
 import {
   INITIAL_INVITE_STATE,
   inviteHeadline,
@@ -92,7 +94,6 @@ const CATEGORIES: { id: string; label: string; icon: LucideIcon; itemIds: string
 /** Partner-action → notifier copy + which stage item to open. Maps the raw
  *  activity_id (as broadcast) to a friendly line and the stage target. */
 const NOTIF: Record<string, { verb: string; target: string }> = {
-  chat: { verb: "sent a message", target: "chat" },
   dj: { verb: "played a song", target: "dj" },
   watch: { verb: "started a video", target: "watch" },
   vision_board: { verb: "added a dream", target: "vision_board" },
@@ -415,6 +416,27 @@ export function RoomStage({
     inviteChime();
   }, [inviteId]);
   const declineInvite = useCallback(() => dispatchInvite({ type: "decline" }), []);
+
+  // ── Chat while the panel is closed: badge on the dock, toast up top ────
+  const chat = useChatRoom();
+  const chatUnread = chat?.unread ?? 0;
+  const [chatToast, setChatToast] = useState<{ id: string; text: string } | null>(null);
+  const lastIncomingId = chat?.lastIncoming?.id ?? null;
+  useEffect(() => {
+    const m = chat?.lastIncoming;
+    if (!m || !lastIncomingId) return;
+    if (stagedRef.current === "chat") return;
+    setChatToast({ id: m.id, text: m.text });
+    // Chat is how you reach someone when the mic or speakers are gone, so
+    // the arrival is audible whenever the panel isn't open (not only in a
+    // background tab).
+    inviteChime(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastIncomingId]);
+  useEffect(() => {
+    if (staged === "chat") setChatToast(null);
+  }, [staged]);
+  const dismissChatToast = useCallback(() => setChatToast(null), []);
 
   const notifTimer = useRef<number | undefined>(undefined);
   // Ids removed via the delete broadcast — dropped from pinned cards instantly.
@@ -1022,7 +1044,8 @@ export function RoomStage({
                     Icon={c.icon}
                     label={c.label}
                     active={c.items.some((i) => i.id === staged) || catId === c.id}
-                    badge={c.items.length > 1 ? c.items.length : undefined}
+                    badge={c.id === "chat" ? chatUnread || undefined : c.items.length > 1 ? c.items.length : undefined}
+                    badgeTone={c.id === "chat" ? "alert" : undefined}
                     onClick={() => pickCategory(c)}
                   />
                 ))}
@@ -1110,6 +1133,22 @@ export function RoomStage({
             />
           );
         })()}
+
+      {chatToast && (
+        <ChatToast
+          key={chatToast.id}
+          partnerName={partnerName}
+          partnerPhotoUrl={partnerPhotoUrl}
+          text={chatToast.text}
+          count={chatUnread}
+          offset={Boolean(inviteId)}
+          onOpen={() => {
+            setChatToast(null);
+            commitStage("chat");
+          }}
+          onDismiss={dismissChatToast}
+        />
+      )}
 
       <div ref={pipAnchorRef} className="contents" />
       {callActive &&
@@ -1247,12 +1286,15 @@ function MenuTile({
   label,
   active,
   badge,
+  badgeTone,
   onClick,
 }: {
   Icon: LucideIcon;
   label: string;
   active: boolean;
   badge?: number;
+  /** "alert" = unread-style (filled, like a phone app badge). */
+  badgeTone?: "alert";
   onClick: () => void;
 }) {
   return (
@@ -1278,8 +1320,16 @@ function MenuTile({
           aria-hidden
         />
         {badge ? (
-          <span className="absolute -right-1 -top-1 z-[2] flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full border border-white/20 bg-[#141019] px-1 text-[9px] font-bold text-primary shadow-md">
-            {badge}
+          <span
+            data-testid={badgeTone === "alert" ? "unread-badge" : undefined}
+            className={cn(
+              "absolute -right-1 -top-1 z-[2] flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full border px-1 text-[9px] font-bold shadow-md",
+              badgeTone === "alert"
+                ? "border-[#141019] bg-rose-500 text-white shadow-[0_0_12px_rgba(244,63,94,0.55)] animate-in zoom-in-50 duration-200"
+                : "border-white/20 bg-[#141019] text-primary",
+            )}
+          >
+            {badge > 99 ? "99+" : badge}
           </span>
         ) : null}
       </span>
