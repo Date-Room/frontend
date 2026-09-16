@@ -46,6 +46,7 @@ import { MusicPlayerBar, MusicRoomProvider } from "@/components/MusicRoom";
 import { ActivityBoundary } from "@/components/RoomErrorBoundary";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useChaperonController } from "@/context/ChaperonContext";
+import { ChaperonSeam } from "@/components/ChaperonSeam";
 import { useActivitySession } from "@/hooks/useActivitySession";
 import { backgroundMoodLabel } from "@/lib/roomAmbiance";
 import {
@@ -953,6 +954,7 @@ export function RoomStage({
                 </div>
               </div>
               <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
+                <ChaperonSeam className="rounded-none" />
                 <RoomVideo variant="full" onLeave={onLeaveCall} />
               </div>
             </section>
@@ -987,7 +989,7 @@ export function RoomStage({
         >
           <div
             className={cn(
-              "h-full w-full cursor-grab overflow-hidden active:cursor-grabbing",
+              "relative h-full w-full cursor-grab overflow-hidden active:cursor-grabbing",
               bubble ? "rounded-full" : "rounded-xl",
             )}
             onPointerDown={startDrag}
@@ -998,6 +1000,7 @@ export function RoomStage({
               setManualBubble(false);
             }}
           >
+            {!bubble && <ChaperonSeam />}
             <RoomVideo
               variant="pip"
               collapsed={bubble}

@@ -111,7 +111,10 @@ export function useChaperon(opts: {
   // The running whisper log (newest first) + a badge count for whispers that
   // landed since the user last looked at the rail.
   const [whisperLog, setWhisperLog] = useState<WhisperLogEntry[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  // Unread since the rail was last opened, per family, so the chip can say
+  // "how many, of which kind" at a glance.
+  const [unread, setUnread] = useState<{ protect: number; coach: number }>({ protect: 0, coach: 0 });
+  const unreadCount = unread.protect + unread.coach;
 
   // "Try me": idle → armed (I said it, listening) → caught (Protect heard it).
   const [probe, setProbe] = useState<"idle" | "armed" | "caught">("idle");
@@ -174,7 +177,8 @@ export function useChaperon(opts: {
         elapsedSec,
       };
       setWhisperLog((log) => [entry, ...log]);
-      setUnreadCount((n) => n + 1);
+      const fam = signal.severity === "alert" || signal.severity === "warn" ? "protect" : "coach";
+      setUnread((u) => ({ ...u, [fam]: u[fam] + 1 }));
       // Alerts persist until dismissed; coaching auto-hides at a readable pace.
       if (!isPersistentSeverity(signal.severity)) {
         dismissTimerRef.current = window.setTimeout(dismiss, COACH_DISPLAY_MS);
@@ -184,7 +188,7 @@ export function useChaperon(opts: {
   );
 
   /** The rail is being looked at — clear the unread badge. */
-  const markRailSeen = useCallback(() => setUnreadCount(0), []);
+  const markRailSeen = useCallback(() => setUnread({ protect: 0, coach: 0 }), []);
 
   // If the agent goes quiet, stop claiming it's connected — the indicators must
   // reflect reality so a dead agent is visible, not hidden behind a green dot.
@@ -270,7 +274,7 @@ export function useChaperon(opts: {
       setStatus("connecting");
       setAgent(DISCONNECTED_AGENT);
       setWhisperLog([]);
-      setUnreadCount(0);
+      setUnread({ protect: 0, coach: 0 });
       armAgentWatchdog();
     },
     [enabled, roomId, armAgentWatchdog],
@@ -348,6 +352,7 @@ export function useChaperon(opts: {
     currentWhisper,
     whisperLog,
     unreadCount,
+    unread,
     markRailSeen,
     start,
     stop,
