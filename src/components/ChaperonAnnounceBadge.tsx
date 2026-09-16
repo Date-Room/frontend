@@ -102,7 +102,7 @@ export function ChaperonAnnounceBadge({
           {isGuest && (
             <p className="mt-3 text-[12px] text-muted-foreground">
               Want one watching out for you?{" "}
-              <Link to="/?src=badge" className="text-primary hover:underline">
+              <Link to="/auth?src=badge" className="text-primary hover:underline">
                 Sign in to get yours
               </Link>{" "}
               for your next date.

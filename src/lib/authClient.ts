@@ -167,6 +167,7 @@ class AuthClient {
     email: string,
     code: string,
     referralCode?: string | null,
+    signupSource?: string | null,
   ): Promise<Session> {
     const response = await fetch(`${API_BASE}/v1/auth/verify-otp`, {
       method: "POST",
@@ -178,13 +179,18 @@ class AuthClient {
         code,
         device_label: "web",
         ...(referralCode ? { referral_code: referralCode } : {}),
+        ...(signupSource ? { signup_source: signupSource } : {}),
       }),
     });
     if (!response.ok) throw await asError(response, "Could not verify the code.");
     return this.finalizeSignIn(await response.json());
   }
 
-  async verifyLink(token: string, referralCode?: string | null): Promise<Session> {
+  async verifyLink(
+    token: string,
+    referralCode?: string | null,
+    signupSource?: string | null,
+  ): Promise<Session> {
     const binding = readLinkBinding();
     const response = await fetch(`${API_BASE}/v1/auth/verify-link`, {
       method: "POST",
@@ -197,6 +203,7 @@ class AuthClient {
         // same-site as the app; this copy always makes the trip.
         ...(binding ? { browser_token: binding } : {}),
         ...(referralCode ? { referral_code: referralCode } : {}),
+        ...(signupSource ? { signup_source: signupSource } : {}),
       }),
       credentials: "include", // matches the browser cookie set on request-otp
     });

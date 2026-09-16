@@ -6,6 +6,9 @@ import {
   endChaperonSession,
   initGate,
   sendChaperonFeedback,
+  sendChaperonOutcomes,
+  setChaperonProbe,
+  type ReactionReason,
   type ChaperonMode,
   type ChaperonDataTier,
   type ChaperonSession,
@@ -67,6 +70,9 @@ export type ChaperonStartConfig = {
   dataTier: ChaperonDataTier;
 };
 
+// Outcome reports (shown / suppressed) are coalesced into one request per window.
+export const OUTCOME_FLUSH_MS = 1_500;
+
 // The server agent heartbeats every ~8s. If none arrives for this long, treat
 // the agent as not responding and say so (status -> "connecting"), rather than
 // leaving a stale green dot.
@@ -107,9 +113,20 @@ export function useChaperon(opts: {
   const [whisperLog, setWhisperLog] = useState<WhisperLogEntry[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // "Try me": idle → armed (I said it, listening) → caught (Protect heard it).
+  const [probe, setProbe] = useState<"idle" | "armed" | "caught">("idle");
+
   const runningRef = useRef(false);
   const sessionRef = useRef<ChaperonSession | null>(null);
   const gateRef = useRef<GateState>(initGate());
+  // Outcomes are batched (one POST per ~1.5 s) so a burst of signals never
+  // turns into a burst of requests. Best-effort telemetry: failures are
+  // dropped, never retried, never surfaced.
+  const outcomeQueueRef = useRef<{ shown: string[]; suppressed: string[] }>({
+    shown: [],
+    suppressed: [],
+  });
+  const outcomeTimerRef = useRef<number | undefined>(undefined);
   const startedAtRef = useRef(0);
   const dismissTimerRef = useRef<number | undefined>(undefined);
   const agentWatchdogRef = useRef<number | undefined>(undefined);
@@ -124,6 +141,26 @@ export function useChaperon(opts: {
     gateRef.current = dismissCurrent(gateRef.current);
     setCurrentWhisper(null);
   }, []);
+
+  const flushOutcomes = useCallback(() => {
+    outcomeTimerRef.current = undefined;
+    const sess = sessionRef.current;
+    const q = outcomeQueueRef.current;
+    if (!sess || (q.shown.length === 0 && q.suppressed.length === 0)) return;
+    outcomeQueueRef.current = { shown: [], suppressed: [] };
+    void sendChaperonOutcomes(sess.id, q).catch(() => {});
+  }, []);
+
+  const queueOutcome = useCallback(
+    (eventId: string | null, outcome: "shown" | "suppressed") => {
+      if (!eventId) return;
+      outcomeQueueRef.current[outcome].push(eventId);
+      if (outcomeTimerRef.current === undefined) {
+        outcomeTimerRef.current = window.setTimeout(flushOutcomes, OUTCOME_FLUSH_MS);
+      }
+    },
+    [flushOutcomes],
+  );
 
   const showWhisper = useCallback(
     (signal: ChaperonSignal) => {
@@ -191,12 +228,20 @@ export function useChaperon(opts: {
           whisper: typeof msg.whisper === "string" ? msg.whisper : "",
           confidence: typeof msg.confidence === "number" ? msg.confidence : 0,
         };
+        if (msg.probe === true) signal.probe = true;
         const { state, show } = admitSignal(gateRef.current, signal, Date.now());
         gateRef.current = state;
-        if (show) showWhisper(show);
+        if (show) {
+          showWhisper(show);
+          queueOutcome(show.event_id, "shown");
+          if (show.probe) setProbe("caught");
+        } else {
+          queueOutcome(signal.event_id, "suppressed");
+          if (signal.probe) setProbe("caught"); // the test landed even if the gate held it
+        }
       }
     },
-    [armAgentWatchdog, showWhisper],
+    [armAgentWatchdog, showWhisper, queueOutcome],
   );
 
   const start = useCallback(
@@ -236,6 +281,9 @@ export function useChaperon(opts: {
     runningRef.current = false;
     if (agentWatchdogRef.current) window.clearTimeout(agentWatchdogRef.current);
     clearDismissTimer();
+    if (outcomeTimerRef.current !== undefined) window.clearTimeout(outcomeTimerRef.current);
+    flushOutcomes();
+    setProbe("idle");
     const sess = sessionRef.current;
     setStatus("off");
     setAgent(DISCONNECTED_AGENT);
@@ -243,15 +291,44 @@ export function useChaperon(opts: {
     setSession(null);
     sessionRef.current = null;
     if (sess) await endChaperonSession(sess.id).catch(() => {});
-  }, []);
+  }, [flushOutcomes]);
 
   // Rate a whisper. Defaults to the currently-visible one (the toast buttons),
   // but the rail passes an explicit event_id so any past whisper is rateable.
-  const sendFeedback = useCallback((helpful: boolean, eventId?: string) => {
+  const sendFeedback = useCallback(
+    (
+      helpful: boolean,
+      eventId?: string,
+      extra?: { reason?: ReactionReason; shareWithTeam?: boolean },
+    ) => {
+      const sess = sessionRef.current;
+      const id = eventId ?? gateRef.current.current?.event_id ?? null;
+      if (!sess || !id) return;
+      void sendChaperonFeedback(sess.id, {
+        event_id: id,
+        helpful,
+        ...(extra?.reason ? { reason: extra.reason } : {}),
+        ...(extra?.shareWithTeam ? { share_with_team: true } : {}),
+      }).catch(() => {});
+    },
+    [],
+  );
+
+  // "I said it": open the try-me window on the server. Skipping just closes it.
+  const startProbe = useCallback(async () => {
     const sess = sessionRef.current;
-    const id = eventId ?? gateRef.current.current?.event_id ?? null;
-    if (!sess || !id) return;
-    void sendChaperonFeedback(sess.id, { event_id: id, helpful }).catch(() => {});
+    if (!sess) return;
+    try {
+      await setChaperonProbe(sess.id, true);
+      setProbe("armed");
+    } catch {
+      setProbe("idle");
+    }
+  }, []);
+  const cancelProbe = useCallback(() => {
+    const sess = sessionRef.current;
+    setProbe("idle");
+    if (sess) void setChaperonProbe(sess.id, false).catch(() => {});
   }, []);
 
   // Clean up on unmount.
@@ -277,5 +354,8 @@ export function useChaperon(opts: {
     dismiss,
     sendFeedback,
     ingestAgentMessage,
+    probe,
+    startProbe,
+    cancelProbe,
   };
 }
