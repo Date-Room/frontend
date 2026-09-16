@@ -49,14 +49,13 @@ describe("helpers", () => {
 });
 
 describe("Review tab", () => {
-  it("shows the pattern, the shared whisper, saves a verdict with a tag and moves on", async () => {
-    api.queue = { unreviewed: 2, items: [row(), row({ event_id: "e2", shared: false, whisper: null, check_id: "stall" })] };
+  it("shows the pattern and the flag, saves a verdict with a tag and moves on", async () => {
+    api.queue = { unreviewed: 2, items: [row(), row({ event_id: "e2", shared: false, check_id: "stall" })] };
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={qc}><AdminBeta /></QueryClientProvider>);
     fireEvent.mouseDown(screen.getByRole("tab", { name: /Review/ }));
     await waitFor(() => expect(screen.getByText("direct request, amount stated")).toBeTruthy());
-    expect(screen.getByText(/Shared by the tester/)).toBeTruthy();
-    expect(screen.getByText(/\[your date\] just asked/)).toBeTruthy();
+    expect(screen.getByText(/Flagged by the tester/)).toBeTruthy();
     const save = screen.getByRole("button", { name: /Save & next/ }) as HTMLButtonElement;
     expect(save.disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "wrong" }));
@@ -67,13 +66,13 @@ describe("Review tab", () => {
     expect(api.verdicts[0]).toMatchObject({ event_id: "e1", verdict: "wrong", tag: "user_right" });
   });
 
-  it("never renders a whisper that was not shared", async () => {
-    api.queue = { unreviewed: 1, items: [row({ shared: false, whisper: null })] };
+  it("never renders words about a call, even if a stray field arrived", async () => {
+    api.queue = { unreviewed: 1, items: [row({ shared: true, whisper: "[your date] just asked for $2,000." } as Record<string, unknown>)] };
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={qc}><AdminBeta /></QueryClientProvider>);
     fireEvent.mouseDown(screen.getByRole("tab", { name: /Review/ }));
     await waitFor(() => expect(screen.getByText("direct request, amount stated")).toBeTruthy());
     expect(screen.queryByText(/just asked/)).toBeNull();
-    expect(screen.queryByText(/Shared by the tester/)).toBeNull();
+    expect(document.body.textContent).not.toMatch(/\$2,000/);
   });
 });

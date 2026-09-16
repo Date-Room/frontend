@@ -1,9 +1,11 @@
 /**
  * The Beta console: watch the chaperon run, work the review queue, decide
  * applications. Structure only, never the words, never who: the API hands
- * us call numbers and tester ids, pattern codes instead of whispers, and a
- * whisper's text only when its viewer shared it (names replaced) or the
- * reviewer is looking at their own call. This page renders exactly that.
+ * us call numbers and tester ids and pattern codes instead of whispers.
+ *
+ * The console never carries a sentence about a call: no whisper text, not
+ * even the reviewer's own, not even when the tester flagged the cue. Codes
+ * only (check, pattern, outcome, reaction, reason).
  *
  * Tabs: Live (stat strip with deltas, needs-you rows, on air, the signal
  * stream), Review (a queue with Save & next), Grants (applications with
@@ -338,7 +340,7 @@ function ReviewTab() {
   });
 
   if (queue.isLoading) return <p className="text-sm text-slate-500">Loading…</p>;
-  if (!current) return <p className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-6 text-center text-sm text-slate-500">Nothing to review. Shared cues and low-confidence shown whispers come here first.</p>;
+  if (!current) return <p className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-6 text-center text-sm text-slate-500">Nothing to review. Flagged cues and low-confidence shown signals come here first.</p>;
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
@@ -357,11 +359,8 @@ function ReviewTab() {
           <div className="px-4 py-3">
             <p className="text-[11px] uppercase tracking-wider text-slate-500">Pattern</p>
             <p className="text-lg text-slate-100">{current.pattern || "(the judge gave no pattern)"}</p>
-            {current.whisper && (
-              <div className="mt-3 rounded-lg border border-sky-500/30 bg-sky-500/[0.06] px-3 py-2 text-sm">
-                <p className="text-[11px] uppercase tracking-wider text-sky-300">{current.shared ? "Shared by the tester with their reaction" : "Your own call"}</p>
-                <p className="mt-1 italic text-slate-100">“{current.whisper}”</p>
-              </div>
+            {current.shared && (
+              <p className="mt-2 text-xs text-sky-300">Flagged by the tester with their reaction: they want this one looked at.</p>
             )}
           </div>
           <div className="grid grid-cols-2 gap-px border-t border-slate-800 bg-slate-800 text-xs sm:grid-cols-4">

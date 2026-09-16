@@ -342,8 +342,6 @@ export type BetaSignalRow = {
   shared: boolean;
   probe: boolean;
   review: BetaReview | null;
-  /** Only when the viewer shared it or the reviewer owns the call. */
-  whisper: string | null;
 };
 
 export type BetaFeedFilters = {
@@ -427,6 +425,7 @@ export type BetaNeedsYou = {
 };
 
 export type BetaHealth = {
+  builds: { api: string; worker: string };
   needs_you: BetaNeedsYou[];
   stuck_sessions: { room_id: string; call: string; started_at: string; hours: number }[];
   cost: { rows_today: number; sessions_ended_today: number };
