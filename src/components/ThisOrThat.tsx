@@ -13,6 +13,9 @@ import {
 } from "@/lib/activities/thisOrThat";
 import { setHelpNow } from "@/lib/activityHelpNow";
 import { useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
+import { GameChoiceCard, type ChoiceBadge } from "@/lib/stagecraft/GameChoiceCard";
+import { GameStage } from "@/lib/stagecraft/GameStage";
+import { GameStageHeader } from "@/lib/stagecraft/GameStageHeader";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
 import { StagePrompt } from "@/lib/stagecraft/StagePrompt";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
@@ -233,56 +236,43 @@ export function ThisOrThat() {
     const litSame = settled && sameSide && isMine;
     const fadedOut = revealing && theirsLit && !isMine && !isTheirs;
     const clickable = !revealing && (myPick == null || myPrediction == null);
+
+    let cardState: Parameters<typeof GameChoiceCard>[0]["state"] = "default";
+    if (litSame || (isMine && isTheirs)) cardState = "swell";
+    else if (isTheirs) cardState = "theirs";
+    else if (isMine) cardState = "mine";
+    else if (fadedOut) cardState = "faded";
+    if (settled && !sameSide && (isMine || isTheirs)) {
+      cardState = side === "a" ? "tug-l" : "tug-r";
+    }
+
+    const badges: ChoiceBadge[] = [];
+    if (isMine) badges.push({ text: "you", tone: "you" });
+    if (isMyCall && !revealing) badges.push({ text: "your call", tone: "call" });
+    if (isTheirs) badges.push({ text: partnerName, tone: "partner" });
+
     return (
-      <button
-        type="button"
+      <GameChoiceCard
+        key={`${state.run}-${state.round}-${side}`}
+        label={opt.label}
+        emoji={opt.emoji}
         disabled={!clickable}
         onClick={() => tap(side)}
-        className={[
-          "dr-half focus-ring relative flex min-h-[9rem] flex-1 flex-col items-center justify-center gap-2 rounded-2xl border p-5 text-center",
-          litSame
-            ? "dr-half--swell border-emerald-400/60 bg-emerald-400/10"
-            : isMine && isTheirs
-              ? "border-emerald-400/60 bg-emerald-400/10"
-              : isMine
-                ? "border-primary bg-primary/10"
-                : isTheirs
-                  ? "border-rose/60 bg-rose/10 dr-half--lit"
-                  : fadedOut
-                    ? "border-white/[0.08] bg-white/[0.02] opacity-30 saturate-50"
-                    : "border-white/[0.10] bg-white/[0.03]",
-          settled && !sameSide && (isMine || isTheirs) ? (side === "a" ? "dr-half--tug-l" : "dr-half--tug-r") : "",
-          clickable ? "hover:-translate-y-1 hover:border-primary/50 cursor-pointer" : "",
-        ].join(" ")}
-      >
-        <span className="text-4xl" aria-hidden>{opt.emoji}</span>
-        <span className="font-serif text-lg sm:text-xl italic leading-tight text-cream">{opt.label}</span>
-        <span className="flex min-h-[1.3rem] flex-wrap justify-center gap-1.5">
-          {isMine && (
-            <span className="rounded-full border border-primary/60 px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-primary">you</span>
-          )}
-          {isMyCall && !revealing && (
-            <span className="rounded-full border border-rose/50 border-dashed px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-rose">your call</span>
-          )}
-          {isTheirs && (
-            <span className="rounded-full border border-rose/60 px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-rose">{partnerName}</span>
-          )}
-        </span>
-      </button>
+        state={cardState}
+        badges={badges}
+      />
     );
   };
 
   return (
-    <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in", revealing && witnessed && !settled ? "dr-stageroom--dim" : ""].join(" ")}>
-      <div className="dr-stageroom-shade" aria-hidden />
-
-      <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Round {Math.min(roundsDone + (revealing ? 0 : 1), TOT_ROUNDS_PER_RUN)} of {TOT_ROUNDS_PER_RUN} · {pair.tier}
-        </p>
-        <p key={title} className="font-serif text-xl italic text-cream animate-fade-in">{title}</p>
-        <p key={status} aria-live="polite" className="min-h-[1rem] max-w-sm text-xs text-muted-foreground animate-fade-in">{status}</p>
-      </div>
+    <GameStage gameId="this_or_that" dimmed={revealing && witnessed && !settled}>
+      <GameStageHeader
+        kicker={`Round ${Math.min(roundsDone + (revealing ? 0 : 1), TOT_ROUNDS_PER_RUN)} of ${TOT_ROUNDS_PER_RUN} · ${pair.tier}`}
+        title={title}
+        status={status}
+        titleKey={`${state.run}-${state.round}-${title}`}
+        statusKey={`${state.run}-${state.round}-${status}`}
+      />
 
       {!revealing && myPick != null && myPrediction == null && (
         <StagePrompt
@@ -292,16 +282,22 @@ export function ThisOrThat() {
         />
       )}
 
-      <div className="relative flex flex-1 flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+      <div
+        key={`${state.run}-${state.round}-pair`}
+        className="dr-tot-pair relative flex flex-1 flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center animate-fade-in"
+      >
         {half("a")}
-        <span className="self-center text-[10px] uppercase tracking-[0.3em] text-muted-foreground/70">or</span>
+        <span className="dr-versus-or">or</span>
         {half("b")}
       </div>
 
       <div className="relative flex min-h-[4.5rem] flex-col items-center justify-center gap-2">
         {!revealing && myPick == null && (
-          <div className="dr-ring" style={{ ["--p" as string]: clock / TOT_CLOCK_SECONDS }}>
-            <span className="font-serif">{clock}</span>
+          <div
+            className={["dr-ring", clock <= 3 ? "dr-ring--urgent" : ""].join(" ")}
+            style={{ ["--p" as string]: clock / TOT_CLOCK_SECONDS }}
+          >
+            <span className="font-serif tabular-nums">{clock}</span>
           </div>
         )}
         {settled && (
@@ -331,6 +327,6 @@ export function ThisOrThat() {
           </div>
         )}
       </div>
-    </div>
+    </GameStage>
   );
 }

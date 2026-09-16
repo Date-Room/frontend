@@ -294,6 +294,7 @@ export function GuacamolePanic() {
     const iReady = state.ready.includes(senderId);
     return (
       <GameLanding
+        gameId="guacamole"
         title="Guacamole Panic"
         promise="Same ingredients, same clock, two bowls. Yours fills only if your fingers keep up."
         minutes="≈ 2 min a batch"

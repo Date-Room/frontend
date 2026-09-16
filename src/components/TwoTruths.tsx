@@ -12,6 +12,7 @@ import { setHelpNow } from "@/lib/activityHelpNow";
 import { useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
 import { StagePrompt } from "@/lib/stagecraft/StagePrompt";
+import { GameStage } from "@/lib/stagecraft/GameStage";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
 import { TryCurtain } from "@/components/TryCurtain";
@@ -261,9 +262,7 @@ export function TwoTruths() {
   };
 
   return (
-    <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in", revealing && unmask.witnessed && !settled ? "dr-stageroom--dim" : ""].join(" ")}>
-      <div className="dr-stageroom-shade" aria-hidden />
-
+    <GameStage gameId="2_truths" dimmed={revealing && unmask.witnessed && !settled}>
       <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
         <p key={title} className="font-serif text-xl italic text-cream animate-fade-in">{title}</p>
         <p key={status} aria-live="polite" className="min-h-[1rem] max-w-sm text-xs text-muted-foreground animate-fade-in">
@@ -421,6 +420,6 @@ export function TwoTruths() {
           </div>
         )}
       </div>
-    </div>
+    </GameStage>
   );
 }

@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -11,7 +10,6 @@ import { createPortal } from "react-dom";
 import {
   RotateCw,
   LayoutGrid,
-  X,
   Video,
   Sparkles,
   StickyNote,
@@ -38,7 +36,10 @@ import {
   Check,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
-import { ActivityHelp, hasActivityHelp } from "@/components/ActivityHelp";
+import { ActivityHelp, GameIntro, hasActivityHelp, shouldShowGameIntro } from "@/components/ActivityHelp";
+import { RoomAmbianceSheet } from "@/components/RoomAmbianceSheet";
+import { RoomThemeChip } from "@/components/RoomThemeChip";
+import { useRoomThemePicker } from "@/hooks/useRoomThemePicker";
 import { useHelpNow } from "@/lib/activityHelpNow";
 import { MusicPlayerBar, MusicRoomProvider } from "@/components/MusicRoom";
 import { ActivityBoundary } from "@/components/RoomErrorBoundary";
@@ -120,6 +121,26 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   room_details: Settings,
 };
 
+/** Generated square backgrounds for dock drill-in tiles. */
+const ITEM_TILE_IMAGES: Record<string, string> = {
+  vision_board: "/dock-tiles/vision-board.png",
+  fridge_notes: "/dock-tiles/fridge-notes.png",
+  bookshelf: "/dock-tiles/bookshelf.png",
+  room_details: "/dock-tiles/room-details.png",
+  questions: "/dock-tiles/questions.png",
+  this_or_that: "/dock-tiles/this-or-that.png",
+  the_36: "/dock-tiles/the-36.png",
+  "2_truths": "/dock-tiles/2-truths.png",
+  truth_or_dare: "/dock-tiles/truth-or-dare.png",
+  one_has_to_go: "/dock-tiles/one-has-to-go.png",
+  pick_a_door: "/dock-tiles/pick-a-door.png",
+  rank_it: "/dock-tiles/rank-it.png",
+  guacamole: "/dock-tiles/guacamole.png",
+  watch: "/dock-tiles/watch.png",
+  dj: "/dock-tiles/dj.png",
+  chat: "/dock-tiles/chat.png",
+};
+
 /** One-line taglines for the drilled-in list rows — mirror the mobile menu. */
 const ITEM_TAGLINES: Record<string, string> = {
   vision_board: "The life you're building.",
@@ -183,11 +204,25 @@ function useCompactViewport(): boolean {
   return compact;
 }
 
+/** Desktop-wide viewport — drives the 50/50 call split layout. */
+function useWideViewport(): boolean {
+  const [wide, setWide] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const on = () => setWide(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return wide;
+}
+
 /**
  * The Our Room "stage" — a Vision-Board-sized card that mounts the chosen
- * activity/wall, a dropup launcher (mobile activity-menu pattern) to swap it,
- * and a draggable call PiP (portrait by default, rotate toggle) shown only
- * while a call is active. The last thing staged persists per room.
+ * activity/wall, an app dock below the card (Room / Games / Watch / Music / Chat),
+ * and call video (50/50 split on desktop, draggable PiP on smaller screens).
+ * The last thing staged persists per room.
  */
 export function RoomStage({
   roomId,
@@ -238,8 +273,9 @@ export function RoomStage({
   // the notifier on the Activities button instead.
   const commitStage = useCallback((id: string) => setStaged(id), []);
 
-  const [menuOpen, setMenuOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  /** Pre-game intro — shown each time you open an activity until you tap Start. */
+  const [introOpen, setIntroOpen] = useState(false);
   // The ? button pulses briefly when the game's "right now" step changes —
   // a reminder of where help lives at exactly the moments its answer is new.
   const helpSnap = useHelpNow(staged);
@@ -255,24 +291,11 @@ export function RoomStage({
     }
     prevStepRef.current = step;
   }, [helpSnap?.step]);
-  // First-open explainer: the first time this person ever stages an activity
-  // that has help, show the how-to-play card before they play (play-testers
-  // never found the ? button — "press" went unexplained). The lobby, chat and
-  // room management are self-evident and stay quiet. Same storage key as the
-  // legacy tray so nobody sees a card twice. Storage failures (private mode)
-  // skip the auto-show rather than nagging on every open.
+  // Pre-game intro: every time you open an activity, learn the flow first,
+  // then tap Start. Mid-game reference lives on the ? button.
   useEffect(() => {
     setHelpOpen(false);
-    if (!staged || !hasActivityHelp(staged)) return;
-    if (staged === "lobby" || staged === "chat" || staged === "room_details") return;
-    try {
-      const key = `dr_activity_help_seen:${staged}`;
-      if (localStorage.getItem(key)) return;
-      localStorage.setItem(key, "1");
-      setHelpOpen(true);
-    } catch {
-      /* storage unavailable — help stays reachable from the ? button */
-    }
+    setIntroOpen(shouldShowGameIntro(staged));
   }, [staged]);
   // Two-level launcher (mirrors mobile): null = category list, else drilled in.
   const [catId, setCatId] = useState<string | null>(null);
@@ -305,7 +328,10 @@ export function RoomStage({
     const t = window.setTimeout(() => setLinkDown(true), 1500);
     return () => window.clearTimeout(t);
   }, [channelStatus]);
+  const { current: themeMood, open: themeOpen, setOpen: setThemeOpen, pick: pickTheme, busy: themeBusy } =
+    useRoomThemePicker();
   const [notif, setNotif] = useState<{ id: number; text: string; target: string } | null>(null);
+
   const notifTimer = useRef<number | undefined>(undefined);
   // Ids removed via the delete broadcast — dropped from pinned cards instantly.
   const [removedVisionIds, setRemovedVisionIds] = useState<Set<string>>(() => new Set());
@@ -348,6 +374,8 @@ export function RoomStage({
     };
   }, [room.channel, room.senderId, partnerName]);
   const compact = useCompactViewport();
+  const wide = useWideViewport();
+  const splitCallLayout = callActive && wide;
   const [portrait, setPortrait] = useState(true);
   const [scale, setScale] = useState(1);
   // Phones start as a small bubble; expand toggles a large (near-fullscreen)
@@ -400,30 +428,40 @@ export function RoomStage({
     [items],
   );
   const activeCat = catId ? availCats.find((c) => c.id === catId) ?? null : null;
+  const dockExpanded = Boolean(activeCat);
+  /** Dock category used to open the current activity — powers “back to Games” etc. */
+  const [lastCatId, setLastCatId] = useState<string | null>(null);
 
-  // Animate the tray's height as it opens and as it drills between levels.
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [panelH, setPanelH] = useState(0);
-  useLayoutEffect(() => {
-    if (menuOpen && panelRef.current) setPanelH(panelRef.current.scrollHeight);
-  }, [menuOpen, catId, availCats]);
-
-  function openMenu() {
-    setCatId(null);
-    setMenuOpen((v) => !v);
-  }
   function pickCategory(c: (typeof availCats)[number]) {
-    if (c.items.length === 1) {
-      commitStage(c.items[0].id);
-      setMenuOpen(false);
-    } else {
-      setCatId(c.id);
-    }
+    setCatId(c.id);
   }
   function pickItem(id: string) {
+    if (activeCat) setLastCatId(activeCat.id);
     commitStage(id);
-    setMenuOpen(false);
+    setCatId(null);
   }
+
+  function goBack() {
+    if (staged !== "lobby") {
+      commitStage("lobby");
+      setCatId(lastCatId);
+      return;
+    }
+    if (dockExpanded) {
+      setCatId(null);
+      setLastCatId(null);
+    }
+  }
+
+  const backLabel = useMemo(() => {
+    if (dockExpanded) return "Lobby";
+    if (staged !== "lobby" && lastCatId) {
+      return availCats.find((c) => c.id === lastCatId)?.label ?? "Lobby";
+    }
+    return "Lobby";
+  }, [dockExpanded, staged, lastCatId, availCats]);
+
+  const showBack = dockExpanded || staged !== "lobby";
 
   // ── Call PiP drag ──
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -595,13 +633,31 @@ export function RoomStage({
 
   return (
     <MusicRoomProvider watchActive={staged === "watch"}>
-    <main className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-28 pt-2 sm:px-6">
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-        {/* Call initiator (mobile-style): a full-width CTA whose title reflects
-            whether the partner's already here, with their status underneath.
-            While a call is live it collapses to a slim presence bar. */}
-        {callActive ? (
-          <div className="perm-status-bar">
+    <main
+      className={cn(
+        "relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-2 pt-1 sm:px-6",
+        splitCallLayout ? "lg:px-5" : "lg:px-8",
+      )}
+    >
+      <div
+        className={cn(
+          "flex h-full min-h-0 w-full gap-2 sm:gap-2.5",
+          splitCallLayout
+            ? "max-w-none flex-col lg:flex-row lg:items-stretch lg:gap-3"
+            : "mx-auto max-w-6xl flex-col",
+        )}
+      >
+        {/* Left — lobby card + app dock (half width when in a call on desktop). */}
+        <div
+          className={cn(
+            "flex min-h-0 min-w-0 flex-col gap-2 sm:gap-2.5",
+            splitCallLayout ? "flex-1 lg:w-1/2 lg:flex-none" : "h-full flex-1",
+          )}
+        >
+        {/* Call initiator — full-width on mobile; on desktop it sits in the
+            stage header so the lobby card can use the full canvas. */}
+        {callActive && !splitCallLayout ? (
+          <div className="perm-status-bar lg:hidden">
             <div className="flex min-w-0 items-center gap-2">
               <span
                 className={cn(
@@ -632,7 +688,7 @@ export function RoomStage({
               <button
                 type="button"
                 onClick={onCallIn}
-                className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-cream backdrop-blur-md transition hover:border-primary/30 hover:bg-white/[0.07] active:scale-[0.99]"
+                className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-cream backdrop-blur-md transition hover:border-primary/30 hover:bg-white/[0.07] active:scale-[0.99] lg:hidden"
               >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
                   <Video className="h-[18px] w-[18px]" />
@@ -647,163 +703,256 @@ export function RoomStage({
           })()
         )}
 
-        {/* Stage — Vision-Board-sized card that mounts the chosen activity. */}
-        <section className="perm-wall-frame flex flex-col overflow-hidden !p-0">
-          <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-4 py-2.5">
-            {stagedItem &&
-              (() => {
-                const Icon = ITEM_ICONS[stagedItem.id] ?? LayoutGrid;
-                return <Icon className="h-3.5 w-3.5 text-primary" aria-hidden />;
-              })()}
-            <span className="text-xs font-medium uppercase tracking-[0.16em] text-cream/80">
-              {stagedItem?.title ?? "Stage"}
-            </span>
-            {staged !== "lobby" && items.some((i) => i.id === "lobby") && (
-              <button
-                type="button"
-                onClick={() => commitStage("lobby")}
-                aria-label="Back to the lobby"
-                className="ml-auto flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/5 hover:text-cream"
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
-            )}
-            {staged && hasActivityHelp(staged) && (
-              <button
-                type="button"
-                onClick={() => setHelpOpen(true)}
-                aria-label="How this works"
-                className={[
-                  "ml-auto flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/5 hover:text-cream",
-                  helpPulse ? "dr-help-pulse" : "",
-                ].join(" ")}
-              >
-                <HelpCircle className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-          <div
-            key={staged}
-            className="animate-stage-swell h-[clamp(260px,calc(100dvh-15.5rem),680px)] min-h-0 overflow-hidden sm:h-[clamp(400px,58vh,680px)]"
-          >
-            {staged ? (
-              <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
-                {renderContent(staged, commitStage)}
-              </ActivityBoundary>
-            ) : null}
-          </div>
-        </section>
-
-      </div>
-
-      {/* Launcher — fixed dock at the bottom of the screen; animated dropup. */}
-      {menuOpen && (
-        <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} aria-hidden />
-      )}
-      <div
-        className={cn(
-          "pointer-events-none fixed inset-x-0 z-40 flex justify-center px-3 transition-[bottom] duration-300",
-          bottomBarActive ? "bottom-[80px]" : "bottom-4",
-        )}
-      >
-        <div className="relative">
+        {/* Stage — collapses to a strip when a dock category is open. */}
+        <section
+          className={cn(
+            "perm-wall-frame flex flex-col overflow-hidden !p-0 transition-[flex] duration-300",
+            dockExpanded ? "shrink-0" : "min-h-0 flex-1",
+          )}
+        >
           <div
             className={cn(
-              "absolute bottom-full left-1/2 mb-3 w-[min(26rem,92vw)] -translate-x-1/2 overflow-hidden rounded-3xl border border-white/10 bg-card/90 shadow-[0_24px_64px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-all duration-300 ease-out",
-              menuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
+              "flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 sm:px-4",
+              dockExpanded ? "py-1.5" : "py-2",
             )}
-            style={{ height: menuOpen ? panelH : 0 }}
           >
-            {/* Content scales up from the bottom as the tray grows, so the
-                whole menu (icons included) opens as one motion. */}
-            <div
-              ref={panelRef}
-              className={cn(
-                "origin-bottom p-3.5 transition-transform duration-300 ease-out",
-                menuOpen ? "scale-100" : "scale-90",
+            {showBack ? (
+              <button
+                type="button"
+                onClick={goBack}
+                className="focus-ring -ml-1 inline-flex items-center gap-1 rounded-full py-0.5 pl-0.5 pr-2.5 text-[11px] font-medium text-primary transition hover:bg-white/[0.06]"
+              >
+                <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
+                <span className="truncate">Back to {backLabel}</span>
+              </button>
+            ) : (
+              <>
+                {stagedItem &&
+                  (() => {
+                    const Icon = ITEM_ICONS[stagedItem.id] ?? LayoutGrid;
+                    return <Icon className="h-3.5 w-3.5 text-primary" aria-hidden />;
+                  })()}
+                <span className="text-xs font-medium uppercase tracking-[0.16em] text-cream/80">
+                  {stagedItem?.title ?? "Stage"}
+                </span>
+              </>
+            )}
+            {showBack && !dockExpanded && staged !== "lobby" && stagedItem && (
+              <span className="truncate text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                {stagedItem.title}
+              </span>
+            )}
+            <div className="ml-auto flex min-w-0 items-center gap-2">
+              {staged === "lobby" && (
+                <RoomThemeChip
+                  current={themeMood}
+                  onClick={() => setThemeOpen(true)}
+                  disabled={themeBusy}
+                  compact={dockExpanded}
+                />
               )}
-            >
-              {activeCat ? (
-                /* Level 2 — the category's activities as a list (mobile style). */
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setCatId(null)}
-                    className="mb-2.5 -ml-1 inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground transition hover:text-cream"
-                  >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                    {activeCat.label}
-                  </button>
-                  <div className="flex flex-col gap-1.5">
-                    {activeCat.items.map((it) => (
-                      <MenuListRow
-                        key={it.id}
-                        Icon={ITEM_ICONS[it.id] ?? LayoutGrid}
-                        label={it.title}
-                        tagline={ITEM_TAGLINES[it.id]}
-                        active={staged === it.id}
-                        onClick={() => pickItem(it.id)}
-                      />
-                    ))}
-                  </div>
-                </>
-              ) : (
-                /* Level 1 — categories (Room / Games / Watch / DJ / Chat),
-                   centered squircle tiles. */
-                <div className="flex flex-wrap justify-center gap-2.5">
-                  {availCats.map((c) => (
-                    <MenuTile
-                      key={c.id}
-                      Icon={c.icon}
-                      label={c.label}
-                      active={c.items.some((i) => i.id === staged)}
-                      badge={c.items.length > 1 ? c.items.length : undefined}
-                      onClick={() => pickCategory(c)}
-                    />
-                  ))}
+              {callActive && !splitCallLayout ? (
+                <div className="hidden min-w-0 items-center gap-2 lg:flex">
+                  <span
+                    className={cn(
+                      "h-2 w-2 shrink-0 rounded-full",
+                      partnerInCall
+                        ? "bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.65)]"
+                        : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse",
+                    )}
+                  />
+                  <p className="truncate text-xs text-cream/80">
+                    {partnerInCall ? `${partnerName} is in the call` : `Ringing ${partnerName}…`}
+                  </p>
                 </div>
+              ) : !callActive ? (
+                (() => {
+                  const title = partnerInCall
+                    ? "Join the call"
+                    : partnerInRoom
+                      ? "Invite them to the call"
+                      : "Start the call";
+                  const sub = partnerInCall
+                    ? `${partnerName} is in the call`
+                    : partnerInRoom
+                      ? `${partnerName} is in the room`
+                      : `${partnerName} isn't in yet`;
+                  return (
+                    <button
+                      type="button"
+                      onClick={onCallIn}
+                      className="group hidden max-w-md items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] py-1.5 pl-1.5 pr-3 text-left text-cream transition hover:border-primary/30 hover:bg-white/[0.07] lg:flex"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                        <Video className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-xs font-semibold leading-tight">{title}</span>
+                        <span className="block truncate text-[10px] leading-tight text-muted-foreground">{sub}</span>
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
+                    </button>
+                  );
+                })()
+              ) : null}
+              {staged && hasActivityHelp(staged) && !introOpen && (
+                <button
+                  type="button"
+                  onClick={() => setHelpOpen(true)}
+                  aria-label="How this works"
+                  className={[
+                    "flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/5 hover:text-cream",
+                    helpPulse ? "dr-help-pulse" : "",
+                  ].join(" ")}
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </button>
               )}
             </div>
           </div>
-          {(() => {
-            const showNotif = notif && !menuOpen;
-            const NotifIcon = showNotif ? ITEM_ICONS[notif.target] ?? LayoutGrid : LayoutGrid;
-            return (
-              <button
-                type="button"
-                onClick={
-                  showNotif
-                    ? () => {
-                        commitStage(notif.target);
-                        setNotif(null);
-                      }
-                    : openMenu
-                }
-                className={cn(
-                  "focus-ring pointer-events-auto flex max-w-[80vw] items-center gap-2 rounded-full border px-5 py-2.5 text-sm font-medium text-cream shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-300",
-                  showNotif
-                    ? "border-primary/40 bg-primary/20"
-                    : "border-white/10 bg-card/85 hover:border-primary/30",
-                )}
+          {!dockExpanded && (
+            <div key={staged} className="animate-stage-swell relative min-h-0 flex-1 overflow-hidden">
+              {staged ? (
+                <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
+                  <div
+                    className={[
+                      "h-full min-h-0 transition duration-300",
+                      introOpen ? "pointer-events-none scale-[0.98] opacity-40 blur-[2px]" : "",
+                    ].join(" ")}
+                    aria-hidden={introOpen}
+                  >
+                    {renderContent(staged, commitStage)}
+                  </div>
+                </ActivityBoundary>
+              ) : null}
+            </div>
+          )}
+        </section>
+
+        {/* App dock — expands when a category is open; lobby collapses above. */}
+        <nav
+          aria-label="Activities"
+          className={cn(
+            "dr-app-dock flex min-h-0 flex-col",
+            dockExpanded ? "min-h-0 flex-1" : "shrink-0",
+            bottomBarActive && !dockExpanded && "mb-14",
+          )}
+        >
+          {notif && (
+            <button
+              type="button"
+              onClick={() => {
+                commitStage(notif.target);
+                setNotif(null);
+              }}
+              className="focus-ring mb-2 flex w-full items-center gap-2 rounded-full border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs text-cream backdrop-blur-md transition hover:border-primary/55 hover:bg-primary/20"
+            >
+              {(() => {
+                const NotifIcon = ITEM_ICONS[notif.target] ?? LayoutGrid;
+                return <NotifIcon className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />;
+              })()}
+              <span className="truncate">{notif.text}</span>
+            </button>
+          )}
+
+          <div
+            className={cn(
+              "flex flex-col rounded-2xl border border-white/[0.12] bg-[#141019]/75 p-2 shadow-[0_16px_48px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-2.5",
+              dockExpanded && "min-h-0 flex-1",
+            )}
+          >
+            {activeCat ? (
+              <>
+                <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cream/70">
+                    {activeCat.label}
+                  </p>
+                  <span className="text-[9px] uppercase tracking-[0.16em] text-cream/40">
+                    {activeCat.items.length} items
+                  </span>
+                </div>
+                <div
+                  className={cn(
+                    "dr-dock-grid min-h-0 flex-1 gap-2 overflow-y-auto",
+                    activeCat.items.length === 1
+                      ? "dr-dock-grid--solo"
+                      : cn(
+                          "grid",
+                          activeCat.items.length <= 4
+                            ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+                            : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5",
+                        ),
+                  )}
+                >
+                  {activeCat.items.map((it) => (
+                    <MenuSquareTile
+                      key={it.id}
+                      Icon={ITEM_ICONS[it.id] ?? LayoutGrid}
+                      label={it.title}
+                      tagline={ITEM_TAGLINES[it.id]}
+                      image={ITEM_TILE_IMAGES[it.id]}
+                      active={staged === it.id}
+                      hero={activeCat.items.length === 1}
+                      onClick={() => pickItem(it.id)}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div
+                className="grid gap-1.5 sm:gap-2"
+                style={{ gridTemplateColumns: `repeat(${Math.max(availCats.length, 1)}, minmax(0, 1fr))` }}
               >
-                {showNotif ? (
-                  <NotifIcon className="h-4 w-4 shrink-0 text-primary" />
-                ) : menuOpen ? (
-                  <X className="h-4 w-4" />
-                ) : (
-                  <LayoutGrid className="h-4 w-4 text-primary" />
-                )}
-                <span key={showNotif ? notif.id : menuOpen ? "close" : "activities"} className="animate-fade-in truncate">
-                  {showNotif ? notif.text : menuOpen ? "Close" : "Activities"}
-                </span>
-              </button>
-            );
-          })()}
+                {availCats.map((c) => (
+                  <MenuTile
+                    key={c.id}
+                    Icon={c.icon}
+                    label={c.label}
+                    active={c.items.some((i) => i.id === staged) || catId === c.id}
+                    badge={c.items.length > 1 ? c.items.length : undefined}
+                    onClick={() => pickCategory(c)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </nav>
+
+        {splitCallLayout && <MusicPlayerBar onOpenList={() => commitStage("dj")} />}
         </div>
+
+        {/* Right — call video fills half the canvas on desktop. */}
+        {splitCallLayout && (
+          <aside className="dr-call-pane hidden min-h-0 w-full shrink-0 flex-col lg:flex lg:w-1/2">
+            <section className="perm-wall-frame flex min-h-0 flex-1 flex-col overflow-hidden !p-0">
+              <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 py-2 sm:px-4">
+                <Video className="h-3.5 w-3.5 text-primary" aria-hidden />
+                <span className="text-xs font-medium uppercase tracking-[0.16em] text-cream/80">
+                  Call
+                </span>
+                <div className="ml-auto flex min-w-0 items-center gap-2">
+                  <span
+                    className={cn(
+                      "h-2 w-2 shrink-0 rounded-full",
+                      partnerInCall
+                        ? "bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.65)]"
+                        : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse",
+                    )}
+                  />
+                  <p className="truncate text-xs text-cream/80">
+                    {partnerInCall ? `${partnerName} is in the call` : `Ringing ${partnerName}…`}
+                  </p>
+                </div>
+              </div>
+              <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
+                <RoomVideo variant="full" onLeave={onLeaveCall} />
+              </div>
+            </section>
+          </aside>
+        )}
       </div>
 
-      {/* Full-width music player, pinned to the very bottom under the tray. */}
-      <MusicPlayerBar onOpenList={() => commitStage("dj")} />
+      {!splitCallLayout && <MusicPlayerBar onOpenList={() => commitStage("dj")} />}
 
       {/* Pinned vision cards & fridge notes — floated around the room, freely
           draggable, popped out of the stage. */}
@@ -821,6 +970,7 @@ export function RoomStage({
           call. The anchor marks its normal home in the room. */}
       <div ref={pipAnchorRef} className="contents" />
       {callActive &&
+        !splitCallLayout &&
         pipHostRef.current &&
         createPortal(
         <div
@@ -900,7 +1050,17 @@ export function RoomStage({
           pipHostRef.current,
         )}
 
-      {helpOpen && staged && <ActivityHelp id={staged} onClose={() => setHelpOpen(false)} />}
+      {introOpen && staged && shouldShowGameIntro(staged) && (
+        <GameIntro
+          id={staged}
+          onStart={() => setIntroOpen(false)}
+          onBack={goBack}
+          backLabel={backLabel === "Lobby" ? "Back to lobby" : `Back to ${backLabel}`}
+        />
+      )}
+      {helpOpen && staged && !introOpen && (
+        <ActivityHelp id={staged} onClose={() => setHelpOpen(false)} />
+      )}
 
       {(linkDown || caughtUp) && (
         <div
@@ -926,6 +1086,13 @@ export function RoomStage({
           )}
         </div>
       )}
+
+      <RoomAmbianceSheet
+        open={themeOpen}
+        onOpenChange={setThemeOpen}
+        current={themeMood}
+        onPick={(id) => void pickTheme(id)}
+      />
     </main>
     </MusicRoomProvider>
   );
@@ -949,64 +1116,125 @@ function MenuTile({
       type="button"
       onClick={onClick}
       title={label}
-      className="group flex w-[3.5rem] flex-col items-center gap-1.5"
+      className="group flex min-w-0 flex-col items-center gap-1.5 px-0.5"
     >
-      {/* iOS-home-screen squircle app icon — flat solid fill + a single dark
-          lucide icon (matches the mobile menu; no gradient/glow). */}
       <span
         className={cn(
-          "relative flex aspect-square w-full items-center justify-center rounded-[26%] bg-primary transition duration-150 group-hover:brightness-105 group-active:scale-90",
-          active && "ring-2 ring-cream/85 ring-offset-2 ring-offset-card",
+          "dr-app-icon relative mx-auto flex aspect-square w-full max-w-[3.75rem] items-center justify-center rounded-[24%] border border-white/[0.14] sm:max-w-[4.25rem]",
+          active ? "dr-app-icon-active" : "dr-app-icon-idle",
         )}
       >
-        <Icon className="h-[42%] w-[42%] text-[#1a1207]" strokeWidth={2.25} aria-hidden />
+        <span className="dr-app-icon-shine pointer-events-none absolute inset-0 rounded-[inherit]" aria-hidden />
+        <Icon
+          className={cn(
+            "relative z-[1] h-[44%] w-[44%] transition duration-200",
+            active ? "text-[#1a1207]" : "text-[#1a1207]/90",
+          )}
+          strokeWidth={2.15}
+          aria-hidden
+        />
         {badge ? (
-          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-card px-1 text-[9px] font-semibold text-cream ring-1 ring-white/15">
+          <span className="absolute -right-1 -top-1 z-[2] flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full border border-white/20 bg-[#141019] px-1 text-[9px] font-bold text-primary shadow-md">
             {badge}
           </span>
         ) : null}
       </span>
-      <span className="max-w-full truncate text-[10px] font-medium text-cream/70">{label}</span>
+      <span
+        className={cn(
+          "max-w-full truncate text-center text-[10px] font-medium leading-tight tracking-[0.06em] sm:text-[11px]",
+          active ? "text-primary" : "text-cream/75 group-hover:text-cream",
+        )}
+      >
+        {label}
+      </span>
     </button>
   );
 }
 
-/** A drilled-in activity as a list row — icon chip + title + tagline + chevron,
- *  mirroring the mobile category list. */
-function MenuListRow({
+/** Drilled-in activity — image-backed square with classic icon + label. */
+function MenuSquareTile({
   Icon,
   label,
   tagline,
+  image,
   active,
+  hero,
   onClick,
 }: {
   Icon: LucideIcon;
   label: string;
   tagline?: string;
+  image?: string;
   active: boolean;
+  hero?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={tagline ? `${label} — ${tagline}` : label}
       className={cn(
-        "flex items-center gap-3 rounded-2xl border p-2.5 text-left transition",
+        "dr-dock-tile group relative flex aspect-square min-w-0 flex-col overflow-hidden border text-left transition duration-200",
+        hero ? "rounded-[1.15rem]" : "rounded-xl",
         active
-          ? "border-primary/40 bg-primary/[0.08]"
-          : "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05]",
+          ? "border-primary/50 shadow-[0_0_0_1px_hsl(var(--primary)/0.4),0_12px_32px_rgb(0_0_0_/_0.45)]"
+          : "border-white/[0.10] hover:border-primary/30 hover:shadow-[0_10px_28px_rgb(0_0_0_/_0.4)]",
       )}
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15">
-        <Icon className="h-[18px] w-[18px] text-primary" aria-hidden />
+      {image ? (
+        <img
+          src={image}
+          alt=""
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+        />
+      ) : (
+        <span className="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-black/50" aria-hidden />
+      )}
+      <span
+        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#080604]/95 via-[#080604]/45 to-[#080604]/15 transition duration-300 group-hover:via-[#080604]/35"
+        aria-hidden
+      />
+      <span className={cn("relative z-[1] flex flex-1 items-start justify-start", hero ? "p-3 sm:p-4" : "p-2")}>
+        <span
+          className={cn(
+            "flex items-center justify-center rounded-lg border border-white/20 bg-black/35 backdrop-blur-md transition duration-200 group-hover:border-primary/40 group-hover:bg-black/50",
+            hero ? "h-11 w-11 sm:h-12 sm:w-12" : "h-8 w-8 sm:h-9 sm:w-9",
+            active && "border-primary/50 bg-primary/20",
+          )}
+        >
+          <Icon
+            className={cn(
+              hero ? "h-5 w-5 sm:h-6 sm:w-6" : "h-4 w-4 sm:h-[18px] sm:w-[18px]",
+              active ? "text-primary" : "text-cream",
+            )}
+            strokeWidth={2}
+            aria-hidden
+          />
+        </span>
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-cream">{label}</span>
+      <span className={cn("relative z-[1] shrink-0 pt-1", hero ? "px-3 pb-3 sm:px-4 sm:pb-4" : "px-2 pb-2 sm:px-2.5 sm:pb-2.5")}>
+        <span
+          className={cn(
+            "block truncate font-serif leading-tight",
+            hero ? "text-base sm:text-lg" : "text-[11px] sm:text-xs",
+            active ? "text-primary" : "text-cream",
+          )}
+        >
+          {label}
+        </span>
         {tagline ? (
-          <span className="block truncate text-[11px] text-muted-foreground">{tagline}</span>
+          <span
+            className={cn(
+              "mt-0.5 block line-clamp-2 leading-snug text-cream/55",
+              hero ? "text-[11px] sm:text-xs" : "text-[8px] sm:text-[9px]",
+            )}
+          >
+            {tagline}
+          </span>
         ) : null}
       </span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
     </button>
   );
 }
@@ -1107,7 +1335,9 @@ function PinnedVisionCard({
   );
 }
 
-const NOTE_SIZE = 172;
+/** Matches `.fridge-sticky-wrap` — used for drag clamping on stage pins. */
+const NOTE_W = 148;
+const NOTE_H = 156;
 const STICKY_PALETTE = [
   "linear-gradient(168deg, #fffef5 0%, #fef08a 48%, #fde047 100%)",
   "linear-gradient(168deg, #fff8fb 0%, #fbcfe8 50%, #f9a8d4 100%)",
@@ -1141,14 +1371,14 @@ function PinnedNoteCard({
       /* ignore */
     }
     return {
-      x: Math.max(EDGE, window.innerWidth - NOTE_SIZE - EDGE - index * 18),
-      y: TOP_PAD + 8 + index * (NOTE_SIZE + 14),
+      x: Math.max(EDGE, window.innerWidth - NOTE_W - EDGE - index * 18),
+      y: TOP_PAD + 8 + index * (NOTE_H + 14),
     };
   });
   const drag = useRef<{ dx: number; dy: number } | null>(null);
   const clamp = (x: number, y: number) => ({
-    x: Math.min(Math.max(x, EDGE), Math.max(EDGE, window.innerWidth - NOTE_SIZE - EDGE)),
-    y: Math.min(Math.max(y, TOP_PAD), Math.max(TOP_PAD, window.innerHeight - NOTE_SIZE - BOTTOM_PAD)),
+    x: Math.min(Math.max(x, EDGE), Math.max(EDGE, window.innerWidth - NOTE_W - EDGE)),
+    y: Math.min(Math.max(y, TOP_PAD), Math.max(TOP_PAD, window.innerHeight - NOTE_H - BOTTOM_PAD)),
   });
   const onMove = useCallback((e: PointerEvent) => {
     if (!drag.current) return;
@@ -1188,22 +1418,25 @@ function PinnedNoteCard({
       style={{
         left: pos.x,
         top: pos.y,
-        width: NOTE_SIZE,
-        height: NOTE_SIZE,
         transform: `rotate(${rot}deg)`,
-        background: STICKY_PALETTE[hash % STICKY_PALETTE.length],
+        ["--note-rot" as string]: `${rot}deg`,
       }}
-      className="fixed z-30 flex cursor-grab touch-none select-none flex-col rounded-[6px] p-3 shadow-[0_16px_40px_rgba(0,0,0,0.45)] active:cursor-grabbing"
+      className="fridge-stage-pin fixed z-30 cursor-grab touch-none select-none active:cursor-grabbing"
     >
-      <span className="absolute -top-1.5 left-1/2 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full bg-primary text-[#1a1207] shadow">
-        <Pin className="h-3 w-3 fill-current" />
-      </span>
-      <p className="mt-1 flex-1 overflow-hidden whitespace-pre-wrap break-words text-[13px] leading-snug text-[#2a2018] line-clamp-6">
-        {note.text}
-      </p>
-      <p className="mt-1 truncate text-[10px] uppercase tracking-[0.14em] text-[#2a2018]/55">
-        {note.pinned_by_name || "Someone"}
-      </p>
+      <span className="fridge-sticky-cast" aria-hidden />
+      <div
+        className="fridge-sticky-paper"
+        style={{ background: STICKY_PALETTE[hash % STICKY_PALETTE.length] }}
+      >
+        <span className="fridge-sticky-pin" aria-hidden />
+        <span className="fridge-sticky-tape" aria-hidden />
+        <span className="fridge-sticky-fold" aria-hidden />
+        <span className="fridge-sticky-lines" aria-hidden />
+        <p className="fridge-sticky-text">{note.text}</p>
+        <div className="fridge-sticky-meta">
+          <span className="truncate">{note.pinned_by_name || "Someone"}</span>
+        </div>
+      </div>
     </div>
   );
 }

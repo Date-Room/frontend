@@ -92,12 +92,14 @@ function LiveRoomAmbianceBackdrop({ preset }: { preset: LobbyMood }) {
   return (
     <>
       <AmbientSceneStack ambiance={preset} positionClassName="fixed inset-0 z-[1]" />
-      <div
-        className="live-room-ambient"
-        data-live-ambiance={preset}
-        data-photo-backdrop="true"
-        aria-hidden
-      />
+      {preset !== PLAIN_MOOD && (
+        <div
+          className="live-room-ambient"
+          data-live-ambiance={preset}
+          data-photo-backdrop="true"
+          aria-hidden
+        />
+      )}
       <div className="live-room-soft-vignette" aria-hidden />
     </>
   );
@@ -532,7 +534,7 @@ function RoomShell({
           }}
         />
 
-        <header className="relative z-30 flex shrink-0 items-center justify-between px-4 py-4 sm:px-6">
+        <header className="relative z-30 flex shrink-0 items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <div className="min-w-0">
             <h1 className="font-serif text-2xl italic text-cream sm:text-3xl">{BRAND_NAME}</h1>
           </div>

@@ -47,7 +47,10 @@ import {
 } from "@/lib/rooms";
 import { ChaperonSetupSheet } from "@/components/ChaperonSetupSheet";
 import { RoomAmbianceSheet } from "@/components/RoomAmbianceSheet";
-import { resolveLobbyMood, type LobbyMood } from "@/lib/ambiance";
+import { RoomThemeChip } from "@/components/RoomThemeChip";
+import { AmbientSceneStack } from "@/components/AmbientSceneStack";
+import { PLAIN_MOOD, resolveLobbyMood, type LobbyMood } from "@/lib/ambiance";
+import { ambianceAccentStyle } from "@/lib/roomAmbiance";
 import {
   Dialog,
   DialogContent,
@@ -78,12 +81,14 @@ function CodeCopyTile({
   copied,
   onCopy,
   loading,
+  hero,
 }: {
   label: string;
   value: string;
   copied: boolean;
   onCopy: () => void;
   loading?: boolean;
+  hero?: boolean;
 }) {
   return (
     <button
@@ -92,25 +97,37 @@ function CodeCopyTile({
       aria-label={`Copy ${label}`}
       disabled={loading}
       className={cn(
-        "group rounded-2xl border border-primary/20 bg-black/25 px-4 py-2 text-left transition",
-        "hover:bg-black/35 hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        "group rounded-2xl border text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        hero
+          ? "border-primary/25 bg-black/35 px-5 py-4 hover:border-primary/45 hover:bg-black/45"
+          : "border-primary/20 bg-black/25 px-4 py-2 hover:bg-black/35 hover:border-primary/40",
         copied && "border-emerald-400/40 bg-emerald-400/5",
       )}
     >
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+      <div className="flex items-center justify-between gap-2">
+        <p
+          className={cn(
+            "font-semibold uppercase tracking-[0.18em] text-muted-foreground",
+            hero ? "text-[11px]" : "text-[10px]",
+          )}
+        >
           {label}
         </p>
         {copied ? (
-          <Check className="h-3 w-3 text-emerald-300" aria-hidden />
+          <Check className={cn("text-emerald-300", hero ? "h-4 w-4" : "h-3 w-3")} aria-hidden />
         ) : (
-          <Copy className="h-3 w-3 text-muted-foreground/70" aria-hidden />
+          <Copy className={cn("text-muted-foreground/70", hero ? "h-4 w-4" : "h-3 w-3")} aria-hidden />
         )}
       </div>
       {loading ? (
-        <ShimmerSkeleton width={86} height={20} className="mt-0.5" />
+        <ShimmerSkeleton width={hero ? 120 : 86} height={hero ? 28 : 20} className="mt-1" />
       ) : (
-        <p className="text-lg font-semibold tracking-wider text-primary tabular-nums select-all">
+        <p
+          className={cn(
+            "font-semibold tracking-[0.2em] text-primary tabular-nums select-all",
+            hero ? "mt-1 text-2xl sm:text-3xl" : "text-lg",
+          )}
+        >
           {value}
         </p>
       )}
@@ -140,6 +157,7 @@ export default function PreRoom() {
   const [starting, setStarting] = useState(false);
   const [copiedKey, setCopiedKey] = useState<CopiedKey>(null);
   const [themeOpen, setThemeOpen] = useState(false);
+  const [moodPreview, setMoodPreview] = useState<LobbyMood | null>(null);
   const [destroyOpen, setDestroyOpen] = useState(false);
   const [destroyStep, setDestroyStep] = useState<"request" | "code">("request");
   const [destroyCode, setDestroyCode] = useState("");
@@ -529,7 +547,8 @@ export default function PreRoom() {
     }
   }
 
-  const currentMood: LobbyMood = resolveLobbyMood(room?.background_id ?? undefined);
+  const currentMood: LobbyMood =
+    moodPreview ?? resolveLobbyMood(room?.background_id ?? undefined);
 
   async function onRenew() {
     if (!room) return;
@@ -551,6 +570,7 @@ export default function PreRoom() {
 
   async function onPickTheme(id: LobbyMood) {
     if (!room) return;
+    setMoodPreview(id);
     try {
       await updateRoom(room.id, { background_id: id });
       await queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
@@ -592,343 +612,366 @@ export default function PreRoom() {
   if (rooms && !room) {
     return (
       <PreRoomShell>
-        <div className="mx-auto flex max-w-md flex-col items-center gap-4 text-center">
-          <p className="font-serif text-xl italic text-cream">Room not found</p>
-          <button
-            type="button"
-            className="auth-mode-switch"
-            onClick={() => navigate("/home")}
-          >
-            Back to home
-          </button>
+        <div className="pr-pre-room mx-auto flex min-h-[calc(100dvh-1.5rem)] w-full max-w-[min(1320px,97vw)] flex-col px-2 pb-3 sm:px-3">
+          <div className="pr-pre-room__card relative flex flex-1 flex-col items-center justify-center overflow-hidden rounded-[1.35rem] border border-white/[0.1] bg-[#100e14]/85 px-6 py-16 text-center shadow-[0_32px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+            <span className="pr-pre-room__glow" aria-hidden />
+            <p className="relative z-10 text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">
+              Closed door
+            </p>
+            <p className="relative z-10 mt-3 font-serif text-2xl italic text-cream sm:text-3xl">
+              This room isn&apos;t here anymore
+            </p>
+            <p className="relative z-10 mt-2 max-w-sm text-sm text-muted-foreground">
+              It may have been deleted, expired, or you might not have access.
+            </p>
+            <button
+              type="button"
+              className="btn-primary relative z-10 mt-8 rounded-full px-8 py-3 text-sm font-semibold"
+              onClick={() => navigate("/home")}
+            >
+              Back to home
+            </button>
+          </div>
         </div>
       </PreRoomShell>
     );
   }
 
-  return (
-    <PreRoomShell>
-      {/* Top bar — back + (host) destroy. */}
-      <header className="mx-auto flex max-w-4xl items-center px-4 sm:px-6 lg:px-8">
+  const roomActionsMenu = room ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <button
           type="button"
-          onClick={() => navigate("/home")}
-          aria-label="Back"
-          className="focus-ring -ml-1 rounded-full p-2 text-muted-foreground transition hover:text-cream hover:bg-white/[0.04]"
+          aria-label="Room actions"
+          className="focus-ring rounded-full p-2 text-muted-foreground transition hover:bg-white/[0.04] hover:text-cream"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <MoreVertical className="h-4 w-4" />
         </button>
-        <div className="ml-2 flex min-w-0 flex-1 flex-col">
-          <p className="truncate font-serif text-lg italic text-cream">
-            {room?.greeting_headline?.trim() || (room ? room.code : "")}
-          </p>
-          {(effectivePartnerName?.trim() ?? "") && (
-            <p className="truncate text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Room with {effectivePartnerName}
-            </p>
-          )}
-        </div>
-        {/* Host actions menu — mirrors mobile's PreRoom kebab. Shows
-            Remove partner (when a kickable guest is in the room),
-            Rotate PIN, and Destroy room (persistent only). Hidden
-            entirely when none of the actions apply. */}
-        {room && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label="Room actions"
-                className="focus-ring rounded-full p-2 text-muted-foreground transition hover:text-cream hover:bg-white/[0.04]"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[200px]">
-              {kickableGuest && (
-                <DropdownMenuItem
-                  onClick={() => void onKickPartner()}
-                  className="gap-2 text-destructive focus:text-destructive"
-                >
-                  <UserMinus className="h-4 w-4" /> Remove {kickableGuest.name}
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onClick={() => void onRotatePin()} className="gap-2">
-                <KeyRound className="h-4 w-4" /> Rotate PIN
-              </DropdownMenuItem>
-              {room.persistence === "persistent" && (
-                <DropdownMenuItem onClick={() => void onRenew()} className="gap-2">
-                  <RefreshCw className="h-4 w-4" /> Renew (30 days)
-                </DropdownMenuItem>
-              )}
-              {room.persistence === "persistent" && (
-                <DropdownMenuItem onClick={() => setThemeOpen(true)} className="gap-2">
-                  <Sparkles className="h-4 w-4" /> Change theme
-                </DropdownMenuItem>
-              )}
-              {room.persistence === "persistent" && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => {
-                      setDestroyStep("request");
-                      setDestroyCode("");
-                      setDestroyOpen(true);
-                    }}
-                    className="gap-2 text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" /> Destroy room
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[200px]">
+        {kickableGuest && (
+          <DropdownMenuItem
+            onClick={() => void onKickPartner()}
+            className="gap-2 text-destructive focus:text-destructive"
+          >
+            <UserMinus className="h-4 w-4" /> Remove {kickableGuest.name}
+          </DropdownMenuItem>
         )}
-      </header>
+        <DropdownMenuItem onClick={() => void onRotatePin()} className="gap-2">
+          <KeyRound className="h-4 w-4" /> Rotate PIN
+        </DropdownMenuItem>
+        {room.persistence === "persistent" && (
+          <DropdownMenuItem onClick={() => void onRenew()} className="gap-2">
+            <RefreshCw className="h-4 w-4" /> Renew (30 days)
+          </DropdownMenuItem>
+        )}
+        {room.persistence === "persistent" && (
+          <DropdownMenuItem onClick={() => setThemeOpen(true)} className="gap-2">
+            <Sparkles className="h-4 w-4" /> Change theme
+          </DropdownMenuItem>
+        )}
+        {room.persistence === "persistent" && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                setDestroyStep("request");
+                setDestroyCode("");
+                setDestroyOpen(true);
+              }}
+              className="gap-2 text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" /> Destroy room
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : null;
 
-      <main className="mx-auto mt-6 w-full max-w-4xl px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-12 md:items-start">
-          
-          {/* Left: Preflight Cam/Mic Check */}
-          <div className="md:col-span-7 space-y-4">
-            <div className="relative aspect-video w-full overflow-hidden rounded-[24px] border border-white/10 bg-black/45 shadow-2xl flex items-center justify-center">
-              {cameraEnabled ? (
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  className="h-full w-full object-cover scale-x-[-1]"
-                />
-              ) : (
-                <div className="flex flex-col items-center gap-3 text-muted-foreground text-center">
-                  <div className="h-16 w-16 rounded-full bg-white/[0.04] border border-white/10 flex items-center justify-center">
-                    <VideoOff className="h-6 w-6 text-muted-foreground/60" />
-                  </div>
-                  <p className="text-sm font-medium">Camera is turned off</p>
-                </div>
-              )}
-              
-              {/* Mic/Cam status indicators overlay */}
-              <div className="absolute bottom-4 left-4 flex gap-1.5 pointer-events-none">
-                <div className={cn(
-                  "p-1.5 rounded-lg backdrop-blur-md border border-white/10 text-[10px] uppercase tracking-wider font-semibold flex items-center gap-1",
-                  micEnabled ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
-                )}>
-                  {micEnabled ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-                  <span>{micEnabled ? "Mic On" : "Muted"}</span>
-                </div>
-              </div>
-            </div>
+  return (
+    <PreRoomShell
+      mood={room?.persistence === "persistent" ? currentMood : undefined}
+    >
+      <div className="pr-pre-room mx-auto flex min-h-[calc(100dvh-1.5rem)] w-full max-w-[min(1320px,97vw)] flex-col px-2 pb-3 sm:px-3">
+        <div className="pr-pre-room__card relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.35rem] border border-white/[0.1] bg-[#100e14]/85 shadow-[0_32px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+          <span className="pr-pre-room__glow" aria-hidden />
 
-            {/* Video & Audio Preflight controls */}
-            <div className="flex flex-col items-center gap-3">
-              <div className="flex items-center gap-4">
-                {/* Microphone Toggle */}
-                <div className="flex flex-col items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setMicEnabled(!micEnabled)}
-                    aria-label={micEnabled ? "Mute Microphone" : "Unmute Microphone"}
-                    className={cn(
-                      "flex h-14 w-14 items-center justify-center rounded-full border transition-all duration-200 focus-ring shadow-lg",
-                      micEnabled
-                        ? "bg-white/[0.06] border-white/15 text-cream hover:bg-white/[0.12]"
-                        : "bg-rose-500/15 border-rose-500/30 text-rose-300 hover:bg-rose-500/25"
-                    )}
-                  >
-                    {micEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-                  </button>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-1">
-                    {micEnabled ? "Mute" : "Unmute"}
-                  </span>
-                </div>
-
-                {/* Camera Toggle */}
-                <div className="flex flex-col items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setCameraEnabled(!cameraEnabled)}
-                    aria-label={cameraEnabled ? "Turn off camera" : "Turn on camera"}
-                    className={cn(
-                      "flex h-14 w-14 items-center justify-center rounded-full border transition-all duration-200 focus-ring shadow-lg",
-                      cameraEnabled
-                        ? "bg-white/[0.06] border-white/15 text-cream hover:bg-white/[0.12]"
-                        : "bg-rose-500/15 border-rose-500/30 text-rose-300 hover:bg-rose-500/25"
-                    )}
-                  >
-                    {cameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-                  </button>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mt-1">
-                    {cameraEnabled ? "Stop Video" : "Start Video"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Device pickers — only shown once we can enumerate. Empty
-                  labels (pre-permission) fall back to "Microphone 1/2…". */}
-              {(groupedDevices.audioinput.length > 0 ||
-                groupedDevices.videoinput.length > 0) && (
-                <div className="flex w-full max-w-sm flex-col gap-2.5">
-                  {groupedDevices.audioinput.length > 0 && (
-                    <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Microphone
-                      <select
-                        value={selectedMic}
-                        onChange={(e) => pickMic(e.target.value)}
-                        className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm normal-case tracking-normal text-cream focus:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      >
-                        <option value="">System default</option>
-                        {groupedDevices.audioinput.map((d, i) => (
-                          <option key={d.deviceId || i} value={d.deviceId}>
-                            {deviceLabel(d, i, "audioinput")}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                  {groupedDevices.videoinput.length > 0 && (
-                    <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                      Camera
-                      <select
-                        value={selectedCam}
-                        onChange={(e) => pickCam(e.target.value)}
-                        className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm normal-case tracking-normal text-cream focus:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      >
-                        <option value="">System default</option>
-                        {groupedDevices.videoinput.map((d, i) => (
-                          <option key={d.deviceId || i} value={d.deviceId}>
-                            {deviceLabel(d, i, "videoinput")}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                </div>
-              )}
-
-              <p className="text-[11px] text-muted-foreground text-center max-w-sm mt-1">
-                Choose your settings here. They will carry over automatically when you start the date.
+          <header className="relative z-10 flex shrink-0 items-center gap-3 border-b border-white/[0.06] px-4 py-3 sm:px-6">
+            <button
+              type="button"
+              onClick={() => navigate("/home")}
+              aria-label="Back"
+              className="focus-ring -ml-1 rounded-full p-2 text-muted-foreground transition hover:bg-white/[0.04] hover:text-cream"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-serif text-xl italic text-cream sm:text-2xl">
+                {room?.greeting_headline?.trim() || (room ? room.code : "Your room")}
+              </p>
+              <p className="truncate text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                {live ? "Session in progress" : "Before you walk in"}
               </p>
             </div>
-          </div>
-
-          {/* Right: Meeting Details & Actions */}
-          <div className="md:col-span-5 space-y-6">
-            
-            {/* Header info */}
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 flex flex-col items-center gap-4 text-center backdrop-blur-md shadow-lg">
-              <AvatarPair
-                selfPhoto={me?.photo_url ?? null}
-                selfName={me?.display_name ?? null}
-                partnerPhoto={effectivePartnerPhoto}
-                partnerName={effectivePartnerName}
+            {partnerPresent && (
+              <span className="hidden shrink-0 items-center gap-1.5 rounded-full border border-primary/35 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary sm:inline-flex">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" aria-hidden />
+                Partner online
+              </span>
+            )}
+            {room?.persistence === "persistent" && (
+              <RoomThemeChip
+                current={currentMood}
+                onClick={() => setThemeOpen(true)}
+                className="hidden sm:inline-flex"
               />
-              
-              {!card ? (
-                <div className="flex flex-col items-center gap-2">
-                  <ShimmerSkeleton width={140} height={18} />
-                  <ShimmerSkeleton width={200} height={12} />
+            )}
+            {roomActionsMenu}
+          </header>
+
+          <div className="relative z-10 grid min-h-0 flex-1 lg:grid-cols-[1.08fr_0.92fr]">
+            {/* Left — mirror check fills the column height */}
+            <section className="pr-pre-room__stage flex min-h-[min(52vh,28rem)] flex-col border-b border-white/[0.06] lg:min-h-0 lg:border-b-0 lg:border-r">
+              <div className="relative min-h-0 flex-1 overflow-hidden bg-black/50">
+                {cameraEnabled ? (
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="h-full w-full object-cover scale-x-[-1]"
+                  />
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-muted-foreground">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/[0.04]">
+                      <VideoOff className="h-6 w-6 text-muted-foreground/60" />
+                    </div>
+                    <p className="text-sm font-medium">Camera is turned off</p>
+                    <p className="max-w-xs text-xs text-muted-foreground/80">
+                      You can still enter — toggle video anytime in the room.
+                    </p>
+                  </div>
+                )}
+                <span className="pr-pre-room__vignette" aria-hidden />
+                <div className="absolute left-4 top-4 rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-cream/80 backdrop-blur-md">
+                  Mirror check
                 </div>
-              ) : (
-                <div className="space-y-1">
-                  <p className="text-base font-semibold text-cream tracking-wide">{headerTitle}</p>
-                  <p className={cn(
-                    "text-xs font-medium tracking-wide transition-colors duration-200",
-                    partnerPresent ? "text-primary animate-pulse" : "text-muted-foreground/85"
-                  )}>
-                    {statusLine}
+                <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3">
+                  <div
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-full border border-white/10 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider backdrop-blur-md",
+                      micEnabled ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300",
+                    )}
+                  >
+                    {micEnabled ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
+                    {micEnabled ? "Mic ready" : "Muted"}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMicEnabled(!micEnabled)}
+                      aria-label={micEnabled ? "Mute microphone" : "Unmute microphone"}
+                      className={cn(
+                        "focus-ring flex h-11 w-11 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition",
+                        micEnabled
+                          ? "border-white/15 bg-black/50 text-cream hover:bg-black/65"
+                          : "border-rose-500/40 bg-rose-500/25 text-rose-200",
+                      )}
+                    >
+                      {micEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCameraEnabled(!cameraEnabled)}
+                      aria-label={cameraEnabled ? "Turn off camera" : "Turn on camera"}
+                      className={cn(
+                        "focus-ring flex h-11 w-11 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition",
+                        cameraEnabled
+                          ? "border-white/15 bg-black/50 text-cream hover:bg-black/65"
+                          : "border-rose-500/40 bg-rose-500/25 text-rose-200",
+                      )}
+                    >
+                      {cameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {(groupedDevices.audioinput.length > 0 || groupedDevices.videoinput.length > 0) && (
+                <div className="shrink-0 border-t border-white/[0.06] bg-black/20 px-4 py-3 sm:px-5">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {groupedDevices.audioinput.length > 0 && (
+                      <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Microphone
+                        <select
+                          value={selectedMic}
+                          onChange={(e) => pickMic(e.target.value)}
+                          className="w-full rounded-xl border border-white/10 bg-black/35 px-3 py-2.5 text-sm normal-case tracking-normal text-cream focus:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        >
+                          <option value="">System default</option>
+                          {groupedDevices.audioinput.map((d, i) => (
+                            <option key={d.deviceId || i} value={d.deviceId}>
+                              {deviceLabel(d, i, "audioinput")}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    {groupedDevices.videoinput.length > 0 && (
+                      <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        Camera
+                        <select
+                          value={selectedCam}
+                          onChange={(e) => pickCam(e.target.value)}
+                          className="w-full rounded-xl border border-white/10 bg-black/35 px-3 py-2.5 text-sm normal-case tracking-normal text-cream focus:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        >
+                          <option value="">System default</option>
+                          {groupedDevices.videoinput.map((d, i) => (
+                            <option key={d.deviceId || i} value={d.deviceId}>
+                              {deviceLabel(d, i, "videoinput")}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    These settings carry over when you enter the room.
                   </p>
                 </div>
               )}
-            </div>
+            </section>
 
-            {/* Meeting Access Card */}
-            <div className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-5 space-y-4 backdrop-blur-md shadow-xl relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 to-transparent pointer-events-none" />
-              
-              <div className="flex items-center justify-between border-b border-white/5 pb-2 relative z-10">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/90">
-                  Meeting Details
-                </span>
-                <span className="text-[9px] uppercase font-semibold text-primary/80 bg-primary/10 border border-primary/20 rounded px-1.5 py-0.5">
-                  Info
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 relative z-10">
-                <CodeCopyTile
-                  label="Meeting ID"
-                  value={room?.code ?? ""}
-                  copied={copiedKey === "room-id"}
-                  loading={!room}
-                  onCopy={() => room && void copyValue(room.code, "room-id")}
-                />
-                <CodeCopyTile
-                  label="Passcode (PIN)"
-                  value={room?.pin ?? ""}
-                  copied={copiedKey === "pin"}
-                  loading={!room}
-                  onCopy={() => room && void copyValue(room.pin, "pin")}
-                />
-              </div>
-
-              <div className="flex flex-col gap-2 pt-1 relative z-10">
-                <button
-                  type="button"
-                  onClick={() => room && void copyValue(inviteUrl, "link")}
-                  disabled={!room}
-                  className={cn(
-                    "flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/[0.02] py-2.5 text-xs text-cream transition hover:bg-white/5 disabled:opacity-50 font-medium",
-                    copiedKey === "link" && "border-emerald-500/40 text-emerald-300 bg-emerald-500/5",
-                  )}
-                >
-                  {copiedKey === "link" ? (
-                    <>
-                      <Check className="h-3.5 w-3.5" aria-hidden /> Link copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3.5 w-3.5" aria-hidden /> Copy Invite Link
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={share}
-                  disabled={!room}
-                  className="flex items-center justify-center gap-2 rounded-full bg-amber py-2.5 text-xs font-semibold text-primary-foreground transition hover:bg-amber/90 disabled:opacity-50 shadow-md"
-                >
-                  <Share2 className="h-3.5 w-3.5" aria-hidden /> Invite Partner...
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={start}
-                disabled={!room || starting}
-                className="btn-primary flex w-full items-center justify-center gap-2 rounded-full py-3.5 font-bold text-sm tracking-wide shadow-lg transition-transform hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
-              >
-                {starting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                {live ? "Rejoin Room" : "Enter Room"}
-              </button>
-              {chaperonAvailable && (
-                <button
-                  type="button"
-                  onClick={() => setChaperonSetupOpen(true)}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/[0.06] py-3 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/[0.12]"
-                >
-                  <ShieldCheck className="h-4 w-4" />
-                  Set up chaperon
-                </button>
+            {/* Right — who's here + door codes + enter */}
+            <section className="flex min-h-0 flex-col gap-4 overflow-y-auto p-4 sm:gap-5 sm:p-6">
+              {room?.persistence === "persistent" && (
+                <div className="sm:hidden">
+                  <RoomThemeChip
+                    current={currentMood}
+                    onClick={() => setThemeOpen(true)}
+                    className="w-full justify-center py-2.5"
+                  />
+                </div>
               )}
-            </div>
 
+              <div className="pr-pre-room__party rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 sm:p-5">
+                <div className="flex flex-wrap items-center gap-4">
+                  <AvatarPair
+                    selfPhoto={me?.photo_url ?? null}
+                    selfName={me?.display_name ?? null}
+                    partnerPhoto={effectivePartnerPhoto}
+                    partnerName={effectivePartnerName}
+                    partnerPresent={partnerPresent}
+                    large
+                  />
+                  <div className="min-w-0 flex-1">
+                    {!card ? (
+                      <div className="flex flex-col gap-2">
+                        <ShimmerSkeleton width={160} height={20} />
+                        <ShimmerSkeleton width={220} height={14} />
+                      </div>
+                    ) : (
+                      <>
+                        <p className="font-serif text-xl italic text-cream sm:text-2xl">{headerTitle}</p>
+                        <p
+                          className={cn(
+                            "mt-1 text-sm transition-colors",
+                            partnerPresent ? "text-primary" : "text-muted-foreground",
+                          )}
+                        >
+                          {statusLine}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pr-pre-room__invite relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/[0.08] via-black/20 to-black/30 p-4 sm:p-5">
+                <span className="pr-pre-room__invite-glow" aria-hidden />
+                <div className="relative z-10 mb-3 flex items-center justify-between gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground">
+                    Door code
+                  </p>
+                  <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-primary">
+                    Share to invite
+                  </span>
+                </div>
+                <div className="relative z-10 grid gap-3 sm:grid-cols-2">
+                  <CodeCopyTile
+                    label="Meeting ID"
+                    value={room?.code ?? ""}
+                    copied={copiedKey === "room-id"}
+                    loading={!room}
+                    hero
+                    onCopy={() => room && void copyValue(room.code, "room-id")}
+                  />
+                  <CodeCopyTile
+                    label="Passcode"
+                    value={room?.pin ?? ""}
+                    copied={copiedKey === "pin"}
+                    loading={!room}
+                    hero
+                    onCopy={() => room && void copyValue(room.pin, "pin")}
+                  />
+                </div>
+                <div className="relative z-10 mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => room && void copyValue(inviteUrl, "link")}
+                    disabled={!room}
+                    className={cn(
+                      "flex items-center justify-center gap-2 rounded-full border border-white/15 bg-black/25 py-3 text-sm font-medium text-cream transition hover:bg-black/35 disabled:opacity-50",
+                      copiedKey === "link" && "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+                    )}
+                  >
+                    {copiedKey === "link" ? (
+                      <>
+                        <Check className="h-4 w-4" aria-hidden /> Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4" aria-hidden /> Copy link
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={share}
+                    disabled={!room}
+                    className="flex items-center justify-center gap-2 rounded-full bg-amber py-3 text-sm font-semibold text-primary-foreground shadow-md transition hover:bg-amber/90 disabled:opacity-50"
+                  >
+                    <Share2 className="h-4 w-4" aria-hidden /> Invite
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-auto space-y-2 pt-1">
+                <button
+                  type="button"
+                  onClick={start}
+                  disabled={!room || starting}
+                  className="btn-primary flex w-full items-center justify-center gap-2 rounded-full py-4 text-base font-bold tracking-wide shadow-[0_16px_40px_rgba(232,166,83,0.25)] transition hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+                >
+                  {starting ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : null}
+                  {live ? "Rejoin room" : "Enter room"}
+                </button>
+                {chaperonAvailable && (
+                  <button
+                    type="button"
+                    onClick={() => setChaperonSetupOpen(true)}
+                    className="flex w-full items-center justify-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/[0.06] py-3 text-sm font-semibold text-emerald-300 transition hover:bg-emerald-500/[0.12]"
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    Set up chaperon
+                  </button>
+                )}
+              </div>
+            </section>
           </div>
-
         </div>
-      </main>
+      </div>
 
       <RoomAmbianceSheet
         open={themeOpen}
@@ -1004,20 +1047,40 @@ export default function PreRoom() {
 
 /** Outer shell — dark amber-tinted gradient backdrop, never transparent.
  *  Keeps the screen warm even while the InviteCard is still loading. */
-function PreRoomShell({ children }: { children: React.ReactNode }) {
+function PreRoomShell({
+  children,
+  mood,
+}: {
+  children: React.ReactNode;
+  mood?: LobbyMood;
+}) {
+  const shellStyle = mood ? ambianceAccentStyle(mood) : undefined;
   return (
-    <PageShell className="overflow-hidden">
-      {/* Amber-tinted radial wash sits above the page background so we
-          never get a flat dark screen during hydration. */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0 -z-[5]"
-        style={{
-          background:
-            "radial-gradient(ellipse 130% 95% at 50% 118%, rgba(155, 95, 50, 0.45) 0%, transparent 58%), radial-gradient(circle at 18% 18%, rgba(245, 166, 35, 0.18) 0%, transparent 42%), radial-gradient(circle at 85% 12%, rgba(232,166,83, 0.16) 0%, transparent 40%)",
-        }}
-      />
-      <div className="relative z-10 mx-auto min-h-screen w-full py-6 sm:py-10">
+    <PageShell className="overflow-hidden" style={shellStyle}>
+      {mood ? (
+        <>
+          <AmbientSceneStack ambiance={mood} positionClassName="pointer-events-none fixed inset-0 z-0" />
+          {mood !== PLAIN_MOOD && (
+            <div
+              className="live-room-ambient pointer-events-none fixed inset-0 z-[1]"
+              data-live-ambiance={mood}
+              data-photo-backdrop="true"
+              aria-hidden
+            />
+          )}
+          <div className="live-room-soft-vignette pointer-events-none fixed inset-0 z-[2]" aria-hidden />
+        </>
+      ) : (
+        <div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 z-0"
+          style={{
+            background:
+              "radial-gradient(ellipse 120% 80% at 50% 100%, rgba(155, 95, 50, 0.42) 0%, transparent 55%), radial-gradient(circle at 12% 20%, rgba(245, 166, 35, 0.14) 0%, transparent 38%), radial-gradient(circle at 88% 15%, rgba(232,166,83, 0.12) 0%, transparent 36%)",
+          }}
+        />
+      )}
+      <div className="relative z-10 mx-auto min-h-[100dvh] w-full py-2 sm:py-3">
         {children}
       </div>
     </PageShell>
@@ -1031,17 +1094,27 @@ function AvatarPair({
   selfName,
   partnerPhoto,
   partnerName,
+  partnerPresent,
+  large,
 }: {
   selfPhoto: string | null;
   selfName: string | null;
   partnerPhoto: string | null;
   partnerName: string | null;
+  partnerPresent?: boolean;
+  large?: boolean;
 }) {
   const partnerEmpty = !partnerName && !partnerPhoto;
   return (
-    <div className="flex items-center gap-3">
-      <Avatar64 photo={selfPhoto} name={selfName} />
-      <Avatar64 photo={partnerPhoto} name={partnerName} awaiting={partnerEmpty} />
+    <div className={cn("flex items-center", large ? "-space-x-3" : "gap-3")}>
+      <Avatar64 photo={selfPhoto} name={selfName} size={large ? 72 : 64} />
+      <Avatar64
+        photo={partnerPhoto}
+        name={partnerName}
+        awaiting={partnerEmpty}
+        size={large ? 72 : 64}
+        pulse={partnerPresent && !partnerEmpty}
+      />
     </div>
   );
 }
@@ -1050,36 +1123,47 @@ function Avatar64({
   photo,
   name,
   awaiting,
+  size = 64,
+  pulse,
 }: {
   photo: string | null;
   name: string | null;
   awaiting?: boolean;
+  size?: number;
+  pulse?: boolean;
 }) {
   const initial = name?.trim() ? name.trim()[0]?.toUpperCase() : null;
+  const dim = size >= 72 ? "h-[4.5rem] w-[4.5rem]" : "h-16 w-16";
+  const iconSize = size >= 72 ? "h-7 w-7" : "h-6 w-6";
+  const initialCls = size >= 72 ? "text-3xl" : "text-2xl";
   const placeholder = (
     <div
       className={cn(
-        "flex h-16 w-16 items-center justify-center rounded-full border-2",
+        "flex items-center justify-center rounded-full border-2",
+        dim,
         awaiting ? "border-border bg-secondary" : "border-primary/40 bg-primary/12",
       )}
     >
       {awaiting ? (
-        <UserPlus className="h-6 w-6 text-muted-foreground" strokeWidth={1.5} />
+        <UserPlus className={cn(iconSize, "text-muted-foreground")} strokeWidth={1.5} />
       ) : initial ? (
-        <span className="text-2xl font-semibold text-primary">{initial}</span>
+        <span className={cn(initialCls, "font-semibold text-primary")}>{initial}</span>
       ) : (
-        <UserPlus className="h-6 w-6 text-muted-foreground" strokeWidth={1.5} />
+        <UserPlus className={cn(iconSize, "text-muted-foreground")} strokeWidth={1.5} />
       )}
     </div>
   );
-  if (!photo) return placeholder;
-  return (
-    <div className="h-16 w-16 overflow-hidden rounded-full border-2 border-primary/40">
-      <UserAvatarImg
-        src={photo}
-        fallback={placeholder}
-        className="h-full w-full object-cover"
-      />
+  const inner = !photo ? (
+    placeholder
+  ) : (
+    <div className={cn("overflow-hidden rounded-full border-2 border-primary/40", dim)}>
+      <UserAvatarImg src={photo} fallback={placeholder} className="h-full w-full object-cover" />
     </div>
+  );
+  if (!pulse) return inner;
+  return (
+    <span className="pr-pre-room__avatar-pulse relative inline-flex rounded-full">
+      {inner}
+    </span>
   );
 }

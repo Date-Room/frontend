@@ -1,13 +1,13 @@
 /** Visual moods for the date room — keys map to `[data-live-ambiance]` in `index.css`. */
 export const AMBIANCE_PRESETS = [
-  { id: "candlelit", label: "Candlelit", hint: "Warm candlelit glow", emoji: "🕯️" },
-  { id: "moonlit", label: "Moonlit", hint: "Cool silver & sapphire night", emoji: "🌙" },
-  { id: "golden", label: "Golden hour", hint: "Honey alpine sunset", emoji: "🌇" },
-  { id: "ocean", label: "Ocean hush", hint: "Deep teal & quiet tides", emoji: "🌊" },
-  { id: "secret", label: "Secret lounge", hint: "Velvet club & violet glow", emoji: "🍸" },
-  { id: "aurora", label: "Aurora veil", hint: "Emerald & violet sky", emoji: "🌌" },
-  { id: "ember", label: "Hearth glow", hint: "Firelight & ember coals", emoji: "🔥" },
-  { id: "blush", label: "Blush dusk", hint: "Rose cloud twilight", emoji: "💗" },
+  { id: "candlelit", label: "Candlelit", hint: "Warm amber glow — intimate and close", emoji: "🕯️" },
+  { id: "moonlit", label: "Moonlit", hint: "Cool silver light over a quiet night", emoji: "🌙" },
+  { id: "golden", label: "Golden hour", hint: "Honey sunset over distant peaks", emoji: "🌇" },
+  { id: "ocean", label: "Ocean hush", hint: "Deep teal tides and still air", emoji: "🌊" },
+  { id: "secret", label: "Secret lounge", hint: "Velvet violet — low lights, late hour", emoji: "🍸" },
+  { id: "aurora", label: "Aurora veil", hint: "Emerald and violet sky in motion", emoji: "🌌" },
+  { id: "ember", label: "Hearth glow", hint: "Firelight, ember warmth, winter night", emoji: "🔥" },
+  { id: "blush", label: "Blush dusk", hint: "Rose clouds at the softest hour", emoji: "💗" },
 ] as const;
 
 export type AmbiancePresetId = (typeof AMBIANCE_PRESETS)[number]["id"];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasActivityHelp } from "./ActivityHelp";
+import { hasActivityHelp, shouldShowGameIntro } from "./ActivityHelp";
 
 describe("activity help coverage", () => {
   it("every tray game has an explainer", () => {
@@ -25,5 +25,11 @@ describe("activity help coverage", () => {
 
   it("unknown ids have no help", () => {
     expect(hasActivityHelp("nope")).toBe(false);
+  });
+
+  it("lobby and room settings skip the intro gate", () => {
+    expect(shouldShowGameIntro("lobby")).toBe(false);
+    expect(shouldShowGameIntro("room_details")).toBe(false);
+    expect(shouldShowGameIntro("rank_it")).toBe(true);
   });
 });

@@ -187,7 +187,12 @@ export default function Settings() {
   const country = countryByCode(countryCode);
 
   return (
-    <CardPage title={t("settings.title")} onBack={() => navigate("/home")} maxWidth="sm:max-w-xl md:max-w-2xl">
+    <CardPage
+      title={t("settings.title")}
+      onBack={() => navigate("/home")}
+      maxWidth="sm:max-w-xl md:max-w-4xl lg:max-w-6xl"
+      bodyClassName="sm:px-6 lg:px-8 sm:pb-8"
+    >
       <input
         ref={photoInputRef}
         type="file"
@@ -200,169 +205,170 @@ export default function Settings() {
         }}
       />
 
-      {/* Desktop section header — small-caps label above the avatar
-          block. Hidden on mobile (single-column already reads cleanly
-          without one). */}
-      <p className="hidden md:block px-1 pb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-        {t("settings.account")}
-      </p>
-
-      {/* ─── Avatar + email ─── */}
-      <div className="flex flex-col items-center gap-2 pt-2">
-        <div className="relative">
-          <div className="h-[104px] w-[104px] overflow-hidden rounded-full border border-border bg-secondary/60">
-            <UserAvatarImg
-              src={avatarUrl}
-              className="h-full w-full object-cover"
-              fallback={
-                <div className="flex h-full w-full items-center justify-center font-serif text-4xl text-primary">
-                  {initial}
-                </div>
-              }
-            />
+      <div className="grid gap-5 lg:grid-cols-12 lg:gap-6">
+        {/* Account */}
+        <div className="lg:col-span-3">
+          <p className="hidden lg:block px-1 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            {t("settings.account")}
+          </p>
+          <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card/40 p-5 lg:items-stretch">
+            <div className="relative self-center">
+              <div className="h-20 w-20 overflow-hidden rounded-full border border-border bg-secondary/60 lg:h-24 lg:w-24">
+                <UserAvatarImg
+                  src={avatarUrl}
+                  className="h-full w-full object-cover"
+                  fallback={
+                    <div className="flex h-full w-full items-center justify-center font-serif text-3xl text-primary">
+                      {initial}
+                    </div>
+                  }
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={uploading}
+                aria-label={t("settings.changePhoto")}
+                className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition hover:scale-105 disabled:opacity-50"
+              >
+                {uploading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
+                )}
+              </button>
+            </div>
+            <p className="mt-1 truncate text-center text-sm font-medium text-cream lg:text-left">
+              {displayName || t("settings.setAName")}
+            </p>
+            <p className="truncate text-center text-xs text-muted-foreground lg:text-left">{me?.email}</p>
+            <div className="mt-3 w-full">
+              <LanguageSwitcher />
+            </div>
           </div>
-          {/* Calmer accent-tinted edit pencil disc badge — not the loud amber camera. */}
+        </div>
+
+        {/* Details */}
+        <div className="space-y-2 lg:col-span-5">
+          <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            {t("settings.details")}
+          </p>
+          <div className="overflow-hidden rounded-2xl border border-border bg-card/40">
+            <div className="flex items-center px-4 py-3">
+              <span className="w-20 shrink-0 text-sm text-muted-foreground">{t("settings.name")}</span>
+              <input
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                maxLength={40}
+                placeholder={t("settings.namePlaceholder")}
+                className="flex-1 bg-transparent text-[15px] text-cream placeholder:text-muted-foreground/60 focus:outline-none"
+              />
+            </div>
+            <div className="ml-4 h-px bg-border/60" />
+            <button
+              type="button"
+              onClick={() => setCountryOpen(true)}
+              className="flex w-full items-center px-4 py-3 text-left transition hover:bg-white/[0.025]"
+            >
+              <span className="w-20 shrink-0 text-sm text-muted-foreground">{t("settings.country")}</span>
+              {country && (
+                <span className="mr-2 text-lg" aria-hidden>
+                  {flagFor(country.code)}
+                </span>
+              )}
+              <span className={cn("flex-1 text-[15px]", country ? "text-cream" : "text-muted-foreground")}>
+                {country?.name ?? t("settings.tapToPick")}
+              </span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </button>
+            {entitlement && (
+              <>
+                <div className="ml-4 h-px bg-border/60" />
+                <div className="flex items-center px-4 py-3">
+                  <span className="w-20 shrink-0 text-sm text-muted-foreground">Plan</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] text-cream">{entitlement.account_tier_label}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Pay via {paymentRailLabel(entitlement.payment_provider)}
+                      {entitlement.date_pack_remaining + entitlement.long_pack_remaining > 0
+                        ? ` · ${entitlement.remaining_passes} credit${entitlement.remaining_passes === 1 ? "" : "s"} left`
+                        : ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="ml-4 h-px bg-border/60" />
+                <form
+                  className="flex items-center gap-2 px-4 py-3"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void (async () => {
+                      if (!promoCode.trim()) return;
+                      setPromoBusy(true);
+                      try {
+                        const res = await redeemPromoCode(promoCode.trim());
+                        toast.success(res.message);
+                        setPromoCode("");
+                        void refetchEntitlement();
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : "Invalid code");
+                      } finally {
+                        setPromoBusy(false);
+                      }
+                    })();
+                  }}
+                >
+                  <span className="w-20 shrink-0 text-sm text-muted-foreground">Promo</span>
+                  <input
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                    placeholder="Enter code"
+                    className="flex-1 min-w-0 bg-transparent text-[15px] text-cream placeholder:text-muted-foreground outline-none uppercase"
+                  />
+                  <button
+                    type="submit"
+                    disabled={promoBusy || !promoCode.trim()}
+                    className="text-xs font-medium text-rosegold disabled:opacity-40"
+                  >
+                    Apply
+                  </button>
+                </form>
+              </>
+            )}
+          </div>
+
+          {error && <p className="text-sm text-rose">{error}</p>}
+
           <button
             type="button"
-            onClick={() => photoInputRef.current?.click()}
-            disabled={uploading}
-            aria-label={t("settings.changePhoto")}
-            className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition hover:scale-105 disabled:opacity-50"
+            onClick={() => void save(false)}
+            disabled={saving}
+            className="btn-primary mt-3 flex w-full items-center justify-center gap-2 rounded-[1.15rem] py-3 font-semibold disabled:opacity-50"
           >
-            {uploading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
-            )}
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
+            Save
           </button>
         </div>
-        <p className="mt-2 truncate text-sm font-medium text-cream">
-          {displayName || t("settings.setAName")}
-        </p>
-        <p className="truncate text-xs text-muted-foreground">{me?.email}</p>
-      </div>
 
-      {/* ─── Language ─── */}
-      <div className="mt-8">
-        <LanguageSwitcher />
-      </div>
-
-      {/* ─── Settings group: Name + Country ─── */}
-      <div className="mt-8 space-y-2">
-        <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          {t("settings.details")}
-        </p>
-        <div className="overflow-hidden rounded-2xl border border-border bg-card/40">
-          {/* Name row */}
-          <div className="flex items-center px-4 py-3">
-            <span className="w-20 shrink-0 text-sm text-muted-foreground">{t("settings.name")}</span>
-            <input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              maxLength={40}
-              placeholder={t("settings.namePlaceholder")}
-              className="flex-1 bg-transparent text-[15px] text-cream placeholder:text-muted-foreground/60 focus:outline-none"
-            />
-          </div>
-          <div className="ml-4 h-px bg-border/60" />
-          {/* Country row */}
-          <button
-            type="button"
-            onClick={() => setCountryOpen(true)}
-            className="flex w-full items-center px-4 py-3.5 text-left transition hover:bg-white/[0.025]"
-          >
-            <span className="w-20 shrink-0 text-sm text-muted-foreground">{t("settings.country")}</span>
-            {country && (
-              <span className="mr-2 text-lg" aria-hidden>
-                {flagFor(country.code)}
-              </span>
-            )}
-            <span className={cn("flex-1 text-[15px]", country ? "text-cream" : "text-muted-foreground")}>
-              {country?.name ?? t("settings.tapToPick")}
-            </span>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          </button>
-          {entitlement && (
-            <>
-              <div className="ml-4 h-px bg-border/60" />
-              <div className="flex items-center px-4 py-3.5">
-                <span className="w-20 shrink-0 text-sm text-muted-foreground">Plan</span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[15px] text-cream">{entitlement.account_tier_label}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    Pay via {paymentRailLabel(entitlement.payment_provider)}
-                    {entitlement.date_pack_remaining + entitlement.long_pack_remaining > 0
-                      ? ` · ${entitlement.remaining_passes} credit${entitlement.remaining_passes === 1 ? "" : "s"} left`
-                      : ""}
-                  </p>
-                </div>
-              </div>
-              <div className="ml-4 h-px bg-border/60" />
-              <form
-                className="flex items-center gap-2 px-4 py-3.5"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void (async () => {
-                    if (!promoCode.trim()) return;
-                    setPromoBusy(true);
-                    try {
-                      const res = await redeemPromoCode(promoCode.trim());
-                      toast.success(res.message);
-                      setPromoCode("");
-                      void refetchEntitlement();
-                    } catch (err) {
-                      toast.error(err instanceof Error ? err.message : "Invalid code");
-                    } finally {
-                      setPromoBusy(false);
-                    }
-                  })();
-                }}
-              >
-                <span className="w-20 shrink-0 text-sm text-muted-foreground">Promo</span>
-                <input
-                  value={promoCode}
-                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                  placeholder="Enter code"
-                  className="flex-1 min-w-0 bg-transparent text-[15px] text-cream placeholder:text-muted-foreground outline-none uppercase"
-                />
-                <button
-                  type="submit"
-                  disabled={promoBusy || !promoCode.trim()}
-                  className="text-xs font-medium text-rosegold disabled:opacity-40"
-                >
-                  Apply
-                </button>
-              </form>
-            </>
+        {/* Invite */}
+        <div className="lg:col-span-4">
+          {me ? <InviteSection me={me} inviterName={displayName} className="mt-0" /> : null}
+          {session?.user.is_admin && (
+            <Link
+              to="/admin"
+              className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-cream transition lg:justify-start"
+            >
+              Platform admin →
+            </Link>
           )}
         </div>
       </div>
 
-      {error && <p className="mt-3 text-sm text-rose">{error}</p>}
-
-      <button
-        type="button"
-        onClick={() => void save(false)}
-        disabled={saving}
-        className="btn-primary mt-5 flex w-full items-center justify-center gap-2 rounded-[1.15rem] py-3.5 font-semibold disabled:opacity-50"
-      >
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-        Save
-      </button>
-
-      {me ? <InviteSection me={me} inviterName={displayName} /> : null}
-
-      {session?.user.is_admin && (
-        <Link
-          to="/admin"
-          className="mt-8 flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-cream transition"
-        >
-          Platform admin →
-        </Link>
-      )}
-
-      {/* Sign out — quiet red text link, not a primary CTA. */}
-      <div className="mt-10 flex justify-center">
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-4 border-t border-white/[0.06] pt-6 lg:justify-between">
+        <p className="text-[10px] tracking-[0.25em] uppercase text-muted-foreground/50">
+          <Link to="/privacy" className="hover:text-cream transition-colors">Privacy</Link>
+          <span className="mx-2 opacity-60" aria-hidden>·</span>
+          <Link to="/terms" className="hover:text-cream transition-colors">Terms</Link>
+        </p>
         <button
           type="button"
           onClick={() => setSignOutOpen(true)}
@@ -372,16 +378,6 @@ export default function Settings() {
         </button>
       </div>
 
-      {/* Legal footer — Privacy + Terms */}
-      <p className="mt-4 text-center text-[10px] tracking-[0.25em] uppercase text-muted-foreground/50">
-        <Link to="/privacy" className="hover:text-cream transition-colors">Privacy</Link>
-        <span className="mx-2 opacity-60" aria-hidden>·</span>
-        <Link to="/terms" className="hover:text-cream transition-colors">Terms</Link>
-      </p>
-
-      {/* Country picker — Sheet on mobile (capped at 80vh, doesn't push
-          past the status bar even with the keyboard up), Command palette
-          inside a Dialog on desktop (keyboard nav, fuzzy search). */}
       <CountryPicker
         open={countryOpen}
         onOpenChange={setCountryOpen}
@@ -392,7 +388,6 @@ export default function Settings() {
         }}
       />
 
-      {/* Sign-out confirm */}
       <Sheet open={signOutOpen} onOpenChange={setSignOutOpen}>
         <SheetContent
           side="bottom"
@@ -430,7 +425,15 @@ export default function Settings() {
 /** Friend invite card — share `dateroom.io/r/{code}` from the profile.
  *  Primary source: `referral_code` on GET /v1/users/me (works on older
  *  API deploys). Optional GET /v1/users/me/referrals enriches with count. */
-function InviteSection({ me, inviterName }: { me: UserMe; inviterName: string }) {
+function InviteSection({
+  me,
+  inviterName,
+  className,
+}: {
+  me: UserMe;
+  inviterName: string;
+  className?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   const { data: refs } = useQuery({
@@ -473,7 +476,7 @@ function InviteSection({ me, inviterName }: { me: UserMe; inviterName: string })
   }
 
   return (
-    <div className="mt-8 space-y-2">
+    <div className={cn("mt-8 space-y-2", className)}>
       <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
         Invite
       </p>

@@ -123,6 +123,7 @@ export function Closer() {
   if (state.phase === "setup") {
     return (
       <GameLanding
+        gameId="the_36"
         title="Closer"
         promise="The 36 questions from a 1997 closeness study, in short stoppable stretches. You never have to finish it, and stopping saves your place."
         minutes="≈ 10 min per stretch of 3"

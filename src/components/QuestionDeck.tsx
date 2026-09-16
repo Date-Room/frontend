@@ -131,6 +131,7 @@ export function QuestionDeck() {
   if (state.phase === "setup") {
     return (
       <GameLanding
+        gameId="questions"
         title="Open Book"
         promise="No lists to scroll. You draft topics, each one deals three questions, and the night escalates from warm to close."
         minutes="≈ 45–60 min"

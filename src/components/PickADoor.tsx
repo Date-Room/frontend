@@ -13,6 +13,7 @@ import {
 import { setHelpNow } from "@/lib/activityHelpNow";
 import { prefersReducedMotion, useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { useTypewriter } from "@/lib/stagecraft/typewriter";
+import { GameStage } from "@/lib/stagecraft/GameStage";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
 import { TryCurtain } from "@/components/TryCurtain";
@@ -184,9 +185,7 @@ export function PickADoor() {
         : "The second door";
 
   return (
-    <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in", dimmed ? "dr-stageroom--dim" : ""].join(" ")}>
-      <div className="dr-stageroom-shade" aria-hidden />
-
+    <GameStage gameId="pick_a_door" dimmed={dimmed}>
       <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Round {state.round + 1} of {DOOR_ROUNDS.length} · {round.title}
@@ -319,7 +318,7 @@ export function PickADoor() {
           )}
         </div>
       )}
-    </div>
+    </GameStage>
   );
 }
 

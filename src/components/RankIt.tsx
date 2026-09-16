@@ -15,6 +15,7 @@ import {
 } from "@/lib/activities/rankIt";
 import { useCinematic } from "@/lib/stagecraft/cinematic";
 import { setHelpNow } from "@/lib/activityHelpNow";
+import { GameStage } from "@/lib/stagecraft/GameStage";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
 import { TryCurtain } from "@/components/TryCurtain";
@@ -109,9 +110,7 @@ export function RankIt() {
             : "Where you already agree.";
 
   return (
-    <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in", dimmed && !onBoard ? "dr-stageroom--dim" : ""].join(" ")}>
-      <div className="dr-stageroom-shade" aria-hidden />
-
+    <GameStage gameId="rank_it" dimmed={dimmed && !onBoard}>
       <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Round {state.round + 1} of {RANK_ROUNDS.length} · {round.title}
@@ -176,7 +175,7 @@ export function RankIt() {
           }}
         />
       )}
-    </div>
+    </GameStage>
   );
 }
 

@@ -18,6 +18,7 @@ import { prefersReducedMotion } from "@/lib/stagecraft/cinematic";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
 import { useTypewriter } from "@/lib/stagecraft/typewriter";
 import { setHelpNow } from "@/lib/activityHelpNow";
+import { GameStage } from "@/lib/stagecraft/GameStage";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
 import { TryCurtain } from "@/components/TryCurtain";
@@ -247,9 +248,7 @@ export function TruthOrDare() {
   }
 
   return (
-    <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in", dimmed ? "dr-stageroom--dim" : ""].join(" ")}>
-      <div className="dr-stageroom-shade" aria-hidden />
-
+    <GameStage gameId="truth_or_dare" dimmed={dimmed}>
       <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Card {Math.min(state.turn + 1, TOD_NIGHT_TURNS)} of {TOD_NIGHT_TURNS} · {TOD_HEATS[heat].name}
@@ -404,6 +403,6 @@ export function TruthOrDare() {
           </div>
         )}
       </div>
-    </div>
+    </GameStage>
   );
 }
