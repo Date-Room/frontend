@@ -33,9 +33,8 @@ export function RoomSettings() {
   const row = rooms?.find((r) => r.id === session.roomId);
   const code = row?.code ?? "";
   const pin = row?.pin ?? "";
-  const inviteUrl = row
-    ? `${window.location.origin}/i/${code}/${pin}${row.recap_invite_token ? `#k=${row.recap_invite_token}` : ""}`
-    : "";
+  // No `#k=` recap tail on share links — see PreRoom.inviteUrl.
+  const inviteUrl = row ? `${window.location.origin}/i/${code}/${pin}` : "";
 
   const bgId = custom.backgroundId ?? PLAIN_MOOD;
   const bgOptions = [

@@ -14,14 +14,29 @@ import {
   Volume2,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
 import { SyncScheduler } from "@/lib/realtime/syncScheduler";
+import {
+  extractScUrl,
+  fetchScOEmbed,
+  isScShortLink,
+  loadScApi,
+  scPlayerSrc,
+  type ScWidget,
+} from "@/lib/soundcloud";
+import {
+  SpotifyResolveError,
+  extractSpotifyTrackUrl,
+  resolveSpotifyToYoutube,
+} from "@/lib/spotify";
 import { cn } from "@/lib/utils";
 import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/types/youtubeIframeApi";
 import { extractId, fetchOEmbed, loadYT, type DjTrack, type OEmbed } from "@/components/DJ";
 import { EmptyState } from "@/components/EmptyState";
+import { PlaylistShelf } from "@/components/PlaylistShelf";
 import {
   MusicCtx,
   useMusicRoom,
@@ -105,6 +120,52 @@ export function MusicRoomProvider({
 
   const playerRef = useRef<YoutubeIframeApiPlayer | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // SoundCloud engine — a hidden widget iframe mirroring the hidden YT player.
+  // Position/duration are cached from widget events (its getters are async).
+  const scContainerRef = useRef<HTMLDivElement>(null);
+  const scRef = useRef<{ widget: ScWidget | null; pos: number; dur: number; playing: boolean; url: string | null }>(
+    { widget: null, pos: 0, dur: 0, playing: false, url: null },
+  );
+  const scActive = nowPlaying?.source === "soundcloud";
+  const scUrl = scActive ? (nowPlaying?.sc_url ?? null) : null;
+  const scActiveRef = useRef(scActive);
+  scActiveRef.current = scActive;
+
+  /* Engine facade — every control path goes through these so play/pause/
+     seek/volume land on whichever engine owns the current track. Plain
+     functions reading refs, so event listeners bound once stay fresh. */
+  const engPlay = () => {
+    if (scActiveRef.current) scRef.current.widget?.play();
+    else {
+      playerRef.current?.unMute?.();
+      playerRef.current?.playVideo?.();
+    }
+  };
+  const engPause = () => {
+    if (scActiveRef.current) scRef.current.widget?.pause();
+    else playerRef.current?.pauseVideo?.();
+  };
+  const engSeek = (sec: number) => {
+    if (scActiveRef.current) {
+      scRef.current.widget?.seekTo(Math.max(0, sec) * 1000);
+      scRef.current.pos = Math.max(0, sec);
+    } else playerRef.current?.seekTo?.(Math.max(0, sec), true);
+  };
+  const engSetVolume = (v: number) => {
+    if (scActiveRef.current) scRef.current.widget?.setVolume(v);
+    else {
+      playerRef.current?.setVolume?.(v);
+      if (v === 0) playerRef.current?.mute?.();
+      else playerRef.current?.unMute?.();
+    }
+  };
+  const engTime = (): number =>
+    scActiveRef.current ? scRef.current.pos : (playerRef.current?.getCurrentTime?.() ?? 0);
+  const engIsPlaying = (): boolean => {
+    if (scActiveRef.current) return scRef.current.playing;
+    if (!window.YT || !playerRef.current?.getPlayerState) return false;
+    return playerRef.current.getPlayerState() === window.YT.PlayerState.PLAYING;
+  };
   const suppressUntilRef = useRef(0);
   const suppress = (ms: number) => {
     const until = Date.now() + ms;
@@ -121,17 +182,34 @@ export function MusicRoomProvider({
   const playingRef = useRef(playing);
   playingRef.current = playing;
 
+  // Recovery mode (Safari): when audio is blocked, rebuild the player inside
+  // the now-visible tile — muted, since muted autoplay is always permitted,
+  // with YouTube's native controls so the unmute tap happens INSIDE the
+  // iframe (the only place Safari accepts the gesture). Once unmuted, the
+  // player is kept as-is (recreating it would re-block) and the tile hides.
+  const recoveryRef = useRef(false);
+  const [playerEpoch, setPlayerEpoch] = useState(0);
+  useEffect(() => {
+    if (needsAudioGesture && playing && !scActive && videoId && !recoveryRef.current) {
+      recoveryRef.current = true;
+      try {
+        playerRef.current?.destroy?.();
+      } catch {
+        /* ignore */
+      }
+      playerRef.current = null;
+      setPlayerEpoch((n) => n + 1);
+    }
+  }, [needsAudioGesture, playing, scActive, videoId]);
+
   // Near-perfect resume sync — both sides start on a shared instant.
   const schedulerRef = useRef<SyncScheduler | null>(null);
   const startPlaybackAt = useCallback((videoTime: number) => {
-    const p = playerRef.current;
-    if (!p) return;
     suppress(2500);
     try {
-      p.seekTo?.(videoTime, true);
-      p.unMute?.();
-      p.setVolume?.(volumeRef.current);
-      p.playVideo?.();
+      engSeek(videoTime);
+      engSetVolume(volumeRef.current);
+      engPlay();
     } catch {
       /* ignore */
     }
@@ -194,16 +272,29 @@ export function MusicRoomProvider({
       // removeChild a node YT swapped out → "not a child" crash.
       const mount = document.createElement("div");
       containerRef.current.appendChild(mount);
+      const recovering = recoveryRef.current;
       playerRef.current = new yt.Player(mount, {
+        // Privacy-enhanced host — see WatchTogether: referrer-less embeds
+        // fail with error 153 under Safari's tracking protection.
+        host: "https://www.youtube-nocookie.com",
         videoId: videoId ?? undefined,
-        playerVars: { rel: 0, modestbranding: 1, playsinline: 1, controls: 0, enablejsapi: 1, origin: window.location.origin },
+        playerVars: {
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          // Recovery: YouTube's own chrome carries the in-iframe unmute tap.
+          controls: recovering ? 1 : 0,
+          mute: recovering ? 1 : 0,
+          enablejsapi: 1,
+          origin: window.location.origin,
+        },
         events: {
           onReady: () => {
             try {
               playerRef.current?.setVolume?.(volume);
               if (dTsRef.current) playerRef.current?.seekTo(dTsRef.current, true);
               if (playingRef.current) {
-                playerRef.current?.unMute?.();
+                if (!recoveryRef.current) playerRef.current?.unMute?.();
                 playerRef.current?.playVideo?.();
               } else {
                 // Persisted paused → stay paused on reload (don't autoplay).
@@ -222,7 +313,10 @@ export function MusicRoomProvider({
             }
             if (isSuppressed()) return;
             if (!isControllerRef.current && e.data === PS.UNSTARTED && playing) setNeedsAudioGesture(true);
-            if (e.data === PS.PLAYING) setNeedsAudioGesture(false);
+            if (e.data === PS.PLAYING && playerRef.current?.isMuted?.() !== true) {
+              setNeedsAudioGesture(false);
+              recoveryRef.current = false;
+            }
             if (!isControllerRef.current) return;
             const time = playerRef.current?.getCurrentTime?.() ?? 0;
             if (e.data === PS.PLAYING) {
@@ -246,7 +340,112 @@ export function MusicRoomProvider({
       playerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldMountPlayer, videoId]);
+  }, [shouldMountPlayer, videoId, playerEpoch]);
+
+  // Controller-side state sync, shared by both engines. Kept in a ref so the
+  // SoundCloud widget's once-bound listeners never go stale.
+  const engineStateSyncRef = useRef<(isPlaying: boolean) => void>(() => {});
+  engineStateSyncRef.current = (isPlayingNow: boolean) => {
+    if (isSuppressed()) return;
+    if (!isControllerRef.current) return;
+    const time = engTime();
+    if (isPlayingNow) {
+      void session?.sendEvent("play", { timestamp_seconds: time });
+      persistDj({ playing: true, timestamp_seconds: time, silence: false });
+    } else {
+      void session?.sendEvent("pause", { timestamp_seconds: time });
+      persistDj({ playing: false, timestamp_seconds: time });
+    }
+  };
+
+  // Hidden SoundCloud widget — the SC counterpart of the YT effect above.
+  const shouldMountSc = Boolean(scUrl) && !silence;
+  useEffect(() => {
+    if (!shouldMountSc || !scContainerRef.current || !scUrl) return;
+    let cancelled = false;
+    void loadScApi().then(() => {
+      if (cancelled || !scContainerRef.current) return;
+      const SC = window.SC;
+      if (!SC) return;
+      if (scRef.current.widget) {
+        // Widget already mounted — load the new track into it.
+        if (scRef.current.url !== scUrl) {
+          scRef.current.url = scUrl;
+          scRef.current.pos = 0;
+          scRef.current.widget.load(scUrl, {
+            auto_play: playingRef.current,
+            callback: () => {
+              scRef.current.widget?.setVolume(volumeRef.current);
+              if (dTsRef.current) scRef.current.widget?.seekTo(dTsRef.current * 1000);
+              scRef.current.widget?.getDuration((ms) => {
+                scRef.current.dur = ms / 1000;
+              });
+            },
+          });
+        }
+        return;
+      }
+      const iframe = document.createElement("iframe");
+      iframe.allow = "autoplay";
+      iframe.width = "100%";
+      iframe.height = "100%";
+      iframe.src = scPlayerSrc(scUrl);
+      scContainerRef.current.appendChild(iframe);
+      const w = SC.Widget(iframe);
+      scRef.current.widget = w;
+      scRef.current.url = scUrl;
+      const E = SC.Widget.Events;
+      w.bind(E.READY, () => {
+        w.setVolume(volumeRef.current);
+        if (dTsRef.current) w.seekTo(dTsRef.current * 1000);
+        if (playingRef.current) w.play();
+        w.getDuration((ms) => {
+          scRef.current.dur = ms / 1000;
+        });
+      });
+      w.bind(E.PLAY_PROGRESS, (d) => {
+        const ms = (d as { currentPosition?: number } | undefined)?.currentPosition;
+        if (typeof ms === "number") scRef.current.pos = ms / 1000;
+      });
+      w.bind(E.PLAY, () => {
+        scRef.current.playing = true;
+        setNeedsAudioGesture(false);
+        engineStateSyncRef.current(true);
+      });
+      w.bind(E.PAUSE, () => {
+        scRef.current.playing = false;
+        engineStateSyncRef.current(false);
+      });
+      w.bind(E.FINISH, () => {
+        if (isControllerRef.current) advanceRef.current(true);
+      });
+      w.bind(E.ERROR, () => {
+        // Un-embeddable or removed track — the controller skips it for both.
+        if (isControllerRef.current) advanceRef.current(true);
+      });
+    });
+    return () => {
+      cancelled = true;
+      if (!shouldMountSc || !scUrl) return;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldMountSc, scUrl]);
+
+  // Tear the widget down only when SoundCloud leaves the stage entirely
+  // (track-to-track changes reuse it via widget.load above).
+  useEffect(() => {
+    if (shouldMountSc) return;
+    const sc = scRef.current;
+    if (sc.widget) {
+      try {
+        sc.widget.pause();
+      } catch {
+        /* ignore */
+      }
+      scContainerRef.current?.replaceChildren();
+      scRef.current = { widget: null, pos: 0, dur: 0, playing: false, url: null };
+    }
+  }, [shouldMountSc]);
 
   // Partner playback + queue events.
   useEffect(() => {
@@ -288,29 +487,47 @@ export function MusicRoomProvider({
         if (Array.isArray(nextQueue)) persistDj({ queue: nextQueue });
         return;
       }
-      if (e.type === "play" && p?.playVideo) {
+      if (e.type === "load_list") {
+        // Partner loaded a saved playlist — mirror the whole list at once.
+        if (!room.canPersist) return;
+        const nextQueue = e.payload.queue;
+        const start = (e.payload.start ?? null) as DjTrack | null;
+        if (!Array.isArray(nextQueue)) return;
+        if (start && nowPlaying == null) {
+          persistDj({
+            now_playing: start,
+            queue: nextQueue,
+            playing: true,
+            timestamp_seconds: 0,
+            silence: false,
+          });
+        } else {
+          persistDj({ queue: nextQueue });
+        }
+        return;
+      }
+      if (e.type === "play") {
         suppress(5000);
         try {
-          if (ts != null) p.seekTo(ts, true);
-          p.unMute?.();
-          p.playVideo();
+          if (ts != null) engSeek(ts);
+          engPlay();
         } catch {
           setNeedsAudioGesture(true);
         }
-      } else if (e.type === "pause" && p?.pauseVideo) {
+      } else if (e.type === "pause") {
         suppress(2000);
         try {
-          p.pauseVideo();
-          if (ts != null) p.seekTo(ts, false);
+          engPause();
+          if (ts != null) engSeek(ts);
         } catch {
           /* ignore */
         }
-      } else if ((e.type === "seek" || e.type === "tick") && p?.getCurrentTime && ts != null) {
-        const local = p.getCurrentTime() ?? 0;
+      } else if ((e.type === "seek" || e.type === "tick") && ts != null) {
+        const local = engTime();
         if (Math.abs(ts - local) > 0.8) {
           suppress(1500);
           try {
-            p.seekTo(ts, true);
+            engSeek(ts);
           } catch {
             /* ignore */
           }
@@ -320,14 +537,45 @@ export function MusicRoomProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, userId, room.canPersist, nowPlaying, tracks, currentIdx]);
 
+  // Autoplay watchdog: the play intent is set optimistically, but Safari
+  // blocks unmuted playback started outside a user gesture. If the engine
+  // still isn't running shortly after we meant to play, offer the tap-to-
+  // enable-audio recovery (a real click, so the retry is allowed).
+  useEffect(() => {
+    if (!playing || watchActive) return;
+    const t = window.setTimeout(() => {
+      if (playingRef.current && !engIsPlaying()) setNeedsAudioGesture(true);
+    }, 1800);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, videoId, scUrl, watchActive]);
+
+  // During recovery, watch for the in-iframe unmute — that's the success
+  // signal (PLAYING alone fires for the muted playback too).
+  useEffect(() => {
+    if (!needsAudioGesture) return;
+    const id = setInterval(() => {
+      if (!recoveryRef.current || scActiveRef.current) return;
+      const p = playerRef.current;
+      if (p?.isMuted?.() === false) {
+        recoveryRef.current = false;
+        setNeedsAudioGesture(false);
+        try {
+          p.setVolume?.(volumeRef.current);
+        } catch {
+          /* ignore */
+        }
+      }
+    }, 400);
+    return () => clearInterval(id);
+  }, [needsAudioGesture]);
+
   // Drift heartbeat — only the current controller emits.
   useEffect(() => {
     if (!isController || !playing) return;
     const id = setInterval(() => {
-      const p = playerRef.current;
-      if (!p?.getCurrentTime || !window.YT) return;
-      if (p.getPlayerState?.() !== window.YT.PlayerState.PLAYING) return;
-      void session?.sendEvent("tick", { timestamp_seconds: p.getCurrentTime() ?? 0 });
+      if (!engIsPlaying()) return;
+      void session?.sendEvent("tick", { timestamp_seconds: engTime() });
     }, 1500);
     return () => clearInterval(id);
   }, [isController, playing, session]);
@@ -347,18 +595,15 @@ export function MusicRoomProvider({
   // the music player from decoding entirely. suppress() keeps this local pause
   // from broadcasting to the partner; onReady/drift resync on resume.
   useEffect(() => {
-    const p = playerRef.current;
-    if (!p) return;
     try {
       if (watchActive) {
         suppress(2000);
-        p.pauseVideo?.();
+        engPause();
       } else if (playingRef.current) {
         suppress(2000);
-        if (dTsRef.current) p.seekTo(dTsRef.current, true);
-        p.unMute?.();
-        p.setVolume?.(volume);
-        p.playVideo?.();
+        if (dTsRef.current) engSeek(dTsRef.current);
+        engSetVolume(volume);
+        engPlay();
       }
     } catch {
       /* ignore */
@@ -405,6 +650,45 @@ export function MusicRoomProvider({
     [session, userId, nowPlaying, tracks],
   );
 
+  // SoundCloud counterpart of playId — tracks are addressed by URL. Metadata
+  // (title/artist/artwork) lands via oEmbed once known, same as YouTube.
+  const playScUrl = useCallback(
+    (trackUrl: string) => {
+      const track: DjTrack = {
+        id: crypto.randomUUID(),
+        title: "Loading…",
+        added_by: userId,
+        channel_title: null,
+        video_id: null,
+        source: "soundcloud",
+        sc_url: trackUrl,
+      };
+      const list = [...tracks, track];
+      const recap = {
+        event_type: "queued_track",
+        payload: { text: trackUrl.replace(/^https:\/\//, "") },
+      };
+      void session?.sendEvent("enqueue", { track });
+      if (nowPlaying != null) {
+        persistDj({ queue: list }, recap);
+      } else {
+        void session?.sendEvent("play", { timestamp_seconds: 0 });
+        persistDj({ now_playing: track, queue: list, playing: true, timestamp_seconds: 0, silence: false }, recap);
+      }
+      void fetchScOEmbed(trackUrl).then((m) => {
+        if (!m) return;
+        const patch = (t: DjTrack) =>
+          t.id === track.id
+            ? { ...t, title: m.title, channel_title: m.author_name, thumb_url: m.thumbnail_url ?? undefined }
+            : t;
+        persistDj({ queue: list.map(patch) });
+        if (nowPlaying == null) persistDj({ now_playing: patch(track), queue: list.map(patch) });
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [session, userId, nowPlaying, tracks],
+  );
+
   // Advance to the next song in the list (no consume). `auto` honours repeat-one
   // by replaying; repeat-all wraps to the top.
   const advance = useCallback(
@@ -414,8 +698,8 @@ export function MusicRoomProvider({
         persistDj({ playing: true, timestamp_seconds: 0 });
         suppress(4000);
         try {
-          playerRef.current?.seekTo?.(0, true);
-          playerRef.current?.playVideo?.();
+          engSeek(0);
+          engPlay();
         } catch {
           /* ignore */
         }
@@ -469,14 +753,14 @@ export function MusicRoomProvider({
   );
 
   const togglePlayPause = useCallback(() => {
-    if (!videoId) return;
-    const time = playerRef.current?.getCurrentTime?.() ?? dTsRef.current;
+    if (!videoId && !scActive) return;
+    const time = engTime() || dTsRef.current;
     if (playing) {
       void session?.sendEvent("pause", { timestamp_seconds: time });
       persistDj({ playing: false, timestamp_seconds: time });
       suppress(2000);
       try {
-        playerRef.current?.pauseVideo?.();
+        engPause();
       } catch {
         /* ignore */
       }
@@ -490,23 +774,21 @@ export function MusicRoomProvider({
         void session?.sendEvent("play", { timestamp_seconds: time });
         suppress(5000);
         try {
-          playerRef.current?.unMute?.();
-          playerRef.current?.playVideo?.();
+          engPlay();
         } catch {
           /* ignore */
         }
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoId, playing, session, persistDj, startPlaybackAt]);
+  }, [videoId, scActive, playing, session, persistDj, startPlaybackAt]);
 
   const restartCurrent = useCallback(() => {
-    if (!videoId) return;
+    if (!videoId && !scActive) return;
     suppress(4000);
     try {
-      playerRef.current?.seekTo?.(0, true);
-      playerRef.current?.unMute?.();
-      playerRef.current?.playVideo?.();
+      engSeek(0);
+      engPlay();
     } catch {
       /* ignore */
     }
@@ -514,12 +796,12 @@ export function MusicRoomProvider({
     persistDj({ playing: true, timestamp_seconds: 0 });
     setPosition(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [videoId, session, persistDj]);
+  }, [videoId, scActive, session, persistDj]);
 
   // Back: within the first few seconds (and a previous song exists) → play the
   // previous song; otherwise restart the current one.
   const previous = useCallback(() => {
-    const pos = playerRef.current?.getCurrentTime?.() ?? 0;
+    const pos = engTime();
     const prevTrack = currentIdx > 0 ? tracks[currentIdx - 1] : null;
     if (prevTrack && pos < 3) {
       playTrack(prevTrack.id);
@@ -530,7 +812,7 @@ export function MusicRoomProvider({
 
   const stop = useCallback(() => {
     try {
-      playerRef.current?.pauseVideo?.();
+      engPause();
     } catch {
       /* ignore */
     }
@@ -545,7 +827,7 @@ export function MusicRoomProvider({
   const close = useCallback(() => {
     suppress(4000);
     try {
-      playerRef.current?.pauseVideo?.();
+      engPause();
     } catch {
       /* ignore */
     }
@@ -554,13 +836,15 @@ export function MusicRoomProvider({
 
   const enableAudio = useCallback(() => {
     try {
-      playerRef.current?.unMute?.();
-      playerRef.current?.setVolume?.(volume);
-      playerRef.current?.playVideo?.();
+      engSetVolume(volume);
+      engPlay();
     } catch {
       /* ignore */
     }
-    setNeedsAudioGesture(false);
+    // Deliberately NOT clearing needsAudioGesture here: the engines' PLAYING
+    // events do that. Clearing on the press hid the recovery tile while the
+    // retry was still blocked (Safari), leaving silence with no way out.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [volume]);
 
   const removeTrack = useCallback(
@@ -599,6 +883,47 @@ export function MusicRoomProvider({
     },
     [persistDj, tracks, session],
   );
+  // A saved playlist lands as ONE list write (per-track enqueues would race
+  // each other's queue snapshots). Already-queued videos are skipped; if
+  // nothing is playing, the first fresh track starts.
+  const loadPlaylist = useCallback(
+    (incoming: DjTrack[]) => {
+      const keyOf = (t: DjTrack) => t.video_id ?? t.sc_url ?? null;
+      const have = new Set(tracks.map(keyOf).filter(Boolean));
+      if (nowPlaying) have.add(keyOf(nowPlaying));
+      const fresh = incoming.filter((t) => keyOf(t) && !have.has(keyOf(t)));
+      if (fresh.length === 0) return;
+      const list = [...tracks, ...fresh];
+      const start = nowPlaying == null ? fresh[0] : null;
+      void session?.sendEvent("load_list", { queue: list, start });
+      const recap = {
+        event_type: "queued_track",
+        payload: { text: `${fresh.length} song${fresh.length === 1 ? "" : "s"} from a saved playlist` },
+      };
+      if (start) {
+        persistDj(
+          { now_playing: start, queue: list, playing: true, timestamp_seconds: 0, silence: false },
+          recap,
+        );
+      } else {
+        persistDj({ queue: list }, recap);
+      }
+      // Backfill titles for tracks the library saved without one.
+      for (const t of fresh) {
+        if (t.title !== "Loading…" || !t.video_id) continue;
+        void fetchOEmbed(t.video_id).then((m) => {
+          if (m) {
+            persistDj({
+              queue: list.map((x) =>
+                x.id === t.id ? { ...x, title: m.title, channel_title: m.author_name } : x,
+              ),
+            });
+          }
+        });
+      }
+    },
+    [persistDj, tracks, nowPlaying, session],
+  );
 
   useEffect(() => {
     const p = playerRef.current;
@@ -611,19 +936,24 @@ export function MusicRoomProvider({
     }
   }, [volume]);
 
-  // Position / duration for the progress bar.
+  // Position / duration for the progress bar (either engine).
   useEffect(() => {
-    if (!shouldMountPlayer) {
+    if (!shouldMountPlayer && !shouldMountSc) {
       setPosition(0);
       setDuration(0);
       return;
     }
     const id = setInterval(() => {
-      const p = playerRef.current as
-        | (YoutubeIframeApiPlayer & { getDuration?: () => number })
-        | null;
-      if (!p?.getCurrentTime) return;
       try {
+        if (scActiveRef.current) {
+          setPosition(scRef.current.pos);
+          if (scRef.current.dur) setDuration(scRef.current.dur);
+          return;
+        }
+        const p = playerRef.current as
+          | (YoutubeIframeApiPlayer & { getDuration?: () => number })
+          | null;
+        if (!p?.getCurrentTime) return;
         setPosition(p.getCurrentTime() ?? 0);
         const d = p.getDuration?.() ?? 0;
         if (d) setDuration(d);
@@ -632,7 +962,7 @@ export function MusicRoomProvider({
       }
     }, 500);
     return () => clearInterval(id);
-  }, [shouldMountPlayer, videoId]);
+  }, [shouldMountPlayer, shouldMountSc, videoId, scUrl]);
 
   const seekFraction = useCallback(
     (f: number) => {
@@ -658,7 +988,9 @@ export function MusicRoomProvider({
 
   const trackTitle = meta?.title ?? nowPlaying?.title ?? null;
   const trackChannel = meta?.author_name ?? nowPlaying?.channel_title ?? null;
-  const thumb = videoId ? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg` : null;
+  const thumb =
+    nowPlaying?.thumb_url ??
+    (videoId ? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg` : null);
 
   const value: MusicCtxValue = {
     nowPlaying,
@@ -682,6 +1014,7 @@ export function MusicRoomProvider({
     enableAudio,
     reactions,
     playId,
+    playScUrl,
     playTrack,
     togglePlayPause,
     restartCurrent,
@@ -690,6 +1023,7 @@ export function MusicRoomProvider({
     next,
     removeTrack,
     reorderTracks,
+    loadPlaylist,
     clearQueue,
     close,
     closed,
@@ -700,12 +1034,46 @@ export function MusicRoomProvider({
     <MusicCtx.Provider value={value}>
       {children}
       {shouldMountPlayer && (
+        /* Normally invisible. When Safari blocks audio, the player becomes a
+           small visible tile: a parent-page click can't carry user activation
+           into a cross-origin iframe (postMessage retries stay blocked), but
+           a tap ON the video itself is a gesture inside the iframe — YouTube
+           plays with sound, PLAYING fires, and the tile tucks away again. */
+        <div
+          className={
+            needsAudioGesture && playing
+              ? "dr-sound-tile fixed bottom-24 left-3 z-[80] overflow-hidden rounded-xl border-2 shadow-2xl animate-fade-in"
+              : "pointer-events-none fixed bottom-2 right-2"
+          }
+          style={
+            needsAudioGesture && playing
+              ? { width: 280, height: 158, borderColor: "var(--room-accent)" }
+              : { width: 320, height: 180, opacity: 0.001, zIndex: -1 }
+          }
+          aria-hidden={!(needsAudioGesture && playing)}
+        >
+          <div
+            ref={containerRef}
+            className="[&_iframe]:!h-full [&_iframe]:!w-full"
+            style={{ width: "100%", height: "100%" }}
+          />
+          {needsAudioGesture && playing && (
+            /* Below the video: YouTube's MINI layout puts its controls (and
+               the speaker button) along the TOP edge — live-tested: a top
+               caption covered the very button it pointed at. */
+            <p className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/75 px-2 py-1.5 text-center text-[11px] font-medium text-cream">
+              Tap the speaker icon to unmute
+            </p>
+          )}
+        </div>
+      )}
+      {shouldMountSc && (
         <div
           className="pointer-events-none fixed bottom-2 right-2"
           style={{ width: 320, height: 180, opacity: 0.001, zIndex: -1 }}
           aria-hidden
         >
-          <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
+          <div ref={scContainerRef} style={{ width: "100%", height: "100%" }} />
         </div>
       )}
     </MusicCtx.Provider>
@@ -716,8 +1084,10 @@ export function MusicRoomProvider({
 
 export function MusicLibrary() {
   const m = useMusicRoom();
+  const room = useRoomSession();
   const [url, setUrl] = useState("");
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [overIdx, setOverIdx] = useState<number | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -725,13 +1095,43 @@ export function MusicLibrary() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const id = extractId(url.trim());
-    if (!id) {
-      setUrlError("Drop a YouTube link.");
+    const raw = url.trim();
+    const id = extractId(raw);
+    const sc = id ? null : extractScUrl(raw);
+    const spotify = id || sc ? null : extractSpotifyTrackUrl(raw);
+    if (spotify) {
+      // Spotify plays through YouTube: resolve the same song, then queue it.
+      setUrlError(null);
+      setResolving(true);
+      void resolveSpotifyToYoutube(spotify)
+        .then((hit) => {
+          m.playId(hit.video_id);
+          toast.success(`Queued "${hit.yt_title}" for your Spotify link.`);
+          setUrl("");
+          setAdding(false);
+        })
+        .catch((err) => {
+          const reason = err instanceof SpotifyResolveError ? err.reason : null;
+          setUrlError(
+            reason === "search-unavailable"
+              ? "Song lookup is down right now — paste the YouTube link for it instead."
+              : "Couldn't match that Spotify song. Paste its YouTube link instead.",
+          );
+        })
+        .finally(() => setResolving(false));
+      return;
+    }
+    if (!id && !sc) {
+      setUrlError(
+        isScShortLink(raw)
+          ? "That's a SoundCloud share link — open it and paste the full soundcloud.com track URL."
+          : "Drop a YouTube, SoundCloud or Spotify link.",
+      );
       return;
     }
     setUrlError(null);
-    m.playId(id);
+    if (id) m.playId(id);
+    else if (sc) m.playScUrl(sc);
     setUrl("");
     setAdding(false);
   };
@@ -762,16 +1162,17 @@ export function MusicLibrary() {
             autoFocus
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="Paste a YouTube link…"
+            placeholder="Paste a YouTube, SoundCloud or Spotify link…"
             className="focus-ring bg-secondary/60 border-white/[0.10] focus-visible:border-primary/40"
           />
           {urlError && <p className="px-1 text-xs text-rose">{urlError}</p>}
           <button
             type="submit"
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+            disabled={resolving}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
             style={{ backgroundColor: "var(--room-accent)" }}
           >
-            <Plus className="h-4 w-4" /> Add song
+            <Plus className="h-4 w-4" /> {resolving ? "Finding it…" : "Add song"}
           </button>
         </form>
       </div>
@@ -787,6 +1188,7 @@ export function MusicLibrary() {
               {m.tracks.length} song{m.tracks.length === 1 ? "" : "s"} · drag to reorder
             </p>
             <div className="flex items-center gap-3">
+              <PlaylistShelf tracks={m.tracks} senderId={room.senderId} onLoad={m.loadPlaylist} />
               <button
                 type="button"
                 onClick={() => setConfirmClear(true)}
@@ -841,7 +1243,13 @@ export function MusicLibrary() {
           </ul>
         </div>
       ) : (
-        <EmptyState variant="music" title="Music" onAdd={() => setAdding(true)} addLabel="Add a song" />
+        <div className="flex flex-1 flex-col">
+          <div className="flex justify-end px-1">
+            {/* An empty room is exactly where a saved playlist matters most. */}
+            <PlaylistShelf tracks={m.tracks} senderId={room.senderId} onLoad={m.loadPlaylist} />
+          </div>
+          <EmptyState variant="music" title="Music" onAdd={() => setAdding(true)} addLabel="Add a song" />
+        </div>
       )}
 
       {confirmClear && (
@@ -904,7 +1312,9 @@ function LibraryRow({
   onPlay?: () => void;
   onRemove?: () => void;
 }) {
-  const thumb = track.video_id ? `https://i.ytimg.com/vi/${track.video_id}/mqdefault.jpg` : null;
+  const thumb =
+    track.thumb_url ??
+    (track.video_id ? `https://i.ytimg.com/vi/${track.video_id}/mqdefault.jpg` : null);
   return (
     <div
       className={cn(
@@ -1030,7 +1440,7 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
           <button
             type="button"
             onClick={m.previous}
-            disabled={!m.videoId}
+            disabled={!m.nowPlaying}
             aria-label="Previous / restart"
             className="flex h-9 w-9 items-center justify-center rounded-full text-cream transition hover:bg-white/10 disabled:opacity-40"
           >
@@ -1039,7 +1449,7 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
           <button
             type="button"
             onClick={m.togglePlayPause}
-            disabled={!m.videoId}
+            disabled={!m.nowPlaying}
             aria-label={m.playing ? "Pause" : "Play"}
             className="flex h-9 w-9 items-center justify-center rounded-full text-primary-foreground transition hover:brightness-105 active:scale-95 disabled:opacity-40"
             style={{ backgroundColor: "var(--room-accent)" }}
@@ -1049,7 +1459,7 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
           <button
             type="button"
             onClick={m.next}
-            disabled={!m.videoId}
+            disabled={!m.nowPlaying}
             aria-label="Next"
             className="flex h-9 w-9 items-center justify-center rounded-full text-cream transition hover:bg-white/10 disabled:opacity-40"
           >
@@ -1071,7 +1481,7 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
           {m.repeat === "one" ? <Repeat1 className="h-[18px] w-[18px]" /> : <Repeat className="h-[18px] w-[18px]" />}
         </button>
 
-        {m.videoId && (
+        {m.nowPlaying && (
           <div className="hidden shrink-0 items-center gap-2 pl-1 sm:flex">
             <Volume2 className="h-4 w-4 text-muted-foreground" />
             <input
@@ -1113,13 +1523,22 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
       </button>
 
       {m.needsAudioGesture && m.playing && (
-        <button
-          onClick={m.enableAudio}
-          className="mt-1.5 w-full rounded-full py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
-          style={{ backgroundColor: "var(--room-accent)" }}
-        >
-          Tap to enable audio
-        </button>
+        m.nowPlaying?.source === "soundcloud" ? (
+          <button
+            onClick={m.enableAudio}
+            className="mt-1.5 w-full rounded-full py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+            style={{ backgroundColor: "var(--room-accent)" }}
+          >
+            Tap to enable audio
+          </button>
+        ) : (
+          <p
+            className="mt-1.5 w-full rounded-full py-1.5 text-center text-xs font-medium"
+            style={{ backgroundColor: "color-mix(in srgb, var(--room-accent) 18%, transparent)", color: "var(--room-accent)" }}
+          >
+            Sound is blocked — unmute the small video, bottom left ↙
+          </p>
+        )
       )}
     </div>
   );

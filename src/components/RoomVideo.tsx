@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -8,25 +8,34 @@ import {
   useLocalParticipant,
   useIsSpeaking,
   useRoomContext,
+  isTrackReference,
 } from "@livekit/components-react";
-import { Track, DisconnectReason, RoomEvent, VideoPresets, type RoomOptions } from "livekit-client";
+import { Track, DisconnectReason, RoomEvent, VideoPresets, setLogLevel, type RoomOptions } from "livekit-client";
 import { toast } from "sonner";
 import "@livekit/components-styles";
 import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Maximize2, Minimize2, Minus, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AmbientController } from "@/components/AmbientController";
 import { ChaperonAgentBridge } from "@/components/ChaperonAgentBridge";
+import { CallPeersBridge } from "@/context/CallPeersContext";
 import { DeviceMenu, DeviceChangeToaster } from "@/components/DeviceMenu";
 import { loadDevicePreference } from "@/lib/devices";
 import { getInvitedGuestName } from "@/lib/invitedGuest";
 import { livekitToken } from "@/lib/rooms";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
+import { partnerFromPresence } from "@/lib/stagecraft/usePartnerName";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import type { PresenceState } from "@/lib/realtime/roomChannel";
 
 // Adaptive stream + dynacast let LiveKit stop sending layers nobody is
 // watching; simulcast gives ambient mode a defined "lowest" layer to fall
 // back to. Stable reference so the Room isn't reconfigured on re-render.
+// Info-level livekit logs ("already connected to room …") flooded the
+// console once a second — connect re-attempts from re-renders, each a
+// guarded no-op. Handlers below are memoized to stop the churn at the
+// source; warnings and errors still surface.
+setLogLevel("warn");
+
 const LIVEKIT_ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
   dynacast: true,
@@ -43,20 +52,9 @@ function partnerNameFromPresence(
   senderId: string,
   roomId: string,
 ): { name: string; photoUrl: string | null } {
-  const entry = presence.find((p) => {
-    const sid =
-      (typeof p.sender_id === "string" && p.sender_id) ||
-      (typeof p.user_id === "string" && p.user_id) ||
-      "";
-    return Boolean(sid) && sid !== senderId;
-  });
-  const fromPresence =
-    (typeof entry?.name === "string" && entry.name) ||
-    (typeof entry?.display_name === "string" && entry.display_name) ||
-    null;
-  const photoUrl = (typeof entry?.photo_url === "string" && entry.photo_url) || null;
+  const p = partnerFromPresence(presence, senderId);
   const invited = getInvitedGuestName(roomId);
-  return { name: fromPresence || invited || "Partner", photoUrl };
+  return { name: p.full || invited || "Partner", photoUrl: p.photoUrl };
 }
 
 type FloatingReaction = { id: string; emoji: string; left: number };
@@ -114,11 +112,22 @@ function sendReaction(emoji: string) {
   window.dispatchEvent(new CustomEvent("dr-react", { detail: emoji }));
 }
 
-/** Composite the two on-screen videos into a framed keepsake (mobile parity). */
+/** "joshua mwaniki" → "Joshua" — keepsake footers get tidy first names. */
+function keepsakeName(raw: string): string {
+  const first = raw.trim().split(/\s+/)[0] ?? "";
+  return first ? first.charAt(0).toUpperCase() + first.slice(1) : "";
+}
+
+/** Composite the on-screen video(s) into a framed keepsake (mobile parity).
+ *  The photo never leaves the device — it renders to a canvas and saves
+ *  straight to the user's downloads; nothing is uploaded.
+ *  `partnerName: null` means you're alone: one centered tile, your name only
+ *  (live-tested: the two-tile layout drew an empty frame and a literal
+ *  "Partner" when someone captured solo). */
 function capturePhoto(
   partnerEl: HTMLVideoElement | null,
   selfEl: HTMLVideoElement | null,
-  partnerName: string,
+  partnerName: string | null,
   selfName: string,
 ) {
   const S = 1080;
@@ -147,9 +156,11 @@ function capturePhoto(
   }
   ctx.restore();
 
+  const solo = partnerName == null;
   const pad = 28;
   const gap = 16;
-  const w = (S - pad * 2 - gap) / 2;
+  // Solo keepsakes get one generous centered tile instead of a half-empty pair.
+  const w = solo ? Math.round(S * 0.62) : (S - pad * 2 - gap) / 2;
   const h = S - pad * 2 - 110; // leave a footer band
   const y = pad;
 
@@ -187,14 +198,21 @@ function capturePhoto(
     ctx.stroke();
   };
 
-  drawTile(partnerEl, pad, false);
-  drawTile(selfEl, pad + w + gap, true);
+  if (solo) {
+    drawTile(selfEl ?? partnerEl, Math.round((S - w) / 2), true);
+  } else {
+    drawTile(partnerEl, pad, false);
+    drawTile(selfEl, pad + w + gap, true);
+  }
 
-  // Footer: names + date.
+  // Footer: first name(s) + date.
+  const footer = solo
+    ? `${keepsakeName(selfName)}  ♥`
+    : `${keepsakeName(partnerName)} & ${keepsakeName(selfName)}  ♥`;
   ctx.textAlign = "center";
   ctx.fillStyle = "rgba(255,236,210,0.92)";
   ctx.font = "italic 40px Georgia, serif";
-  ctx.fillText(`${partnerName} & ${selfName}  ♥`, S / 2, S - 56);
+  ctx.fillText(footer, S / 2, S - 56);
   ctx.fillStyle = "rgba(255,236,210,0.5)";
   ctx.font = "22px Georgia, serif";
   ctx.fillText(new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }), S / 2, S - 24);
@@ -273,13 +291,18 @@ function Tile({
   /** Show the whole camera frame (no crop) so both sides see the same thing. */
   contain?: boolean;
 }) {
-  const cameraOff = !participant || participant.publication?.isMuted;
+  // A placeholder ref (no publication yet) can't feed <VideoTrack> — treat it
+  // like a muted camera and show the avatar instead.
+  const videoTrackRef =
+    participant && isTrackReference(participant) && !participant.publication.isMuted
+      ? participant
+      : undefined;
   const lowPower = useLowPowerMode();
   return (
     <div className="relative w-full h-full overflow-hidden rounded-2xl bg-black border border-white/[0.08]"
       style={{ boxShadow: "0 12px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)" }}
     >
-      {cameraOff || !participant ? (
+      {!videoTrackRef ? (
         participant ? (
           <SpeakingAvatar trackRef={participant} label={label} />
         ) : (
@@ -290,7 +313,7 @@ function Tile({
       ) : (
         <>
           <VideoTrack
-            trackRef={participant}
+            trackRef={videoTrackRef}
             className={`w-full h-full ${contain ? "object-contain" : "object-cover"} ${isLocal ? "scale-x-[-1]" : ""}`}
             style={{ filter: lowPower ? LITE_CSS : BEAUTY_CSS }}
           />
@@ -401,6 +424,15 @@ function Stage({
     [room.presence, room.senderId, room.roomId],
   );
 
+  // The capture listener below subscribes once per channel, so anything the
+  // shot needs at fire time is read through refs — the old closure captured
+  // first-render presence/tracks and could stamp a stale (or missing)
+  // partner name onto the keepsake.
+  const presenceRef = useRef(room.presence);
+  presenceRef.current = room.presence;
+  const hasPartnerRef = useRef(remotes.length > 0);
+  hasPartnerRef.current = remotes.length > 0;
+
   function scheduleCapture(at: number) {
     const tick = () => {
       const left = Math.ceil((at - Date.now()) / 1000);
@@ -409,13 +441,16 @@ function Stage({
         window.setTimeout(tick, 250);
       } else {
         setCountdown(null);
-        const pName = partnerNameFromPresence(room.presence, room.senderId, room.roomId).name;
-        capturePhoto(
-          partnerWrapRef.current?.querySelector("video") ?? null,
-          selfWrapRef.current?.querySelector("video") ?? null,
-          pName,
-          room.displayName || "You",
-        );
+        const partnerVid = partnerWrapRef.current?.querySelector("video") ?? null;
+        const selfVid = selfWrapRef.current?.querySelector("video") ?? null;
+        if (hasPartnerRef.current) {
+          const pName = partnerNameFromPresence(presenceRef.current, room.senderId, room.roomId).name;
+          capturePhoto(partnerVid, selfVid, pName, room.displayName || "You");
+        } else {
+          // Alone in the room — a solo keepsake, no empty partner frame.
+          // (In the PiP layout the only video lives in the partner slot.)
+          capturePhoto(null, selfVid ?? partnerVid, null, room.displayName || "You");
+        }
       }
     };
     tick();
@@ -435,6 +470,16 @@ function Stage({
     void room.channel.broadcast("capture", { capture_at: at, from: room.senderId });
     scheduleCapture(at);
   }
+
+  // The lobby's Photo Booth tile fires this — same synced 3-2-1 as the
+  // camera button on the call controls.
+  const startCaptureRef = useRef(startCapture);
+  startCaptureRef.current = startCapture;
+  useEffect(() => {
+    const onBooth = () => startCaptureRef.current();
+    window.addEventListener("dr:booth:capture", onBooth);
+    return () => window.removeEventListener("dr:booth:capture", onBooth);
+  }, []);
 
   // Total tile count: self + remotes (or self + 1 placeholder when alone)
   const tileCount = 1 + Math.max(1, remotes.length);
@@ -741,6 +786,28 @@ export function RoomVideo({
     };
   }, []);
 
+  // Stable handler identities: inline arrows re-trigger LiveKitRoom's
+  // internal connect effect on every parent re-render (the once-a-second
+  // "already connected" churn).
+  const onLkError = useCallback((e: Error) => {
+    toast.error(e instanceof Error ? e.message : "Call error.");
+  }, []);
+  const onLkDeviceFailure = useCallback((failure?: unknown) => {
+    toast.error(
+      failure ? `Microphone/camera blocked (${String(failure)}).` : "Microphone/camera unavailable.",
+    );
+  }, []);
+  const onLkDisconnected = useCallback(
+    (reason?: DisconnectReason) => {
+      if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
+        toast.message("Call moved to your other device.");
+        onLeave?.();
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onLeave],
+  );
+
   if (error) {
     return <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">{error}</div>;
   }
@@ -762,27 +829,14 @@ export function RoomVideo({
       options={roomOptions}
       data-lk-theme="default"
       className="relative h-full w-full"
-      onError={(e) => {
-        // Surface connect/publish errors instead of silently swallowing them.
-        toast.error(e instanceof Error ? e.message : "Call error.");
-      }}
-      onMediaDeviceFailure={(failure) => {
-        toast.error(
-          failure ? `Microphone/camera blocked (${failure}).` : "Microphone/camera unavailable.",
-        );
-      }}
-      onDisconnected={(reason) => {
-        // Only one device per user per room — joining elsewhere takes over the
-        // call stream, so this (older) device leaves cleanly.
-        if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
-          toast.message("Call moved to your other device.");
-          onLeave?.();
-        }
-      }}
+      onError={onLkError}
+      onMediaDeviceFailure={onLkDeviceFailure}
+      onDisconnected={onLkDisconnected}
     >
       <MicKeepAlive />
       <AmbientController />
       <ChaperonAgentBridge />
+      <CallPeersBridge />
       <DeviceChangeToaster />
       <Stage
         onLeave={onLeave ?? (() => {})}

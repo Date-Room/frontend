@@ -148,7 +148,7 @@
     "hero": {
       "eyebrow": "Avant le numéro de téléphone",
       "title": "Rencontrez-les avant\nde les rencontrer.",
-      "subtitle": "Une salle privée que vous partagez avec un code à six chiffres. Aucun numéro de téléphone. Aucun échange gênant. Juste assez pour savoir si ça vaut le coup de se voir en vrai.",
+      "subtitle": "Une salle privée partagée avec un code à six chiffres. Aucun numéro. Juste assez pour savoir si ça vaut le coup.",
       "tagline": "Pas un appel vidéo. Un rendez-vous.",
       "create": "Créez votre salle",
       "seeHow": "Voir comment ça marche",
@@ -158,8 +158,9 @@
     "why": {
       "eyebrow": "Pourquoi DateRoom existe",
       "title": "Les rencontres coûtent cher.\nÀ tous les niveaux.",
-      "p1": "Un premier rendez-vous coûte désormais cent euros avant même le deuxième verre. Et le prix de l'erreur est encore plus élevé : un numéro que vous ne pouvez pas reprendre, des messages qui ne s'arrêtent jamais, un inconnu qui sait où vous trouver.",
-      "p2": "Il devrait exister une étape entre le match et la rencontre. Une plus sûre. Elle n'existait pas. Maintenant, si."
+      "p1": "Un premier rendez-vous coûte désormais cent euros avant même le deuxième verre. Et le prix de l'erreur est encore plus élevé : un numéro que vous ne pouvez pas reprendre.",
+      "p2": "Il devrait exister une étape entre le match et la rencontre. Une plus sûre. Il n'y en avait pas. Maintenant, si.",
+      "bridge": "Une salle. Compatible avec toutes les applis de rencontre."
     },
     "how": {
       "eyebrow": "Comment ça marche",
@@ -255,7 +256,9 @@
       "togetherCta": "Ouvrir À deux",
       "crewName": "Bande",
       "crewDesc": "Soirées cinéma, soirées jeux, clubs de lecture. Soirée cinéma de groupe jusqu'à 5 personnes.",
-      "crewCta": "Ouvrir Bande"
+      "crewCta": "Ouvrir Bande",
+      "sessionsLabel": "Packs de sessions — payez quand vous vous voyez",
+      "subscriptionsLabel": "Des salles qui restent ouvertes"
     },
     "badges": {
       "tagline": "Bientôt dans votre poche.",
@@ -288,6 +291,29 @@
       "connect": "Nous suivre",
       "connectContact": "Contact",
       "copyright": "© DateRoom, {{year}}."
+    },
+    "modes": {
+      "eyebrow": "Choisissez une salle",
+      "title": "Trois façons de rester proches.",
+      "subtitle": "Un premier rendez-vous, une salle qui reste ouverte, ou une soirée entre vous.",
+      "date": {
+        "eyebrow": "Premiers rendez-vous",
+        "title": "La salle avant le numéro.",
+        "body": "Glissez un code à six chiffres dans n'importe quel DM. Vingt minutes ou deux heures. La salle disparaît quand vous avez fini.",
+        "cta": "Créer une salle de date"
+      },
+      "together": {
+        "eyebrow": "Déjà à vous ?",
+        "title": "Une salle qui reste ouverte.",
+        "body": "Villes différentes, nuits tardives, enfants partout. Épinglez un tableau de vision. Laissez des mots. Regardez ensemble depuis deux fuseaux.",
+        "cta": "Ouvrir une salle Together"
+      },
+      "crew": {
+        "eyebrow": "Ou réunissez le groupe",
+        "title": "Plus proches que la boucle de groupe.",
+        "body": "Jusqu'à cinq. Soirées film, le jeu de cartes, le DJ. La boucle de groupe — mais vous vous voyez vraiment.",
+        "cta": "Ouvrir une salle entre amis"
+      }
     }
   }
 }

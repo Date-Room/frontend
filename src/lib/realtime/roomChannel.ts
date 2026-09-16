@@ -38,6 +38,8 @@ export type PresenceState = Record<string, unknown>;
 type BroadcastListener = (e: BroadcastEvent) => void;
 type DurableListener = (u: DurableUpdate) => void;
 type PresenceListener = (states: PresenceState[]) => void;
+type StatusListener = (status: string) => void;
+type ReconnectListener = () => void;
 
 type Outbound =
   | { type: "broadcast"; event: string; payload: Record<string, unknown> }
@@ -55,7 +57,14 @@ type Inbound =
   | { type: "error"; code: string; message: string };
 
 const MAX_BACKOFF_MS = 30_000;
-const PING_INTERVAL_MS = 25_000;
+// Liveness. A flaky link often leaves the socket half-open: the browser
+// still reports OPEN, sends vanish, and no `close` ever fires — so nothing
+// would reconnect and nothing would re-sync (live-tested: a game stayed
+// dead for its whole length). Every inbound message counts as liveness;
+// if a ping goes unanswered past the grace, we declare the socket a zombie,
+// tear it down ourselves and reconnect. Worst-case detection ≈ 23s.
+const PING_INTERVAL_MS = 15_000;
+const PONG_GRACE_MS = 8_000;
 
 export class RoomChannel {
   readonly roomId: string;
@@ -68,6 +77,10 @@ export class RoomChannel {
   private readonly broadcastListeners = new Set<BroadcastListener>();
   private readonly durableListeners = new Set<DurableListener>();
   private readonly presenceListeners = new Set<PresenceListener>();
+  private readonly statusListeners = new Set<StatusListener>();
+  private readonly reconnectListeners = new Set<ReconnectListener>();
+  /** How many `ready`s we've seen — the second and later are reconnects. */
+  private readyCount = 0;
 
   /** Subscriber-id → state. Rebuilt from presence.sync/join/leave. */
   private presence: Record<string, PresenceState> = {};
@@ -77,6 +90,8 @@ export class RoomChannel {
   private outbox: Outbound[] = [];
   private backoff = 500;
   private reconnectTimer: number | null = null;
+  /** When we last heard ANYTHING from the server (pong or otherwise). */
+  private lastInbound = 0;
   private pingTimer: number | null = null;
   private disposed = false;
   private openResolver: (() => void) | null = null;
@@ -134,11 +149,42 @@ export class RoomChannel {
     };
   }
 
+  // ── connection state ──────────────────────────────────────────────────
+  /** Every status transition (connecting / open / subscribed / error /
+   *  closed:<code>). The room shows "Reconnecting…" off this so a player
+   *  knows their taps aren't landing instead of mashing a button. */
+  onStatus(fn: StatusListener): () => void {
+    this.statusListeners.add(fn);
+    return () => {
+      this.statusListeners.delete(fn);
+    };
+  }
+
+  /** Fires after a RE-connect's `ready` — never the first — once presence
+   *  is re-tracked and the outbox has been flushed, so anything a listener
+   *  sends is ordered AFTER the moves that were queued during the drop.
+   *  Activities re-sync here: the server keeps no replay buffer, so every
+   *  broadcast sent while we were down (our own echoes included) is gone. */
+  onReconnect(fn: ReconnectListener): () => void {
+    this.reconnectListeners.add(fn);
+    return () => {
+      this.reconnectListeners.delete(fn);
+    };
+  }
+
+  private setStatus(status: string) {
+    if (this.status === status) return;
+    this.status = status;
+    for (const fn of this.statusListeners) fn(status);
+  }
+
   async dispose(): Promise<void> {
     this.disposed = true;
     this.broadcastListeners.clear();
     this.durableListeners.clear();
     this.presenceListeners.clear();
+    this.statusListeners.clear();
+    this.reconnectListeners.clear();
     this.subscribed = false;
     if (this.reconnectTimer !== null) {
       window.clearTimeout(this.reconnectTimer);
@@ -174,12 +220,12 @@ export class RoomChannel {
     if (this.socket && this.socket.readyState <= WebSocket.OPEN) return;
 
     const url = this.buildUrl();
-    this.status = "connecting";
+    this.setStatus("connecting");
     const sock = new WebSocket(url);
     this.socket = sock;
 
     sock.onopen = () => {
-      this.status = "open";
+      this.setStatus("open");
       // `ready` from server confirms we're truly joined — wait for it
       // before resolving open() and flushing the outbox.
     };
@@ -187,12 +233,12 @@ export class RoomChannel {
     sock.onmessage = (ev) => this.handle(JSON.parse(ev.data as string) as Inbound);
 
     sock.onerror = () => {
-      this.status = "error";
+      this.setStatus("error");
     };
 
     sock.onclose = (ev) => {
       this.subscribed = false;
-      this.status = `closed:${ev.code}`;
+      this.setStatus(`closed:${ev.code}`);
       this.socket = null;
       this.presence = {};
       // 4401 = bad token (server-side close), don't retry on it.
@@ -209,10 +255,37 @@ export class RoomChannel {
 
     if (this.pingTimer === null) {
       this.pingTimer = window.setInterval(() => {
-        // Cheap keepalive so intermediaries don't reap the socket on idle.
+        if (this.subscribed && Date.now() - this.lastInbound > PING_INTERVAL_MS + PONG_GRACE_MS) {
+          this.declareZombie();
+          return;
+        }
+        // Cheap keepalive so intermediaries don't reap the socket on idle —
+        // and the pong it earns is what the watchdog above listens for.
         this.send({ type: "ping" });
       }, PING_INTERVAL_MS);
     }
+  }
+
+  /** Half-open socket: nothing heard back for too long. The browser won't
+   *  close it for us (that can take minutes), so we do — detaching the old
+   *  handlers first so a late `close` can't schedule a second reconnect. */
+  private declareZombie() {
+    const sock = this.socket;
+    if (!sock) return;
+    sock.onopen = null;
+    sock.onmessage = null;
+    sock.onerror = null;
+    sock.onclose = null;
+    try {
+      sock.close();
+    } catch {
+      /* already gone */
+    }
+    this.socket = null;
+    this.subscribed = false;
+    this.presence = {};
+    this.setStatus("closed:zombie");
+    this.scheduleReconnect();
   }
 
   private scheduleReconnect() {
@@ -243,10 +316,12 @@ export class RoomChannel {
   }
 
   private handle(message: Inbound) {
+    this.lastInbound = Date.now();
     switch (message.type) {
       case "ready": {
+        this.lastInbound = Date.now();
         this.subscribed = true;
-        this.status = "subscribed";
+        this.setStatus("subscribed");
         this.backoff = 500;
         this.presence = { ...message.presence };
         this.emitPresence();
@@ -259,6 +334,10 @@ export class RoomChannel {
           this.openResolver();
           this.openResolver = null;
           this.openRejecter = null;
+        }
+        this.readyCount += 1;
+        if (this.readyCount > 1) {
+          for (const fn of this.reconnectListeners) fn();
         }
         return;
       }

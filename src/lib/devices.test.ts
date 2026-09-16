@@ -80,12 +80,10 @@ describe("deviceLabel", () => {
 describe("speakerSelectionSupported", () => {
   it("reflects setSinkId presence on HTMLMediaElement", () => {
     const had = "setSinkId" in HTMLMediaElement.prototype;
-    // @ts-expect-error test shim
     HTMLMediaElement.prototype.setSinkId = () => Promise.resolve();
     expect(speakerSelectionSupported()).toBe(true);
     if (!had) {
-      // @ts-expect-error cleanup
-      delete HTMLMediaElement.prototype.setSinkId;
+      delete (HTMLMediaElement.prototype as Partial<HTMLMediaElement>).setSinkId;
       expect(speakerSelectionSupported()).toBe(false);
     }
     vi.restoreAllMocks();

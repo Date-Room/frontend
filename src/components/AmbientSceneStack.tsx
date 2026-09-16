@@ -4,9 +4,8 @@ import type { LobbyMood } from "@/lib/ambiance";
 import { PLAIN_MOOD, resolveAmbiancePreset } from "@/lib/ambiance";
 import { LOBBY_PREVIEW_SCENES } from "@/lib/lobbyPreviewScenes";
 
-/** Faded-in resting opacity for the photo — kept low so the scene reads as a
- *  soft wash behind the room chrome rather than busy foreground art. */
-const SCENE_OPACITY = 0.32;
+/** Faded-in resting opacity for the photo — soft wash behind room chrome. */
+const SCENE_OPACITY = 0.4;
 
 type AmbientSceneStackProps = {
   /** Room mood from create-flow selection or persisted background_id */
@@ -36,8 +35,9 @@ export function AmbientSceneStack({
   if (ambiance === PLAIN_MOOD) {
     return (
       <div className={cn("pointer-events-none overflow-hidden", positionClassName)} aria-hidden>
-        <div className="absolute inset-0 bg-background" />
-        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] via-transparent to-black/30" />
+        <div className="absolute inset-0 bg-[#0a080c]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_90%_70%_at_50%_0%,rgba(255,255,255,0.05)_0%,transparent_55%)]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-white/[0.03] via-transparent to-black/45" />
       </div>
     );
   }
