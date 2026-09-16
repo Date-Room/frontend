@@ -140,7 +140,11 @@ export type RoomExperience = {
   ambient_idle_minutes?: number;
   /** Chaperon (AI observer) availability — server flag AND a session room. */
   chaperon_enabled?: boolean;
+  /** Others in the room with a chaperon on who chose to say so (never self). */
+  chaperon_announcements?: ChaperonAnnouncement[];
 };
+
+export type ChaperonAnnouncement = { user_id: string; display_name: string };
 
 export type LiveKitToken = {
   token: string;
