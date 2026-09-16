@@ -7,6 +7,10 @@ let mockCtrl: Record<string, unknown> | null = null;
 vi.mock("@/context/ChaperonContext", () => ({
   useChaperonController: () => mockCtrl,
 }));
+vi.mock("@/context/RoomSessionContext", () => ({
+  useRoomSession: () => ({ roomId: "room-test", senderId: "u1", presence: [], channel: {} }),
+}));
+vi.mock("@/lib/stagecraft/usePartnerName", () => ({ usePartnerName: () => "Them" }));
 
 import { ChaperonMount } from "@/components/ChaperonMount";
 
@@ -53,12 +57,20 @@ describe("ChaperonMount portal attachment", () => {
     const { rerender } = render(wrap());
     expect(document.querySelector('[aria-label="Chaperon"]')).toBeNull();
 
-    mockCtrl = ctrl(true);
+    mockCtrl = { ...ctrl(true), active: true, status: "watching" };
     rerender(wrap());
 
     const shield = document.querySelector('[aria-label="Chaperon"]');
     expect(shield).not.toBeNull();
     expect(document.contains(shield)).toBe(true); // in the live DOM, not detached
+  });
+
+  // Off means nothing in the call area: the way in is the lobby card, the
+  // dock tile, or the pre-room sheet, never a grey pill on every date.
+  it("shows no shield while enabled but off", () => {
+    mockCtrl = ctrl(true);
+    render(wrap());
+    expect(document.querySelector('[aria-label="Chaperon"]')).toBeNull();
   });
 });
 

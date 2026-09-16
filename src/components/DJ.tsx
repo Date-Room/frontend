@@ -11,6 +11,7 @@ import {
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
 import { getLimits } from "@/lib/catalogRuntime";
+import { ensureYtShim } from "@/lib/ytEmbedPlayer";
 import type { YoutubeIframeApiPlayer, YoutubePlayerStateChangeEvent } from "@/types/youtubeIframeApi";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,12 @@ export type DjTrack = {
   added_by: string;
   channel_title: string | null;
   video_id: string | null;
+  /** Optional (wire-compatible with mobile, which ignores unknown fields).
+   *  Absent/"youtube" = video_id is a YouTube id; "soundcloud" = sc_url is
+   *  the track URL the SoundCloud widget loads. */
+  source?: "youtube" | "soundcloud";
+  sc_url?: string;
+  thumb_url?: string;
 };
 
 export function extractId(url: string): string | null {
@@ -56,21 +63,9 @@ export function extractId(url: string): string | null {
   return null;
 }
 
-let ytApiPromise: Promise<void> | null = null;
+// The controller is our own postMessage shim — see lib/ytEmbedPlayer.ts.
 export function loadYT() {
-  if (ytApiPromise) return ytApiPromise;
-  ytApiPromise = new Promise((res) => {
-    if (window.YT?.Player) return res();
-    const t = document.createElement("script");
-    t.src = "https://www.youtube.com/iframe_api";
-    document.head.appendChild(t);
-    const prev = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      prev?.();
-      res();
-    };
-  });
-  return ytApiPromise;
+  return ensureYtShim();
 }
 
 export type OEmbed = { title: string; author_name: string; thumbnail_url: string };

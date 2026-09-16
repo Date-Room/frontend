@@ -33,6 +33,8 @@ export type MusicCtxValue = {
   enableAudio: () => void;
   reactions: Reaction[];
   playId: (id: string) => void;
+  /** Queue a SoundCloud track by its soundcloud.com URL. */
+  playScUrl: (url: string) => void;
   playTrack: (id: string) => void;
   togglePlayPause: () => void;
   restartCurrent: () => void;
@@ -41,6 +43,8 @@ export type MusicCtxValue = {
   next: () => void;
   removeTrack: (id: string) => void;
   reorderTracks: (from: number, to: number) => void;
+  /** Append a saved playlist as one list write (starts it if idle). */
+  loadPlaylist: (tracks: DjTrack[]) => void;
   clearQueue: () => void;
   close: () => void;
   closed: boolean;

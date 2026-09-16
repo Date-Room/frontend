@@ -148,7 +148,7 @@
     "hero": {
       "eyebrow": "Before the phone number",
       "title": "Date them before\nyou date them.",
-      "subtitle": "A private room you share with a six-digit code. No phone numbers. No awkward exchange. Just enough to know if it's worth meeting in real life.",
+      "subtitle": "A private room you share with a six-digit code. No phone numbers. Just enough to know if it's worth meeting.",
       "tagline": "Not a video call. A date.",
       "create": "Create your room",
       "seeHow": "See how it works",
@@ -158,17 +158,42 @@
     "why": {
       "eyebrow": "Why this exists",
       "title": "Dating got expensive.\nIn every sense.",
-      "p1": "First dates now cost a hundred bucks before the second drink. And the price of being wrong is higher: a number you can't take back, texts that won't stop, a stranger who knows where to find you.",
-      "p2": "There should be a step between matching and meeting. A safer one. There wasn't. Now there is."
+      "p1": "First dates now cost a hundred bucks before the second drink. And the price of being wrong is higher: a number you can't take back.",
+      "p2": "There should be a step between matching and meeting. A safer one. There wasn't. Now there is.",
+      "bridge": "One room. Works across every dating app."
+    },
+    "story": {
+      "quote": "Not a video call. A date.",
+      "stat1n": "6-digit",
+      "stat1l": "Room codes",
+      "stat2n": "8",
+      "stat2l": "Room moods",
+      "stat3n": "0",
+      "stat3l": "Phone numbers"
+    },
+    "moods": {
+      "nav": "Moods",
+      "eyebrow": "Set the mood",
+      "title": "Eight backdrops.\nOne feeling.",
+      "subtitle": "Candlelit, moonlit, golden hour — the room paints itself around you."
     },
     "how": {
       "eyebrow": "How it works",
       "title": "Three steps. Nothing to download.",
       "live": "live",
       "steps": [
-        { "t": "Create the room.", "d": "A six-digit code lands in your hand. Add an optional PIN if you want extra cover." },
-        { "t": "Share the code.", "d": "Drop it in any DM. The other side opens it on the app or in any browser." },
-        { "t": "Open the door.", "d": "Twenty minutes, an hour, whatever you booked. The room dissolves when you're done." }
+        {
+          "t": "Create the room.",
+          "d": "A six-digit code lands in your hand. Add an optional PIN if you want extra cover."
+        },
+        {
+          "t": "Share the code.",
+          "d": "Drop it in any DM. The other side opens it on the app or in any browser."
+        },
+        {
+          "t": "Open the door.",
+          "d": "Twenty minutes, an hour, whatever you booked. The room dissolves when you're done."
+        }
       ]
     },
     "inside": {
@@ -176,14 +201,38 @@
       "title": "Built for the part of dating that's actually hard: the first hour.",
       "subtitle": "Awkward silences kill chemistry. The room comes with things to do.",
       "cards": [
-        { "t": "The Deck", "d": "Real questions, not small talk. Two hundred and fifty prompts that get past the weather." },
-        { "t": "Watch Together", "d": "A YouTube clip, a stand-up set, a trailer. Synced down to the second." },
-        { "t": "Synced DJ", "d": "Play her the song. Play him the song back. Watch each other react." },
-        { "t": "This or That", "d": "Rapid-fire choices. The fastest way to find out you both hate camping." },
-        { "t": "Capture", "d": "A photo of the two of you, taken at the same moment from two cities. The only thing you keep." },
-        { "t": "Truth or Dare", "d": "Couple-safe by default. Tiered, so you choose how brave the room gets." },
-        { "t": "Two Truths and a Lie", "d": "The classic. Now with a partner who can't quite read your face through the candlelight." },
-        { "t": "More coming", "d": "Karaoke, the 36 Questions, Couple's Trivia, Draw and Guess. The next wave." }
+        {
+          "t": "The Deck",
+          "d": "Real questions, not small talk. Two hundred and fifty prompts that get past the weather."
+        },
+        {
+          "t": "Watch Together",
+          "d": "A YouTube clip, a stand-up set, a trailer. Synced down to the second."
+        },
+        {
+          "t": "Synced DJ",
+          "d": "Play her the song. Play him the song back. Watch each other react."
+        },
+        {
+          "t": "This or That",
+          "d": "Rapid-fire choices. The fastest way to find out you both hate camping."
+        },
+        {
+          "t": "Capture",
+          "d": "A photo of the two of you, taken at the same moment from two cities. The only thing you keep."
+        },
+        {
+          "t": "Truth or Dare",
+          "d": "Couple-safe by default. Tiered, so you choose how brave the room gets."
+        },
+        {
+          "t": "Two Truths and a Lie",
+          "d": "The classic. Now with a partner who can't quite read your face through the candlelight."
+        },
+        {
+          "t": "More coming",
+          "d": "Karaoke, the 36 Questions, Couple's Trivia, Draw and Guess. The next wave."
+        }
       ]
     },
     "oneRoom": {
@@ -222,7 +271,9 @@
       "togetherCta": "Open Together",
       "crewName": "Crew",
       "crewDesc": "Movie nights, game nights, book clubs. Group watch party for up to 5.",
-      "crewCta": "Open Crew"
+      "crewCta": "Open Crew",
+      "sessionsLabel": "Session packs — pay when you date",
+      "subscriptionsLabel": "Rooms that stay open"
     },
     "badges": {
       "tagline": "Coming soon to your pocket.",
@@ -255,6 +306,29 @@
       "connect": "Connect",
       "connectContact": "Contact",
       "copyright": "© DateRoom, {{year}}."
+    },
+    "modes": {
+      "eyebrow": "Pick a room",
+      "title": "Three ways to stay close.",
+      "subtitle": "A first date, a room that stays open, or a night with your people.",
+      "date": {
+        "eyebrow": "First dates",
+        "title": "The room before the number.",
+        "body": "Drop a six-digit code in any DM. Twenty minutes or two hours. The room dissolves when you're done.",
+        "cta": "Create a date room"
+      },
+      "together": {
+        "eyebrow": "Already yours?",
+        "title": "A room that stays open.",
+        "body": "Different cities, late nights, kids everywhere. Pin a vision board. Leave notes. Watch together from two time zones.",
+        "cta": "Open a Together room"
+      },
+      "crew": {
+        "eyebrow": "Or bring the group",
+        "title": "Closer than the group chat.",
+        "body": "Up to five of you. Movie nights, the deck, the DJ. The group chat — but you can actually see each other.",
+        "cta": "Open a room with friends"
+      }
     }
   }
 }

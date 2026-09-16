@@ -4,6 +4,7 @@ import {
   clearSmartAppBanner,
   setSmartAppBanner,
 } from "@/lib/appBanner";
+import { IOS_APP_ID } from "@/lib/appStores";
 
 function bannerMeta(): HTMLMetaElement | null {
   return document.head.querySelector('meta[name="apple-itunes-app"]');
@@ -15,8 +16,16 @@ afterEach(() => {
 });
 
 describe("iOS Smart App Banner", () => {
-  it("does nothing when VITE_APPSTORE_APP_ID is unset", () => {
+  it("falls back to the shipped app id when the env var is unset", () => {
+    // The apps shipped 2026-09, so the banner works with no deploy config.
     vi.stubEnv("VITE_APPSTORE_APP_ID", "");
+    expect(appStoreAppId()).toBe(IOS_APP_ID);
+    expect(setSmartAppBanner("https://dateroom.io/i/ABC/1234")).toBe(true);
+    expect(bannerMeta()!.getAttribute("content")).toContain(`app-id=${IOS_APP_ID}`);
+  });
+
+  it('can still be switched off with VITE_APPSTORE_APP_ID="none"', () => {
+    vi.stubEnv("VITE_APPSTORE_APP_ID", "none");
     expect(appStoreAppId()).toBeNull();
     expect(setSmartAppBanner("https://dateroom.io/i/ABC/1234")).toBe(false);
     expect(bannerMeta()).toBeNull();
@@ -50,8 +59,8 @@ describe("iOS Smart App Banner", () => {
     expect(bannerMeta()).toBeNull();
   });
 
-  it("trims whitespace-only env to null", () => {
+  it("trims whitespace-only env back to the default", () => {
     vi.stubEnv("VITE_APPSTORE_APP_ID", "   ");
-    expect(appStoreAppId()).toBeNull();
+    expect(appStoreAppId()).toBe(IOS_APP_ID);
   });
 });

@@ -145,21 +145,27 @@ export const OHTG_ROUNDS: OhtgRound[] = [
 ];
 
 /**
- * The reveal's beat timeline: your guess pins → their cut stamps down →
- * the read verdict → did they read you → settle. Pacing tightens as the
- * arc deepens — full theatre while the rhythm is new, quicker stamps by
- * the time the stakes are high (ten rounds of slow reveals would drag).
+ * The reveal's beat timeline: the room dims → your cut falls off the table
+ * (ritual — you knew) → theirs falls (the reveal) → the verdict surface
+ * settles. Pacing tightens as the arc deepens — full theatre while the
+ * rhythm is new, quicker falls by the time the stakes are high (ten rounds
+ * of slow reveals would drag).
  */
 export function ohtgRevealSteps(round: number): { id: string; at: number }[] {
   const factor = round <= 2 ? 1 : round <= 5 ? 0.72 : 0.5;
   const base: [string, number][] = [
-    ["pin", 0],
-    ["stamp", 1000],
-    ["verdict", 2200],
-    ["mirror", 3100],
-    ["settle", 3900],
+    ["dim", 0],
+    ["yours", 700],
+    ["theirs", 2300],
+    ["verdict", 3900],
   ];
   return base.map(([id, at]) => ({ id, at: Math.round(at * factor) }));
+}
+
+/** "A, B and C" — survivor grammar for the verdict plaque. */
+export function listOf(names: string[]): string {
+  if (names.length < 2) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
 export type OhtgPhase = "cutting" | "guessing" | "revealing";

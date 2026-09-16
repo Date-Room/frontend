@@ -32,6 +32,7 @@ export type Room = {
   livekit_room_name: string;
   package: RoomPackage;
   scheduled_for: string | null;
+  scheduled_tz?: string | null;
   started_at: string | null;
   ended_at: string | null;
   expires_at: string | null;
@@ -66,6 +67,7 @@ export type InviteCard = {
   host_display_name: string;
   host_photo_url: string | null;
   scheduled_for: string | null;
+  scheduled_tz?: string | null;
   expires_at: string | null;
   state: RoomStateName;
   greeting_headline: string | null;
@@ -96,6 +98,8 @@ export type CreateRoomRequest = {
   persistence: RoomPersistence;
   package: RoomPackage;
   scheduled_for?: string | null;
+  /** IANA zone `scheduled_for` was chosen in (e.g. "Africa/Nairobi"). */
+  scheduled_tz?: string | null;
   connection_id?: string | null;
   greeting_headline?: string | null;
   greeting_subtext?: string | null;
@@ -136,7 +140,11 @@ export type RoomExperience = {
   ambient_idle_minutes?: number;
   /** Chaperon (AI observer) availability — server flag AND a session room. */
   chaperon_enabled?: boolean;
+  /** Others in the room with a chaperon on who chose to say so (never self). */
+  chaperon_announcements?: ChaperonAnnouncement[];
 };
+
+export type ChaperonAnnouncement = { user_id: string; display_name: string };
 
 export type LiveKitToken = {
   token: string;

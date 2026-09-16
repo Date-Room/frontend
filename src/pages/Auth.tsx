@@ -9,6 +9,7 @@ import {
   type AuthConfig,
 } from "@/lib/authClient";
 import { clearPendingReferral, getPendingReferral } from "@/lib/pendingReferral";
+import { captureSignupSource, clearSignupSource, getSignupSource } from "@/lib/signupSource";
 import { toast } from "sonner";
 import { PageShell } from "@/components/PageShell";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -46,6 +47,10 @@ export default function Auth() {
 
   useEffect(() => {
     void fetchAuthConfig().then(setAuthConfig);
+  }, []);
+  // `?src=recap_hook` etc. on the way in: kept until a sign-in completes.
+  useEffect(() => {
+    captureSignupSource(window.location.search);
   }, []);
 
   function stashRedirect() {
@@ -109,10 +114,11 @@ export default function Auth() {
     if (code.length !== 6) return;
     setLoading(true);
     try {
-      await authClient.verifyOtp(email.trim(), code, getPendingReferral());
+      await authClient.verifyOtp(email.trim(), code, getPendingReferral(), getSignupSource());
       // Attribution attempted — clear so a subsequent unrelated sign-in
       // on this browser isn't mis-credited.
       clearPendingReferral();
+      clearSignupSource();
       // Where to land — same as AuthCallback.
       let dest = "/home";
       try {

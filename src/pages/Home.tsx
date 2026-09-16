@@ -368,7 +368,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main ref={mainRef} className="relative z-10 mx-auto min-h-screen max-w-3xl px-4 pt-20 pb-28 lg:max-w-4xl lg:px-6 lg:pb-16">
+      <main ref={mainRef} className="relative z-10 mx-auto min-h-screen max-w-6xl px-4 pt-20 pb-28 lg:px-6 lg:pb-16">
         {tab === "rooms" && (
           <div className="animate-fade-in space-y-4">
             {/* Big inline title — scrolls with content, WhatsApp-style.
@@ -876,40 +876,64 @@ function ProfilePane({
   onSignOut: () => void;
 }) {
   return (
-    <div className="mx-auto max-w-xl animate-float-up space-y-4 stagger-children">
-      <div className="editorial-card p-6">
-        <div className="flex items-start gap-4">
-          <UserAvatarImg
-            src={me?.photo_url}
-            alt=""
-            className="h-16 w-16 shrink-0 rounded-full border-2 border-rosegold/20 object-cover"
-            fallback={
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 border-rosegold/20 bg-gradient-to-br from-rosegold/30 to-romantic/30 font-serif text-2xl text-cream">
-                {initial}
+    <div className="animate-float-up">
+      <div className="grid gap-4 lg:grid-cols-12 lg:gap-5">
+        {/* Identity strip — full width */}
+        <div className="editorial-card p-5 lg:col-span-12 lg:flex lg:items-center lg:gap-6 lg:p-6">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <UserAvatarImg
+              src={me?.photo_url}
+              alt=""
+              className="h-16 w-16 shrink-0 rounded-full border-2 border-rosegold/20 object-cover"
+              fallback={
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-2 border-rosegold/20 bg-gradient-to-br from-rosegold/30 to-romantic/30 font-serif text-2xl text-cream">
+                  {initial}
+                </div>
+              }
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="truncate text-lg font-medium text-cream lg:text-xl">
+                  {me?.display_name || me?.email?.split("@")[0]}
+                </p>
+                {entitlement && (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/35 bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-primary">
+                    {entitlement.account_tier_label}
+                  </span>
+                )}
               </div>
-            }
-          />
-          <div className="min-w-0 flex-1 pt-0.5">
-            <p className="truncate text-lg font-medium text-cream">
-              {me?.display_name || me?.email?.split("@")[0]}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">{me?.email}</p>
+              <p className="truncate text-xs text-muted-foreground lg:text-sm">{me?.email}</p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2 lg:mt-0 lg:shrink-0">
+            <button
+              type="button"
+              onClick={onSettings}
+              className="focus-ring inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-cream transition hover:bg-white/[0.06]"
+            >
+              <User className="h-4 w-4 text-muted-foreground" />
+              Manage profile
+            </button>
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="focus-ring inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-cream transition hover:bg-white/[0.06]"
+            >
+              <LogOut className="h-4 w-4 text-muted-foreground" />
+              Sign out
+            </button>
           </div>
         </div>
+
+        {/* Plans fill the rest of the view */}
+        <div className="lg:col-span-12">
+          <ProfilePlanSection
+            entitlement={entitlement}
+            billingConfig={billingConfig}
+            loading={billingLoading}
+          />
+        </div>
       </div>
-      <button type="button" onClick={onSettings} className="editorial-card hover-lift focus-ring flex w-full items-center gap-3 px-4 py-3.5">
-        <User className="h-4 w-4 text-muted-foreground" />
-        <span className="flex-1 text-left text-sm text-cream">Manage profile</span>
-      </button>
-      <ProfilePlanSection
-        entitlement={entitlement}
-        billingConfig={billingConfig}
-        loading={billingLoading}
-      />
-      <button type="button" onClick={onSignOut} className="editorial-card hover-lift focus-ring flex w-full items-center gap-3 px-4 py-3.5">
-        <LogOut className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm text-cream">Sign out</span>
-      </button>
     </div>
   );
 }

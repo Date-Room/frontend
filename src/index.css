@@ -523,81 +523,101 @@
 /* ── Live date room ambience (paired with `[data-live-ambiance]` on `.live-room-ambient`) ── */
 @layer components {
   .live-room-ambient {
-    @apply fixed inset-0 pointer-events-none z-[2] opacity-[0.92];
-    transition: opacity 1.2s ease-out, filter 1.2s ease-out;
+    @apply fixed inset-0 pointer-events-none z-[2];
+    opacity: 0.88;
+    transition: opacity 1.4s ease-out, filter 1.4s ease-out;
     mix-blend-mode: soft-light;
+    animation: dr-ambiance-breathe 14s ease-in-out infinite;
   }
 
-  /* Photo backdrops (`AmbientSceneStack`) — lighten color wash so each mood reads through */
+  /* Photo backdrops (`AmbientSceneStack`) — color wash so each mood reads through */
   .live-room-ambient[data-photo-backdrop="true"] {
-    opacity: 0.72;
-    mix-blend-mode: soft-light;
+    opacity: 0.78;
+    mix-blend-mode: screen;
+  }
+
+  @keyframes dr-ambiance-breathe {
+    0%, 100% { filter: brightness(1) saturate(1); }
+    50% { filter: brightness(1.06) saturate(1.08); }
   }
 
   @media (prefers-reduced-motion: reduce) {
+    .live-room-ambient {
+      animation: none;
+    }
     .live-room-ambient[data-photo-backdrop="true"] {
-      opacity: 0.8;
+      opacity: 0.82;
     }
   }
 
   .live-room-soft-vignette {
     @apply fixed inset-0 pointer-events-none z-[3];
-    background: radial-gradient(circle at center, transparent 0%, rgba(13, 11, 19, 0.44) 100%);
+    background:
+      radial-gradient(ellipse 85% 75% at 50% 45%, transparent 32%, rgba(13, 11, 19, 0.52) 100%),
+      linear-gradient(180deg, rgba(8, 6, 10, 0.35) 0%, transparent 22%, rgba(8, 6, 10, 0.55) 100%);
   }
 
   .live-room-ambient[data-live-ambiance="candlelit"] {
     background:
-      radial-gradient(ellipse 130% 95% at 50% 118%, hsl(28 42% 38% / 0.94) 0%, transparent 58%),
-      radial-gradient(circle at 18% 18%, hsl(38 56% 52% / 0.44) 0%, transparent 42%),
-      radial-gradient(circle at 85% 12%, hsl(16 48% 46% / 0.36) 0%, transparent 40%);
+      radial-gradient(ellipse 140% 100% at 50% 120%, hsl(28 58% 42% / 0.95) 0%, transparent 58%),
+      radial-gradient(circle at 18% 16%, hsl(38 72% 58% / 0.48) 0%, transparent 44%),
+      radial-gradient(circle at 88% 10%, hsl(16 52% 48% / 0.38) 0%, transparent 42%),
+      radial-gradient(circle at 50% 50%, hsl(32 40% 18% / 0.25) 0%, transparent 65%);
   }
 
   .live-room-ambient[data-live-ambiance="moonlit"] {
     background:
-      radial-gradient(circle at 72% 12%, hsl(258 48% 62% / 0.4) 0%, transparent 46%),
-      radial-gradient(circle at 22% 82%, hsl(215 42% 46% / 0.42) 0%, transparent 52%),
-      linear-gradient(165deg, hsl(248 36% 18% / 0.82), hsl(222 30% 14% / 0.72));
+      radial-gradient(circle at 74% 10%, hsl(258 62% 68% / 0.48) 0%, transparent 48%),
+      radial-gradient(circle at 20% 84%, hsl(215 48% 52% / 0.46) 0%, transparent 54%),
+      radial-gradient(ellipse 90% 60% at 50% 100%, hsl(230 38% 22% / 0.55) 0%, transparent 58%),
+      linear-gradient(165deg, hsl(248 40% 20% / 0.85), hsl(222 32% 14% / 0.75));
   }
 
   .live-room-ambient[data-live-ambiance="golden"] {
     background:
-      radial-gradient(ellipse 110% 75% at 50% -12%, hsl(43 92% 62% / 0.52) 0%, transparent 56%),
-      radial-gradient(circle at 12% 88%, hsl(28 72% 48% / 0.38) 0%, transparent 46%);
+      radial-gradient(ellipse 120% 80% at 50% -8%, hsl(43 96% 64% / 0.58) 0%, transparent 58%),
+      radial-gradient(circle at 10% 90%, hsl(28 78% 50% / 0.42) 0%, transparent 48%),
+      radial-gradient(circle at 92% 40%, hsl(35 85% 55% / 0.28) 0%, transparent 42%);
   }
 
   .live-room-ambient[data-live-ambiance="ocean"] {
     background:
-      radial-gradient(circle at 82% 68%, hsl(188 52% 38% / 0.42) 0%, transparent 48%),
-      radial-gradient(circle at 14% 26%, hsl(205 46% 34% / 0.38) 0%, transparent 48%),
-      linear-gradient(180deg, hsl(200 38% 16% / 0.74), hsl(188 34% 13% / 0.68));
+      radial-gradient(circle at 84% 70%, hsl(188 58% 42% / 0.48) 0%, transparent 50%),
+      radial-gradient(circle at 12% 24%, hsl(205 52% 38% / 0.42) 0%, transparent 50%),
+      radial-gradient(ellipse 100% 55% at 50% 110%, hsl(195 45% 18% / 0.62) 0%, transparent 55%),
+      linear-gradient(180deg, hsl(200 42% 18% / 0.78), hsl(188 36% 13% / 0.72));
   }
 
   .live-room-ambient[data-live-ambiance="secret"] {
     background:
-      radial-gradient(circle at 50% 115%, hsl(292 42% 34% / 0.74) 0%, transparent 54%),
-      radial-gradient(circle at 12% 14%, hsl(340 52% 42% / 0.34) 0%, transparent 38%),
-      radial-gradient(circle at 88% 16%, hsl(268 46% 46% / 0.26) 0%, transparent 34%);
+      radial-gradient(circle at 50% 118%, hsl(292 48% 38% / 0.78) 0%, transparent 56%),
+      radial-gradient(circle at 10% 12%, hsl(340 58% 46% / 0.38) 0%, transparent 40%),
+      radial-gradient(circle at 90% 14%, hsl(268 52% 50% / 0.32) 0%, transparent 36%),
+      radial-gradient(circle at 50% 40%, hsl(280 35% 16% / 0.35) 0%, transparent 60%);
   }
 
   .live-room-ambient[data-live-ambiance="aurora"] {
     background:
-      radial-gradient(circle at 72% 8%, hsl(165 76% 46% / 0.52) 0%, transparent 44%),
-      radial-gradient(circle at 28% 78%, hsl(268 58% 48% / 0.42) 0%, transparent 52%),
-      linear-gradient(198deg, hsl(258 42% 16% / 0.8), hsl(190 42% 12% / 0.74));
+      radial-gradient(circle at 74% 6%, hsl(165 82% 50% / 0.58) 0%, transparent 46%),
+      radial-gradient(circle at 26% 76%, hsl(268 62% 52% / 0.48) 0%, transparent 54%),
+      radial-gradient(circle at 55% 35%, hsl(210 55% 45% / 0.22) 0%, transparent 50%),
+      linear-gradient(198deg, hsl(258 46% 18% / 0.85), hsl(190 44% 12% / 0.78));
   }
 
   .live-room-ambient[data-live-ambiance="ember"] {
     background:
-      radial-gradient(ellipse 130% 90% at 50% 108%, hsl(22 96% 48% / 0.74) 0%, transparent 56%),
-      radial-gradient(circle at 82% 16%, hsl(42 92% 42% / 0.36) 0%, transparent 40%),
-      linear-gradient(180deg, hsl(12 62% 7% / 0.74), hsl(26 72% 9% / 0.72));
+      radial-gradient(ellipse 140% 95% at 50% 112%, hsl(22 100% 50% / 0.82) 0%, transparent 58%),
+      radial-gradient(circle at 84% 14%, hsl(42 96% 46% / 0.42) 0%, transparent 42%),
+      radial-gradient(circle at 18% 70%, hsl(12 85% 32% / 0.35) 0%, transparent 48%),
+      linear-gradient(180deg, hsl(12 68% 8% / 0.78), hsl(26 78% 10% / 0.75));
   }
 
   .live-room-ambient[data-live-ambiance="blush"] {
     background:
-      radial-gradient(ellipse 115% 70% at 50% -6%, hsl(326 74% 60% / 0.42) 0%, transparent 54%),
-      radial-gradient(circle at 16% 88%, hsl(280 52% 44% / 0.38) 0%, transparent 48%),
-      linear-gradient(185deg, hsl(292 42% 15% / 0.74), hsl(330 52% 10% / 0.7));
+      radial-gradient(ellipse 120% 75% at 50% -4%, hsl(326 78% 62% / 0.48) 0%, transparent 56%),
+      radial-gradient(circle at 14% 90%, hsl(280 58% 48% / 0.42) 0%, transparent 50%),
+      radial-gradient(circle at 88% 55%, hsl(340 65% 55% / 0.28) 0%, transparent 46%),
+      linear-gradient(185deg, hsl(292 46% 16% / 0.78), hsl(330 55% 11% / 0.74));
   }
 
   /* Persistent-room wall tabs — Vision Board / Fridge / Bookshelf */
@@ -1017,10 +1037,22 @@
   }
 
   /* Sticky note — layered paper with magnet, tape, curl */
-  .fridge-sticky-wrap {
-    @apply relative shrink-0 cursor-pointer border-0 bg-transparent p-0 transition duration-200;
+  .fridge-sticky-wrap,
+  .fridge-stage-pin {
+    @apply relative shrink-0 border-0 bg-transparent p-0;
     width: 9.25rem;
     height: 9.75rem;
+  }
+
+  .fridge-sticky-wrap {
+    @apply cursor-pointer transition duration-200;
+  }
+
+  .fridge-stage-pin .fridge-sticky-paper {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.65) inset,
+      2px 5px 0 rgba(0, 0, 0, 0.05),
+      4px 14px 24px rgba(0, 0, 0, 0.28);
   }
 
   .fridge-sticky-cast {
@@ -1078,20 +1110,46 @@
     );
   }
 
-  .fridge-sticky-magnet {
-    @apply absolute left-1/2 top-1.5 z-10 h-4 w-4 -translate-x-1/2 rounded-full;
-    background:
-      radial-gradient(circle at 32% 26%, #ffb07a, #e85d26 52%, #9a3412 100%);
-    box-shadow:
-      0 3px 5px rgba(0, 0, 0, 0.35),
-      inset 0 1px 1px rgba(255, 255, 255, 0.55),
-      inset 0 -2px 3px rgba(0, 0, 0, 0.2);
+  /* Push pin through the sticky — classic fridge magnet-board look */
+  .fridge-sticky-pin {
+    @apply absolute left-1/2 top-0 z-10 -translate-x-1/2;
+    width: 0.95rem;
+    height: 1.35rem;
   }
 
-  .fridge-sticky-magnet::after {
+  .fridge-sticky-pin::before {
     content: "";
-    @apply absolute inset-[3px] rounded-full;
-    background: radial-gradient(circle at 40% 35%, rgba(255, 255, 255, 0.45), transparent 55%);
+    @apply absolute left-1/2 top-0 block -translate-x-1/2 rounded-full;
+    width: 0.95rem;
+    height: 0.95rem;
+    background:
+      radial-gradient(circle at 32% 28%, #ff8a65, #e53935 48%, #b71c1c 100%);
+    box-shadow:
+      0 3px 6px rgba(0, 0, 0, 0.38),
+      inset 0 1px 1px rgba(255, 255, 255, 0.55),
+      inset 0 -2px 3px rgba(0, 0, 0, 0.22);
+  }
+
+  .fridge-sticky-pin::after {
+    content: "";
+    @apply absolute left-1/2 top-[0.72rem] block -translate-x-1/2;
+    width: 2px;
+    height: 0.55rem;
+    border-radius: 1px;
+    background: linear-gradient(180deg, #c0c4c8, #8a9098 55%, #5c636b);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  }
+
+  .fridge-sticky-wrap-pinned .fridge-sticky-paper {
+    box-shadow:
+      0 0 0 2px hsl(var(--primary) / 0.45),
+      0 1px 0 rgba(255, 255, 255, 0.65) inset,
+      3px 8px 16px rgba(0, 0, 0, 0.16);
+  }
+
+  .fridge-sticky-room-pin {
+    @apply absolute right-1.5 top-7 z-20 flex h-4 w-4 items-center justify-center rounded-full bg-primary/90 text-[#1a1207];
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   }
 
   .fridge-sticky-tape {
@@ -1315,6 +1373,20 @@
 /* ───────────── Stagecraft — game-show reveals (Pick a Door) ───────────── */
 
 .dr-stageroom { position: relative; }
+.dr-stageroom--themed::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background-image: var(--game-hero);
+  background-size: cover;
+  background-position: center;
+  opacity: 0.14;
+  filter: saturate(0.85) blur(0.5px);
+  transform: scale(1.04);
+}
 .dr-stageroom-shade {
   position: absolute; inset: 0; z-index: 0; pointer-events: none;
   border-radius: inherit;
@@ -1384,10 +1456,22 @@
   display: grid; place-items: center; width: 4.6rem; height: 4.6rem; border-radius: 999px;
   font-size: 1.35rem; color: hsl(var(--foreground));
   background: conic-gradient(var(--room-accent) calc(var(--p) * 360deg), rgb(255 255 255 / 0.12) 0);
+  animation: dr-ring-idle 2.4s ease-in-out infinite;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--room-accent) 35%, transparent);
+}
+.dr-ring--urgent {
+  animation: dr-ring-urgent 0.85s ease-in-out infinite;
 }
 .dr-ring span {
   display: grid; place-items: center; width: 3.6rem; height: 3.6rem;
   border-radius: 999px; background: hsl(var(--background));
+}
+@keyframes dr-ring-idle {
+  50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--room-accent) 12%, transparent); }
+}
+@keyframes dr-ring-urgent {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, hsl(var(--destructive)) 40%, transparent); }
+  50% { transform: scale(1.06); box-shadow: 0 0 0 8px color-mix(in srgb, hsl(var(--destructive)) 18%, transparent); }
 }
 
 @keyframes dr-plaque-in {
@@ -1444,32 +1528,832 @@
   .dr-bigdoor-leaf--l, .dr-bigdoor-leaf--r, .dr-bigdoor-spill { animation: none; }
 }
 
-/* One Has To Go — stamps and the lighter dusk shade */
-.dr-stageroom--dusk .dr-stageroom-shade {
-  opacity: 1;
-  background: radial-gradient(75% 60% at 50% 40%, transparent 0%, rgb(0 0 0 / 0.5) 100%), rgb(0 0 0 / 0.22);
+/* One Has To Go — table cards that fall off the table */
+.dr-table { perspective: 1100px; }
+.dr-table--reading .dr-tile:not(:disabled) {
+  border-style: dashed;
+  border-color: color-mix(in srgb, #d4826a 55%, transparent);
 }
-.dr-cutcard { overflow: visible; }
-.dr-stamp {
-  position: absolute; top: 50%; right: 4.2rem; translate: 0 -50%;
-  font-size: 1.9rem; line-height: 1; color: hsl(var(--destructive));
-  rotate: -12deg; text-shadow: 0 2px 12px rgb(0 0 0 / 0.6);
+.dr-tile {
+  transform-style: preserve-3d;
+  transition: transform 0.35s ease, border-color 0.35s ease, opacity 0.9s ease, filter 0.9s ease, background-color 0.35s ease;
+}
+.dr-tile--sealed {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--room-accent) 35%, transparent), 0 24px 60px -30px color-mix(in srgb, var(--room-accent) 90%, transparent);
+}
+.dr-tile--fallen {
+  animation: dr-tile-fall 1.1s cubic-bezier(0.4, 0, 0.7, 1) both;
   pointer-events: none;
+  border-color: hsl(var(--destructive) / 0.5);
 }
-.dr-stamp--anim { animation: dr-stamp-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
-.dr-stamp--second { right: 2.6rem; rotate: 9deg; }
-.dr-cutcard--slammed { animation: dr-slam-shake 0.45s ease 0.08s; }
+.dr-tile--gone {
+  opacity: 0.25;
+  transform: translateY(18px) rotateX(50deg) scale(0.95);
+  filter: grayscale(0.7) brightness(0.65);
+  pointer-events: none;
+  border-color: hsl(var(--destructive) / 0.4);
+}
+.dr-tile-x {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 3.2rem; line-height: 1; color: hsl(var(--destructive) / 0.55);
+  pointer-events: none; animation: fade-in 0.6s ease both;
+}
+.dr-tile-tag {
+  position: absolute; bottom: 0.55rem; left: 50%; translate: -50% 0;
+  padding: 0.18rem 0.55rem; border-radius: 999px; border-width: 1px; border-style: solid;
+  font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; white-space: nowrap;
+}
+.dr-tile-tag--top { bottom: auto; top: 0.55rem; }
 
-@keyframes dr-stamp-in {
-  from { opacity: 0; scale: 2.4; rotate: -30deg; }
-  to { opacity: 1; scale: 1; rotate: -12deg; }
-}
-@keyframes dr-slam-shake {
-  0%, 100% { translate: 0 0; }
-  25% { translate: -3px 1px; }
-  50% { translate: 3px -1px; }
-  75% { translate: -2px 0; }
+@keyframes dr-tile-fall {
+  0% { opacity: 1; transform: none; }
+  35% { transform: translateY(-8px) rotateZ(-2deg); }
+  100% {
+    opacity: 0.25;
+    transform: translateY(18px) rotateX(50deg) scale(0.95);
+    filter: grayscale(0.7) brightness(0.65);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .dr-stamp--anim, .dr-cutcard--slammed { animation: none; }
+  .dr-tile--fallen {
+    animation: none;
+    opacity: 0.25;
+    transform: translateY(18px) rotateX(50deg) scale(0.95);
+    filter: grayscale(0.7) brightness(0.65);
+  }
+}
+
+/* Truth or Dare — the deck and the deciding coin */
+.dr-tod-deck { position: relative; width: 8.5rem; height: 11rem; }
+.dr-tod-back {
+  position: absolute; inset: 0; border-radius: 1rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  background:
+    repeating-linear-gradient(45deg, rgb(255 255 255 / 0.05) 0 6px, transparent 6px 12px),
+    rgb(0 0 0 / 0.45);
+  box-shadow: 0 30px 70px -40px rgb(0 0 0 / 0.9);
+}
+.dr-tod-back--3 { transform: translate(12px, 10px) rotate(5deg); opacity: 0.5; }
+.dr-tod-back--2 { transform: translate(6px, 5px) rotate(2.5deg); opacity: 0.75; }
+
+.dr-coin {
+  position: relative; width: 8rem; height: 8rem;
+  transform-style: preserve-3d;
+  transition: transform 0.9s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+.dr-coin-face {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  border-radius: 999px; backface-visibility: hidden;
+  font-family: inherit; font-style: italic; font-size: 1.4rem; color: hsl(var(--foreground));
+  border: 1px solid rgb(255 255 255 / 0.16);
+  background: rgb(0 0 0 / 0.45);
+}
+.dr-coin-face--dare {
+  transform: rotateY(180deg);
+  color: var(--room-accent);
+  border-color: color-mix(in srgb, var(--room-accent) 60%, transparent);
+}
+.dr-coin--spin { animation: dr-coin-spin 0.8s linear infinite; }
+.dr-coin--truth { transform: rotateY(0deg) scale(1.05); }
+.dr-coin--dare { transform: rotateY(180deg) scale(1.05); }
+@keyframes dr-coin-spin { to { transform: rotateY(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .dr-coin--spin { animation: none; }
+}
+
+/* Gameshow moments — lock-in pulse, green seal flash, lie flip, score bump */
+.dr-ttcard { transform-style: preserve-3d; }
+.dr-lockin { animation: dr-lockin 0.9s ease-in-out 2; }
+.dr-ttcard--sealed { animation: dr-seal-true 1.1s ease-out both; }
+.dr-ttcard--flip { animation: dr-lie-flip 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.dr-score-plate { transition: border-color 0.3s ease, background-color 0.3s ease; }
+.dr-score-plate--bump { animation: dr-score-bump 1.3s ease-out; }
+
+@keyframes dr-lockin {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--room-accent) 0%, transparent); }
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--room-accent) 45%, transparent); }
+}
+@keyframes dr-seal-true {
+  0% { background-color: rgb(52 211 153 / 0.55); }
+  18% { background-color: rgb(52 211 153 / 0.08); }
+  36% { background-color: rgb(52 211 153 / 0.55); }
+  54% { background-color: rgb(52 211 153 / 0.08); }
+  72% { background-color: rgb(52 211 153 / 0.45); }
+  100% { background-color: rgb(52 211 153 / 0.10); }
+}
+@keyframes dr-lie-flip {
+  0% { transform: rotateX(0deg); }
+  50% { transform: rotateX(90deg) scale(1.02); }
+  100% { transform: rotateX(0deg); }
+}
+@keyframes dr-score-bump {
+  0% { transform: scale(1); }
+  20% { transform: scale(1.12); background-color: rgb(52 211 153 / 0.28); border-color: rgb(52 211 153 / 0.7); }
+  60% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dr-lockin, .dr-ttcard--sealed, .dr-ttcard--flip, .dr-score-plate--bump { animation: none; }
+  .dr-ttcard--sealed { background-color: rgb(52 211 153 / 0.10); }
+}
+
+/* This or That — the halves tug */
+.dr-half { transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1), border-color 0.4s ease, opacity 0.5s ease, filter 0.5s ease, background-color 0.4s ease; }
+.dr-half--lit { animation: dr-half-lit 0.7s ease both; }
+.dr-half--swell { transform: scale(1.03); }
+.dr-half--tug-l { transform: translateX(-8px); }
+.dr-half--tug-r { transform: translateX(8px); }
+@keyframes dr-half-lit {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, #d4826a 0%, transparent); }
+  40% { box-shadow: 0 0 0 6px color-mix(in srgb, #d4826a 40%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, #d4826a 0%, transparent); }
+}
+@media (max-width: 640px) {
+  .dr-half--tug-l { transform: translateY(-6px); }
+  .dr-half--tug-r { transform: translateY(6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dr-half, .dr-half--swell, .dr-half--tug-l, .dr-half--tug-r { transform: none; transition: none; }
+  .dr-half--lit { animation: none; }
+}
+
+/* Game choice cards — atmospheric halves / table tiles */
+.dr-choice-card {
+  transition:
+    transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1),
+    border-color 0.35s ease,
+    opacity 0.45s ease,
+    filter 0.45s ease,
+    box-shadow 0.35s ease;
+  border-color: rgb(255 255 255 / 0.1);
+  background: rgb(0 0 0 / 0.35);
+}
+.dr-choice-card__bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  transition: transform 8s ease, filter 0.45s ease;
+}
+.dr-choice-card__grain {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  opacity: 0.35;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+.dr-choice-card__emoji {
+  position: absolute;
+  top: 1.1rem;
+  left: 50%;
+  translate: -50% 0;
+  z-index: 2;
+  font-size: 2.75rem;
+  line-height: 1;
+  filter: drop-shadow(0 8px 16px rgb(0 0 0 / 0.45));
+  transition: transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.dr-choice-card__body {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 1rem 1.1rem;
+  background: linear-gradient(180deg, transparent 0%, rgb(0 0 0 / 0.72) 38%, rgb(0 0 0 / 0.88) 100%);
+}
+.dr-choice-card--clickable:hover {
+  transform: translateY(-4px) scale(1.02);
+  border-color: color-mix(in srgb, var(--room-accent) 45%, transparent);
+  box-shadow: 0 20px 50px -28px var(--choice-glow, color-mix(in srgb, var(--room-accent) 60%, transparent));
+}
+.dr-choice-card--clickable:hover .dr-choice-card__bg { transform: scale(1.08); }
+.dr-choice-card--clickable:hover .dr-choice-card__emoji { transform: scale(1.12) translateY(-2px); }
+.dr-choice-card--clickable:active { transform: translateY(-1px) scale(0.99); }
+.dr-choice-card--mine {
+  border-color: color-mix(in srgb, var(--room-accent) 55%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--room-accent) 25%, transparent), 0 16px 40px -24px var(--choice-glow, transparent);
+}
+.dr-choice-card--theirs {
+  border-color: color-mix(in srgb, #d4826a 60%, transparent);
+  animation: dr-half-lit 0.7s ease both;
+}
+.dr-choice-card--lit { animation: dr-half-lit 0.7s ease both; }
+.dr-choice-card--swell { transform: scale(1.04); }
+.dr-choice-card--tug-l { transform: translateX(-8px); }
+.dr-choice-card--tug-r { transform: translateX(8px); }
+.dr-choice-card--faded {
+  opacity: 0.32;
+  filter: grayscale(0.45) brightness(0.75);
+  transform: scale(0.98);
+}
+.dr-choice-card--sealed {
+  border-color: color-mix(in srgb, var(--room-accent) 55%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--room-accent) 30%, transparent), 0 24px 60px -30px color-mix(in srgb, var(--room-accent) 70%, transparent);
+}
+.dr-choice-card--survivor {
+  border-color: rgb(52 211 153 / 0.5);
+  box-shadow: 0 0 0 1px rgb(52 211 153 / 0.2), 0 16px 40px -28px rgb(52 211 153 / 0.25);
+}
+
+.dr-game-header__title { animation: dr-game-title-in 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.dr-game-header__status { animation: dr-game-title-in 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) 0.06s both; }
+@keyframes dr-game-title-in {
+  from { opacity: 0; translate: 0 8px; filter: blur(4px); }
+  to { opacity: 1; translate: 0 0; filter: blur(0); }
+}
+
+.dr-versus-or {
+  align-self: center;
+  font-size: 0.62rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.45);
+  animation: dr-versus-pulse 2.2s ease-in-out infinite;
+}
+@keyframes dr-versus-pulse {
+  50% { opacity: 1; color: color-mix(in srgb, var(--room-accent) 80%, white); }
+}
+
+/* Game landing — hero + staggered beats */
+.dr-game-landing { position: relative; isolation: isolate; }
+.dr-game-landing__hero {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.22;
+  filter: saturate(0.9);
+  mask-image: radial-gradient(70% 65% at 50% 35%, black 0%, transparent 100%);
+}
+.dr-game-landing__content,
+.dr-game-landing__beats,
+.dr-game-landing > :last-child { position: relative; z-index: 1; }
+.dr-game-landing__title { animation: dr-game-title-in 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.dr-game-landing__beat { animation: dr-game-title-in 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+/* Help modal polish */
+.dr-help-modal__hero img { object-fit: cover; }
+.dr-help-now { animation: dr-help-now-pulse 2.4s ease-in-out infinite; }
+@keyframes dr-help-now-pulse {
+  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--room-accent) 55%, transparent); }
+}
+.dr-help-step { animation: dr-game-title-in 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.dr-help-step--current { animation: dr-help-step-glow 2s ease-in-out infinite; }
+@keyframes dr-help-step-glow {
+  50% { box-shadow: 0 0 0 1px color-mix(in srgb, var(--room-accent) 35%, transparent); }
+}
+
+.dr-game-intro .dr-help-step__glyph {
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-style: normal;
+  color: color-mix(in srgb, var(--room-accent) 85%, white);
+  border-color: color-mix(in srgb, var(--room-accent) 35%, transparent);
+}
+
+@media (max-width: 640px) {
+  .dr-choice-card--tug-l { transform: translateY(-6px); }
+  .dr-choice-card--tug-r { transform: translateY(6px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dr-stageroom--themed::before { transform: none; }
+  .dr-ring, .dr-ring--urgent { animation: none; }
+  .dr-choice-card, .dr-choice-card__bg, .dr-choice-card__emoji { transition: none; }
+  .dr-choice-card--clickable:hover { transform: none; }
+  .dr-choice-card--tug-l, .dr-choice-card--tug-r, .dr-choice-card--swell { transform: none; }
+  .dr-choice-card--theirs, .dr-choice-card--lit { animation: none; }
+  .dr-game-header__title, .dr-game-header__status,
+  .dr-game-landing__title, .dr-game-landing__beat,
+  .dr-help-step, .dr-help-now, .dr-help-step--current,
+  .dr-versus-or { animation: none; }
+}
+
+/* Closer — the breathing ring for the four minutes */
+.dr-breathe { animation: dr-breathe 6s ease-in-out infinite; }
+@keyframes dr-breathe { 50% { transform: scale(1.08); opacity: 0.75; } }
+@media (prefers-reduced-motion: reduce) { .dr-breathe { animation: none; } }
+
+/* Lobby — one-view compact grid (walls + tonight fill the stage) */
+.dr-lobby-compact {
+  --lobby-gap: 0.5rem;
+}
+
+.dr-lobby-compact .dr-shelf-even {
+  grid-template-columns: repeat(var(--shelf-cols), minmax(0, 1fr));
+}
+
+.dr-shelf-tile .dr-shelf-frame img {
+  opacity: 0.55;
+  filter: saturate(0.85) brightness(0.65);
+  transform: scale(1.05);
+}
+
+.dr-shelf-tile:hover .dr-shelf-frame img {
+  opacity: 1;
+  filter: saturate(1.05) brightness(1);
+  transform: scale(1);
+}
+
+/* In-call desktop split — lobby left, video right (50/50) */
+.dr-call-pane {
+  min-height: 0;
+}
+
+.dr-call-pane .perm-wall-frame {
+  height: 100%;
+}
+
+/* Premium app dock — gold squircles + labels */
+.dr-app-dock {
+  padding-top: 0.125rem;
+}
+
+.dr-app-square {
+  background:
+    linear-gradient(155deg, rgb(255 255 255 / 0.07) 0%, rgb(255 255 255 / 0.02) 42%, rgb(0 0 0 / 0.45) 100%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+.dr-app-square:hover {
+  background:
+    linear-gradient(155deg, hsl(var(--primary) / 0.12) 0%, rgb(255 255 255 / 0.04) 45%, rgb(0 0 0 / 0.42) 100%);
+}
+
+.dr-app-square:active {
+  transform: scale(0.96);
+}
+
+.dr-theme-chip {
+  box-shadow: 0 0 0 1px rgb(232 166 83 / 0.08), 0 8px 24px rgb(0 0 0 / 0.25);
+}
+
+.dr-theme-chip:hover:not(:disabled) {
+  box-shadow: 0 0 0 1px rgb(232 166 83 / 0.2), 0 10px 28px rgb(0 0 0 / 0.32);
+}
+
+/* Mood picker — theme sheet */
+.dr-mood-hero__shimmer {
+  background: linear-gradient(
+    105deg,
+    transparent 38%,
+    rgb(255 255 255 / 0.06) 48%,
+    transparent 58%
+  );
+  animation: dr-mood-shimmer 6s ease-in-out infinite;
+}
+
+@keyframes dr-mood-shimmer {
+  0%, 100% { opacity: 0.35; transform: translateX(-8%); }
+  50% { opacity: 0.65; transform: translateX(8%); }
+}
+
+.dr-mood-card:focus-visible {
+  outline: 2px solid hsl(var(--primary) / 0.55);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dr-mood-hero__shimmer {
+    animation: none;
+    opacity: 0.4;
+  }
+}
+
+.dr-dock-grid {
+  align-content: start;
+}
+
+/* Solo dock categories (Watch, Music, Chat) — one hero tile, centered */
+.dr-dock-grid--solo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-content: center;
+  padding: 0.5rem 0 1rem;
+}
+
+.dr-dock-grid--solo .dr-dock-tile {
+  width: min(18rem, 52vw, 46vh);
+  max-width: 100%;
+  aspect-ratio: 1;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .dr-dock-grid--solo .dr-dock-tile {
+    width: min(20rem, 38vw, 50vh);
+  }
+}
+
+.dr-dock-tile img {
+  opacity: 0.72;
+  filter: saturate(0.88) brightness(0.78);
+}
+
+.dr-dock-tile:hover img {
+  opacity: 1;
+  filter: saturate(1.05) brightness(0.95);
+}
+
+.dr-dock-tile:active {
+  transform: scale(0.97);
+}
+
+.dr-app-icon-idle {
+  background:
+    linear-gradient(145deg, hsl(var(--primary) / 0.95) 0%, hsl(var(--primary) / 0.72) 48%, hsl(32 42% 38%) 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    inset 0 -2px 6px rgb(0 0 0 / 0.22),
+    0 10px 24px rgb(0 0 0 / 0.42);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.25s ease,
+    filter 0.2s ease;
+}
+
+.dr-app-icon-active {
+  background:
+    linear-gradient(145deg, hsl(var(--primary)) 0%, hsl(38 78% 58%) 52%, hsl(32 52% 42%) 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.45),
+    inset 0 -2px 8px rgb(0 0 0 / 0.28),
+    0 0 0 1px hsl(var(--primary) / 0.55),
+    0 14px 32px rgb(0 0 0 / 0.5);
+}
+
+.dr-app-icon-shine {
+  background: linear-gradient(
+    135deg,
+    rgb(255 255 255 / 0.42) 0%,
+    rgb(255 255 255 / 0.08) 38%,
+    transparent 58%
+  );
+}
+
+.dr-app-icon-idle:hover {
+  filter: brightness(1.06);
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.4),
+    inset 0 -2px 6px rgb(0 0 0 / 0.22),
+    0 14px 28px rgb(0 0 0 / 0.48);
+}
+
+.dr-app-icon-idle:active,
+.dr-app-icon-active:active {
+  transform: scale(0.94);
+}
+
+/* Lobby shelf — image-led cards with hover reveal */
+.dr-shelf-even {
+  --shelf-cols: 1;
+}
+@media (min-width: 640px) {
+  .dr-shelf-even {
+    grid-template-columns: repeat(var(--shelf-cols), minmax(0, 1fr));
+  }
+}
+.dr-shelf-card {
+  background: rgb(255 255 255 / 0.02);
+  transition:
+    border-color 0.35s ease,
+    transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.4s ease;
+}
+.dr-shelf-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 40px -24px rgb(0 0 0 / 0.65);
+}
+.dr-shelf-frame {
+  isolation: isolate;
+}
+.dr-shelf-frame img {
+  opacity: 0.28;
+  filter: saturate(0.75) brightness(0.55);
+  transform: scale(1.12);
+  transition:
+    opacity 0.55s cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 0.55s ease,
+    transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.dr-shelf-card:hover .dr-shelf-frame img {
+  opacity: 1;
+  filter: saturate(1.05) brightness(1.02);
+  transform: scale(1);
+}
+.dr-shelf-scrim {
+  background:
+    linear-gradient(to top, rgb(8 6 4 / 0.92) 0%, rgb(8 6 4 / 0.45) 45%, rgb(8 6 4 / 0.55) 100%);
+  opacity: 1;
+  transition: opacity 0.5s ease;
+}
+.dr-shelf-card:hover .dr-shelf-scrim {
+  opacity: 0.35;
+}
+.dr-shelf-glyph {
+  opacity: 0.92;
+  filter: drop-shadow(0 2px 10px rgb(0 0 0 / 0.45));
+  transition: opacity 0.4s ease, transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.dr-shelf-card:hover .dr-shelf-glyph {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.12);
+}
+@media (prefers-reduced-motion: reduce) {
+  .dr-shelf-card,
+  .dr-shelf-glyph,
+  .dr-shelf-frame img,
+  .dr-shelf-scrim {
+    transition: none;
+  }
+  .dr-shelf-card:hover {
+    transform: none;
+  }
+  .dr-shelf-frame img {
+    opacity: 0.7;
+    transform: none;
+  }
+  .dr-shelf-card:hover .dr-shelf-frame img {
+    transform: none;
+  }
+}
+
+/* StagePrompt — the unmissable instruction band (play-testers missed the
+   small status line and stalled after locking a pick). Slides across, then
+   settles and stays for the whole phase. */
+.dr-stage-prompt {
+  /* Never flex-shrink: the game panels are h-full flex columns, and a
+     squeezed band clips its own text (live play-test screenshot). */
+  flex: none;
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.35rem 0.6rem;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--room-accent, #d4826a) 55%, transparent);
+  background: color-mix(in srgb, var(--room-accent, #d4826a) 14%, transparent);
+  text-align: center;
+  overflow: hidden;
+  animation: dr-stage-prompt-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.dr-stage-prompt::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.10) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: dr-stage-prompt-sheen 2.6s ease-in-out 0.5s 2;
+}
+.dr-stage-prompt-lead {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--room-accent, #d4826a);
+}
+.dr-stage-prompt-text {
+  font-family: var(--font-serif, Georgia, serif);
+  font-style: italic;
+  font-size: 1rem;
+  line-height: 1.35;
+  color: hsl(var(--cream, 40 30% 92%));
+}
+@keyframes dr-stage-prompt-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes dr-stage-prompt-sheen { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .dr-stage-prompt { animation: none; }
+  .dr-stage-prompt::after { animation: none; }
+}
+
+/* Safari sound-recovery tile — pulses a few times so it's findable when it
+   appears next to the player bar, then settles. */
+.dr-sound-tile { animation: dr-sound-pulse 1.5s ease-in-out 4; }
+@keyframes dr-sound-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--room-accent, #d4826a) 0%, transparent); }
+  50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--room-accent, #d4826a) 45%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .dr-sound-tile { animation: none; } }
+
+/* Help button pulse — two soft rings when the game's "right now" step
+   changes, then still. A reminder, never a nag. */
+.dr-help-pulse { animation: dr-help-pulse 1.2s ease-in-out 2; color: var(--room-accent); }
+@keyframes dr-help-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--room-accent, #d4826a) 0%, transparent); }
+  50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--room-accent, #d4826a) 40%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .dr-help-pulse { animation: none; } }
+
+/* Guacamole Panic — bowls, splats, freezes. The bowl fills bottom-up; the
+   splat is a quick red shake; freeze/peek are full overlays. */
+.dr-guac-bowl {
+  position: relative;
+  width: 84px;
+  height: 64px;
+  overflow: hidden;
+  border: 2px solid rgb(255 255 255 / 0.18);
+  border-radius: 0 0 42px 42px;
+  background: rgb(255 255 255 / 0.04);
+}
+.dr-guac-bowl--mini { width: 56px; height: 44px; border-radius: 0 0 28px 28px; }
+.dr-guac-fill {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  background: linear-gradient(to top, #4f772d, #90a955);
+  transition: height 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.dr-guac-face { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; opacity: 0.85; }
+.dr-guac-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 180px;
+  padding: 18px 26px 14px;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 20px;
+  background: rgb(255 255 255 / 0.04);
+  animation: dr-guac-pop 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+}
+@keyframes dr-guac-pop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.dr-guac-timer { width: 100%; height: 4px; border-radius: 2px; background: rgb(255 255 255 / 0.10); overflow: hidden; }
+.dr-guac-timer-fill { height: 100%; background: var(--room-accent, #d4826a); }
+.dr-guac-freeze {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 16px;
+  background: rgb(96 165 250 / 0.18);
+  backdrop-filter: blur(2px);
+  animation: dr-guac-freeze-in 0.2s ease both;
+}
+@keyframes dr-guac-freeze-in { from { opacity: 0; } to { opacity: 1; } }
+.dr-guac-btn { background: rgb(255 255 255 / 0.03); transition: transform 0.08s ease, border-color 0.2s ease; }
+.dr-guac-btn:active:not(:disabled) { transform: scale(0.93); border-color: var(--room-accent, #d4826a); }
+.dr-guac-steal { animation: dr-guac-glow 1s ease-in-out infinite; }
+@keyframes dr-guac-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(252 211 77 / 0); }
+  50% { box-shadow: 0 0 0 6px rgb(252 211 77 / 0.25); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dr-guac-card, .dr-guac-steal, .dr-guac-freeze, .dr-guac-wash, .dr-guac-points, .dr-guac-blob { animation: none; }
+  .dr-guac-flyer { display: none; }
+  .dr-guac-fill { transition: none; }
+}
+
+/* Guacamole press feedback — every press answers back. A soft edge wash
+   (green right / red wrong) rather than a bright full-screen flash, so a
+   fast run never strobes; the pressed button colours too, and the
+   ingredient flies to the bowl or a blob lands on the floor heap. */
+.dr-guac-wash {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  animation: dr-guac-wash-out 0.4s ease-out both;
+}
+.dr-guac-wash--hit {
+  box-shadow: inset 0 0 0 3px rgb(52 211 153 / 0.85), inset 0 0 46px rgb(52 211 153 / 0.28);
+}
+.dr-guac-wash--miss {
+  box-shadow: inset 0 0 0 3px rgb(239 68 68 / 0.85), inset 0 0 46px rgb(239 68 68 / 0.28);
+}
+@keyframes dr-guac-wash-out { from { opacity: 1; } to { opacity: 0; } }
+
+.dr-guac-btn--hit { border-color: rgb(52 211 153 / 0.9); background: rgb(52 211 153 / 0.22); }
+.dr-guac-btn--miss { border-color: rgb(239 68 68 / 0.9); background: rgb(239 68 68 / 0.22); }
+
+.dr-guac-flyer {
+  position: absolute;
+  font-size: 34px;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+  animation: dr-guac-fly 0.6s cubic-bezier(0.4, 0.1, 0.3, 1) both;
+}
+@keyframes dr-guac-fly {
+  from { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  to {
+    transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 120px))) scale(0.3);
+    opacity: 0.1;
+  }
+}
+
+/* NB: never reuse a @keyframes name — index.css is one global sheet, the
+   last definition wins, and a collision silently re-animates whatever else
+   claimed the name. (This popup was called dr-guac-pop and hijacked the
+   ingredient card's pop-in, ending it at opacity 0 — the card flashed for
+   0.22s and vanished, live-caught by Joshua.) */
+.dr-guac-points {
+  position: absolute;
+  font-size: 18px;
+  font-weight: 700;
+  color: #6ee7b7;
+  text-shadow: 0 2px 8px rgb(0 0 0 / 0.55);
+  animation: dr-guac-points-rise 0.7s ease-out both;
+}
+@keyframes dr-guac-points-rise {
+  from { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+  30% { transform: translate(-50%, -110%) scale(1.1); opacity: 1; }
+  to { transform: translate(-50%, -230%) scale(1); opacity: 0; }
+}
+
+/* The floor heap — blobs of dropped guac, piling up. */
+.dr-guac-heap { position: relative; width: 48px; height: 26px; }
+.dr-guac-blob {
+  position: absolute;
+  width: 14px;
+  height: 10px;
+  border-radius: 62% 38% 55% 45% / 58% 62% 38% 42%;
+  background: linear-gradient(140deg, #5a7a34, #3c5520);
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.35);
+  animation: dr-guac-drop 0.32s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+@keyframes dr-guac-drop { from { transform: translateY(-16px) scale(0.5); opacity: 0; } }
+.dr-guac-heap-more {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  font-size: 9px;
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.55);
+}
+
+/* Pre-room — threshold / green-room before enter */
+.pr-pre-room__card {
+  isolation: isolate;
+}
+
+.pr-pre-room__stage {
+  background:
+    linear-gradient(180deg, rgb(0 0 0 / 0.15) 0%, transparent 28%),
+    linear-gradient(0deg, rgb(0 0 0 / 0.35) 0%, transparent 22%);
+}
+
+.pr-pre-room__party {
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgb(255 255 255 / 0.04), transparent 55%),
+    rgb(255 255 255 / 0.02);
+}
+
+.pr-pre-room__glow {
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    radial-gradient(80% 55% at 0% 0%, rgba(232, 166, 83, 0.12), transparent 55%),
+    radial-gradient(70% 50% at 100% 100%, rgba(232, 166, 83, 0.08), transparent 50%);
+}
+
+.pr-pre-room__vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 85% 75% at 50% 45%, transparent 35%, rgb(0 0 0 / 0.55) 100%);
+}
+
+.pr-pre-room__invite-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 80% 20%, rgba(232, 166, 83, 0.16), transparent 45%);
+}
+
+.pr-pre-room__avatar-pulse::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, hsl(var(--primary)) 55%, transparent);
+  animation: pr-avatar-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes pr-avatar-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pr-pre-room__avatar-pulse::before {
+    animation: none;
+    opacity: 0.6;
+  }
 }

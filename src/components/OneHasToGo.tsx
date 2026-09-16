@@ -1,27 +1,40 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useReducedActivity } from "@/lib/activities/useReducedActivity";
 import {
   OHTG_ROUNDS,
   initialOhtgState,
+  listOf,
   ohtgFromJson,
   ohtgIsFinished,
   ohtgRevealSteps,
   reduceOhtg,
 } from "@/lib/activities/oneHasToGo";
 import { useCinematic } from "@/lib/stagecraft/cinematic";
+import { GameChoiceCard, type ChoiceBadge } from "@/lib/stagecraft/GameChoiceCard";
+import { GameStage } from "@/lib/stagecraft/GameStage";
+import { GameStageHeader } from "@/lib/stagecraft/GameStageHeader";
+import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
+import { setHelpNow } from "@/lib/activityHelpNow";
+import { StagePrompt } from "@/lib/stagecraft/StagePrompt";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
- * One Has To Go — staged reveal built on the stamp. Your own cut stamps the
- * moment you tap it (no take-backs); the reveal then plays as beats: your
- * guess pins, their cut slams down, the read verdict lands, then the mirror
- * (did they read you). Pacing tightens as the ten-round arc deepens.
+ * One Has To Go — table-cards reveal. Four big cards on the table; you cut
+ * one (sealed, no take-backs), then read your date's cut on the same cards
+ * re-skinned as a different question. The reveal is physical: the room dims,
+ * your cut falls off the table first (ritual — you knew), then theirs (the
+ * reveal), landing on a verdict surface that stays put: the cuts, the read,
+ * what survives, the running tally. Pacing tightens over the ten-round arc.
  *
- * Presentation only over the shared reducer; reload mid-reveal lands on the
- * settled board (stagecraft witnessed-live rule).
+ * Deliberate departures from the handoff spec: your own cut stays guessable
+ * (same-cut rounds are real, and calling one is the game's best moment), and
+ * there is no enforced defend timer — the verdict surface is the prompt.
  */
 
-const STAGE_RANK: Record<string, number> = { pin: 0, stamp: 1, verdict: 2, mirror: 3, settle: 4 };
+const STAGE_RANK: Record<string, number> = { dim: 0, yours: 1, theirs: 2, verdict: 3 };
 
 export function OneHasToGo() {
   const { state, emit, senderId } = useReducedActivity(
@@ -31,6 +44,7 @@ export function OneHasToGo() {
     reduceOhtg,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
 
   const myReads = state.reads[senderId] ?? 0;
   const theirReads = Object.entries(state.reads).reduce(
@@ -39,20 +53,25 @@ export function OneHasToGo() {
   );
 
   const readsBar = (
-    <div className="flex justify-center gap-6 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-      <span>Reads · you {myReads}</span>
-      <span>·</span>
-      <span>{partnerName} {theirReads}</span>
-    </div>
+    <Scoreboard
+      label="Reads"
+      entries={[
+        { name: "You", value: myReads, accent: true },
+        { name: partnerName, value: theirReads },
+      ]}
+    />
   );
 
   const accentBtn = "rounded-full text-primary-foreground transition hover:opacity-90 disabled:opacity-50";
   const accentStyle = { backgroundColor: "var(--room-accent)" } as const;
 
   const revealing = !ohtgIsFinished(state) && state.phase === "revealing";
-  const { stage, witnessed } = useCinematic(revealing, ohtgRevealSteps(Math.min(state.round, OHTG_ROUNDS.length - 1)));
-  // Reveal progress: -1 before the show, 4 (settle) when hydrated mid-reveal.
-  const rank = revealing ? (witnessed ? STAGE_RANK[stage ?? "pin"] ?? 0 : 4) : -1;
+  const { stage, witnessed } = useCinematic(
+    revealing,
+    ohtgRevealSteps(Math.min(state.round, OHTG_ROUNDS.length - 1)),
+  );
+  // -1 before the reveal; hydrating mid-reveal jumps straight to the verdict.
+  const rank = revealing ? (witnessed ? STAGE_RANK[stage ?? "dim"] ?? 0 : 3) : -1;
 
   if (ohtgIsFinished(state)) {
     return (
@@ -83,49 +102,70 @@ export function OneHasToGo() {
   const guessing = state.phase === "guessing";
   const sameCut = revealing && myCut === theirCut;
   const iReadThem = revealing && myGuess === theirCut;
-  const theyReadMe =
-    revealing && otherCutEntry != null && state.guesses[otherCutEntry[0]] === myCut;
+  const theyReadMe = revealing && otherCutEntry != null && state.guesses[otherCutEntry[0]] === myCut;
 
-  const theirStampShown = rank >= 1;
-  const verdictShown = rank >= 2;
-  const mirrorShown = rank >= 3;
-  const settled = rank >= 4;
+  const yoursFallen = rank >= 1;
+  const theirsFallen = rank >= 2;
+  const onVerdict = rank >= 3;
+
+  const survivorNames = onVerdict
+    ? round.options.filter((_, i) => i !== myCut && i !== theirCut).map((o) => o.label)
+    : [];
+
+  // "Right now" help snapshot (see lib/activityHelpNow).
+  useEffect(() => {
+    const snap = revealing
+      ? { now: "The cuts fall. Say why yours had to go, then tap Next round.", step: 2 }
+      : guessing
+        ? iGuessed
+          ? { now: `Locked. Waiting for ${partnerName}…`, step: 1 }
+          : { now: `Now tap the one you think ${partnerName} cut.`, step: 1 }
+        : iCut
+          ? { now: `Sealed. Waiting for ${partnerName} to cut.`, step: 0 }
+          : { now: "Tap the one you'd get rid of forever.", step: 0 };
+    setHelpNow("one_has_to_go", snap);
+  }, [revealing, guessing, iGuessed, iCut, partnerName]);
 
   const title = !revealing
     ? guessing
-      ? "Read their mind"
-      : "One has to go"
-    : settled
+      ? "Now read your date"
+      : iCut
+        ? "The cut is sealed"
+        : "One of these has to go"
+    : onVerdict
       ? sameCut
         ? round.matchLine
         : round.clashLine
-      : rank === 0
-        ? "Before the truth…"
-        : "The cut lands";
+      : rank === 2
+        ? `${partnerName}'s cut`
+        : rank === 1
+          ? "Your cut"
+          : "Both cuts are in";
 
   const status = !revealing
     ? guessing
       ? iGuessed
-        ? "Guess locked. No changing your mind."
-        : `Which one did ${partnerName} cut?`
+        ? "Read locked · waiting for the room…"
+        : `Which one do you think ${partnerName} cut? Calling a same-cut is allowed.`
       : iCut
-        ? "Locked in. No take-backs."
+        ? "Sealed · no take-backs."
         : round.lead
-    : settled
-      ? "Defend your decisions."
-      : rank === 0 && myGuess != null
-        ? `You think ${partnerName} cut ${round.options[myGuess].label}…`
-        : "";
+    : onVerdict
+      ? iReadThem
+        ? "You called it."
+        : `You read ${partnerName} wrong.`
+      : rank === 2
+        ? `And ${partnerName}'s.`
+        : rank === 1
+          ? "It falls off the table."
+          : "Lights down. Nobody can change their mind now.";
 
   const onOption = (i: number) => {
     if (state.phase === "cutting" && !iCut) {
       emit(
         "cut",
         { round: state.round, option: i },
-        {
-          event_type: "eliminated",
-          payload: { text: `${round.title} · cut ${round.options[i].label}` },
-        },
+        { event_type: "eliminated", payload: { text: `${round.title} · cut ${round.options[i].label}` } },
       );
     } else if (guessing && !iGuessed) {
       emit("guess", { round: state.round, option: i });
@@ -134,9 +174,13 @@ export function OneHasToGo() {
 
   const nextRound = () => {
     const readsLine = sameCut
-      ? "same cut"
-      : [iReadThem ? `you read ${partnerName} right` : `${partnerName} surprised you`,
-         theyReadMe ? `${partnerName} read you` : `your pick surprised ${partnerName}`].join(" · ");
+      ? iReadThem
+        ? `same cut and you called it`
+        : "same cut"
+      : [
+          iReadThem ? `you read ${partnerName} right` : `${partnerName} surprised you`,
+          theyReadMe ? `${partnerName} read you` : `your pick surprised ${partnerName}`,
+        ].join(" · ");
     emit(
       "next_round",
       { round: state.round },
@@ -145,115 +189,155 @@ export function OneHasToGo() {
   };
 
   return (
-    <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in", revealing && witnessed && !settled ? "dr-stageroom--dusk" : ""].join(" ")}>
-      <div className="dr-stageroom-shade" aria-hidden />
+    <GameStage gameId="one_has_to_go" dimmed={revealing && witnessed && !onVerdict}>
+      <GameStageHeader
+        kicker={`Round ${state.round + 1} of ${OHTG_ROUNDS.length} · ${round.title}`}
+        title={title}
+        status={status}
+        titleKey={`${state.round}-${title}`}
+        statusKey={`${state.round}-${status}`}
+      />
 
-      <div className="relative flex flex-col items-center gap-1 text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Round {state.round + 1} of {OHTG_ROUNDS.length} · {round.title}
-        </p>
-        <p className="font-serif text-xl italic text-cream">{title}</p>
-        <p key={status} className="min-h-[1rem] text-xs text-muted-foreground animate-fade-in">{status}</p>
-      </div>
+      {guessing && !iGuessed && (
+        <StagePrompt
+          id={`ohtg-guess-${state.round}`}
+          lead="✓ Your cut is sealed"
+          text={`Now tap the one you think ${partnerName} cut.`}
+        />
+      )}
 
-      <div className="relative flex flex-1 flex-col justify-center gap-3">
+      <div className={["dr-table relative grid grid-cols-2 gap-3", guessing && !iGuessed ? "dr-table--reading" : ""].join(" ")}>
         {round.options.map((opt, i) => {
-          const cutByMe = myCut === i;
-          const cutByThem = revealing && theirStampShown && theirCut === i;
-          const dead = (revealing || guessing || iCut) && cutByMe ? true : cutByThem;
-          const myPendingGuess = (guessing || (revealing && !settled)) && myGuess === i;
+          const isMine = myCut === i;
+          const isTheirs = revealing && theirCut === i;
+          const fell = (isMine && yoursFallen) || (isTheirs && theirsFallen);
+          const survivor = onVerdict && !isMine && !isTheirs;
+          const sealed = isMine && !fell && (iCut || revealing);
+          const isRead = myGuess === i && (guessing || revealing) && iGuessed;
+          const waiting = revealing && !onVerdict && !fell && !sealed;
           const clickable = (state.phase === "cutting" && !iCut) || (guessing && !iGuessed);
+
+          let cardState: Parameters<typeof GameChoiceCard>[0]["state"] = "default";
+          if (sealed) cardState = "sealed";
+          else if (survivor) cardState = "survivor";
+          else if (waiting) cardState = "faded";
+
+          const badges: ChoiceBadge[] = [];
+          if (isRead && !fell) badges.push({ text: "your read", tone: "read" });
+          if (sealed) badges.push({ text: "you cut", tone: "cut" });
+          if (fell && isMine) {
+            badges.push({
+              text: sameCut && theirsFallen ? "you both cut" : "you cut",
+              tone: "neutral",
+            });
+          }
+          if (fell && isTheirs && !sameCut) badges.push({ text: `${partnerName} cut`, tone: "partner" });
+          if (survivor) badges.push({ text: "survives", tone: "survives" });
+
           return (
-            <button
+            <GameChoiceCard
               key={i}
-              type="button"
-              onClick={() => onOption(i)}
+              size="md"
+              label={opt.label}
+              emoji={opt.emoji}
               disabled={!clickable}
+              onClick={() => onOption(i)}
+              state={cardState}
+              badges={badges}
               className={[
-                "dr-cutcard focus-ring relative rounded-2xl border p-4 text-left transition-all duration-300",
-                dead
-                  ? "border-destructive/50 bg-destructive/10"
-                  : myPendingGuess
-                    ? "border-primary bg-primary/10"
-                    : "border-white/[0.08] bg-white/[0.02]",
-                clickable ? "hover:-translate-y-0.5 hover:border-primary/50 hover:bg-white/[0.05]" : "",
-                cutByThem ? "dr-cutcard--slammed" : "",
+                "dr-tile",
+                fell ? (witnessed ? "dr-tile--fallen" : "dr-tile--gone") : "",
+                sealed ? "dr-tile--sealed" : "",
               ].join(" ")}
-            >
-              <div className="flex items-center gap-3">
-                <span className={["text-2xl", dead ? "grayscale" : ""].join(" ")}>{opt.emoji}</span>
-                <span
-                  className={[
-                    "flex-1 text-sm sm:text-base text-cream",
-                    dead ? "line-through decoration-destructive/70 opacity-70" : "",
-                  ].join(" ")}
-                >
-                  {opt.label}
-                </span>
-                <span className="flex shrink-0 items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] font-medium">
-                  {myPendingGuess && !revealing && (
-                    <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/40">your guess</span>
-                  )}
-                  {revealing && rank === 0 && myPendingGuess && (
-                    <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/40">your guess</span>
-                  )}
-                  {settled && cutByMe && (
-                    <span className="px-2 py-0.5 rounded-full bg-destructive/20 text-destructive border border-destructive/40">you ❌</span>
-                  )}
-                  {settled && cutByThem && (
-                    <span className="px-2 py-0.5 rounded-full bg-rose/20 text-rose border border-rose/40">{partnerName} ❌</span>
-                  )}
-                </span>
-              </div>
-              {cutByMe && !settled && (iCut || revealing) && (
-                <span className="dr-stamp" aria-hidden>✕</span>
-              )}
-              {cutByThem && !settled && (
-                <span className={["dr-stamp dr-stamp--anim", sameCut ? "dr-stamp--second" : ""].join(" ")} aria-hidden>✕</span>
-              )}
-            </button>
+              overlay={fell ? <span className="dr-tile-x" aria-hidden>✕</span> : undefined}
+            />
           );
         })}
       </div>
 
-      <div className="relative min-h-[5rem] flex flex-col items-center justify-center gap-2">
-        {revealing ? (
-          <>
-            {verdictShown && (
-              <p className={["text-sm animate-fade-in", iReadThem ? "text-primary font-medium" : "text-cream/70"].join(" ")}>
-                {sameCut && iReadThem
-                  ? "🎯 Same cut, and you called it"
-                  : iReadThem
-                    ? `🎯 You read ${partnerName} right`
-                    : `${partnerName} surprised you`}
+      {guessing && !iGuessed && (
+        <p className="relative text-center text-[11px] text-muted-foreground">
+          Guessing right is worth a read. Reading yourself only counts if {partnerName} cut it too.
+        </p>
+      )}
+
+      <div className="relative flex flex-col items-center justify-center gap-3">
+        {onVerdict && myCut != null && theirCut != null && myGuess != null ? (
+          <div className="flex w-full flex-col gap-3 animate-fade-in">
+            <div className="dr-beam" aria-hidden />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/[0.10] bg-white/[0.03] p-4 text-left">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">The cuts</p>
+                <p className="mt-2 flex items-center gap-2 font-serif text-cream">
+                  <span aria-hidden>{round.options[myCut].emoji}</span> {round.options[myCut].label}
+                  <span className="ml-auto text-[10px] font-sans uppercase tracking-[0.2em] text-primary">you</span>
+                </p>
+                {!sameCut && (
+                  <p className="mt-1 flex items-center gap-2 font-serif text-cream">
+                    <span aria-hidden>{round.options[theirCut].emoji}</span> {round.options[theirCut].label}
+                    <span className="ml-auto text-[10px] font-sans uppercase tracking-[0.2em] text-rose">{partnerName}</span>
+                  </p>
+                )}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {sameCut
+                    ? "Same cut · one thing gone, and you both killed it"
+                    : "Two things gone · the table just got smaller"}
+                </p>
+              </div>
+              <div
+                className="rounded-2xl border p-4 text-left"
+                style={{
+                  borderColor: "color-mix(in srgb, var(--room-accent) 45%, transparent)",
+                  background: "color-mix(in srgb, var(--room-accent) 6%, transparent)",
+                }}
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>
+                  The read
+                </p>
+                <p className="mt-2 flex items-center gap-2 font-serif text-cream">
+                  <span aria-hidden>{round.options[myGuess].emoji}</span> {round.options[myGuess].label}
+                  <span className="ml-auto text-[10px] font-sans uppercase tracking-[0.2em] text-muted-foreground">your guess</span>
+                </p>
+                <p className={["mt-2 text-xs", iReadThem ? "text-emerald-300" : "text-cream/80"].join(" ")}>
+                  {iReadThem
+                    ? `🎯 Right · you knew what ${partnerName} would let go`
+                    : `Wrong · ${partnerName} actually cut ${round.options[theirCut].label}`}
+                </p>
+                <p className={["mt-1 text-xs", theyReadMe ? "text-rose" : "text-muted-foreground"].join(" ")}>
+                  {theyReadMe ? `👀 ${partnerName} read you too` : `${partnerName} missed yours`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center gap-3 text-center">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>
+                What survives · {survivorNames.join(" + ")}
               </p>
-            )}
-            {mirrorShown && (
-              <p className={["text-sm animate-fade-in", theyReadMe ? "text-rose font-medium" : "text-cream/70"].join(" ")}>
-                {theyReadMe ? `👀 ${partnerName} read you too` : `Your pick surprised ${partnerName}`}
+              <p className="max-w-sm font-serif text-base italic leading-relaxed text-cream/90">
+                {survivorNames.length === 1
+                  ? `Everything from here is ${survivorNames[0]}. Defend it.`
+                  : `${listOf(survivorNames)} live on. Tell ${partnerName} why ${round.options[myCut].label} had to go.`}
               </p>
-            )}
-            {settled && (
-              <>
-                {readsBar}
+              {readsBar}
+              {tryRoom && state.round + 1 >= TRY_CAPS.one_has_to_go_rounds ? (
+                <TryCurtain line="Seven more rounds wait in a date room, ending with The Dangerous One." />
+              ) : (
                 <Button onClick={nextRound} className={accentBtn} style={accentStyle}>
                   {state.round + 1 >= OHTG_ROUNDS.length ? "Finish" : "Next round"}
                 </Button>
-              </>
-            )}
-          </>
-        ) : guessing ? (
+              )}
+            </div>
+          </div>
+        ) : revealing ? null : guessing ? (
           iGuessed ? (
-            <p className="text-sm text-muted-foreground animate-pulse">waiting for {partnerName}&apos;s guess…</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">You both cut. 👀 Now read their mind.</p>
-          )
+            <p className="text-sm text-muted-foreground animate-pulse">waiting for {partnerName}&apos;s read…</p>
+          ) : null
         ) : iCut ? (
           <p className="text-sm text-muted-foreground animate-pulse">waiting for {partnerName} to choose…</p>
         ) : (
           readsBar
         )}
       </div>
-    </div>
+    </GameStage>
   );
 }

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Plus, Sparkles } from "lucide-react";
+import { ArrowUpRight, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PaymentCheckout } from "@/components/PaymentCheckout";
 import { StoreDownloadCta } from "@/components/StoreDownloadCta";
@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ShimmerSkeleton } from "@/components/ui/skeleton";
 import {
   type AccountTier,
   type BillableProduct,
@@ -72,6 +73,56 @@ const TIER_OPTIONS: TierOption[] = [
   },
 ];
 
+function tierOption(id: AccountTier): TierOption {
+  return TIER_OPTIONS.find((t) => t.id === id) ?? TIER_OPTIONS[0];
+}
+
+function currentTierDetail(entitlement: Entitlement): string {
+  if (entitlement.has_active_subscription) {
+    return entitlement.account_tier === "crew"
+      ? "Subscription active · group watch"
+      : "Subscription active · persistent room";
+  }
+  const parts: string[] = [];
+  if (entitlement.account_tier === "try") {
+    parts.push("Free · 20-minute sessions");
+  } else {
+    parts.push(entitlement.account_tier_label || tierOption(entitlement.account_tier).title);
+  }
+  if (entitlement.date_pack_remaining > 0) {
+    parts.push(`${entitlement.date_pack_remaining} Date Pack session${entitlement.date_pack_remaining === 1 ? "" : "s"} left`);
+  }
+  if (entitlement.long_pack_remaining > 0) {
+    parts.push(`${entitlement.long_pack_remaining} Long Pack session${entitlement.long_pack_remaining === 1 ? "" : "s"} left`);
+  }
+  if ((entitlement.together_remaining ?? 0) > 0 && !entitlement.has_active_subscription) {
+    parts.push(`${entitlement.together_remaining} Together credit${(entitlement.together_remaining ?? 0) === 1 ? "" : "s"}`);
+  }
+  if ((entitlement.crew_remaining ?? 0) > 0 && entitlement.account_tier !== "crew") {
+    parts.push(`${entitlement.crew_remaining} Crew credit${(entitlement.crew_remaining ?? 0) === 1 ? "" : "s"}`);
+  }
+  return parts.join(" · ");
+}
+
+function isActiveTier(entitlement: Entitlement, tierId: AccountTier): boolean {
+  if (entitlement.account_tier === tierId) return true;
+  if (tierId === "together" && entitlement.has_active_subscription && entitlement.account_tier === "together") {
+    return true;
+  }
+  if (tierId === "crew" && entitlement.has_active_subscription && entitlement.account_tier === "crew") {
+    return true;
+  }
+  return false;
+}
+
+function recommendedUpgrade(entitlement: Entitlement | undefined): BillableProduct | null {
+  if (!entitlement) return "date_pack";
+  if (entitlement.has_active_subscription && entitlement.account_tier === "crew") return null;
+  if (entitlement.has_active_subscription && entitlement.account_tier === "together") return "crew";
+  if (entitlement.account_tier === "long_pack" || entitlement.long_pack_remaining > 0) return "together";
+  if (entitlement.account_tier === "date_pack" || entitlement.date_pack_remaining > 0) return "long_pack";
+  return "date_pack";
+}
 
 export function ProfilePlanSection({
   entitlement,
@@ -81,62 +132,16 @@ export function ProfilePlanSection({
   entitlement: Entitlement | undefined;
   billingConfig: BillingConfig | undefined;
   loading?: boolean;
+  /** @deprecated Layout is always full-width on profile. */
+  dense?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [upgradeProduct, setUpgradeProduct] = useState<BillableProduct | null>(null);
-  const [buyOpen, setBuyOpen] = useState(false);
 
-  const paywallOpen = billingConfig && !billingConfig.paywall_enabled;
-
-  // Plans the user owns right now — packages/credits they've bought (and the
-  // free Try session), each with how many are left. A user can own several at
-  // once, so this is a list, not a single "current tier".
-  type OwnedPlan = { emoji: string; title: string; detail: string; count: number | null };
-  const ownedPlans: OwnedPlan[] = [];
-  if (entitlement) {
-    ownedPlans.push({ emoji: "🕯️", title: "Try", detail: "20-min session", count: null });
-    if (entitlement.date_pack_remaining > 0) {
-      ownedPlans.push({
-        emoji: "💌",
-        title: "Date Pack",
-        detail: "1 hour each",
-        count: entitlement.date_pack_remaining,
-      });
-    }
-    if (entitlement.long_pack_remaining > 0) {
-      ownedPlans.push({
-        emoji: "🌙",
-        title: "Long Pack",
-        detail: "2 hours each",
-        count: entitlement.long_pack_remaining,
-      });
-    }
-    if (entitlement.has_active_subscription) {
-      ownedPlans.push({
-        emoji: entitlement.account_tier === "crew" ? "🎬" : "🏠",
-        title: entitlement.account_tier === "crew" ? "Crew" : "Together",
-        detail: "Subscription active",
-        count: null,
-      });
-    } else {
-      if ((entitlement.together_remaining ?? 0) > 0) {
-        ownedPlans.push({
-          emoji: "🏠",
-          title: "Together",
-          detail: "Persistent room",
-          count: entitlement.together_remaining ?? 0,
-        });
-      }
-      if ((entitlement.crew_remaining ?? 0) > 0) {
-        ownedPlans.push({
-          emoji: "🎬",
-          title: "Crew",
-          detail: "Persistent group room",
-          count: entitlement.crew_remaining ?? 0,
-        });
-      }
-    }
-  }
+  const earlyAccess = billingConfig && !billingConfig.paywall_enabled;
+  const currentTier = entitlement?.account_tier ?? "try";
+  const currentMeta = tierOption(currentTier);
+  const suggestProduct = useMemo(() => recommendedUpgrade(entitlement), [entitlement]);
 
   async function refreshBilling() {
     await Promise.all([
@@ -151,126 +156,172 @@ export function ProfilePlanSection({
     upgradeProduct === "crew"
       ? "Subscribe to Crew"
       : upgradeProduct === "together"
-      ? "Subscribe to Together"
-      : upgradeProduct === "long_pack"
-        ? "Buy Long Pack"
-        : upgradeProduct === "date_pack"
-          ? "Buy Date Pack"
-          : "Upgrade";
+        ? "Subscribe to Together"
+        : upgradeProduct === "long_pack"
+          ? "Buy Long Pack"
+          : upgradeProduct === "date_pack"
+            ? "Buy Date Pack"
+            : "Upgrade";
 
   const checkoutBlocked =
     billingConfig && upgradeProduct ? checkoutBlockedMessage(billingConfig) : null;
 
+  const paidTiers = TIER_OPTIONS.filter((o) => o.product);
+
   return (
     <>
-      <section className="editorial-card overflow-hidden">
-        <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-4 py-3.5">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" aria-hidden />
-            <p className="text-sm font-medium text-cream">Plans you own</p>
+      <section className="space-y-4">
+        {/* Current tier — hero */}
+        <div className="editorial-card overflow-hidden">
+          <div className="relative border-b border-white/[0.06] bg-gradient-to-br from-primary/[0.12] via-transparent to-transparent px-5 py-5 sm:px-6 sm:py-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary/85">
+                  Your plan
+                </p>
+                {loading && !entitlement ? (
+                  <div className="mt-3 space-y-2">
+                    <ShimmerSkeleton width={180} height={32} />
+                    <ShimmerSkeleton width={260} height={16} />
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-black/30 text-3xl ring-1 ring-primary/30">
+                        {currentMeta.emoji}
+                      </span>
+                      <div className="min-w-0">
+                        <h2 className="font-serif text-2xl italic text-cream sm:text-3xl">
+                          {entitlement?.account_tier_label ?? currentMeta.title}
+                        </h2>
+                        <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                          {entitlement ? currentTierDetail(entitlement) : currentMeta.desc}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              {suggestProduct && !loading && (
+                <button
+                  type="button"
+                  onClick={() => setUpgradeProduct(suggestProduct)}
+                  className="btn-primary inline-flex shrink-0 items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold shadow-[0_12px_32px_rgba(232,166,83,0.22)]"
+                >
+                  Upgrade
+                  <ArrowUpRight className="h-4 w-4" aria-hidden />
+                </button>
+              )}
+            </div>
+            {earlyAccess && (
+              <p className="mt-4 rounded-xl border border-primary/20 bg-primary/[0.06] px-3 py-2 text-xs leading-relaxed text-cream/80">
+                Early access — everything is unlocked while we&apos;re in beta. You can still
+                buy packs or subscribe below to be ready when billing goes live.
+              </p>
+            )}
           </div>
-          {billingConfig && !paywallOpen && (
-            <span className="text-[11px] text-muted-foreground">
-              {isStoreCheckout(billingConfig)
-                ? "Purchases in the app"
-                : `Pay with ${paymentRailLabel(billingConfig.payment_provider)}`}
-            </span>
+
+          {billingConfig && (
+            <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-2.5 text-[11px] text-muted-foreground sm:px-6">
+              <span className="inline-flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden />
+                {isStoreCheckout(billingConfig)
+                  ? "Purchases happen in the DateRoom app"
+                  : `Pay with ${paymentRailLabel(billingConfig.payment_provider)}`}
+              </span>
+              {billingConfig.dev_checkout_enabled && (
+                <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-300">
+                  Dev checkout on
+                </span>
+              )}
+            </div>
           )}
         </div>
 
-        {ownedPlans.length > 0 && (
-          <ul className="divide-y divide-white/[0.06] border-b border-white/[0.06]">
-            {ownedPlans.map((p) => (
-              <li key={p.title} className="flex items-center gap-3 px-4 py-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg ring-1 ring-primary/20">
-                  {p.emoji}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-cream">{p.title}</p>
-                  <p className="text-xs text-muted-foreground">{p.detail}</p>
-                </div>
-                {p.count !== null ? (
-                  <span className="shrink-0 text-sm font-semibold tabular-nums text-cream">
-                    ×{p.count}
-                  </span>
-                ) : (
-                  <span className="shrink-0 text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                    {p.title === "Try" ? "Free" : "Active"}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {paywallOpen ? (
-          <div className="px-4 py-4 text-sm text-muted-foreground">
-            Everything&apos;s open during early access — no upgrade needed right now.
+        {/* Upgrade grid — always visible */}
+        <div className="editorial-card overflow-hidden">
+          <div className="border-b border-white/[0.06] px-5 py-3.5 sm:px-6">
+            <p className="text-sm font-medium text-cream">Upgrade your plan</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Pick a pack or subscription — your current plan is marked below.
+            </p>
           </div>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={() => setBuyOpen((v) => !v)}
-              aria-expanded={buyOpen}
-              className="focus-ring flex w-full items-center justify-center gap-2 border-t border-white/[0.06] bg-primary/[0.08] px-4 py-4 text-sm font-semibold text-primary transition-colors hover:bg-primary/[0.14]"
-            >
-              <Plus className="h-4 w-4" aria-hidden />
-              Buy a plan
-              <ChevronDown
-                className={cn("h-4 w-4 transition-transform duration-200", buyOpen && "rotate-180")}
-                aria-hidden
-              />
-            </button>
-            <div
-              className={cn(
-                "grid transition-[grid-template-rows] duration-300 ease-out",
-                buyOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-              )}
-            >
-              <div className="overflow-hidden">
-                <ul className="divide-y divide-white/[0.06] border-t border-white/[0.06]">
-                  {TIER_OPTIONS.filter((o) => o.product).map((option) => {
-                    const meta = billingProductForTier(option.id, billingConfig?.products);
-                    const price = formatTierPrice(option.id, meta);
-                    const unit = tierPricingMeta(option.id).unit;
-                    return (
-                      <li key={option.id} className="px-4 py-3.5">
-                        <div className="flex items-start gap-3">
-                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-lg ring-1 ring-primary/20">
-                            {option.emoji}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-sm font-medium text-cream">{option.title}</p>
-                              <span className="text-sm font-semibold tabular-nums text-primary">
-                                {price}
-                              </span>
-                            </div>
-                            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                              {option.desc}
-                              {unit && option.id !== "try" ? ` · ${unit}` : ""}
-                            </p>
-                          </div>
-                          {option.product && (
-                            <button
-                              type="button"
-                              onClick={() => setUpgradeProduct(option.product)}
-                              disabled={loading}
-                              className="shrink-0 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary transition hover:bg-primary/15 disabled:opacity-40"
-                            >
-                              Buy
-                            </button>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
+
+          <ul className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-4">
+            {paidTiers.map((option) => {
+              const meta = billingProductForTier(option.id, billingConfig?.products);
+              const price = formatTierPrice(option.id, meta);
+              const unit = tierPricingMeta(option.id).unit;
+              const isCurrent = entitlement ? isActiveTier(entitlement, option.id) : false;
+              const isSuggested = option.product === suggestProduct;
+
+              return (
+                <li
+                  key={option.id}
+                  className={cn(
+                    "flex flex-col rounded-2xl border p-4 transition",
+                    isCurrent
+                      ? "border-primary/45 bg-primary/[0.08] shadow-[0_0_0_1px_hsl(var(--primary)/0.25)]"
+                      : "border-white/[0.08] bg-white/[0.02] hover:border-primary/25 hover:bg-white/[0.04]",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xl ring-1 ring-primary/20">
+                      {option.emoji}
+                    </span>
+                    {isCurrent && (
+                      <span className="rounded-full border border-primary/35 bg-primary/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-primary">
+                        Current
+                      </span>
+                    )}
+                    {!isCurrent && isSuggested && (
+                      <span className="rounded-full border border-white/15 bg-white/[0.04] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-cream/70">
+                        Suggested
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-3 font-serif text-lg text-cream">{option.title}</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums text-primary">{price}</p>
+                  <p className="mt-1 flex-1 text-xs leading-relaxed text-muted-foreground">
+                    {option.desc}
+                    {unit ? ` · ${unit}` : ""}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => option.product && setUpgradeProduct(option.product)}
+                    disabled={loading || isCurrent || !option.product}
+                    className={cn(
+                      "mt-4 w-full rounded-full py-2.5 text-[11px] font-bold uppercase tracking-[0.14em] transition disabled:cursor-default",
+                      isCurrent
+                        ? "border border-primary/25 bg-primary/10 text-primary/70"
+                        : "border border-primary/35 bg-primary/12 text-primary hover:bg-primary/20 disabled:opacity-40",
+                    )}
+                  >
+                    {isCurrent ? "Your plan" : "Upgrade"}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Free Try tier — reference row */}
+          <div className="border-t border-white/[0.06] px-5 py-3 sm:px-6">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="text-lg" aria-hidden>
+                {TIER_OPTIONS[0].emoji}
+              </span>
+              <div className="min-w-0 flex-1">
+                <span className="font-medium text-cream">Try</span>
+                <span className="text-muted-foreground"> — free 20-minute session for every account</span>
               </div>
+              {currentTier === "try" && (
+                <span className="rounded-full border border-white/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  Included
+                </span>
+              )}
             </div>
-          </>
-        )}
+          </div>
+        </div>
       </section>
 
       <Dialog open={upgradeProduct !== null} onOpenChange={(open) => !open && setUpgradeProduct(null)}>
