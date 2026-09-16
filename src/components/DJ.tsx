@@ -34,6 +34,12 @@ import { cn } from "@/lib/utils";
  *
  * Wire-format + playback semantics unchanged from prior version so
  * the cross-platform sync keeps working.
+ *
+ * Guests can't write durable state, so a guest's `enqueue` only lands if
+ * a signed-in member has Music open to persist it. Until then the guest
+ * keeps the tracks it asked for and replays them when someone arrives and
+ * sends `sync_request` (which Music sends on mount). Mobile ignores the
+ * unknown type.
  */
 
 export type DjTrack = {
@@ -125,6 +131,17 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
   const isSuppressed = () => Date.now() < suppressUntilRef.current;
   const isDJRef = useRef(isDJ);
   isDJRef.current = isDJ;
+  // Tracks a guest queued that nobody has persisted yet (see header note).
+  const pendingRef = useRef<DjTrack[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  useEffect(() => {
+    if (pendingRef.current.length === 0) return;
+    const landed = new Set<string>([...(nowPlaying ? [nowPlaying.id] : []), ...queue.map((t) => t.id)]);
+    pendingRef.current = pendingRef.current.filter((t) => !landed.has(t.id));
+    setPendingCount(pendingRef.current.length);
+  }, [nowPlaying, queue]);
+  const replayTimersRef = useRef<number[]>([]);
+  useEffect(() => () => replayTimersRef.current.forEach((t) => window.clearTimeout(t)), []);
 
   const partnerId = useMemo(() => {
     for (const p of room.presence) {
@@ -235,6 +252,17 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
     if (!session) return;
     return session.onEvent((e) => {
       if (e.userId === userId) return;
+      if (e.type === "sync_request") {
+        // Someone just opened Music. A signed-in side has nothing to do
+        // (durable covers them); a guest replays what it queued that never
+        // landed, spaced out so the receiver's reducer sees each one.
+        if (room.canPersist || pendingRef.current.length === 0) return;
+        replayTimersRef.current.forEach((t) => window.clearTimeout(t));
+        replayTimersRef.current = pendingRef.current.map((track, i) =>
+          window.setTimeout(() => void session.sendEvent("enqueue", { track }), i * 700),
+        );
+        return;
+      }
       const p = playerRef.current;
       const ts = typeof e.payload.timestamp_seconds === "number" ? e.payload.timestamp_seconds : undefined;
       if (e.type === "enqueue") {
@@ -334,6 +362,12 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
     });
   }, [session, userId, room.canPersist]);
 
+  // Ask the room what's on (a guest DJ answers by replaying its queue).
+  useEffect(() => {
+    if (!session) return;
+    void session.sendEvent("sync_request", {});
+  }, [session]);
+
   // DJ drift heartbeat.
   useEffect(() => {
     if (!isDJ || !playing) return;
@@ -396,6 +430,10 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       // Broadcast the enqueue so the partner can mirror; their reducer
       // appends to queue if something's already playing.
       void session?.sendEvent("enqueue", { track });
+      if (!room.canPersist) {
+        pendingRef.current = [...pendingRef.current, track];
+        setPendingCount(pendingRef.current.length);
+      }
       if (nowPlaying != null) {
         // A track is already playing — append to OUR queue (the partner's
         // enqueue-listener does the same on their side).
@@ -442,7 +480,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [session, userId, currentDj, turn, nowPlaying, queue],
+    [session, userId, currentDj, turn, nowPlaying, queue, room.canPersist],
   );
 
   const playUrl = (e: React.FormEvent) => {
@@ -606,7 +644,11 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
           {!silence && trackChannel ? (
             <p className="truncate text-xs text-muted-foreground lg:text-sm">{trackChannel}</p>
           ) : !silence && !trackTitle ? (
-            <p className="text-xs text-muted-foreground lg:text-sm">Paste a YouTube link below to start the queue.</p>
+            <p className="text-xs text-muted-foreground lg:text-sm">
+              {pendingCount > 0
+                ? `Queued. It starts when ${partnerId ? names[partnerId] || "your date" : "your date"} opens Music.`
+                : "Paste a YouTube link below to start the queue."}
+            </p>
           ) : null}
         </div>
 
