@@ -92,12 +92,13 @@ export function getAdminStats() {
   return api.get<AdminStats>("/v1/admin/stats");
 }
 
-export function listAdminUsers(params?: { search?: string; cursor?: string }) {
+export function listAdminUsers(params?: { search?: string; cursor?: string; limit?: number }) {
   const qs = new URLSearchParams();
   if (params?.search) qs.set("search", params.search);
   if (params?.cursor) qs.set("cursor", params.cursor);
+  if (params?.limit) qs.set("limit", String(params.limit));
   const q = qs.toString();
-  return api.get<Page<AdminUserRow>>(`/v1/admin/users${q ? `?${q}` : ""}`);
+  return api.get<Page<AdminUserRow> & { total?: number | null }>(`/v1/admin/users${q ? `?${q}` : ""}`);
 }
 
 export function getAdminUser(id: string) {
