@@ -34,6 +34,7 @@ import {
   type LucideIcon,
   Loader2,
   Check,
+  ShieldCheck,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
 import { ActivityHelp, GameIntro, hasActivityHelp, shouldShowGameIntro } from "@/components/ActivityHelp";
@@ -44,6 +45,7 @@ import { useHelpNow } from "@/lib/activityHelpNow";
 import { MusicPlayerBar, MusicRoomProvider } from "@/components/MusicRoom";
 import { ActivityBoundary } from "@/components/RoomErrorBoundary";
 import { useRoomSession } from "@/context/RoomSessionContext";
+import { useChaperonController } from "@/context/ChaperonContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
 import { backgroundMoodLabel } from "@/lib/roomAmbiance";
 import {
@@ -304,6 +306,7 @@ export function RoomStage({
   // a tappable notice for ~3s, then it settles back. (Activities are per-user,
   // so this is how you learn your partner did something.)
   const room = useRoomSession();
+  const chaperon = useChaperonController();
 
   // Game-channel connection state — NOT the video call, which is a separate
   // LiveKit connection that survives networks this WebSocket doesn't. Shown
@@ -908,6 +911,16 @@ export function RoomStage({
                     onClick={() => pickCategory(c)}
                   />
                 ))}
+                {/* Chaperon lives in the dock too, so it is reachable mid-game
+                    (the lobby card is hidden once an activity is up). */}
+                {chaperon?.enabled && (
+                  <MenuTile
+                    Icon={ShieldCheck}
+                    label="Chaperon"
+                    active={chaperon.active}
+                    onClick={() => window.dispatchEvent(new CustomEvent("dr:chaperon:open-setup"))}
+                  />
+                )}
               </div>
             )}
           </div>
