@@ -233,7 +233,8 @@ export function totFromJson(s: Record<string, unknown> | null): TotState {
 export function reduceTot(current: TotState, event: TotEvent): TotState {
   const me = event.userId;
   const evRound = typeof event.payload.round === "number" ? event.payload.round : null;
-  const side = event.payload.side === "a" || event.payload.side === "b" ? event.payload.side : null;
+  const rawSide = event.payload.side;
+  const side: TotSide | null = rawSide === "a" ? "a" : rawSide === "b" ? "b" : null;
 
   switch (event.type) {
     case "pick": {
