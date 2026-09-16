@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
   type ReactNode,
@@ -47,6 +48,15 @@ import { ActivityBoundary } from "@/components/RoomErrorBoundary";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useChaperonController } from "@/context/ChaperonContext";
 import { ChaperonSeam } from "@/components/ChaperonSeam";
+import { ActivityInvite, inviteChime } from "@/components/ActivityInvite";
+import {
+  INITIAL_INVITE_STATE,
+  inviteHeadline,
+  inviteReducer,
+  isInvitable,
+  pendingInvite,
+  starterStatus,
+} from "@/lib/activityInvite";
 import { useActivitySession } from "@/hooks/useActivitySession";
 import { backgroundMoodLabel } from "@/lib/roomAmbiance";
 import {
@@ -233,6 +243,7 @@ export function RoomStage({
   renderContent,
   partnerStatus,
   partnerName = "Your partner",
+  partnerPhotoUrl = null,
   partnerInRoom = false,
   partnerInCall = false,
   partnerPresent = false,
@@ -245,6 +256,7 @@ export function RoomStage({
   renderContent: (id: string, launch: (id: string) => void) => ReactNode;
   partnerStatus: string;
   partnerName?: string;
+  partnerPhotoUrl?: string | null;
   partnerInRoom?: boolean;
   partnerInCall?: boolean;
   partnerPresent?: boolean;
@@ -336,11 +348,77 @@ export function RoomStage({
     useRoomThemePicker();
   const [notif, setNotif] = useState<{ id: number; text: string; target: string } | null>(null);
 
+  const stagedRef = useRef(staged);
+  stagedRef.current = staged;
+
+  // ── "JJ started X, join them?" ─────────────────────────────────────────
+  // Where the partner is (from their `stage` broadcasts, or their activity
+  // events as a fallback for clients that don't send `stage`), reduced into
+  // one actionable invite. See lib/activityInvite.ts for the rules.
+  const [invite, dispatchInvite] = useReducer(inviteReducer, INITIAL_INVITE_STATE);
+  const openedAtRef = useRef<number | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  // Tell the partner what I opened (null = a wall, the lobby, or settings).
+  // Re-sent on reconnect and when the partner arrives, so a late joiner
+  // still gets invited into a game I'm already sitting in.
+  const partnerPresentRef = useRef(partnerPresent);
+  useEffect(() => {
+    openedAtRef.current = isInvitable(staged) ? Date.now() : null;
+    setNowTick(Date.now());
+    void room.channel.broadcast("stage", {
+      activity_id: isInvitable(staged) ? staged : null,
+      from: room.senderId,
+      name: room.displayName,
+      at: new Date().toISOString(),
+    });
+  }, [staged, room.channel, room.senderId, room.displayName]);
+  useEffect(() => {
+    const rose = partnerPresent && !partnerPresentRef.current;
+    partnerPresentRef.current = partnerPresent;
+    if (!partnerPresent) {
+      dispatchInvite({ type: "partner_left" });
+      return;
+    }
+    if (rose && isInvitable(stagedRef.current)) {
+      void room.channel.broadcast("stage", {
+        activity_id: stagedRef.current,
+        from: room.senderId,
+        name: room.displayName,
+        at: new Date().toISOString(),
+      });
+    }
+  }, [partnerPresent, room.channel, room.senderId, room.displayName]);
+  useEffect(() => {
+    if (channelStatus !== "subscribed" || !isInvitable(stagedRef.current)) return;
+    void room.channel.broadcast("stage", {
+      activity_id: stagedRef.current,
+      from: room.senderId,
+      name: room.displayName,
+      at: new Date().toISOString(),
+    });
+  }, [channelStatus, room.channel, room.senderId, room.displayName]);
+  // The "Inviting JJ…" chip on the starter's side times out on its own.
+  useEffect(() => {
+    if (openedAtRef.current == null) return;
+    const t = window.setTimeout(() => setNowTick(Date.now()), 46_000);
+    return () => window.clearTimeout(t);
+  }, [staged, nowTick]);
+  const inviteId = pendingInvite(invite, staged);
+  const lastChimedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!inviteId) {
+      lastChimedRef.current = null;
+      return;
+    }
+    if (lastChimedRef.current === inviteId) return;
+    lastChimedRef.current = inviteId;
+    inviteChime();
+  }, [inviteId]);
+  const declineInvite = useCallback(() => dispatchInvite({ type: "decline" }), []);
+
   const notifTimer = useRef<number | undefined>(undefined);
   // Ids removed via the delete broadcast — dropped from pinned cards instantly.
   const [removedVisionIds, setRemovedVisionIds] = useState<Set<string>>(() => new Set());
-  const stagedRef = useRef(staged);
-  stagedRef.current = staged;
   useEffect(() => {
     const off = room.channel.onBroadcast((e) => {
       if (e.kind === "vision_removed") {
@@ -360,12 +438,24 @@ export function RoomStage({
         notifTimer.current = window.setTimeout(() => setNotif(null), 3400);
         return;
       }
+      if (e.kind === "stage") {
+        const d = e.payload as { activity_id?: string | null; from?: string; at?: string };
+        if (d.from === room.senderId) return;
+        const at = d.at ? Date.parse(d.at) || Date.now() : Date.now();
+        dispatchInvite({ type: "stage", id: d.activity_id ?? null, at });
+        return;
+      }
       if (e.kind !== "activity") return;
       const d = e.payload as { activity_id?: string; type?: string; user_id?: string };
       if (!d.activity_id || d.user_id === room.senderId) return;
       if (d.type && NOTIF_NOISY.has(d.type)) return;
       const meta = NOTIF[d.activity_id];
       if (!meta) return;
+      // Joinable activities get the invite card instead of the dock pill.
+      if (isInvitable(meta.target)) {
+        dispatchInvite({ type: "activity", id: meta.target, eventType: d.type, at: Date.now() });
+        return;
+      }
       // Already viewing that activity — no need to nudge me to open it.
       if (meta.target === stagedRef.current) return;
       setNotif({ id: Date.now(), text: `${partnerName} ${meta.verb}`, target: meta.target });
@@ -741,6 +831,30 @@ export function RoomStage({
                 {stagedItem.title}
               </span>
             )}
+            {(() => {
+              // Starter's side: did my date follow me in?
+              const st = starterStatus(invite, staged, partnerPresent, nowTick, 45_000, openedAtRef.current);
+              if (!st) return null;
+              return (
+                <span
+                  data-testid="stage-partner-status"
+                  className={cn(
+                    "hidden min-w-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] sm:inline-flex",
+                    st === "together"
+                      ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+                      : "border-white/[0.1] bg-white/[0.04] text-cream/60",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "h-1.5 w-1.5 shrink-0 rounded-full",
+                      st === "together" ? "bg-emerald-400" : "bg-primary animate-pulse",
+                    )}
+                  />
+                  <span className="truncate">{st === "together" ? `${partnerName} is here` : `Inviting ${partnerName}…`}</span>
+                </span>
+              );
+            })()}
             <div className="ml-auto flex min-w-0 items-center gap-2">
               {staged === "lobby" && (
                 <RoomThemeChip
@@ -978,6 +1092,25 @@ export function RoomStage({
           Rendered into a persistent host (see pipHostRef) so it can be
           re-parented into the Watch fullscreen layer without remounting the
           call. The anchor marks its normal home in the room. */}
+      {inviteId &&
+        (() => {
+          const item = items.find((i) => i.id === inviteId);
+          const title = item?.title ?? inviteId;
+          return (
+            <ActivityInvite
+              partnerName={partnerName}
+              partnerPhotoUrl={partnerPhotoUrl}
+              activityId={inviteId}
+              activityTitle={title}
+              headline={inviteHeadline(partnerName, inviteId, title)}
+              tileSrc={ITEM_TILE_IMAGES[inviteId]}
+              Icon={ITEM_ICONS[inviteId]}
+              onJoin={() => commitStage(inviteId)}
+              onDecline={declineInvite}
+            />
+          );
+        })()}
+
       <div ref={pipAnchorRef} className="contents" />
       {callActive &&
         !splitCallLayout &&

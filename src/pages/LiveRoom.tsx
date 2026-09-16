@@ -218,6 +218,7 @@ function RoomShell({
       "Your partner";
     return {
       name,
+      photoUrl: typeof p?.photo_url === "string" && p.photo_url ? p.photo_url : null,
       inRoom: Boolean(p) || callPeers.length > 0,
       inCall: p?.is_in_call === true || callPeers.length > 0,
     };
@@ -613,6 +614,7 @@ function RoomShell({
           renderContent={renderRoomActivity}
           partnerStatus={partnerStatus}
           partnerName={partnerInfo.name}
+          partnerPhotoUrl={partnerInfo.photoUrl}
           partnerInRoom={partnerInfo.inRoom}
           partnerInCall={partnerInfo.inCall}
           partnerPresent={partnerPresent}
