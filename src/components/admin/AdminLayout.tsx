@@ -7,6 +7,7 @@ import {
   ScrollText,
   ShieldCheck,
   ArrowLeft,
+  Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/authClient";
@@ -17,6 +18,7 @@ const NAV = [
   { to: "/admin/promo", label: "Promo codes", icon: Ticket },
   { to: "/admin/rooms", label: "Rooms", icon: DoorOpen },
   { to: "/admin/chaperon", label: "Chaperon AI", icon: ShieldCheck },
+  { to: "/admin/beta", label: "Beta console", icon: Radio },
   { to: "/admin/audit", label: "Audit log", icon: ScrollText },
 ];
 

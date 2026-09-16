@@ -197,6 +197,9 @@ export type CoachBetaApplication = {
   status: string;
   created_at: string;
   calls_remaining: number;
+  decided_at?: string | null;
+  decline_reason?: string | null;
+  is_team?: boolean;
 };
 
 export type CoachBetaApplicationsResponse = {
@@ -310,5 +313,157 @@ export function redeemPromoCode(code: string) {
   return api.post<{ success: boolean; message: string; benefit: string }>(
     "/v1/billing/redeem-promo",
     { code },
+  );
+}
+
+// --- Beta console (structure only: pseudonyms, pattern codes, no words) -----
+
+export type BetaReview = { verdict: string; tag: string | null; note: string; at: string };
+
+export type BetaSignalRow = {
+  event_id: string;
+  at: string;
+  call: string;
+  tester: string;
+  team: boolean;
+  mode: string;
+  family: "protect" | "coach";
+  check_id: string;
+  severity: string;
+  confidence: number;
+  pattern: string;
+  provider: string;
+  model: string;
+  rubric_version: string;
+  elapsed_sec: number;
+  outcome: string;
+  reaction: string | null;
+  reaction_reason: string | null;
+  shared: boolean;
+  probe: boolean;
+  review: BetaReview | null;
+  /** Only when the viewer shared it or the reviewer owns the call. */
+  whisper: string | null;
+};
+
+export type BetaFeedFilters = {
+  family?: "protect" | "coach";
+  outcome?: "shown" | "suppressed" | "pending";
+  reacted?: boolean;
+  reviewed?: boolean;
+  probe?: boolean;
+  shared?: boolean;
+  mine?: boolean;
+  team?: boolean;
+  call?: string;
+};
+
+function qs(params: Record<string, string | number | boolean | undefined>): string {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") p.set(k, String(v));
+  const s = p.toString();
+  return s ? `?${s}` : "";
+}
+
+export function getBetaFeed(filters: BetaFeedFilters, cursor?: string, limit = 50) {
+  return api.get<{ items: BetaSignalRow[]; next_cursor: string | null }>(
+    `/v1/admin/beta/feed${qs({ ...filters, cursor, limit })}`,
+  );
+}
+
+export type BetaOverview = {
+  on_air: { sessions: number; coached: number; guardian: number };
+  today: Record<string, number | null>;
+  yesterday: Record<string, number | null>;
+  unreviewed: number;
+};
+
+export function getBetaOverview() {
+  return api.get<BetaOverview>("/v1/admin/beta/overview");
+}
+
+export type BetaLiveSession = {
+  session_id: string;
+  call: string;
+  tester: string;
+  team: boolean;
+  mode: string;
+  started_at: string;
+  signals: number;
+  shown: number;
+  probe_armed: boolean;
+  newest: { check_id: string; confidence: number; at: string; outcome: string } | null;
+};
+
+export function getBetaLive() {
+  return api.get<{ sessions: BetaLiveSession[] }>("/v1/admin/beta/live");
+}
+
+export function getBetaReviewQueue(limit = 10) {
+  return api.get<{ items: BetaSignalRow[]; unreviewed: number }>(
+    `/v1/admin/beta/review/queue${qs({ limit })}`,
+  );
+}
+
+export type BetaVerdict = "correct" | "wrong" | "borderline";
+export type BetaVerdictTag = "user_right" | "missed_worse" | "wording_off" | "rubric_gap";
+
+export function postBetaVerdict(body: {
+  event_id: string;
+  verdict: BetaVerdict;
+  tag?: BetaVerdictTag;
+  note?: string;
+}) {
+  return api.post<void>("/v1/admin/beta/review/verdicts", body);
+}
+
+export type BetaNeedsYou = {
+  id: string;
+  severity: "alert" | "warn";
+  title: string;
+  detail: string;
+  action: "end_sessions" | null;
+  rooms: string[];
+};
+
+export type BetaHealth = {
+  needs_you: BetaNeedsYou[];
+  stuck_sessions: { room_id: string; call: string; started_at: string; hours: number }[];
+  cost: { rows_today: number; sessions_ended_today: number };
+  unwritten_debriefs: number;
+  suppression: { signals: number; agent: number; gate: number };
+  judges: {
+    provider: string;
+    model: string;
+    signals: number;
+    shown: number;
+    probes: number;
+    agree_rate_pct: number | null;
+    evals: number;
+    errors: number;
+    error_rate_pct: number | null;
+    mean_latency_ms: number | null;
+    slow: number;
+  }[];
+  by_check: { check_id: string; signals: number; shown: number; agree_rate_pct: number | null }[];
+};
+
+export function getBetaHealth() {
+  return api.get<BetaHealth>("/v1/admin/beta/health");
+}
+
+export function postBetaEndSessions(room_ids: string[]) {
+  return api.post<{ ended: number }>("/v1/admin/beta/health/end-sessions", { room_ids });
+}
+
+export type CoachBetaDeclineReason = "no_reason" | "duplicate_device" | "not_yet" | "other";
+
+export function declineCoachBeta(body: { user_id: string; reason: CoachBetaDeclineReason }) {
+  return api.post<{ status: string; reason: string }>("/v1/admin/chaperon/coach-beta/decline", body);
+}
+
+export function listCoachBetaApplicationsBy(status: "pending" | "granted" | "declined" | "all") {
+  return api.get<CoachBetaApplicationsResponse>(
+    `/v1/admin/chaperon/coach-beta/applications${qs({ status })}`,
   );
 }

@@ -36,6 +36,7 @@ import AdminPromoCodes from "./pages/admin/AdminPromoCodes";
 import AdminRooms from "./pages/admin/AdminRooms";
 import AdminAudit from "./pages/admin/AdminAudit";
 import AdminChaperon from "./pages/admin/AdminChaperon";
+import AdminBeta from "./pages/admin/AdminBeta";
 import { AuthGuard } from "./components/AuthGuard";
 import { AdminGuard } from "./components/admin/AdminGuard";
 import { AdminLayout } from "./components/admin/AdminLayout";
@@ -115,6 +116,7 @@ const App = () => {
               <Route path="promo" element={<AdminPromoCodes />} />
               <Route path="rooms" element={<AdminRooms />} />
               <Route path="chaperon" element={<AdminChaperon />} />
+              <Route path="beta" element={<AdminBeta />} />
               <Route path="audit" element={<AdminAudit />} />
             </Route>
 
