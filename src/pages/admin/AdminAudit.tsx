@@ -10,13 +10,13 @@ export default function AdminAudit() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold">Audit log</h2>
-        <p className="text-slate-500 text-sm mt-1">Who changed what — grants, promos, admin flags.</p>
+        <h2 className="font-serif text-2xl font-medium text-cream">Audit log</h2>
+        <p className="text-muted-foreground/70 text-sm mt-1">Who changed what — grants, promos, admin flags.</p>
       </div>
 
-      <div className="rounded-xl border border-slate-800 overflow-hidden">
+      <div className="rounded-xl border border-white/[0.08] overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-900/80 text-slate-500 text-left">
+          <thead className="bg-card/80 text-muted-foreground/70 text-left">
             <tr>
               <th className="px-4 py-3">When</th>
               <th className="px-4 py-3">Admin</th>
@@ -27,19 +27,19 @@ export default function AdminAudit() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground/70">
                   Loading…
                 </td>
               </tr>
             )}
             {data?.items.map((row) => (
-              <tr key={row.id} className="border-t border-slate-800">
-                <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
+              <tr key={row.id} className="border-t border-white/[0.08]">
+                <td className="px-4 py-3 text-muted-foreground/70 text-xs whitespace-nowrap">
                   {new Date(row.created_at).toLocaleString()}
                 </td>
-                <td className="px-4 py-3 text-slate-400 text-xs">{row.admin_email ?? "—"}</td>
-                <td className="px-4 py-3 text-slate-200">{row.action}</td>
-                <td className="px-4 py-3 text-slate-500 text-xs font-mono">
+                <td className="px-4 py-3 text-muted-foreground text-xs">{row.admin_email ?? "—"}</td>
+                <td className="px-4 py-3 text-cream/90">{row.action}</td>
+                <td className="px-4 py-3 text-muted-foreground/70 text-xs font-mono">
                   {row.target_type && `${row.target_type}:`}
                   {row.target_id?.slice(0, 8)}…
                 </td>

@@ -12,14 +12,14 @@ export default function AdminRooms() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold">Rooms</h2>
-        <p className="text-slate-500 text-sm mt-1">Active and persistent rooms across the platform.</p>
+        <h2 className="font-serif text-2xl font-medium text-cream">Rooms</h2>
+        <p className="text-muted-foreground/70 text-sm mt-1">Active and persistent rooms across the platform.</p>
       </div>
 
       <select
         value={state}
         onChange={(e) => setState(e.target.value)}
-        className="rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm"
+        className="rounded-lg bg-card border border-white/[0.14] px-3 py-2 text-sm"
       >
         <option value="">All states</option>
         <option value="live">Live</option>
@@ -29,9 +29,9 @@ export default function AdminRooms() {
         <option value="ended">Ended</option>
       </select>
 
-      <div className="rounded-xl border border-slate-800 overflow-x-auto">
+      <div className="rounded-xl border border-white/[0.08] overflow-x-auto">
         <table className="w-full text-sm min-w-[640px]">
-          <thead className="bg-slate-900/80 text-slate-500 text-left">
+          <thead className="bg-card/80 text-muted-foreground/70 text-left">
             <tr>
               <th className="px-4 py-3">Code</th>
               <th className="px-4 py-3">Host</th>
@@ -43,26 +43,26 @@ export default function AdminRooms() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground/70">
                   Loading…
                 </td>
               </tr>
             )}
             {data?.items.map((r) => (
-              <tr key={r.id} className="border-t border-slate-800">
-                <td className="px-4 py-3 font-mono text-slate-200">{r.code}</td>
-                <td className="px-4 py-3 text-slate-500 text-xs">{r.host_email ?? "—"}</td>
-                <td className="px-4 py-3 text-slate-400">
+              <tr key={r.id} className="border-t border-white/[0.08]">
+                <td className="px-4 py-3 font-mono text-cream/90">{r.code}</td>
+                <td className="px-4 py-3 text-muted-foreground/70 text-xs">{r.host_email ?? "—"}</td>
+                <td className="px-4 py-3 text-muted-foreground">
                   {r.package}
                   {r.persistence === "persistent" && (
                     <span className="ml-1 text-amber-500/80">· persistent</span>
                   )}
                 </td>
-                <td className="px-4 py-3 tabular-nums text-slate-400">
+                <td className="px-4 py-3 tabular-nums text-muted-foreground">
                   {r.participant_count}/{r.max_participants}
                 </td>
                 <td className="px-4 py-3">
-                  <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs uppercase">
+                  <span className="rounded-full bg-white/[0.08] px-2 py-0.5 text-xs uppercase">
                     {r.state}
                   </span>
                 </td>
