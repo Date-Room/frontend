@@ -16,6 +16,8 @@ export type MusicCtxValue = {
   tracks: DjTrack[];
   currentId: string | null;
   upcomingCount: number;
+  /** Songs a guest queued that no signed-in member has persisted yet. */
+  pendingCount: number;
   playing: boolean;
   silence: boolean;
   videoId: string | null;
