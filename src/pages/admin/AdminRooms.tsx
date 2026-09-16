@@ -9,7 +9,7 @@ const STATE_TONE: Record<string, string> = {
   live: "bg-emerald-500/15 text-emerald-300",
   active: "bg-emerald-500/15 text-emerald-300",
   waiting: "bg-sky-500/15 text-sky-300",
-  grace: "bg-amber-500/15 text-amber-300",
+  grace: "bg-fuchsia-500/15 text-fuchsia-300",
   ended: "bg-white/[0.08] text-cream/60",
 };
 

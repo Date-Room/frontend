@@ -116,13 +116,13 @@ export default function AdminBeta() {
             Live <Count n={overview.data?.on_air.sessions} />
           </TabsTrigger>
           <TabsTrigger value="review">
-            Review <Count n={queue.data?.unreviewed} tone="amber" />
+            Review <Count n={queue.data?.unreviewed} tone="warn" />
           </TabsTrigger>
           <TabsTrigger value="grants">
-            Grants <Count n={apps.data?.pending_count} tone="amber" />
+            Grants <Count n={apps.data?.pending_count} tone="warn" />
           </TabsTrigger>
           <TabsTrigger value="feedback">
-            Feedback <Count n={feedback.data?.counts?.new} tone="amber" />
+            Feedback <Count n={feedback.data?.counts?.new} tone="warn" />
           </TabsTrigger>
           <TabsTrigger value="status">
             Status {needsYou > 0 && <span className="ml-1.5 rounded-full bg-rose-500/20 px-1.5 text-[10px] font-bold text-rose-300">!</span>}
@@ -149,10 +149,10 @@ export default function AdminBeta() {
   );
 }
 
-function Count({ n, tone = "slate" }: { n: number | undefined; tone?: "slate" | "amber" }) {
+function Count({ n, tone = "slate" }: { n: number | undefined; tone?: "slate" | "warn" }) {
   if (!n) return null;
   return (
-    <span className={cn("ml-1.5 rounded-full px-1.5 text-[10px] font-bold", tone === "amber" ? "bg-amber-500/20 text-amber-300" : "bg-white/[0.12] text-cream/90")}>
+    <span className={cn("ml-1.5 rounded-full px-1.5 text-[10px] font-bold", tone === "warn" ? "bg-fuchsia-500/20 text-fuchsia-300" : "bg-white/[0.12] text-cream/90")}>
       {n}
     </span>
   );
@@ -220,8 +220,8 @@ function LiveTab() {
       </div>
 
       {(health.data?.needs_you ?? []).map((row) => (
-        <div key={row.id} className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-sm", row.severity === "alert" ? "border-rose-500/40 bg-rose-500/[0.06] text-rose-100" : "border-amber-500/40 bg-amber-500/[0.06] text-amber-100")}>
-          <span className={cn("h-2 w-2 rounded-full", row.severity === "alert" ? "bg-rose-400" : "bg-amber-400")} />
+        <div key={row.id} className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-sm", row.severity === "alert" ? "border-rose-500/40 bg-rose-500/[0.06] text-rose-100" : "border-fuchsia-500/40 bg-fuchsia-500/[0.06] text-fuchsia-100")}>
+          <span className={cn("h-2 w-2 rounded-full", row.severity === "alert" ? "bg-rose-400" : "bg-fuchsia-400")} />
           <span className="font-medium">{row.title}</span>
           <span className="truncate text-muted-foreground">{row.detail}</span>
         </div>
@@ -302,17 +302,17 @@ function SignalTable({ rows, loading }: { rows: BetaSignalRow[]; loading: boolea
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.event_id} className={cn("border-t border-white/[0.08]", r.severity === "alert" && "border-l-2 border-l-rose-500", r.severity === "warn" && "border-l-2 border-l-amber-500")}>
+            <tr key={r.event_id} className={cn("border-t border-white/[0.08]", r.severity === "alert" && "border-l-2 border-l-rose-500", r.severity === "warn" && "border-l-2 border-l-fuchsia-500")}>
               <td className="px-3 py-2 font-mono text-muted-foreground">{hhmmss(r.at)}</td>
               <td className="px-3 py-2 font-mono">{r.call} <span className="text-muted-foreground/70">{r.tester}</span>{r.team && <span className="ml-1 text-muted-foreground/70">· team</span>}</td>
-              <td className="px-3 py-2">{r.family === "protect" ? <ShieldCheck className="h-3.5 w-3.5 text-rose-300" /> : <Compass className="h-3.5 w-3.5 text-amber-300" />}</td>
+              <td className="px-3 py-2">{r.family === "protect" ? <ShieldCheck className="h-3.5 w-3.5 text-rose-300" /> : <Compass className="h-3.5 w-3.5 text-fuchsia-300" />}</td>
               <td className="px-3 py-2 font-mono">{r.check_id} <span className="text-muted-foreground/70">{r.confidence.toFixed(2)}</span>{r.probe && <span className="ml-1 rounded-full bg-sky-500/15 px-1.5 text-[10px] text-sky-300">probe</span>}</td>
               <td className="px-3 py-2 text-cream/80">{r.pattern || "—"}</td>
               <td className="px-3 py-2 font-mono text-muted-foreground">{r.model || r.provider}</td>
               <td className="px-3 py-2 text-cream/80">{outcomeLabel(r.outcome)}</td>
               <td className="px-3 py-2 text-cream/80">{reactionLabel(r)}{r.shared && <span className="ml-1 rounded-full bg-sky-500/15 px-1.5 text-[10px] text-sky-300">shared</span>}</td>
               <td className="px-3 py-2">
-                {r.probe ? <span className="text-muted-foreground/70">auto</span> : r.review ? <span className={cn("rounded-full px-1.5 text-[10px]", r.review.verdict === "correct" ? "bg-emerald-500/15 text-emerald-300" : r.review.verdict === "wrong" ? "bg-rose-500/15 text-rose-300" : "bg-amber-500/15 text-amber-300")}>{r.review.verdict}</span> : <span className="rounded-full bg-amber-500/15 px-1.5 text-[10px] text-amber-300">review</span>}
+                {r.probe ? <span className="text-muted-foreground/70">auto</span> : r.review ? <span className={cn("rounded-full px-1.5 text-[10px]", r.review.verdict === "correct" ? "bg-emerald-500/15 text-emerald-300" : r.review.verdict === "wrong" ? "bg-rose-500/15 text-rose-300" : "bg-fuchsia-500/15 text-fuchsia-300")}>{r.review.verdict}</span> : <span className="rounded-full bg-fuchsia-500/15 px-1.5 text-[10px] text-fuchsia-300">review</span>}
               </td>
             </tr>
           ))}
@@ -366,7 +366,7 @@ function ReviewTab() {
         </div>
         <div className="rounded-lg border border-white/[0.08] bg-card/40">
           <div className="flex items-center gap-2 border-b border-white/[0.08] px-4 py-3 text-sm">
-            {current.family === "protect" ? <ShieldCheck className="h-4 w-4 text-rose-300" /> : <Compass className="h-4 w-4 text-amber-300" />}
+            {current.family === "protect" ? <ShieldCheck className="h-4 w-4 text-rose-300" /> : <Compass className="h-4 w-4 text-fuchsia-300" />}
             <span className="font-mono font-semibold">{current.check_id}</span>
             <span className="rounded bg-white/[0.08] px-1.5 font-mono text-xs text-cream/80">{current.confidence.toFixed(2)}</span>
             <span className="ml-auto font-mono text-xs text-muted-foreground/70">{current.call} · {current.tester}{current.team ? " · team" : ""}</span>
@@ -408,7 +408,7 @@ function ReviewTab() {
               ))}
             </div>
             <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note for the rubric log (optional)" rows={2} className="w-full rounded-lg border border-white/[0.08] bg-card px-3 py-2 text-sm text-cream placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none" />
-            <button type="button" disabled={!verdict || save.isPending} onClick={() => save.mutate()} className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold transition hover:bg-primary/90 disabled:opacity-40">
+            <button type="button" disabled={!verdict || save.isPending} onClick={() => save.mutate()} className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground neon-btn px-4 py-2 text-sm font-semibold transition hover:bg-primary/90 disabled:opacity-40">
               {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Save &amp; next
             </button>
@@ -500,7 +500,7 @@ function ApplicationCard({ app, onDone }: { app: CoachBetaApplication; onDone: (
       <div className="flex items-center gap-2 border-b border-white/[0.08] px-4 py-3">
         <p className="font-semibold">{app.display_name || app.email}</p>
         {app.is_team && <span className="rounded-full bg-white/[0.12] px-2 py-0.5 text-[11px] text-cream/80">team</span>}
-        <span className="ml-auto text-xs text-amber-300">waiting {waitingFor(app.created_at)}</span>
+        <span className="ml-auto text-xs text-fuchsia-300">waiting {waitingFor(app.created_at)}</span>
       </div>
       <div className="px-4 py-4">
         <p className="text-[11px] uppercase tracking-wider text-muted-foreground/70">Why they want in</p>
@@ -513,7 +513,7 @@ function ApplicationCard({ app, onDone }: { app: CoachBetaApplication; onDone: (
           <span className="w-8 text-center text-sm font-semibold tabular-nums">{calls}</span>
           <button type="button" aria-label="More" onClick={() => setCalls((c) => Math.min(COACH_BETA_MAX_GRANT, c + 1))} className="px-2 py-1.5 text-cream/80 hover:bg-white/[0.08]"><Plus className="h-4 w-4" /></button>
         </div>
-        <button type="button" disabled={grant.isPending} onClick={() => grant.mutate()} className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-40">
+        <button type="button" disabled={grant.isPending} onClick={() => grant.mutate()} className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground neon-btn px-4 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-40">
           {grant.isPending && <Loader2 className="h-4 w-4 animate-spin" />}Grant {calls}
         </button>
         {!declineOpen ? (
@@ -582,7 +582,7 @@ function StatusTab() {
           <p className="rounded-lg border border-white/[0.08] bg-card/40 px-4 py-4 text-sm text-muted-foreground/70">Nothing on the floor.</p>
         ) : (
           h.needs_you.map((row) => (
-            <div key={row.id} className={cn("flex flex-wrap items-center gap-3 rounded-lg border-l-2 border border-white/[0.08] bg-card/40 px-4 py-3", row.severity === "alert" ? "border-l-rose-500" : "border-l-amber-500")}>
+            <div key={row.id} className={cn("flex flex-wrap items-center gap-3 rounded-lg border-l-2 border border-white/[0.08] bg-card/40 px-4 py-3", row.severity === "alert" ? "border-l-rose-500" : "border-l-fuchsia-500")}>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-cream">{row.title}</p>
                 <p className="text-xs text-muted-foreground">{row.detail}</p>
@@ -613,7 +613,7 @@ function StatusTab() {
                     <td className="px-4 py-2 font-mono text-cream/90">{j.model || j.provider}</td>
                     <td className="px-2 py-2 tabular-nums">{j.agree_rate_pct == null ? "\u2014" : `${j.agree_rate_pct}%`}</td>
                     <td className={cn("px-2 py-2 tabular-nums", (j.error_rate_pct ?? 0) >= 20 && "text-rose-300")}>{j.errors}{j.error_rate_pct != null ? ` (${j.error_rate_pct}%)` : ""}</td>
-                    <td className={cn("px-2 py-2 tabular-nums", (j.mean_latency_ms ?? 0) >= 10_000 && "text-amber-300")}>{j.mean_latency_ms == null ? "\u2014" : `${(j.mean_latency_ms / 1000).toFixed(1)}s`}</td>
+                    <td className={cn("px-2 py-2 tabular-nums", (j.mean_latency_ms ?? 0) >= 10_000 && "text-fuchsia-300")}>{j.mean_latency_ms == null ? "\u2014" : `${(j.mean_latency_ms / 1000).toFixed(1)}s`}</td>
                     <td className="px-2 py-2 tabular-nums">{j.shown} / {j.signals}</td>
                   </tr>
                 ))}
@@ -653,7 +653,7 @@ function StatusTab() {
 // ── Feedback ─────────────────────────────────────────────────────────────────
 
 const KIND_TONE: Record<AdminFeedbackRow["kind"], string> = {
-  confusing: "bg-amber-500/15 text-amber-300",
+  confusing: "bg-fuchsia-500/15 text-fuchsia-300",
   broken: "bg-rose-500/15 text-rose-300",
   idea: "bg-sky-500/15 text-sky-300",
   loved: "bg-emerald-500/15 text-emerald-300",

@@ -1,6 +1,7 @@
 import typography from "@tailwindcss/typography";
 import tailwindcssAnimate from "tailwindcss-animate";
 import type { Config } from "tailwindcss";
+import colors from "tailwindcss/colors";
 
 export default {
   darkMode: ["class"],
@@ -89,7 +90,9 @@ export default {
         // (activities included) to match its background; defaults to the brand
         // amber at :root. Channels are space-separated HSL for /opacity support.
         amber: "hsl(var(--amber) / <alpha-value>)",
-        rose: "#D4826A",
+        // Product rose stays the bare `rose`; numeric steps restore Tailwind's
+        // scale so status utilities (rose-300/400/500) actually render.
+        rose: { ...colors.rose, DEFAULT: "#D4826A" },
       },
       borderRadius: {
         lg: "var(--radius)",

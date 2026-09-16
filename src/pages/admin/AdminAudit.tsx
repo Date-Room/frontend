@@ -13,7 +13,7 @@ export function auditSeverity(action: string): "info" | "warn" | "danger" {
 
 const TONE = {
   info: "bg-white/[0.08] text-cream/70",
-  warn: "bg-amber-500/15 text-amber-300",
+  warn: "bg-fuchsia-500/15 text-fuchsia-300",
   danger: "bg-rose-500/15 text-rose-300",
 };
 

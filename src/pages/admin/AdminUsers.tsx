@@ -154,7 +154,7 @@ export default function AdminUsers() {
                   onClick={() => setSelected(u)}
                   className={cn(
                     "border-t border-white/[0.08] cursor-pointer hover:bg-card/50",
-                    selected?.id === u.id && "bg-amber-500/10",
+                    selected?.id === u.id && "bg-fuchsia-500/10",
                   )}
                 >
                   <td className="px-4 py-3">
@@ -166,7 +166,7 @@ export default function AdminUsers() {
                       {u.account_tier_label}
                     </span>
                     {u.is_admin && (
-                      <span className="ml-1 text-amber-400 text-xs">admin</span>
+                      <span className="ml-1 text-fuchsia-400 text-xs">admin</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground/70 text-xs">

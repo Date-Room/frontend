@@ -285,7 +285,7 @@ export default function AdminChaperon() {
           type="button"
           disabled={!dirty || !selectedConfigured || saving}
           onClick={() => void save()}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground px-4 py-2.5 text-sm font-semibold transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground neon-btn px-4 py-2.5 text-sm font-semibold transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           Save
@@ -597,7 +597,7 @@ function SttSection() {
           type="button"
           disabled={!dirty || !configured || saving}
           onClick={() => void save()}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground px-4 py-2.5 text-sm font-semibold transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground neon-btn px-4 py-2.5 text-sm font-semibold transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           Save
@@ -619,7 +619,7 @@ function CoachBetaSection() {
   return (
     <section className="space-y-3 border-t border-white/[0.08] pt-8">
       <header className="flex items-center gap-2">
-        <Sparkles className="h-5 w-5 text-amber-400" />
+        <Sparkles className="h-5 w-5 text-fuchsia-400" />
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-wide text-cream/80">
             Coach beta — applications
@@ -630,7 +630,7 @@ function CoachBetaSection() {
           </p>
         </div>
         {data && data.pending_count > 0 && (
-          <span className="ml-auto rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-300">
+          <span className="ml-auto rounded-full bg-fuchsia-500/15 px-2.5 py-1 text-xs font-semibold text-fuchsia-300">
             {data.pending_count} pending
           </span>
         )}
@@ -706,7 +706,7 @@ function CoachBetaApplicationRow({
           type="button"
           disabled={granting}
           onClick={() => void grant()}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground px-3 py-2 text-sm font-semibold text-white transition hover:bg-primary/90 disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground neon-btn px-3 py-2 text-sm font-semibold transition hover:bg-primary/90 disabled:opacity-40"
         >
           {granting && <Loader2 className="h-4 w-4 animate-spin" />}
           Grant
