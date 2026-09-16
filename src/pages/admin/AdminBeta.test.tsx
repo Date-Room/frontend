@@ -5,6 +5,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const api = vi.hoisted(() => ({
   queue: { unreviewed: 2, items: [] as unknown[] },
   verdicts: [] as unknown[],
+  ended: [] as string[],
+  health: {
+    builds: { api: "e4c6b00ec5b2", worker: "e4c6b00ec5b2" },
+    needs_you: [] as unknown[],
+    stuck_sessions: [] as unknown[],
+    cost: { rows_today: 0, sessions_ended_today: 0 },
+    unwritten_debriefs: 0,
+    suppression: { signals: 0, agent: 0, gate: 0 },
+    judges: [] as unknown[],
+    by_check: [] as unknown[],
+  },
 }));
 vi.mock("@/lib/admin", async (orig) => {
   const mod = await orig<typeof import("@/lib/admin")>();
@@ -12,7 +23,8 @@ vi.mock("@/lib/admin", async (orig) => {
     ...mod,
     getBetaOverview: vi.fn(async () => ({ on_air: { sessions: 0, coached: 0, guardian: 0 }, today: {}, yesterday: {}, unreviewed: 2 })),
     getBetaLive: vi.fn(async () => ({ sessions: [] })),
-    getBetaHealth: vi.fn(async () => ({ needs_you: [], stuck_sessions: [], cost: { rows_today: 0, sessions_ended_today: 0 }, unwritten_debriefs: 0, suppression: { signals: 0, agent: 0, gate: 0 }, judges: [], by_check: [] })),
+    getBetaHealth: vi.fn(async () => api.health),
+    postBetaEndSessions: vi.fn(async (rooms: string[]) => { api.ended.push(...rooms); return { ended: rooms.length }; }),
     getBetaFeed: vi.fn(async () => ({ items: [], next_cursor: null })),
     getBetaReviewQueue: vi.fn(async () => api.queue),
     postBetaVerdict: vi.fn(async (b: unknown) => { api.verdicts.push(b); }),
@@ -20,7 +32,7 @@ vi.mock("@/lib/admin", async (orig) => {
   };
 });
 
-import AdminBeta, { delta, outcomeLabel, reactionLabel, waitingFor } from "@/pages/admin/AdminBeta";
+import AdminBeta, { buildsLabel, delta, outcomeLabel, reactionLabel, waitingFor } from "@/pages/admin/AdminBeta";
 
 const row = (over: Record<string, unknown> = {}) => ({
   event_id: "e1", at: "2026-09-16T18:42:10Z", call: "Call 1A2B", tester: "T-31", team: false, mode: "coached",
@@ -74,5 +86,37 @@ describe("Review tab", () => {
     await waitFor(() => expect(screen.getByText("direct request, amount stated")).toBeTruthy());
     expect(screen.queryByText(/just asked/)).toBeNull();
     expect(document.body.textContent).not.toMatch(/\$2,000/);
+  });
+});
+
+
+describe("Status tab", () => {
+  it("builds label reads in step or differ", () => {
+    expect(buildsLabel({ api: "e4c6b00ec5b2", worker: "e4c6b00ec5b2" })).toEqual({ text: "api and worker on e4c6b00", ok: true });
+    expect(buildsLabel({ api: "e4c6b00ec5b2", worker: "" }).text).toBe("api e4c6b00 \u00b7 worker not reporting");
+    expect(buildsLabel({ api: "e4c6b00ec5b2", worker: "f0ada6a1" }).ok).toBe(false);
+  });
+
+  it("renders needs-you rows and the one real action", async () => {
+    api.health = {
+      ...api.health,
+      builds: { api: "e4c6b00ec5b2", worker: "f0ada6a12345" },
+      needs_you: [
+        { id: "stuck_sessions", severity: "warn", title: "2 sessions stuck open", detail: "Call 1A2B (5h), Call 3C4D (9h)", action: "end_sessions", rooms: ["r1", "r2"] },
+        { id: "cost_ledger_empty", severity: "warn", title: "Cost ledger wrote 0 rows today", detail: "3 sessions ended", action: null, rooms: [] },
+      ],
+      judges: [{ provider: "anthropic", model: "claude-haiku-4-5", signals: 20, shown: 14, probes: 2, agree_rate_pct: 71, evals: 63, errors: 1, error_rate_pct: 2, mean_latency_ms: 4100, slow: 0 }],
+      by_check: [{ check_id: "money_ask", signals: 9, shown: 7, agree_rate_pct: 80 }],
+    };
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={qc}><AdminBeta /></QueryClientProvider>);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /Status/ }));
+    await waitFor(() => expect(screen.getByText("2 sessions stuck open")).toBeTruthy());
+    expect(screen.getByText(/worker f0ada6a/)).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /Close sessions/ })).toHaveLength(1); // only the real action
+    fireEvent.click(screen.getByRole("button", { name: /Close sessions/ }));
+    await waitFor(() => expect(api.ended).toEqual(["r1", "r2"]));
+    expect(screen.getByText("claude-haiku-4-5")).toBeTruthy();
+    expect(screen.getByText("money_ask")).toBeTruthy();
   });
 });

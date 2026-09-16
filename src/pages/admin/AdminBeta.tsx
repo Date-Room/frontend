@@ -9,7 +9,8 @@
  *
  * Tabs: Live (stat strip with deltas, needs-you rows, on air, the signal
  * stream), Review (a queue with Save & next), Grants (applications with
- * grant and decline), Status (PR 14).
+ * grant and decline), Status (what falls on the floor, with the one action
+ * that exists, and the per-judge and per-check numbers).
  */
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -26,6 +27,7 @@ import {
   getBetaReviewQueue,
   grantCoachBeta,
   listCoachBetaApplicationsBy,
+  postBetaEndSessions,
   postBetaVerdict,
   type BetaFeedFilters,
   type BetaSignalRow,
@@ -125,9 +127,7 @@ export default function AdminBeta() {
           <GrantsTab />
         </TabsContent>
         <TabsContent value="status">
-          <p className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-6 text-center text-sm text-slate-500">
-            Status lands in the next release: needs-you rows with the actions that exist, per-judge numbers, today by check.
-          </p>
+          <StatusTab />
         </TabsContent>
       </Tabs>
     </div>
@@ -519,4 +519,117 @@ function ApplicationCard({ app, onDone }: { app: CoachBetaApplication; onDone: (
 
 function listCoachBetaApplications() {
   return listCoachBetaApplicationsBy("pending");
+}
+
+
+// ── Status ───────────────────────────────────────────────────────────────────
+
+/** Pure: how the builds line reads. */
+export function buildsLabel(b: { api: string; worker: string } | undefined): { text: string; ok: boolean } {
+  if (!b) return { text: "\u2014", ok: true };
+  const api = b.api ? b.api.slice(0, 7) : "unknown";
+  const worker = b.worker ? b.worker.slice(0, 7) : "not reporting";
+  const ok = Boolean(b.api && b.worker && b.api === b.worker);
+  return { text: ok ? `api and worker on ${api}` : `api ${api} \u00b7 worker ${worker}`, ok };
+}
+
+function StatusTab() {
+  const qc = useQueryClient();
+  const health = useQuery({ queryKey: ["beta-health"], queryFn: getBetaHealth, refetchInterval: 30_000 });
+  const end = useMutation({
+    mutationFn: (rooms: string[]) => postBetaEndSessions(rooms),
+    onSuccess: (r) => {
+      toast.success(`Closed ${r.ended} session${r.ended === 1 ? "" : "s"}`);
+      void qc.invalidateQueries({ queryKey: ["beta-health"] });
+      void qc.invalidateQueries({ queryKey: ["beta-overview"] });
+      void qc.invalidateQueries({ queryKey: ["beta-live"] });
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not close sessions"),
+  });
+  const h = health.data;
+  if (health.isLoading || !h) return <p className="text-sm text-slate-500">Loading\u2026</p>;
+  const builds = buildsLabel(h.builds);
+  const sup = h.suppression;
+  const heldPct = sup.signals ? Math.round((100 * (sup.agent + sup.gate)) / sup.signals) : 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <Stat label="Builds" value={builds.ok ? "in step" : "differ"} sub={builds.text} />
+        <Stat label="Stuck sessions" value={String(h.stuck_sessions.length)} sub="open > 3h" />
+        <Stat label="Cost ledger" value={String(h.cost.rows_today)} sub={`rows today \u00b7 ${h.cost.sessions_ended_today} sessions ended`} />
+        <Stat label="Held back" value={`${heldPct}%`} sub={`${sup.agent} cooldown \u00b7 ${sup.gate} gate \u00b7 of ${sup.signals}`} />
+      </div>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Needs you now</h2>
+        {h.needs_you.length === 0 ? (
+          <p className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-4 text-sm text-slate-500">Nothing on the floor.</p>
+        ) : (
+          h.needs_you.map((row) => (
+            <div key={row.id} className={cn("flex flex-wrap items-center gap-3 rounded-lg border-l-2 border border-slate-800 bg-slate-900/40 px-4 py-3", row.severity === "alert" ? "border-l-rose-500" : "border-l-amber-500")}>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-slate-100">{row.title}</p>
+                <p className="text-xs text-slate-400">{row.detail}</p>
+              </div>
+              {row.action === "end_sessions" && (
+                <button type="button" disabled={end.isPending} onClick={() => end.mutate(row.rooms)} className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-40">
+                  {end.isPending && <Loader2 className="h-4 w-4 animate-spin" />}Close sessions
+                </button>
+              )}
+            </div>
+          ))
+        )}
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-lg border border-slate-800 bg-slate-900/40">
+          <h2 className="border-b border-slate-800 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Judges \u00b7 last 7 days</h2>
+          {h.judges.length === 0 ? (
+            <p className="px-4 py-4 text-sm text-slate-500">No evaluates yet.</p>
+          ) : (
+            <table className="w-full text-xs">
+              <thead className="text-left text-[10px] uppercase tracking-wider text-slate-500">
+                <tr><th className="px-4 py-2">Judge</th><th className="px-2 py-2">Agree</th><th className="px-2 py-2">Errors</th><th className="px-2 py-2">Latency</th><th className="px-2 py-2">Shown</th></tr>
+              </thead>
+              <tbody>
+                {h.judges.map((j) => (
+                  <tr key={`${j.provider}:${j.model}`} className="border-t border-slate-800">
+                    <td className="px-4 py-2 font-mono text-slate-200">{j.model || j.provider}</td>
+                    <td className="px-2 py-2 tabular-nums">{j.agree_rate_pct == null ? "\u2014" : `${j.agree_rate_pct}%`}</td>
+                    <td className={cn("px-2 py-2 tabular-nums", (j.error_rate_pct ?? 0) >= 20 && "text-rose-300")}>{j.errors}{j.error_rate_pct != null ? ` (${j.error_rate_pct}%)` : ""}</td>
+                    <td className={cn("px-2 py-2 tabular-nums", (j.mean_latency_ms ?? 0) >= 10_000 && "text-amber-300")}>{j.mean_latency_ms == null ? "\u2014" : `${(j.mean_latency_ms / 1000).toFixed(1)}s`}</td>
+                    <td className="px-2 py-2 tabular-nums">{j.shown} / {j.signals}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+        <section className="rounded-lg border border-slate-800 bg-slate-900/40">
+          <h2 className="border-b border-slate-800 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Today, by check</h2>
+          {h.by_check.length === 0 ? (
+            <p className="px-4 py-4 text-sm text-slate-500">Nothing fired today.</p>
+          ) : (
+            <div className="space-y-2 px-4 py-3">
+              {h.by_check.map((c) => {
+                const max = Math.max(...h.by_check.map((x) => x.signals), 1);
+                return (
+                  <div key={c.check_id} className="grid grid-cols-[130px_minmax(0,1fr)_60px] items-center gap-2 text-xs">
+                    <span className="font-mono text-slate-200">{c.check_id}</span>
+                    <span className="h-2 overflow-hidden rounded bg-slate-800"><span className="block h-full bg-emerald-500" style={{ width: `${(100 * c.signals) / max}%` }} /></span>
+                    <span className="text-right tabular-nums text-slate-400">{c.signals}{c.agree_rate_pct != null ? ` \u00b7 ${c.agree_rate_pct}%` : ""}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+
+      <p className="text-xs text-slate-500">
+        {h.unwritten_debriefs} ended session{h.unwritten_debriefs === 1 ? "" : "s"} with no review written yet (reviews are written on first open).
+      </p>
+    </div>
+  );
 }
