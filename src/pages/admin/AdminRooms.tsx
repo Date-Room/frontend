@@ -27,7 +27,7 @@ export default function AdminRooms() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="font-serif text-2xl font-medium text-cream">Rooms</h2>
+        <h2 className="text-2xl font-semibold tracking-tight text-cream">Rooms</h2>
         <p className="mt-1 text-sm text-muted-foreground/70">Dates and persistent rooms across the platform.</p>
       </div>
 

@@ -1,7 +1,7 @@
 /**
  * One series, thin bars, a baseline, four grid lines, a single direct label on
- * the last point, hover tooltip per bar. Amber is the brand mark colour; the
- * chart has one series so no legend is needed and the title names it.
+ * the last point, hover tooltip per bar. The series wears the admin primary
+ * (electric cyan); one series, so no legend and the title names it.
  */
 import { useState } from "react";
 
@@ -36,11 +36,11 @@ export function RevenueChart({ points, unit = "", height = 200 }: { points: Poin
       <svg viewBox={`0 0 ${w} ${height}`} width="100%" className="block" role="img" aria-label="Daily settled revenue">
         {[0.25, 0.5, 0.75, 1].map((g) => (
           <g key={g}>
-            <line x1={padL} x2={w - 8} y1={y(max * g)} y2={y(max * g)} stroke="hsl(30 10% 22%)" strokeWidth="1" />
-            <text x={padL - 6} y={y(max * g) + 4} textAnchor="end" fontSize="10" fill="hsl(30 12% 50%)">{fmt(max * g)}</text>
+            <line x1={padL} x2={w - 8} y1={y(max * g)} y2={y(max * g)} stroke="hsl(222 24% 16%)" strokeWidth="1" />
+            <text x={padL - 6} y={y(max * g) + 4} textAnchor="end" fontSize="10" fill="hsl(215 20% 55%)">{fmt(max * g)}</text>
           </g>
         ))}
-        <line x1={padL} x2={w - 8} y1={height - padB} y2={height - padB} stroke="hsl(30 10% 28%)" />
+        <line x1={padL} x2={w - 8} y1={height - padB} y2={height - padB} stroke="hsl(222 24% 24%)" />
         {points.map((p, i) => {
           const x = padL + i * bw;
           const h = height - padB - y(p.value);
@@ -52,21 +52,21 @@ export function RevenueChart({ points, unit = "", height = 200 }: { points: Poin
               width={Math.max(bw - 3, 1)}
               height={Math.max(h, 0)}
               rx="2"
-              fill={i === last || i === hover ? "#E8A653" : "rgba(232,166,83,.5)"}
+              fill={i === last || i === hover ? "hsl(190 95% 55%)" : "hsl(190 95% 55% / 0.45)"}
               onMouseEnter={() => setHover(i)}
               onMouseLeave={() => setHover(null)}
             />
           );
         })}
         {points.length > 0 && (
-          <text x={padL + last * bw + bw / 2} y={y(points[last].value) - 6} textAnchor="middle" fontSize="11" fontWeight="600" fill="hsl(40 14% 96%)">
+          <text x={padL + last * bw + bw / 2} y={y(points[last].value) - 6} textAnchor="middle" fontSize="11" fontWeight="600" fill="hsl(210 40% 96%)">
             {fmt(points[last].value)}{unit}
           </text>
         )}
         {points.length > 0 && (
           <>
-            <text x={padL} y={height - 6} fontSize="10" fill="hsl(30 12% 50%)">{points[0].day.slice(5)}</text>
-            <text x={w - 8} y={height - 6} textAnchor="end" fontSize="10" fill="hsl(30 12% 50%)">{points[last].day.slice(5)}</text>
+            <text x={padL} y={height - 6} fontSize="10" fill="hsl(215 20% 55%)">{points[0].day.slice(5)}</text>
+            <text x={w - 8} y={height - 6} textAnchor="end" fontSize="10" fill="hsl(215 20% 55%)">{points[last].day.slice(5)}</text>
           </>
         )}
       </svg>
