@@ -111,7 +111,7 @@ const NOTIF: Record<string, { verb: string; target: string }> = {
   rank_it: { verb: "is playing Rank It", target: "rank_it" },
 };
 /** Chatty sync events that shouldn't pop a notification. */
-const NOTIF_NOISY = new Set(["tick", "seek", "cursor", "typing", "presence", "pause"]);
+const NOTIF_NOISY = new Set(["tick", "seek", "cursor", "typing", "presence", "pause", "sync", "sync_request"]);
 
 /** Lucide equivalents of the mobile activity-menu icons (Material) — keeps
  *  the two clients visually consistent (no ad-hoc emojis). */
