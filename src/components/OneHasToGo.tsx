@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useReducedActivity } from "@/lib/activities/useReducedActivity";
 import {
@@ -10,9 +11,15 @@ import {
   reduceOhtg,
 } from "@/lib/activities/oneHasToGo";
 import { useCinematic } from "@/lib/stagecraft/cinematic";
+import { GameChoiceCard, type ChoiceBadge } from "@/lib/stagecraft/GameChoiceCard";
+import { GameStage } from "@/lib/stagecraft/GameStage";
+import { GameStageHeader } from "@/lib/stagecraft/GameStageHeader";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
+import { setHelpNow } from "@/lib/activityHelpNow";
 import { StagePrompt } from "@/lib/stagecraft/StagePrompt";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
  * One Has To Go — table-cards reveal. Four big cards on the table; you cut
@@ -37,6 +44,7 @@ export function OneHasToGo() {
     reduceOhtg,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
 
   const myReads = state.reads[senderId] ?? 0;
   const theirReads = Object.entries(state.reads).reduce(
@@ -104,6 +112,20 @@ export function OneHasToGo() {
     ? round.options.filter((_, i) => i !== myCut && i !== theirCut).map((o) => o.label)
     : [];
 
+  // "Right now" help snapshot (see lib/activityHelpNow).
+  useEffect(() => {
+    const snap = revealing
+      ? { now: "The cuts fall. Say why yours had to go, then tap Next round.", step: 2 }
+      : guessing
+        ? iGuessed
+          ? { now: `Locked. Waiting for ${partnerName}…`, step: 1 }
+          : { now: `Now tap the one you think ${partnerName} cut.`, step: 1 }
+        : iCut
+          ? { now: `Sealed. Waiting for ${partnerName} to cut.`, step: 0 }
+          : { now: "Tap the one you'd get rid of forever.", step: 0 };
+    setHelpNow("one_has_to_go", snap);
+  }, [revealing, guessing, iGuessed, iCut, partnerName]);
+
   const title = !revealing
     ? guessing
       ? "Now read your date"
@@ -167,23 +189,14 @@ export function OneHasToGo() {
   };
 
   return (
-    <div
-      className={[
-        "dr-stageroom flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in",
-        revealing && witnessed && !onVerdict ? "dr-stageroom--dim" : "",
-      ].join(" ")}
-    >
-      <div className="dr-stageroom-shade" aria-hidden />
-
-      <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Round {state.round + 1} of {OHTG_ROUNDS.length} · {round.title}
-        </p>
-        <p key={title} className="font-serif text-xl italic text-cream animate-fade-in">{title}</p>
-        <p key={status} aria-live="polite" className="min-h-[1rem] text-xs text-muted-foreground animate-fade-in">
-          {status}
-        </p>
-      </div>
+    <GameStage gameId="one_has_to_go" dimmed={revealing && witnessed && !onVerdict}>
+      <GameStageHeader
+        kicker={`Round ${state.round + 1} of ${OHTG_ROUNDS.length} · ${round.title}`}
+        title={title}
+        status={status}
+        titleKey={`${state.round}-${title}`}
+        statusKey={`${state.round}-${status}`}
+      />
 
       {guessing && !iGuessed && (
         <StagePrompt
@@ -203,48 +216,41 @@ export function OneHasToGo() {
           const isRead = myGuess === i && (guessing || revealing) && iGuessed;
           const waiting = revealing && !onVerdict && !fell && !sealed;
           const clickable = (state.phase === "cutting" && !iCut) || (guessing && !iGuessed);
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onOption(i)}
-              disabled={!clickable}
-              className={[
-                "dr-tile focus-ring relative flex min-h-[7rem] flex-col items-center justify-center gap-1.5 rounded-2xl border p-4 pb-8 text-center",
-                fell
-                  ? witnessed
-                    ? "dr-tile--fallen"
-                    : "dr-tile--gone"
-                  : sealed
-                    ? "border-primary bg-primary/10 dr-tile--sealed"
-                    : survivor
-                      ? "border-emerald-400/50 bg-emerald-400/5"
-                      : waiting
-                        ? "border-white/[0.08] bg-white/[0.02] opacity-60 saturate-50"
-                        : "border-white/[0.10] bg-white/[0.03]",
-                clickable ? "hover:-translate-y-0.5 hover:border-primary/50 hover:bg-white/[0.05] cursor-pointer" : "",
-              ].join(" ")}
-            >
-              <span className="text-3xl" aria-hidden>{opt.emoji}</span>
-              <span className="font-serif text-base sm:text-lg text-cream leading-tight">{opt.label}</span>
 
-              {isRead && !fell && (
-                <span className="dr-tile-tag dr-tile-tag--top border-rose/60 text-rose border-dashed">your read</span>
-              )}
-              {sealed && <span className="dr-tile-tag border-primary/60 text-primary">you cut</span>}
-              {fell && isMine && (
-                <span className="dr-tile-tag border-destructive/50 text-destructive/90">
-                  {sameCut && theirsFallen ? "you both cut" : "you cut"}
-                </span>
-              )}
-              {fell && isTheirs && !sameCut && (
-                <span className="dr-tile-tag border-rose/60 text-rose">{partnerName} cut</span>
-              )}
-              {survivor && <span className="dr-tile-tag border-emerald-400/60 text-emerald-300">survives</span>}
-              {fell && (
-                <span className="dr-tile-x" aria-hidden>✕</span>
-              )}
-            </button>
+          let cardState: Parameters<typeof GameChoiceCard>[0]["state"] = "default";
+          if (sealed) cardState = "sealed";
+          else if (survivor) cardState = "survivor";
+          else if (waiting) cardState = "faded";
+
+          const badges: ChoiceBadge[] = [];
+          if (isRead && !fell) badges.push({ text: "your read", tone: "read" });
+          if (sealed) badges.push({ text: "you cut", tone: "cut" });
+          if (fell && isMine) {
+            badges.push({
+              text: sameCut && theirsFallen ? "you both cut" : "you cut",
+              tone: "neutral",
+            });
+          }
+          if (fell && isTheirs && !sameCut) badges.push({ text: `${partnerName} cut`, tone: "partner" });
+          if (survivor) badges.push({ text: "survives", tone: "survives" });
+
+          return (
+            <GameChoiceCard
+              key={i}
+              size="md"
+              label={opt.label}
+              emoji={opt.emoji}
+              disabled={!clickable}
+              onClick={() => onOption(i)}
+              state={cardState}
+              badges={badges}
+              className={[
+                "dr-tile",
+                fell ? (witnessed ? "dr-tile--fallen" : "dr-tile--gone") : "",
+                sealed ? "dr-tile--sealed" : "",
+              ].join(" ")}
+              overlay={fell ? <span className="dr-tile-x" aria-hidden>✕</span> : undefined}
+            />
           );
         })}
       </div>
@@ -313,9 +319,13 @@ export function OneHasToGo() {
                   : `${listOf(survivorNames)} live on. Tell ${partnerName} why ${round.options[myCut].label} had to go.`}
               </p>
               {readsBar}
-              <Button onClick={nextRound} className={accentBtn} style={accentStyle}>
-                {state.round + 1 >= OHTG_ROUNDS.length ? "Finish" : "Next round"}
-              </Button>
+              {tryRoom && state.round + 1 >= TRY_CAPS.one_has_to_go_rounds ? (
+                <TryCurtain line="Seven more rounds wait in a date room, ending with The Dangerous One." />
+              ) : (
+                <Button onClick={nextRound} className={accentBtn} style={accentStyle}>
+                  {state.round + 1 >= OHTG_ROUNDS.length ? "Finish" : "Next round"}
+                </Button>
+              )}
             </div>
           </div>
         ) : revealing ? null : guessing ? (
@@ -328,6 +338,6 @@ export function OneHasToGo() {
           readsBar
         )}
       </div>
-    </div>
+    </GameStage>
   );
 }

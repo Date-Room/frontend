@@ -20,7 +20,10 @@ import {
 } from "@/lib/activities/closer";
 import { GameLanding } from "@/lib/stagecraft/GameLanding";
 import { useTypewriter } from "@/lib/stagecraft/typewriter";
+import { setHelpNow } from "@/lib/activityHelpNow";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
  * Closer (activity id "the_36") — the 36 questions in stoppable stretches.
@@ -48,6 +51,7 @@ export function Closer() {
     reduceCloser,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
 
   const [stretchPick, setStretchPick] = useState<3 | 6 | 12>(3);
   const [startAt, setStartAt] = useState(0);
@@ -64,6 +68,27 @@ export function Closer() {
   const iAnswer = inTurns && state.sub === "answering" &&
     (clAnswererIsStarter(state) ? senderId === state.starter_id : senderId !== state.starter_id);
   const iRule = inTurns && state.sub === "ruling" && state.answerer_id != null && state.answerer_id !== senderId;
+
+  // "Right now" help snapshot (see lib/activityHelpNow).
+  useEffect(() => {
+    const snap =
+      state.phase === "setup"
+        ? { now: "Pick a stretch: 3, 6 or 12 questions. Stopping later saves your place.", step: 0 }
+        : state.phase === "turns"
+          ? state.sub === "answering"
+            ? iAnswer
+              ? { now: "Your turn. Answer out loud, then tap That's my answer.", step: 1 }
+              : { now: `Listen — ${partnerName} is answering.`, step: 1 }
+            : iRule
+              ? { now: "Rule what you heard: Answered, Half of it, or Dodged it.", step: 2 }
+              : { now: `${partnerName} is ruling what they heard.`, step: 2 }
+          : state.phase === "keep"
+            ? { now: `Save one line you heard from ${partnerName}.`, step: 3 }
+            : state.phase === "eyes"
+              ? { now: "Four minutes. Just look.", step: 3 }
+              : { now: "Continue together, or stop here — stopping saves your place.", step: 3 };
+    setHelpNow("the_36", snap);
+  }, [state.phase, state.sub, iAnswer, iRule, partnerName]);
 
   // The loose clock: counts, never cuts anyone off. Local per turn.
   const [clock, setClock] = useState(CL_SPEAK_SECONDS);
@@ -98,6 +123,7 @@ export function Closer() {
   if (state.phase === "setup") {
     return (
       <GameLanding
+        gameId="the_36"
         title="Closer"
         promise="The 36 questions from a 1997 closeness study, in short stoppable stretches. You never have to finish it, and stopping saves your place."
         minutes="≈ 10 min per stretch of 3"
@@ -108,7 +134,7 @@ export function Closer() {
         ]}
       >
         <div className="flex gap-2.5">
-          {([3, 6, 12] as const).map((v) => (
+          {(tryRoom ? ([3] as const) : ([3, 6, 12] as const)).map((v) => (
             <button
               key={v}
               type="button"
@@ -308,11 +334,13 @@ export function Closer() {
           </p>
         ))}
         <div className="flex flex-wrap justify-center gap-2">
-          {!atEnd && (
+          {!atEnd && tryRoom ? (
+            <TryCurtain line="Your place is saved at this question. The next stretch continues in a date room." />
+          ) : !atEnd ? (
             <Button onClick={() => emit("continue")} disabled={iVoted} className={accentBtn} style={accentStyle}>
               {iVoted ? `waiting for ${partnerName}…` : `${state.stretch} more`}
             </Button>
-          )}
+          ) : null}
           {atEnd ? (
             <Button onClick={() => emit("start_eyes", { at: new Date().toISOString() })} className={accentBtn} style={accentStyle}>
               The last four minutes

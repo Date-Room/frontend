@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useReducedActivity } from "@/lib/activities/useReducedActivity";
 import {
@@ -15,10 +15,13 @@ import {
   reduceOb,
   rollTopicQuestions,
 } from "@/lib/activities/openBook";
+import { setHelpNow } from "@/lib/activityHelpNow";
 import { useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { GameLanding } from "@/lib/stagecraft/GameLanding";
 import { useTypewriter } from "@/lib/stagecraft/typewriter";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
  * Open Book (activity id "questions") — draft topics, not questions. See
@@ -46,6 +49,8 @@ export function QuestionDeck() {
     reduceOb,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
+  const obCapped = tryRoom && state.phase === "play" && state.card >= TRY_CAPS.open_book_cards;
   const [draftText, setDraftText] = useState("");
   const [binPick, setBinPick] = useState<string | null>(null);
   const [swapPick, setSwapPick] = useState<string | null>(null);
@@ -72,6 +77,37 @@ export function QuestionDeck() {
   const myVeto = state.vetoes[senderId];
   const theirVeto = Object.entries(state.vetoes).find(([uid]) => uid !== senderId)?.[1];
 
+  // "Right now" help snapshot (see lib/activityHelpNow).
+  useEffect(() => {
+    const current = deck[Math.min(state.card, Math.max(deck.length - 1, 0))];
+    const iAnswerThis = current != null && current.by !== senderId;
+    const snap =
+      state.phase === "setup"
+        ? { now: "Pick the night's length: 15 or 21 questions.", step: 0 }
+        : state.phase === "draft"
+          ? myTurn
+            ? { now: "Your claim — tap a topic you want in the deck.", step: 1 }
+            : { now: `${partnerName} is claiming a topic.`, step: 1 }
+          : state.phase === "write"
+            ? iWrote
+              ? { now: `Waiting for ${partnerName} to finish writing.`, step: 2 }
+              : { now: "Write one question of your own — it buys you a veto.", step: 2 }
+            : state.phase === "veto"
+              ? iVetoed
+                ? { now: `Waiting for ${partnerName}'s veto.`, step: 2 }
+                : { now: `Throw out one topic ${partnerName} chose and pick its replacement.`, step: 2 }
+              : state.phase === "done"
+                ? { now: "That's the night. A new night deals questions you haven't seen.", step: 3 }
+                : iAnswerThis
+                  ? state.answered
+                    ? { now: `${partnerName} is ruling your answer.`, step: 3 }
+                    : { now: "This one's yours. Answer out loud, then tap That's my answer.", step: 3 }
+                  : state.answered
+                    ? { now: "Rule what you heard: Answered, Half of it, or Dodged it.", step: 3 }
+                    : { now: `${partnerName} answers this one. Listen.`, step: 3 };
+    setHelpNow("questions", snap);
+  }, [state.phase, state.card, state.answered, deck, myTurn, iWrote, iVetoed, senderId, partnerName]);
+
   const claimTopic = (id: string) => {
     const t = obTopic(id);
     if (!t || !myTurn) return;
@@ -95,6 +131,7 @@ export function QuestionDeck() {
   if (state.phase === "setup") {
     return (
       <GameLanding
+        gameId="questions"
         title="Open Book"
         promise="No lists to scroll. You draft topics, each one deals three questions, and the night escalates from warm to close."
         minutes="≈ 45–60 min"
@@ -463,7 +500,10 @@ export function QuestionDeck() {
               })}
             </div>
 
-            {typed.complete &&
+            {obCapped && (
+              <TryCurtain line="Three cards were the taste. The full drafted night lives in a date room." />
+            )}
+            {!obCapped && typed.complete &&
               (card.by !== senderId ? (
                 // The card is theirs — I answer it.
                 !state.answered ? (

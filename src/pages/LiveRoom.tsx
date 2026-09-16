@@ -21,6 +21,9 @@ import { RoomAmbianceSheet } from "@/components/RoomAmbianceSheet";
 import { PageShell } from "@/components/PageShell";
 import { RoomSessionProvider, useRoomSession, type RoomIdentity } from "@/context/RoomSessionContext";
 import { ChaperonProvider } from "@/context/ChaperonContext";
+import { CallPeersProvider, useCallPeers } from "@/context/CallPeersContext";
+import { ChaperonAnnounceBadge } from "@/components/ChaperonAnnounceBadge";
+import type { ChaperonAnnouncement } from "@/lib/rooms";
 import { ChaperonMount } from "@/components/ChaperonMount";
 import {
   RoomCustomizationProvider,
@@ -46,6 +49,7 @@ import { DJ } from "@/components/DJ";
 import { MusicLibrary } from "@/components/MusicRoom";
 import { RoomSettings } from "@/components/RoomSettings";
 import { ActivityLobby } from "@/components/ActivityLobby";
+import { GuacamolePanic } from "@/components/GuacamolePanic";
 import { QuestionDeck } from "@/components/QuestionDeck";
 import { Closer } from "@/components/Closer";
 import { TwoTruths } from "@/components/TwoTruths";
@@ -91,12 +95,14 @@ function LiveRoomAmbianceBackdrop({ preset }: { preset: LobbyMood }) {
   return (
     <>
       <AmbientSceneStack ambiance={preset} positionClassName="fixed inset-0 z-[1]" />
-      <div
-        className="live-room-ambient"
-        data-live-ambiance={preset}
-        data-photo-backdrop="true"
-        aria-hidden
-      />
+      {preset !== PLAIN_MOOD && (
+        <div
+          className="live-room-ambient"
+          data-live-ambiance={preset}
+          data-photo-backdrop="true"
+          aria-hidden
+        />
+      )}
       <div className="live-room-soft-vignette" aria-hidden />
     </>
   );
@@ -116,6 +122,7 @@ type ActivityTabId =
   | "one_has_to_go"
   | "pick_a_door"
   | "rank_it"
+  | "guacamole"
   | "watch"
   | "dj"
   | "chat";
@@ -142,6 +149,7 @@ const ACTIVITY_TABS: TabDef[] = [
   { id: "one_has_to_go", label: "One Has To Go", icon: "🗑️", curatableId: "one_has_to_go" },
   { id: "pick_a_door", label: "Pick a Door", icon: "🚪", curatableId: "pick_a_door" },
   { id: "rank_it", label: "Rank It", icon: "📊", curatableId: "rank_it" },
+  { id: "guacamole", label: "Guacamole Panic", icon: "🥑", curatableId: "guacamole" },
   { id: "watch", label: "Watch", icon: "📺", curatableId: "watch" },
   { id: "dj", label: "Music", icon: "🎵", curatableId: "dj" },
   { id: "chat", label: "Chat", icon: "💭", curatableId: null },
@@ -193,14 +201,26 @@ function RoomShell({
     () => partnerLightLabel(partnerPresenceEntry(session.presence, session.senderId)),
     [session.presence, session.senderId, i18n.language],
   );
+  // "In the call" comes from LiveKit (ground truth), OR'd with presence for
+  // the moment before the media connects. The name falls back to LiveKit's
+  // participant name when presence has none (the mobile presence schema).
+  const callPeers = useCallPeers();
   const partnerInfo = useMemo(() => {
     const p = partnerPresenceEntry(session.presence, session.senderId);
+    const peer = callPeers[0];
+    const fallback = t("room.yourPartner");
+    const presenceName = p ? partnerDisplayName(p) : "";
+    const name =
+      (presenceName && presenceName !== fallback ? presenceName : "") ||
+      peer?.name ||
+      presenceName ||
+      "Your partner";
     return {
-      name: partnerDisplayName(p) || "Your partner",
-      inRoom: Boolean(p),
-      inCall: p?.is_in_call === true,
+      name,
+      inRoom: Boolean(p) || callPeers.length > 0,
+      inCall: p?.is_in_call === true || callPeers.length > 0,
     };
-  }, [session.presence, session.senderId]);
+  }, [session.presence, session.senderId, callPeers, t]);
   const partnerPresent = partnerInfo.inRoom;
 
   const enterLiveMode = useCallback(
@@ -490,6 +510,8 @@ function RoomShell({
         return <PickADoor />;
       case "rank_it":
         return <RankIt />;
+      case "guacamole":
+        return <GuacamolePanic />;
       case "watch":
         return <WatchTogether />;
       case "dj":
@@ -527,7 +549,7 @@ function RoomShell({
           }}
         />
 
-        <header className="relative z-30 flex shrink-0 items-center justify-between px-4 py-4 sm:px-6">
+        <header className="relative z-30 flex shrink-0 items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
           <div className="min-w-0">
             <h1 className="font-serif text-2xl italic text-cream sm:text-3xl">{BRAND_NAME}</h1>
           </div>
@@ -679,6 +701,7 @@ export default function LiveRoom() {
   const [curatedActivityIds, setCuratedActivityIds] = useState<CuratableActivityId[]>([]);
   const [maxParticipants, setMaxParticipants] = useState(2);
   const [chaperonEnabled, setChaperonEnabled] = useState(false);
+  const [chaperonAnnouncements, setChaperonAnnouncements] = useState<ChaperonAnnouncement[]>([]);
 
   const slot = params.get("slot") || "a";
   const participantId = params.get("participant_id") || undefined;
@@ -754,6 +777,7 @@ export default function LiveRoom() {
         setRoomPackage(plan.package);
         setCuratedActivityIds(plan.curatedActivityIds);
         setChaperonEnabled(exp.chaperon_enabled === true);
+        setChaperonAnnouncements(exp.chaperon_announcements ?? []);
         if (plan.maxParticipants) {
           setMaxParticipants(plan.maxParticipants);
         }
@@ -772,6 +796,7 @@ export default function LiveRoom() {
           if (exp.expires_at) {
             setSessionExpiresAt(exp.expires_at);
           }
+          setChaperonAnnouncements(exp.chaperon_announcements ?? []);
         })
         .catch(() => undefined);
     }, 15_000);
@@ -815,6 +840,7 @@ export default function LiveRoom() {
     >
       <RoomCustomizationProvider>
         <ChaperonProvider enabled={chaperonEnabled}>
+         <CallPeersProvider>
           <RoomShell
             expiresAt={sessionExpiresAt}
             onExpiresAtChange={setSessionExpiresAt}
@@ -824,6 +850,8 @@ export default function LiveRoom() {
             curatedActivityIds={curatedActivityIds}
           />
           <ChaperonMount />
+          <ChaperonAnnounceBadge initial={chaperonAnnouncements} />
+         </CallPeersProvider>
         </ChaperonProvider>
       </RoomCustomizationProvider>
     </RoomSessionProvider>

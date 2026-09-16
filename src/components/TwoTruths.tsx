@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useReducedActivity } from "@/lib/activities/useReducedActivity";
@@ -8,10 +8,14 @@ import {
   reduceTwoTruths,
   twoTruthsFromJson,
 } from "@/lib/activities/twoTruths";
+import { setHelpNow } from "@/lib/activityHelpNow";
 import { useCinematic, type CinematicStep } from "@/lib/stagecraft/cinematic";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
 import { StagePrompt } from "@/lib/stagecraft/StagePrompt";
+import { GameStage } from "@/lib/stagecraft/GameStage";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
  * 2 Truths and a Lie — press and stakes. Statements deal in one at a time;
@@ -47,6 +51,7 @@ export function TwoTruths() {
     reduceTwoTruths,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
 
   const [drafts, setDrafts] = useState(["", "", ""]);
   const [lie, setLie] = useState<number | null>(null);
@@ -57,6 +62,28 @@ export function TwoTruths() {
 
   const round = state.round;
   const isStoryteller = round?.storyteller_id === senderId;
+
+  // "Right now" help snapshot (see lib/activityHelpNow).
+  useEffect(() => {
+    const phase = round?.phase ?? null;
+    const snap =
+      phase == null
+        ? { now: "Start a round — one of you writes, the other reads.", step: 0 }
+        : phase === "composing"
+          ? isStoryteller
+            ? { now: "Write two truths and one lie. Mark the lie, then seal them.", step: 0 }
+            : { now: `${partnerName} is writing. Get your poker face ready.`, step: 1 }
+          : phase === "guessing"
+            ? isStoryteller
+              ? round?.pressed != null
+                ? { now: "You've been pressed — say more about that one, out loud.", step: 2 }
+                : { now: `${partnerName} is reading you. Give nothing away.`, step: 2 }
+              : round?.pressed == null && !skippedPress
+                ? { now: `Your one press: tap a statement and ${partnerName} must say more. Or skip to the call.`, step: 2 }
+                : { now: "Choose your bet (1 safe, 2 bold), then tap the statement you think is the lie.", step: 3 }
+            : { now: "The truths seal green, then the lie flips over.", step: 4 };
+    setHelpNow("2_truths", snap);
+  }, [round?.phase, round?.pressed, isStoryteller, skippedPress, partnerName]);
   const myScore = state.scores[senderId] ?? 0;
   const theirScore = Object.entries(state.scores).reduce((n, [k, v]) => (k === senderId ? n : n + v), 0);
 
@@ -235,9 +262,7 @@ export function TwoTruths() {
   };
 
   return (
-    <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in", revealing && unmask.witnessed && !settled ? "dr-stageroom--dim" : ""].join(" ")}>
-      <div className="dr-stageroom-shade" aria-hidden />
-
+    <GameStage gameId="2_truths" dimmed={revealing && unmask.witnessed && !settled}>
       <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
         <p key={title} className="font-serif text-xl italic text-cream animate-fade-in">{title}</p>
         <p key={status} aria-live="polite" className="min-h-[1rem] max-w-sm text-xs text-muted-foreground animate-fade-in">
@@ -385,12 +410,16 @@ export function TwoTruths() {
         {settled && (
           <div className="flex flex-col items-center gap-3 animate-fade-in">
             {scoreboard}
-            <Button onClick={() => emit("reveal_and_swap")} className={accentBtn} style={accentStyle}>
-              Next round — swap
-            </Button>
+            {tryRoom && state.rounds_played + 1 >= TRY_CAPS.two_truths_rounds ? (
+              <TryCurtain line="You both got one lie in. The rematch lives in a date room." />
+            ) : (
+              <Button onClick={() => emit("reveal_and_swap")} className={accentBtn} style={accentStyle}>
+                Next round — swap
+              </Button>
+            )}
           </div>
         )}
       </div>
-    </div>
+    </GameStage>
   );
 }

@@ -3,18 +3,28 @@
  *
  * Rendered only on invite/lobby routes so a guest on mobile Safari gets a
  * one-tap path into the native app, with the current invite URL passed as
- * `app-argument` for the app's deep-link listener. No-ops (and renders
- * nothing) until VITE_APPSTORE_APP_ID is set — the app isn't in the store
- * yet. Android/desktop browsers ignore the tag.
+ * `app-argument` for the app's deep-link listener. Android/desktop browsers
+ * ignore the tag.
+ *
+ * Apple's own banner is the one install prompt we allow near the invite
+ * path: it's a dismissible strip rather than a gate, and for anyone who
+ * already has the app it reads "Open" instead of "Get". Everything louder
+ * waits until after a date (see lib/appStores).
  */
+
+import { IOS_APP_ID } from "@/lib/appStores";
 
 const META_NAME = "apple-itunes-app";
 
-/** The configured App Store id, or null when unset/blank. */
+/** The App Store id. Defaults to the shipped app so the banner works with
+ *  no deploy config; VITE_APPSTORE_APP_ID still overrides (staging builds,
+ *  or killing the banner by setting it blank... which is why "none" is
+ *  honoured explicitly rather than falling through to the default). */
 export function appStoreAppId(): string | null {
-  const id = import.meta.env.VITE_APPSTORE_APP_ID;
-  const trimmed = typeof id === "string" ? id.trim() : "";
-  return trimmed.length > 0 ? trimmed : null;
+  const raw = import.meta.env.VITE_APPSTORE_APP_ID;
+  const configured = typeof raw === "string" ? raw.trim() : "";
+  if (configured.toLowerCase() === "none") return null;
+  return configured.length > 0 ? configured : IOS_APP_ID;
 }
 
 /**

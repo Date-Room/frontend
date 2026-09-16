@@ -17,7 +17,11 @@ import {
 import { prefersReducedMotion } from "@/lib/stagecraft/cinematic";
 import { Scoreboard } from "@/lib/stagecraft/Scoreboard";
 import { useTypewriter } from "@/lib/stagecraft/typewriter";
+import { setHelpNow } from "@/lib/activityHelpNow";
+import { GameStage } from "@/lib/stagecraft/GameStage";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
  * Truth or Dare — the night. Your date deals and decides truth or dare for
@@ -37,6 +41,7 @@ export function TruthOrDare() {
     reduceTod,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
 
   const heat = todHeatForTurn(state.turn);
   const iPerform = state.performer_id === senderId;
@@ -44,6 +49,31 @@ export function TruthOrDare() {
   const myTokens = state.tokens[senderId] ?? 0;
   const theirTokens = Object.entries(state.tokens).reduce((n, [k, v]) => (k === senderId ? n : n + v), 0);
   const myBurnsLeft = TOD_BURNS_PER_NIGHT - (state.burns_used[senderId] ?? 0);
+
+  // "Right now" help snapshot (see lib/activityHelpNow).
+  useEffect(() => {
+    const snap =
+      state.phase === "done"
+        ? state.vault.length > 0
+          ? { now: "The vault opens — talk through what got burned or dodged.", step: 4 }
+          : { now: "That's the night. Shuffle a new one when you like.", step: 4 }
+        : state.phase === "deck"
+          ? { now: "Tap the deck to start the turn.", step: 0 }
+          : state.phase === "decide"
+            ? iPerform
+              ? { now: `${partnerName} is choosing truth or dare FOR you. Wait for the coin.`, step: 0 }
+              : { now: `Choose for ${partnerName}: truth or dare.`, step: 0 }
+            : state.phase === "stakes"
+              ? iPerform
+                ? { now: "Your card. Take it (1 token), Double it (2), or Burn it away.", step: 1 }
+                : { now: `${partnerName} decides: take, double, or burn.`, step: 1 }
+              : state.phase === "perform"
+                ? iPerform
+                  ? { now: "Do it or answer it — out loud, on camera.", step: 2 }
+                  : { now: `Watch closely. You rule this next: delivered or dodged.`, step: 3 }
+                : { now: "The ruling is in. Next turn.", step: 3 };
+    setHelpNow("truth_or_dare", snap);
+  }, [state.phase, state.vault.length, iPerform, partnerName]);
 
   const accentBtn = "rounded-full text-primary-foreground transition hover:opacity-90 disabled:opacity-50";
   const accentStyle = { backgroundColor: "var(--room-accent)" } as const;
@@ -218,9 +248,7 @@ export function TruthOrDare() {
   }
 
   return (
-    <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in", dimmed ? "dr-stageroom--dim" : ""].join(" ")}>
-      <div className="dr-stageroom-shade" aria-hidden />
-
+    <GameStage gameId="truth_or_dare" dimmed={dimmed}>
       <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Card {Math.min(state.turn + 1, TOD_NIGHT_TURNS)} of {TOD_NIGHT_TURNS} · {TOD_HEATS[heat].name}
@@ -357,9 +385,13 @@ export function TruthOrDare() {
               <div className="flex flex-col items-center gap-3 animate-fade-in">
                 {tokensBar}
                 <div className="flex gap-2">
+                  {tryRoom && state.turn + 1 >= TRY_CAPS.truth_or_dare_turns ? (
+                    <TryCurtain line="One card each was the taste. Six a night, Warm to Bare, in a date room." />
+                  ) : (
                   <Button onClick={() => emit("next_turn")} className={accentBtn} style={accentStyle}>
                     {state.turn + 1 >= TOD_NIGHT_TURNS ? "See the night" : "Next card"}
                   </Button>
+                  )}
                   {state.turn + 1 < TOD_NIGHT_TURNS && (
                     <Button onClick={() => emit("end_night")} variant="outline" className={quietBtn}>
                       End the night
@@ -371,6 +403,6 @@ export function TruthOrDare() {
           </div>
         )}
       </div>
-    </div>
+    </GameStage>
   );
 }

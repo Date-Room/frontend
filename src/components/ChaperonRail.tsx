@@ -88,6 +88,11 @@ export function ChaperonRail({
                 <span className="text-[10px] font-medium tabular-nums text-white/40">
                   {formatElapsed(e.elapsedSec)}
                 </span>
+                {e.signal.probe && (
+                  <span className="rounded-full bg-sky-400/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-sky-300">
+                    Your test
+                  </span>
+                )}
               </div>
               <p className="mt-1 text-[12px] leading-snug text-cream/90">{e.signal.whisper}</p>
               {eventId && (

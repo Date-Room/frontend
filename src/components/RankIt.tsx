@@ -14,7 +14,11 @@ import {
   reduceRankIt,
 } from "@/lib/activities/rankIt";
 import { useCinematic } from "@/lib/stagecraft/cinematic";
+import { setHelpNow } from "@/lib/activityHelpNow";
+import { GameStage } from "@/lib/stagecraft/GameStage";
 import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { TRY_CAPS, useTryRoom } from "@/lib/tryDemo";
+import { TryCurtain } from "@/components/TryCurtain";
 
 /**
  * Rank It — hosted reveal. Order by real drag (arrows stay as the keyboard
@@ -39,6 +43,7 @@ export function RankIt() {
     reduceRankIt,
   );
   const partnerName = usePartnerName();
+  const tryRoom = useTryRoom();
 
   const round = RANK_ROUNDS[state.round];
   const mine = state.rankings[senderId];
@@ -55,6 +60,19 @@ export function RankIt() {
     [round, insights],
   );
   const { stage, witnessed } = useCinematic(revealing, steps);
+
+  // "Right now" help snapshot (see lib/activityHelpNow).
+  useEffect(() => {
+    const finished = rankItIsFinished(state);
+    const snap = finished
+      ? { now: "That's the set. Tap Play again for another run.", step: 3 }
+      : state.phase === "revealing"
+        ? { now: "Watch the orders compare — the widest gap is the conversation.", step: 2 }
+        : mine
+          ? { now: `Locked. Waiting for ${partnerName} to lock theirs.`, step: 1 }
+          : { now: "Drag the five into YOUR order, best at the top. Then lock it.", step: 0 };
+    setHelpNow("rank_it", snap);
+  }, [state, mine, partnerName]);
 
   if (rankItIsFinished(state)) {
     return (
@@ -92,9 +110,7 @@ export function RankIt() {
             : "Where you already agree.";
 
   return (
-    <div className={["dr-stageroom flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in", dimmed && !onBoard ? "dr-stageroom--dim" : ""].join(" ")}>
-      <div className="dr-stageroom-shade" aria-hidden />
-
+    <GameStage gameId="rank_it" dimmed={dimmed && !onBoard}>
       <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Round {state.round + 1} of {RANK_ROUNDS.length} · {round.title}
@@ -141,6 +157,7 @@ export function RankIt() {
           insights={insights}
           partnerName={partnerName}
           finishLabel={state.round + 1 >= RANK_ROUNDS.length ? "Finish" : "Next round"}
+          curtain={tryRoom && state.round + 1 >= TRY_CAPS.rank_it_rounds}
           onNext={() => {
             const w = round.items[insights.widest];
             emit(
@@ -158,7 +175,7 @@ export function RankIt() {
           }}
         />
       )}
-    </div>
+    </GameStage>
   );
 }
 
@@ -421,6 +438,7 @@ function FlipBoard({
   insights,
   partnerName,
   onNext,
+  curtain = false,
   finishLabel,
 }: {
   roundIndex: number;
@@ -429,6 +447,7 @@ function FlipBoard({
   insights: ReturnType<typeof rankInsights>;
   partnerName: string;
   onNext: () => void;
+  curtain?: boolean;
   finishLabel: string;
 }) {
   const round = RANK_ROUNDS[roundIndex];
@@ -506,9 +525,13 @@ function FlipBoard({
             </>
           )}
         </p>
+        {curtain ? (
+          <TryCurtain line="Six more rankings wait in a date room." />
+        ) : (
         <Button onClick={onNext} className={accentBtn} style={accentStyle}>
           {finishLabel}
         </Button>
+        )}
       </div>
     </div>
   );

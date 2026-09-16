@@ -2,8 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronDown, ShieldCheck, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { useChaperonController } from "@/context/ChaperonContext";
-import { ChaperonSetupSheet } from "@/components/ChaperonSetupSheet";
+import {
+  ChaperonSetupSheet,
+  loadChaperonPrefs,
+  prefsToStartConfig,
+  takeChaperonAutostart,
+} from "@/components/ChaperonSetupSheet";
+import { useRoomSession } from "@/context/RoomSessionContext";
+import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
+import { getCoachBetaStatus } from "@/lib/chaperon";
 import { ChaperonRail } from "@/components/ChaperonRail";
+import { ChaperonTryCard } from "@/components/ChaperonTryCard";
 import {
   CHAPERON_STATUS_DEFAULT_OPEN,
   ChaperonStatusPanel,
@@ -35,7 +44,35 @@ function loadRailOpen(): boolean {
  */
 export function ChaperonMount() {
   const ctrl = useChaperonController();
+  const session = useRoomSession();
+  const partnerName = usePartnerName();
   const [setupOpen, setSetupOpen] = useState(false);
+
+  // Pre-room "Use my free protected date" → start on entry, once per room.
+  // Coach rides along only if the person still has a call (checked live, so
+  // a stale preference can never 402 the start).
+  const autostartTried = useRef(false);
+  const enabled = ctrl?.enabled === true;
+  const start = ctrl?.start;
+  const roomId = session.roomId;
+  useEffect(() => {
+    if (!enabled || !start || autostartTried.current) return;
+    if (!takeChaperonAutostart(roomId)) return;
+    autostartTried.current = true;
+    const prefs = loadChaperonPrefs();
+    if (!prefs.protect) return;
+    void (async () => {
+      let coachAvailable = false;
+      if (prefs.coach) {
+        try {
+          coachAvailable = (await getCoachBetaStatus()).calls_remaining > 0;
+        } catch {
+          coachAvailable = false;
+        }
+      }
+      await start(prefsToStartConfig(prefs, coachAvailable));
+    })();
+  }, [enabled, start, roomId]);
   // The lobby shelf's Chaperon tile opens the same setup sheet via a window
   // event, so discoverability doesn't hang on the small in-call shield.
   useEffect(() => {
@@ -171,7 +208,10 @@ export function ChaperonMount() {
           (the old layout floated each piece at its own fixed offset, and the
           status card covered the rail with no way to move it). */}
       <div className="pointer-events-none fixed left-3 top-16 z-40 flex max-h-[calc(100vh-6rem)] w-[min(15rem,44vw)] flex-col items-start gap-2">
-        {/* Discreet control cluster — status + toggles the whisper rail. */}
+        {/* Discreet control cluster — status + toggles the whisper rail. Only
+            while the chaperon is on: off means nothing in the call area (the
+            way in is the lobby card, the dock, or the pre-room sheet). */}
+        {active && (
         <button
           type="button"
           onClick={onShieldClick}
@@ -207,6 +247,7 @@ export function ChaperonMount() {
             />
           )}
         </button>
+        )}
 
         {/* Honest per-stage status. Expanded card in beta; collapses to a slim
             indicator chip on tap or whenever a whisper arrives. */}
@@ -220,6 +261,9 @@ export function ChaperonMount() {
             />
           </div>
         )}
+
+        {/* First chaperoned date: the try-me probe, once per browser. */}
+        <ChaperonTryCard partnerName={partnerName === "Them" ? null : partnerName} />
 
         {/* The running whisper log — collapsible; only when the reviewer opens it. */}
         {railOpen && (
@@ -288,6 +332,7 @@ export function ChaperonMount() {
         open={setupOpen}
         onClose={() => setSetupOpen(false)}
         variant="live"
+        partnerName={partnerName === "Them" ? null : partnerName}
         active={active}
         onStart={ctrl.start}
         onStop={ctrl.stop}

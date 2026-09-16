@@ -15,6 +15,7 @@ import { ohtgFromJson } from "@/lib/activities/oneHasToGo";
 import { todFromJson } from "@/lib/activities/truthOrDare";
 import { obFromJson, buildObDeck } from "@/lib/activities/openBook";
 import { clFromJson, CL_TOTAL, CL_QUESTIONS } from "@/lib/activities/closer";
+import { guacFromJson } from "@/lib/activities/guacamole";
 
 export type NightKind = "game" | "talk" | "shared";
 
@@ -48,6 +49,7 @@ export const NIGHT_NAMES: Record<string, { name: string; kind: NightKind }> = {
   one_has_to_go: { name: "One Has To Go", kind: "game" },
   pick_a_door: { name: "Pick a Door", kind: "game" },
   rank_it: { name: "Rank It", kind: "game" },
+  guacamole: { name: "Guacamole Panic", kind: "game" },
   watch: { name: "Watch Together", kind: "shared" },
   dj: { name: "Listen Together", kind: "shared" },
   chat: { name: "Chat", kind: "shared" },
@@ -132,6 +134,17 @@ export function nightOutcome(
           figure: { value: `${CL_TOTAL} / ${CL_TOTAL}`, label: "plus the silence" },
         };
       return { outcome: `${at} questions in.`, figure: { value: `${at} / ${CL_TOTAL}`, label: "asked" } };
+    }
+    case "guacamole": {
+      const t = guacFromJson(s);
+      const batches = t.batches_played + (t.phase === "reveal" ? 1 : 0);
+      if (batches === 0) return { outcome: "The kitchen stayed cold." };
+      const scores = Object.values(t.results).map((r) => r.score);
+      const best = scores.length ? Math.max(...scores) : 0;
+      return {
+        outcome: `${plural(batches, "batch")} of guacamole. Best bowl scored ${best}${t.steals.length ? `, ${plural(t.steals.length, "lime")} stolen` : ""}.`,
+        figure: { value: String(batches), label: batches === 1 ? "batch" : "batches" },
+      };
     }
     case "watch":
       return { outcome: s.video_id ? "Watched something together, in step." : "Opened, but never pressed play." };
