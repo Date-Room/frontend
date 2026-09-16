@@ -3,14 +3,14 @@ import { Check, ChevronRight, ChevronUp, Loader2, Minus, X } from "lucide-react"
 import type { AgentStatus, ChaperonStatus, TrackStatus } from "@/hooks/useChaperon";
 import { cn } from "@/lib/utils";
 
-// Beta shows the per-stage detail expanded by default so the team can see
-// exactly what's working. At scale, flip this to false and the everyday UI is
-// just the dot with this detail one tap away (nothing is removed). One line.
-export const CHAPERON_STATUS_DEFAULT_OPEN = true;
+// Quiet when healthy, specific when not: the chip carries the four stage dots
+// only while a stage is unhealthy, and this panel (with the sentence, the
+// rows and the diagnostics) is one tap behind it. Nothing is removed.
+export const CHAPERON_STATUS_DEFAULT_OPEN = false;
 
-type RowState = "ok" | "bad" | "pending" | "unknown";
+export type RowState = "ok" | "bad" | "pending" | "unknown";
 
-function Indicator({ state }: { state: RowState }) {
+export function Indicator({ state }: { state: RowState }) {
   if (state === "ok")
     return <Check className="h-3.5 w-3.5 text-emerald-400" aria-label="working" />;
   if (state === "bad") return <X className="h-3.5 w-3.5 text-rose-400" aria-label="not working" />;
@@ -43,6 +43,27 @@ function trackState(track: TrackStatus, agentConnected: boolean): RowState {
   if (track === null) return "pending";
   if (track.receivingAudio) return "ok";
   return track.subscribed ? "bad" : "pending";
+}
+
+/** Pure: the stage dots and one sentence for the chip and the panel header. */
+export function healthSummary(
+  status: ChaperonStatus,
+  agent: AgentStatus,
+  remoteName = "them",
+): { healthy: boolean; states: RowState[]; sentence: string } {
+  const agentState: RowState = agent.connected ? "ok" : "pending";
+  const you = trackState(agent.you, agent.connected);
+  const them = trackState(agent.them, agent.connected);
+  const judge: RowState = !agent.connected ? "unknown" : agent.judgeOk ? "ok" : "bad";
+  const states = [agentState, you, them, judge];
+  if (status === "off") return { healthy: true, states, sentence: "" };
+  if (!agent.connected) return { healthy: false, states, sentence: "Connecting…" };
+  if (them === "bad" && you === "bad")
+    return { healthy: false, states, sentence: "Not hearing either of you yet." };
+  if (them === "bad") return { healthy: false, states, sentence: `Not hearing ${remoteName} yet.` };
+  if (you === "bad") return { healthy: false, states, sentence: "Not hearing you yet." };
+  if (judge === "bad") return { healthy: false, states, sentence: "Coaching paused. Retrying." };
+  return { healthy: true, states, sentence: "" };
 }
 
 /**
@@ -96,6 +117,7 @@ export function ChaperonStatusPanel({
     );
   }
 
+  const summary = healthSummary(status, agent, remoteName);
   return (
     <div className="w-56 rounded-xl border border-white/10 bg-black/70 px-3 py-2 backdrop-blur">
       <button
@@ -104,9 +126,14 @@ export function ChaperonStatusPanel({
         aria-label="Collapse chaperon status"
         className="mb-0.5 flex w-full items-center justify-between text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40 transition hover:text-white/70"
       >
-        Status
+        How I'm doing
         <ChevronUp className="h-3 w-3" aria-hidden />
       </button>
+      {summary.sentence && (
+        <p className="mb-1 font-serif text-[13px] italic leading-snug text-cream">
+          {summary.sentence}
+        </p>
+      )}
       <Row label={agent.connected ? "Agent connected" : "Connecting to agent…"} state={agentState} />
       <Row label="Hearing you" state={trackState(agent.you, agent.connected)} />
       <Row label={`Hearing ${remoteName}`} state={trackState(agent.them, agent.connected)} />

@@ -89,6 +89,7 @@ export function ChaperonSetupSheet({
   busy = false,
   onStart,
   onStop,
+  onOpenStatus,
 }: {
   open: boolean;
   onClose: () => void;
@@ -101,6 +102,8 @@ export function ChaperonSetupSheet({
   busy?: boolean;
   onStart?: (cfg: ChaperonStartConfig) => void | Promise<void>;
   onStop?: () => void | Promise<void>;
+  /** Live variant: open the in-call status panel (rows + diagnostics). */
+  onOpenStatus?: () => void;
 }) {
   const [prefs, setPrefs] = useState<Prefs>(loadChaperonPrefs);
 
@@ -250,8 +253,21 @@ export function ChaperonSetupSheet({
 
         {variant === "live" && active && (
           <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
-            I listen to the whole call from our server, both sides. The status in the call
-            shows, live, whether I am hearing each of you.
+            I listen to the whole call from our server, both sides.{" "}
+            {onOpenStatus ? (
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenStatus();
+                  onClose();
+                }}
+                className="text-primary hover:underline"
+              >
+                How I'm doing right now
+              </button>
+            ) : (
+              "The status in the call shows, live, whether I am hearing each of you."
+            )}
           </p>
         )}
 

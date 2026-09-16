@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ShieldCheck, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useChaperonController } from "@/context/ChaperonContext";
 import {
   ChaperonSetupSheet,
@@ -13,6 +13,7 @@ import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 import { getCoachBetaStatus } from "@/lib/chaperon";
 import { ChaperonRail } from "@/components/ChaperonRail";
 import { ChaperonTryCard } from "@/components/ChaperonTryCard";
+import { ChaperonChip, type RailFilter } from "@/components/ChaperonChip";
 import {
   ChaperonReactions,
   FamilyIcon,
@@ -90,6 +91,7 @@ export function ChaperonMount() {
   // whisper once, from either surface).
   const [ratings, setRatings] = useState<Record<string, "up" | "down">>({});
   const [railOpen, setRailOpen] = useState(loadRailOpen);
+  const [railFilter, setRailFilter] = useState<RailFilter>("all");
   // The per-stage status card. Open by default in beta, but it AUTO-COLLAPSES
   // to a slim indicator chip the moment a whisper lands: the coach's words are
   // the product, diagnostics must never sit on top of them (live complaint —
@@ -160,10 +162,11 @@ export function ChaperonMount() {
     currentWhisper,
     active,
     whisperLog,
-    unreadCount,
+    unread,
     markRailSeen,
     dismiss,
     sendFeedback,
+    session: chapSession,
   } = ctrl;
 
   function rate(eventId: string, helpful: boolean, detail?: ReactionDetail) {
@@ -175,32 +178,11 @@ export function ChaperonMount() {
   const currentEventId = currentWhisper?.event_id ?? null;
   const currentRating = currentEventId ? ratings[currentEventId] : undefined;
 
-  const dotClass =
-    status === "watching"
-      ? "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse"
-      : status === "connecting"
-        ? "bg-sky-400 shadow-[0_0_10px_rgba(56,189,248,0.6)] animate-pulse"
-        : status === "degraded"
-          ? "bg-amber shadow-[0_0_10px_rgba(251,191,36,0.6)]"
-          : "bg-white/30";
-  const dotTitle =
-    status === "watching"
-      ? "Chaperon is watching"
-      : status === "connecting"
-        ? "Connecting to the agent…"
-        : status === "degraded"
-          ? "Coaching is degraded — retrying"
-          : "Chaperon is off";
-
-  // Shield is the collapsed rail: when active it toggles the whisper history;
-  // when off (nothing to review) it opens setup so you can turn it on.
-  function onShieldClick() {
-    if (!active) {
-      setSetupOpen(true);
-      return;
-    }
+  function openRail(filter: RailFilter) {
+    setRailFilter(filter);
     setRailOpen((v) => {
-      const next = !v;
+      // Same icon again closes; a different filter re-targets an open rail.
+      const next = !(v && filter === railFilter);
       if (next) markRailSeen();
       return next;
     });
@@ -218,52 +200,30 @@ export function ChaperonMount() {
             while the chaperon is on: off means nothing in the call area (the
             way in is the lobby card, the dock, or the pre-room sheet). */}
         {active && (
-        <button
-          type="button"
-          onClick={onShieldClick}
-          title={dotTitle}
-          aria-label="Chaperon"
-          className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-black/50 px-2.5 py-1.5 backdrop-blur transition hover:bg-black/70"
-        >
-          <ShieldCheck
-            className={cn("h-3.5 w-3.5", active ? "text-emerald-300" : "text-white/60")}
+          <ChaperonChip
+            status={status}
+            agent={agent}
+            coached={chapSession?.mode === "coached" || chapSession?.mode === "wing"}
+            unread={unread}
+            alertOnScreen={currentWhisper?.severity === "alert"}
+            remoteName={partnerName === "Them" ? "them" : partnerName}
+            onOpenRail={openRail}
+            onOpenStatus={() => setStatusOpen((v) => !v)}
           />
-          <span className={cn("h-2 w-2 rounded-full", dotClass)} aria-hidden />
-          {active && (
-            <span className="text-[10px] font-medium text-white/70">
-              {status === "connecting"
-                ? "connecting"
-                : status === "degraded"
-                  ? "degraded"
-                  : "watching"}
-            </span>
-          )}
-          {unreadCount > 0 && (
-            <span className="ml-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-bold text-black">
-              {unreadCount}
-            </span>
-          )}
-          {active && whisperLog.length > 0 && (
-            <ChevronDown
-              className={cn(
-                "h-3 w-3 text-white/50 transition-transform",
-                railOpen && "rotate-180",
-              )}
-              aria-hidden
-            />
-          )}
-        </button>
         )}
 
-        {/* Honest per-stage status. Expanded card in beta; collapses to a slim
-            indicator chip on tap or whenever a whisper arrives. */}
-        {active && (
+        {/* Honest per-stage status: the panel with the sentence, the rows and
+            the diagnostics. Opened from the chip while a stage is unhealthy, or
+            from the setup sheet; auto-collapses when a whisper lands so it never
+            sits on top of the coach's words. */}
+        {active && statusOpen && (
           <div className="pointer-events-auto">
             <ChaperonStatusPanel
               status={status}
               agent={agent}
-              open={statusOpen}
-              onToggle={() => setStatusOpen((v) => !v)}
+              remoteName={partnerName === "Them" ? "them" : partnerName}
+              open
+              onToggle={() => setStatusOpen(false)}
             />
           </div>
         )}
@@ -276,6 +236,8 @@ export function ChaperonMount() {
           <ChaperonRail
             entries={whisperLog}
             ratings={ratings}
+            filter={railFilter}
+            onFilter={setRailFilter}
             onRate={rate}
             onCollapse={() => setRailOpen(false)}
             onOpenSetup={() => setSetupOpen(true)}
@@ -330,6 +292,7 @@ export function ChaperonMount() {
         active={active}
         onStart={ctrl.start}
         onStop={ctrl.stop}
+        onOpenStatus={() => setStatusOpen(true)}
       />
     </>
   );

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, cleanup } from "@testing-library/react";
+import { render, cleanup, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Drive the controller directly so we control `enabled` timing.
@@ -23,6 +23,11 @@ function ctrl(enabled: boolean) {
     active: false,
     whisperLog: [],
     unreadCount: 0,
+    unread: { protect: 0, coach: 0 },
+    session: null,
+    probe: "idle",
+    startProbe: () => {},
+    cancelProbe: () => {},
     markRailSeen: () => {},
     dismiss: () => {},
     sendFeedback: () => {},
@@ -60,7 +65,9 @@ describe("ChaperonMount portal attachment", () => {
     mockCtrl = { ...ctrl(true), active: true, status: "watching" };
     rerender(wrap());
 
-    const shield = document.querySelector('[aria-label="Chaperon"]');
+    // Chip (healthy) or dots (agent not yet connected): either way, the surface
+    // is in the live document.
+    const shield = document.querySelector('[aria-label^="Chaperon"]');
     expect(shield).not.toBeNull();
     expect(document.contains(shield)).toBe(true); // in the live DOM, not detached
   });
@@ -97,37 +104,50 @@ describe("status panel vs whisper priority", () => {
     };
   }
 
-  it("starts with the status card expanded (beta default)", () => {
-    mockCtrl = activeCtrl(0);
+  const OK = { subscribed: true, receivingAudio: true, turns: 1, lastTurnSecAgo: 1 };
+
+  // Quiet when healthy: no status card, no dots, just the icon chip.
+  it("shows only the icon chip while every stage is healthy", () => {
+    mockCtrl = { ...activeCtrl(0), agent: { connected: true, judgeOk: true, you: OK, them: OK, lastError: null } };
     render(wrap());
+    expect(document.querySelector('[role="group"][aria-label="Chaperon"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="Collapse chaperon status"]')).toBeNull();
+    expect(document.querySelector('[aria-label="not working"]')).toBeNull();
+  });
+
+  // Specific when not: the chip becomes the four dots with the reason, and a
+  // tap opens the panel with the sentence and the rows.
+  it("becomes the dots when a stage fails and opens the panel on tap", () => {
+    const silent = { subscribed: true, receivingAudio: false, turns: 0, lastTurnSecAgo: null };
+    mockCtrl = { ...activeCtrl(0), agent: { connected: true, judgeOk: true, you: OK, them: silent, lastError: null } };
+    render(wrap());
+    const chip = document.querySelector('[aria-label^="Chaperon: Not hearing"]') as HTMLElement;
+    expect(chip).not.toBeNull();
+    fireEvent.click(chip);
     expect(document.querySelector('[aria-label="Collapse chaperon status"]')).not.toBeNull();
   });
 
   // Regression: the expanded status card used to float OVER the whisper rail
-  // with no way to move it, hiding the coach's words. It must collapse to the
-  // slim chip the moment a new whisper arrives.
-  it("auto-collapses the status card when a whisper lands", () => {
-    mockCtrl = activeCtrl(0);
+  // with no way to move it, hiding the coach's words. It must leave the moment
+  // a new whisper arrives.
+  it("auto-collapses the status panel when a whisper lands", () => {
+    const silent = { subscribed: true, receivingAudio: false, turns: 0, lastTurnSecAgo: null };
+    const agent = { connected: true, judgeOk: true, you: OK, them: silent, lastError: null };
+    mockCtrl = { ...activeCtrl(0), agent };
     const { rerender } = render(wrap());
+    fireEvent.click(document.querySelector('[aria-label^="Chaperon: Not hearing"]') as HTMLElement);
     expect(document.querySelector('[aria-label="Collapse chaperon status"]')).not.toBeNull();
 
-    mockCtrl = activeCtrl(1);
+    mockCtrl = { ...activeCtrl(1), agent };
     rerender(wrap());
-
     expect(document.querySelector('[aria-label="Collapse chaperon status"]')).toBeNull();
-    expect(document.querySelector('[aria-label="Expand chaperon status"]')).not.toBeNull();
   });
 
-  it("keeps the whole cluster in one flow column so the card cannot overlap the rail", () => {
-    mockCtrl = activeCtrl(2);
+  it("keeps the whole cluster in one flow column so nothing can overlap the rail", () => {
+    mockCtrl = { ...activeCtrl(2), agent: { connected: true, judgeOk: true, you: OK, them: OK, lastError: null } };
     render(wrap());
-    const shield = document.querySelector('[aria-label="Chaperon"]') as HTMLElement;
-    const column = shield.parentElement as HTMLElement;
-    // The pill, the status chip/card, and (when open) the rail are siblings in
-    // one flex column — normal flow, so overlap is structurally impossible.
+    const chip = document.querySelector('[role="group"][aria-label="Chaperon"]') as HTMLElement;
+    const column = chip.parentElement as HTMLElement;
     expect(column.className).toContain("flex-col");
-    expect(column.contains(document.querySelector('[aria-label="Collapse chaperon status"]'))).toBe(
-      true,
-    );
   });
 });
