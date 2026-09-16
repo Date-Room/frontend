@@ -984,6 +984,8 @@ export default function PreRoom() {
         open={chaperonSetupOpen}
         onClose={() => setChaperonSetupOpen(false)}
         variant="preferences"
+        roomId={room?.id}
+        partnerName={effectivePartnerName}
       />
 
       <Dialog open={destroyOpen} onOpenChange={(o) => !destroyBusy && setDestroyOpen(o)}>

@@ -118,6 +118,34 @@ export function applyCoachBeta(reason: string): Promise<CoachBetaStatus> {
   return api.post<CoachBetaStatus>("/v1/chaperon/coach-beta/apply", { reason });
 }
 
+// --- Protect entitlement (free first date, then metered when switched on) ---
+
+export type ProtectStatus = {
+  metering_enabled: boolean;
+  free_used: boolean;
+  credits_remaining: number;
+};
+
+export function getProtectStatus(): Promise<ProtectStatus> {
+  return api.get<ProtectStatus>("/v1/chaperon/protect");
+}
+
+/** The pill on the Protect card: what this person has to spend. Pure. */
+export function protectPill(st: ProtectStatus | undefined): {
+  label: string;
+  tone: "free" | "credits" | "empty";
+} {
+  if (!st || !st.free_used) return { label: "1 free date", tone: "free" };
+  if (!st.metering_enabled) return { label: "Free", tone: "free" };
+  if (st.credits_remaining > 0) {
+    return {
+      label: `${st.credits_remaining} date${st.credits_remaining === 1 ? "" : "s"} left`,
+      tone: "credits",
+    };
+  }
+  return { label: "None left", tone: "empty" };
+}
+
 /** What Coach will cost once it leaves beta — shown to prime willingness to
  *  pay while it's free-in-beta. */
 export const COACH_PRICE_BLURB =
