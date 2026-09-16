@@ -657,21 +657,16 @@ export function RoomStage({
         {/* Call initiator — full-width on mobile; on desktop it sits in the
             stage header so the lobby card can use the full canvas. */}
         {callActive && !splitCallLayout ? (
-          <div className="perm-status-bar lg:hidden">
-            <div className="flex min-w-0 items-center gap-2">
-              <span
-                className={cn(
-                  "h-2 w-2 shrink-0 rounded-full",
-                  partnerInCall
-                    ? "bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.65)]"
-                    : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse",
-                )}
-              />
-              <p className="truncate text-sm text-cream/80">
-                {partnerInCall ? `${partnerName} is in the call` : `Ringing ${partnerName}…`}
-              </p>
+          // Ringing is a status worth a strip; a connected call is not (the
+          // video says it). The strip leaves once they are in.
+          !partnerInCall ? (
+            <div className="perm-status-bar lg:hidden">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" />
+                <p className="truncate text-sm text-cream/80">{`Ringing ${partnerName}…`}</p>
+              </div>
             </div>
-          </div>
+          ) : null
         ) : (
           (() => {
             const title = partnerInCall
@@ -762,7 +757,7 @@ export function RoomStage({
                     )}
                   />
                   <p className="truncate text-xs text-cream/80">
-                    {partnerInCall ? `${partnerName} is in the call` : `Ringing ${partnerName}…`}
+                    {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
                   </p>
                 </div>
               ) : !callActive ? (
@@ -940,7 +935,7 @@ export function RoomStage({
                     )}
                   />
                   <p className="truncate text-xs text-cream/80">
-                    {partnerInCall ? `${partnerName} is in the call` : `Ringing ${partnerName}…`}
+                    {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
                   </p>
                 </div>
               </div>

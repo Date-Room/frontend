@@ -16,6 +16,7 @@ import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Maximize2, Minimize2, M
 import { cn } from "@/lib/utils";
 import { AmbientController } from "@/components/AmbientController";
 import { ChaperonAgentBridge } from "@/components/ChaperonAgentBridge";
+import { CallPeersBridge } from "@/context/CallPeersContext";
 import { DeviceMenu, DeviceChangeToaster } from "@/components/DeviceMenu";
 import { loadDevicePreference } from "@/lib/devices";
 import { getInvitedGuestName } from "@/lib/invitedGuest";
@@ -829,6 +830,7 @@ export function RoomVideo({
       <MicKeepAlive />
       <AmbientController />
       <ChaperonAgentBridge />
+      <CallPeersBridge />
       <DeviceChangeToaster />
       <Stage
         onLeave={onLeave ?? (() => {})}
