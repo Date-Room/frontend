@@ -68,7 +68,19 @@ export type ChaperonDebriefResponse = {
   ended_at: string | null;
   // null while the session is active, or on the `none` (no-retention) tier.
   debrief: ChaperonDebrief | null;
+  /** Whispers that reached (or could have reached) you, by family. */
+  counts: { protect: number; coach: number };
+  /** Your "try me" test was caught and set aside. */
+  probe_caught: boolean;
+  /** Your word on the review, once given. */
+  rating: DebriefRating | null;
 };
+
+export type DebriefRating = "fair" | "mostly" | "unfair";
+
+export function rateChaperonDebrief(roomId: string, rating: DebriefRating): Promise<void> {
+  return api.post<void>(`/v1/chaperon/rooms/${roomId}/debrief/rating`, { rating });
+}
 
 /** 404s when the caller never ran a chaperon in this room. */
 export function getChaperonDebrief(roomId: string): Promise<ChaperonDebriefResponse> {

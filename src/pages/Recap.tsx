@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Calendar, ChevronRight, Lightbulb, Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { Calendar, ChevronRight, Loader2, ShieldCheck, Sparkles } from "lucide-react";
 import { CardPage } from "@/components/CardPage";
 import { PaymentCheckout } from "@/components/PaymentCheckout";
 import {
@@ -18,6 +18,7 @@ import { ApiError } from "@/lib/api";
 import { GetTheAppCard } from "@/components/GetTheAppCard";
 import { authClient } from "@/lib/authClient";
 import { getChaperonDebrief, type ChaperonDebriefResponse } from "@/lib/chaperon";
+import { ChaperonReview } from "@/components/ChaperonReview";
 import {
   getBillingConfig,
   getEntitlement,
@@ -387,49 +388,9 @@ export default function Recap() {
             </section>
           )}
 
-          {/* The chaperon's debrief — yours only; your date has their own. */}
-          {debriefRes?.debrief && (
-            <section className="mb-8 animate-float-up">
-              <div className="editorial-card p-6">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <p className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
-                    <ShieldCheck className="h-3.5 w-3.5 text-rosegold" aria-hidden />
-                    From your chaperon
-                  </p>
-                  <span
-                    className={cn(
-                      "rounded-full border px-2.5 py-0.5 text-[10px] font-medium",
-                      debriefRes.debrief.safety === "all_clear"
-                        ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
-                        : "border-rose-500/40 bg-rose-500/10 text-rose-300",
-                    )}
-                  >
-                    {debriefRes.debrief.safety === "all_clear"
-                      ? "Nothing needed flagging"
-                      : "Something was flagged"}
-                  </span>
-                </div>
-                <h2 className="font-serif text-xl italic leading-snug text-cream">
-                  {debriefRes.debrief.headline}
-                </h2>
-                {debriefRes.debrief.moments.length > 0 && (
-                  <ul className="mt-4 space-y-2">
-                    {debriefRes.debrief.moments.map((m) => (
-                      <li key={m} className="flex items-start gap-2.5 text-sm text-cream/85">
-                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rosegold/70" aria-hidden />
-                        {m}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {debriefRes.debrief.tip && (
-                  <p className="mt-4 flex items-start gap-2 border-t border-white/10 pt-3 text-sm text-muted-foreground">
-                    <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-rosegold/70" aria-hidden />
-                    {debriefRes.debrief.tip}
-                  </p>
-                )}
-              </div>
-            </section>
+          {/* The chaperon's review — yours only; your date has their own. */}
+          {debriefRes?.debrief && id && (
+            <ChaperonReview roomId={id} res={debriefRes} partnerName={partnerName} />
           )}
           {debriefRes && !debriefRes.debrief && debriefRes.ended_at && debriefRes.data_tier === "none" && (
             <p className="mb-8 text-center text-xs italic text-muted-foreground">
