@@ -1,7 +1,8 @@
-import { ChevronUp, Settings, ShieldCheck, ThumbsDown, ThumbsUp } from "lucide-react";
+import { ChevronUp, Settings, ShieldCheck } from "lucide-react";
 import type { ChaperonSeverity } from "@/lib/chaperon";
 import type { WhisperLogEntry } from "@/hooks/useChaperon";
 import { cn } from "@/lib/utils";
+import { ChaperonReactions, type ReactionDetail } from "@/components/ChaperonReactions";
 
 /** Left dot per severity — matches the toast's colour language. */
 const DOT: Record<ChaperonSeverity, string> = {
@@ -33,7 +34,7 @@ export function ChaperonRail({
 }: {
   entries: WhisperLogEntry[];
   ratings: Record<string, "up" | "down">;
-  onRate: (eventId: string, helpful: boolean) => void;
+  onRate: (eventId: string, helpful: boolean, detail?: ReactionDetail) => void;
   onCollapse: () => void;
   onOpenSetup: () => void;
 }) {
@@ -96,31 +97,13 @@ export function ChaperonRail({
               </div>
               <p className="mt-1 text-[12px] leading-snug text-cream/90">{e.signal.whisper}</p>
               {eventId && (
-                <div className="mt-1 flex items-center gap-1">
-                  <button
-                    type="button"
-                    aria-label="Helpful"
-                    disabled={rated !== undefined}
-                    onClick={() => onRate(eventId, true)}
-                    className={cn(
-                      "rounded-full p-0.5 text-cream/50 transition hover:bg-white/10 hover:text-cream disabled:opacity-40",
-                      rated === "up" && "text-emerald-300",
-                    )}
-                  >
-                    <ThumbsUp className="h-3 w-3" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Not helpful"
-                    disabled={rated !== undefined}
-                    onClick={() => onRate(eventId, false)}
-                    className={cn(
-                      "rounded-full p-0.5 text-cream/50 transition hover:bg-white/10 hover:text-cream disabled:opacity-40",
-                      rated === "down" && "text-rose-300",
-                    )}
-                  >
-                    <ThumbsDown className="h-3 w-3" />
-                  </button>
+                <div className="mt-1.5">
+                  <ChaperonReactions
+                    signal={e.signal}
+                    rated={rated}
+                    size="sm"
+                    onRate={(helpful, detail) => onRate(eventId, helpful, detail)}
+                  />
                 </div>
               )}
             </div>

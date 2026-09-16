@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ShieldCheck, ThumbsDown, ThumbsUp, X } from "lucide-react";
+import { ChevronDown, ShieldCheck, X } from "lucide-react";
 import { useChaperonController } from "@/context/ChaperonContext";
 import {
   ChaperonSetupSheet,
@@ -13,6 +13,12 @@ import { usePartnerName } from "@/lib/stagecraft/usePartnerName";
 import { getCoachBetaStatus } from "@/lib/chaperon";
 import { ChaperonRail } from "@/components/ChaperonRail";
 import { ChaperonTryCard } from "@/components/ChaperonTryCard";
+import {
+  ChaperonReactions,
+  FamilyIcon,
+  checkLabel,
+  type ReactionDetail,
+} from "@/components/ChaperonReactions";
 import {
   CHAPERON_STATUS_DEFAULT_OPEN,
   ChaperonStatusPanel,
@@ -160,9 +166,9 @@ export function ChaperonMount() {
     sendFeedback,
   } = ctrl;
 
-  function rate(eventId: string, helpful: boolean) {
+  function rate(eventId: string, helpful: boolean, detail?: ReactionDetail) {
     if (ratings[eventId]) return;
-    sendFeedback(helpful, eventId);
+    sendFeedback(helpful, eventId, detail);
     setRatings((r) => ({ ...r, [eventId]: helpful ? "up" : "down" }));
   }
 
@@ -277,53 +283,41 @@ export function ChaperonMount() {
         )}
       </div>
 
-      {/* Newest whisper as a centre toast; it also lands in the rail. */}
+      {/* Newest whisper as a centre band; it also lands in the rail. Centre is
+          where the eyes are on the web room (the game), and the band carries
+          the whole anatomy so it can be reacted to while it has attention. */}
       {currentWhisper && (
         <div className="pointer-events-none fixed inset-x-0 top-14 z-40 flex justify-center px-4">
           <div
             className={cn(
-              "pointer-events-auto flex max-w-sm items-start gap-2.5 rounded-2xl border px-4 py-3 text-cream shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl animate-fade-in",
+              "pointer-events-auto w-full max-w-md rounded-2xl border px-4 py-3 text-cream shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl animate-fade-in",
               SEVERITY_STYLES[currentWhisper.severity],
             )}
           >
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-cream/80" aria-hidden />
-            <p className="min-w-0 flex-1 text-sm leading-snug">{currentWhisper.whisper}</p>
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-cream/60">
+              <FamilyIcon severity={currentWhisper.severity} className="h-3.5 w-3.5" />
+              <span>{currentWhisper.probe ? "Your test" : checkLabel(currentWhisper.check_id)}</span>
+              <button
+                type="button"
+                aria-label="Dismiss"
+                onClick={dismiss}
+                className="ml-auto rounded-full p-1 text-cream/60 transition hover:bg-white/10 hover:text-cream"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <p className="mt-1.5 font-serif text-[15px] italic leading-snug text-cream">
+              {currentWhisper.whisper}
+            </p>
             {currentEventId && (
-              <div className="flex shrink-0 items-center gap-1">
-                <button
-                  type="button"
-                  aria-label="Helpful"
-                  disabled={currentRating !== undefined}
-                  onClick={() => rate(currentEventId, true)}
-                  className={cn(
-                    "rounded-full p-1 transition hover:bg-white/10 disabled:opacity-40",
-                    currentRating === "up" && "text-emerald-300",
-                  )}
-                >
-                  <ThumbsUp className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Not helpful"
-                  disabled={currentRating !== undefined}
-                  onClick={() => rate(currentEventId, false)}
-                  className={cn(
-                    "rounded-full p-1 transition hover:bg-white/10 disabled:opacity-40",
-                    currentRating === "down" && "text-rose-300",
-                  )}
-                >
-                  <ThumbsDown className="h-3.5 w-3.5" />
-                </button>
+              <div className="mt-2.5">
+                <ChaperonReactions
+                  signal={currentWhisper}
+                  rated={currentRating}
+                  onRate={(helpful, detail) => rate(currentEventId, helpful, detail)}
+                />
               </div>
             )}
-            <button
-              type="button"
-              aria-label="Dismiss"
-              onClick={dismiss}
-              className="shrink-0 rounded-full p-1 text-cream/60 transition hover:bg-white/10 hover:text-cream"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
           </div>
         </div>
       )}
