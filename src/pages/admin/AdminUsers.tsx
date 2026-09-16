@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCursorPages } from "@/hooks/useCursorPages";
 import { Pager } from "@/components/admin/Pager";
@@ -29,7 +30,8 @@ const GRANTS = [
 
 export default function AdminUsers() {
   const qc = useQueryClient();
-  const [search, setSearch] = useState("");
+  const [params] = useSearchParams();
+  const [search, setSearch] = useState(params.get("q") ?? "");
   const [selected, setSelected] = useState<AdminUserRow | null>(null);
   const [coachCalls, setCoachCalls] = useState(1);
   const [protectDates, setProtectDates] = useState(1);

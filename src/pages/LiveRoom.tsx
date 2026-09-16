@@ -23,6 +23,7 @@ import { RoomSessionProvider, useRoomSession, type RoomIdentity } from "@/contex
 import { ChaperonProvider } from "@/context/ChaperonContext";
 import { CallPeersProvider, useCallPeers } from "@/context/CallPeersContext";
 import { ChaperonAnnounceBadge } from "@/components/ChaperonAnnounceBadge";
+import { TellUsSheet } from "@/components/TellUsSheet";
 import type { ChaperonAnnouncement } from "@/lib/rooms";
 import { ChaperonMount } from "@/components/ChaperonMount";
 import {
@@ -366,6 +367,7 @@ function RoomShell({
     }
   }, [wallRoom]);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [tellUsOpen, setTellUsOpen] = useState(false);
   const [ambianceOpen, setAmbianceOpen] = useState(false);
   const [ambianceOverride, setAmbianceOverride] = useState<LobbyMood | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -583,6 +585,13 @@ function RoomShell({
               </div>
             )}
             <button
+              type="button"
+              onClick={() => setTellUsOpen(true)}
+              className="text-xs uppercase tracking-[0.2em] text-muted-foreground transition hover:text-cream"
+            >
+              Tell us
+            </button>
+            <button
               onClick={() => setShowLeaveConfirm(true)}
               className="text-xs uppercase tracking-[0.2em] text-muted-foreground transition hover:text-cream"
             >
@@ -590,6 +599,13 @@ function RoomShell({
             </button>
           </div>
         </header>
+        <TellUsSheet
+          open={tellUsOpen}
+          onClose={() => setTellUsOpen(false)}
+          surface="room"
+          activityId={String(tab)}
+          roomId={roomId}
+        />
 
         <RoomStage
           roomId={roomId}

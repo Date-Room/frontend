@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCursorPages } from "@/hooks/useCursorPages";
+import { Pager } from "@/components/admin/Pager";
 import { Copy, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -15,7 +17,7 @@ import { ApiError } from "@/lib/api";
 import {
   createPromoCode,
   generatePromoCodes,
-  listPromoCodes,
+  listAdminPromoCodes,
   updatePromoCode,
   type PromoCode,
 } from "@/lib/admin";
@@ -289,10 +291,14 @@ function BenefitFields({
 
 export default function AdminPromoCodes() {
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin-promo"],
-    queryFn: listPromoCodes,
+  const [labelFilter, setLabelFilter] = useState("");
+  const pages = useCursorPages<PromoCode>({
+    queryKey: ["admin-promo", labelFilter],
+    fetchPage: (cursor, limit) => listAdminPromoCodes({ label: labelFilter || undefined, cursor, limit }),
+    perPage: 25,
   });
+  const data = { items: pages.items };
+  const isLoading = pages.isLoading;
 
   const [generating, setGenerating] = useState(false);
   const [customSubmitting, setCustomSubmitting] = useState(false);
@@ -568,6 +574,12 @@ export default function AdminPromoCodes() {
         </form>
       </details>
 
+      <input
+        value={labelFilter}
+        onChange={(e) => setLabelFilter(e.target.value)}
+        placeholder="Filter by campaign label…"
+        className="w-full max-w-sm rounded-lg border border-white/[0.14] bg-card px-3 py-2 text-sm text-cream placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none"
+      />
       <div className="rounded-xl border border-white/[0.08] overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-card/80 text-muted-foreground/70 text-left">
@@ -629,6 +641,7 @@ export default function AdminPromoCodes() {
             ))}
           </tbody>
         </table>
+        <Pager from={pages.from} to={pages.to} total={pages.total} perPage={pages.perPage} onPerPage={pages.setPerPage} hasPrev={pages.hasPrev} hasNext={pages.hasNext} onPrev={pages.prev} onNext={pages.next} noun="codes" busy={pages.isFetching} />
       </div>
     </div>
   );

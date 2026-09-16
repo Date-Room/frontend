@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/authClient";
 import { getAdminStats, listCoachBetaApplicationsBy } from "@/lib/admin";
+import { CommandSearch } from "@/components/admin/CommandSearch";
 
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; count?: number | string };
 
@@ -63,6 +64,9 @@ export function AdminLayout() {
             <p className="font-serif text-[17px] leading-none">DateRoom</p>
             <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">Back of house</p>
           </div>
+        </div>
+        <div className="px-3 pb-1">
+          <CommandSearch />
         </div>
         <nav className="flex-1 space-y-1 px-2">
           {groups.map((g) => (

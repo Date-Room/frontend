@@ -16,7 +16,10 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Compass, Loader2, Minus, Plus, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Pager } from "@/components/admin/Pager";
+import { useCursorPages } from "@/hooks/useCursorPages";
 import {
   COACH_BETA_MAX_GRANT,
   declineCoachBeta,
@@ -27,8 +30,11 @@ import {
   getBetaReviewQueue,
   grantCoachBeta,
   listCoachBetaApplicationsBy,
+  listAdminFeedback,
   postBetaEndSessions,
   postBetaVerdict,
+  updateAdminFeedback,
+  type AdminFeedbackRow,
   type BetaFeedFilters,
   type BetaSignalRow,
   type BetaVerdict,
@@ -90,7 +96,10 @@ export default function AdminBeta() {
   const queue = useQuery({ queryKey: ["beta-review-queue"], queryFn: () => getBetaReviewQueue(10) });
   const apps = useQuery({ queryKey: ["admin-coach-beta-applications"], queryFn: listCoachBetaApplications });
   const health = useQuery({ queryKey: ["beta-health"], queryFn: getBetaHealth, refetchInterval: 30_000 });
+  const feedback = useQuery({ queryKey: ["admin-feedback-counts"], queryFn: () => listAdminFeedback({ limit: 1 }), staleTime: 30_000 });
   const needsYou = health.data?.needs_you.length ?? 0;
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") ?? "live";
 
   return (
     <div className="space-y-6">
@@ -101,8 +110,8 @@ export default function AdminBeta() {
         </p>
       </header>
 
-      <Tabs defaultValue="live" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 bg-card/60">
+      <Tabs value={tab} onValueChange={(v) => setParams(v === "live" ? {} : { tab: v }, { replace: true })} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5 bg-card/60">
           <TabsTrigger value="live">
             Live <Count n={overview.data?.on_air.sessions} />
           </TabsTrigger>
@@ -111,6 +120,9 @@ export default function AdminBeta() {
           </TabsTrigger>
           <TabsTrigger value="grants">
             Grants <Count n={apps.data?.pending_count} tone="amber" />
+          </TabsTrigger>
+          <TabsTrigger value="feedback">
+            Feedback <Count n={feedback.data?.counts?.new} tone="amber" />
           </TabsTrigger>
           <TabsTrigger value="status">
             Status {needsYou > 0 && <span className="ml-1.5 rounded-full bg-rose-500/20 px-1.5 text-[10px] font-bold text-rose-300">!</span>}
@@ -125,6 +137,9 @@ export default function AdminBeta() {
         </TabsContent>
         <TabsContent value="grants">
           <GrantsTab />
+        </TabsContent>
+        <TabsContent value="feedback">
+          <FeedbackTab />
         </TabsContent>
         <TabsContent value="status">
           <StatusTab />
@@ -630,6 +645,101 @@ function StatusTab() {
       <p className="text-xs text-muted-foreground/70">
         {h.unwritten_debriefs} ended session{h.unwritten_debriefs === 1 ? "" : "s"} with no review written yet (reviews are written on first open).
       </p>
+    </div>
+  );
+}
+
+
+// ── Feedback ─────────────────────────────────────────────────────────────────
+
+const KIND_TONE: Record<AdminFeedbackRow["kind"], string> = {
+  confusing: "bg-amber-500/15 text-amber-300",
+  broken: "bg-rose-500/15 text-rose-300",
+  idea: "bg-sky-500/15 text-sky-300",
+  loved: "bg-emerald-500/15 text-emerald-300",
+};
+
+function FeedbackTab() {
+  const qc = useQueryClient();
+  const [status, setStatus] = useState<"new" | "seen" | "done" | "all">("new");
+  const [kind, setKind] = useState<AdminFeedbackRow["kind"] | "all">("all");
+  const pages = useCursorPages<AdminFeedbackRow>({
+    queryKey: ["admin-feedback", status, kind],
+    fetchPage: (cursor, limit) =>
+      listAdminFeedback({ status: status === "all" ? undefined : status, kind: kind === "all" ? undefined : kind, cursor, limit }),
+  });
+  const counts = useQuery({ queryKey: ["admin-feedback-counts"], queryFn: () => listAdminFeedback({ limit: 1 }) });
+  const [noteFor, setNoteFor] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const update = useMutation({
+    mutationFn: (v: { id: string; status?: "new" | "seen" | "done"; admin_note?: string }) =>
+      updateAdminFeedback(v.id, { status: v.status, admin_note: v.admin_note }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["admin-feedback"] });
+      void qc.invalidateQueries({ queryKey: ["admin-feedback-counts"] });
+      void qc.invalidateQueries({ queryKey: ["admin-needs-action"] });
+      setNoteFor(null);
+      setNote("");
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not update"),
+  });
+  const c = counts.data?.counts ?? {};
+  const seg = (on: boolean) =>
+    cn("rounded-full border px-2.5 py-0.5 text-xs transition", on ? "border-primary/60 bg-primary/[0.12] text-primary" : "border-white/[0.14] bg-card text-cream/80 hover:bg-white/[0.08]");
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {(["new", "seen", "done", "all"] as const).map((s) => (
+          <button key={s} type="button" onClick={() => setStatus(s)} className={seg(status === s)}>
+            {s === "all" ? "All" : s[0].toUpperCase() + s.slice(1)}{s !== "all" && c[s] != null ? ` · ${c[s]}` : ""}
+          </button>
+        ))}
+        <span className="mx-2 h-4 w-px bg-white/[0.14]" />
+        {(["all", "confusing", "broken", "idea", "loved"] as const).map((k) => (
+          <button key={k} type="button" onClick={() => setKind(k)} className={seg(kind === k)}>
+            {k === "all" ? "Every kind" : k[0].toUpperCase() + k.slice(1)}
+          </button>
+        ))}
+      </div>
+      <div className="rounded-lg border border-white/[0.08] bg-card/40">
+        {pages.isLoading ? (
+          <p className="px-4 py-6 text-sm text-muted-foreground/70">Loading\u2026</p>
+        ) : pages.items.length === 0 ? (
+          <p className="px-4 py-6 text-center text-sm text-muted-foreground/70">Nothing here. Feedback arrives from the room header, the recap and the pre-room.</p>
+        ) : (
+          <ul className="divide-y divide-white/[0.08]">
+            {pages.items.map((f) => (
+              <li key={f.id} className="flex flex-wrap items-start gap-3 px-4 py-3 text-sm">
+                <span className={cn("mt-0.5 rounded-full px-2 py-0.5 text-[11px] font-semibold", KIND_TONE[f.kind])}>{f.kind}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-cream">{f.text || <span className="text-muted-foreground/70">(no words, just the tap)</span>}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {f.display_name || f.email || "someone"}{f.team ? " · team" : ""} · {f.surface}{f.activity_id ? ` · ${f.activity_id}` : ""} · {f.platform}{f.app_version ? ` ${f.app_version}` : ""} · {new Date(f.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+                  </p>
+                  {f.admin_note && <p className="mt-1 text-xs text-primary/90">Note: {f.admin_note}</p>}
+                  {noteFor === f.id && (
+                    <div className="mt-2 flex gap-2">
+                      <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What we did about it" className="focus-ring h-8 flex-1 rounded-lg border border-white/[0.14] bg-card px-2 text-xs text-cream" />
+                      <button type="button" onClick={() => update.mutate({ id: f.id, admin_note: note })} className="rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground">Save</button>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {f.status !== "seen" && f.status !== "done" && (
+                    <button type="button" onClick={() => update.mutate({ id: f.id, status: "seen" })} className="rounded-lg border border-white/[0.14] bg-card px-2.5 py-1 text-xs text-cream/80 hover:bg-white/[0.08]">Seen</button>
+                  )}
+                  {f.status !== "done" && (
+                    <button type="button" onClick={() => update.mutate({ id: f.id, status: "done" })} className="rounded-lg border border-emerald-500/40 bg-emerald-500/[0.08] px-2.5 py-1 text-xs text-emerald-200 hover:bg-emerald-500/15">Done</button>
+                  )}
+                  <button type="button" onClick={() => { setNoteFor(noteFor === f.id ? null : f.id); setNote(f.admin_note); }} className="rounded-lg border border-white/[0.14] bg-card px-2.5 py-1 text-xs text-cream/80 hover:bg-white/[0.08]">Note</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <Pager from={pages.from} to={pages.to} total={pages.total} perPage={pages.perPage} onPerPage={pages.setPerPage} hasPrev={pages.hasPrev} hasNext={pages.hasNext} onPrev={pages.prev} onNext={pages.next} noun="items" busy={pages.isFetching} />
+      </div>
     </div>
   );
 }
