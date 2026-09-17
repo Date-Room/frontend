@@ -72,7 +72,8 @@ import {
 import { cn } from "@/lib/utils";
 
 /** Two-level launcher categories — mirrors the mobile activity menu.
- *  Single-item categories stage directly; multi-item ones drill in. */
+ *  Single-item categories stage directly (see pickCategory); multi-item
+ *  ones drill in. */
 const CATEGORIES: { id: string; label: string; icon: LucideIcon; itemIds: string[] }[] = [
   {
     id: "room",
@@ -549,6 +550,16 @@ export function RoomStage({
   const [lastCatId, setLastCatId] = useState<string | null>(null);
 
   function pickCategory(c: (typeof availCats)[number]) {
+    // One thing inside (Watch, Music, Chat): open it. The drill-in list is
+    // for choosing between things, and a list of one is just a second tap.
+    if (c.items.length === 1) {
+      // No list to return to either — Back goes to the lobby, not to a
+      // drill-in of one tile.
+      setLastCatId(null);
+      commitStage(c.items[0].id);
+      setCatId(null);
+      return;
+    }
     setCatId(c.id);
   }
   function pickItem(id: string) {
@@ -1008,15 +1019,10 @@ export function RoomStage({
                 </div>
                 <div
                   className={cn(
-                    "dr-dock-grid min-h-0 flex-1 gap-2 overflow-y-auto",
-                    activeCat.items.length === 1
-                      ? "dr-dock-grid--solo"
-                      : cn(
-                          "grid",
-                          activeCat.items.length <= 4
-                            ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
-                            : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5",
-                        ),
+                    "dr-dock-grid grid min-h-0 flex-1 gap-2 overflow-y-auto",
+                    activeCat.items.length <= 4
+                      ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+                      : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5",
                   )}
                 >
                   {activeCat.items.map((it) => (
@@ -1027,7 +1033,6 @@ export function RoomStage({
                       tagline={ITEM_TAGLINES[it.id]}
                       image={ITEM_TILE_IMAGES[it.id]}
                       active={staged === it.id}
-                      hero={activeCat.items.length === 1}
                       onClick={() => pickItem(it.id)}
                     />
                   ))}
@@ -1352,7 +1357,6 @@ function MenuSquareTile({
   tagline,
   image,
   active,
-  hero,
   onClick,
 }: {
   Icon: LucideIcon;
@@ -1360,7 +1364,6 @@ function MenuSquareTile({
   tagline?: string;
   image?: string;
   active: boolean;
-  hero?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -1369,8 +1372,7 @@ function MenuSquareTile({
       onClick={onClick}
       title={tagline ? `${label} — ${tagline}` : label}
       className={cn(
-        "dr-dock-tile group relative flex aspect-square min-w-0 flex-col overflow-hidden border text-left transition duration-200",
-        hero ? "rounded-[1.15rem]" : "rounded-xl",
+        "dr-dock-tile group relative flex aspect-square min-w-0 flex-col overflow-hidden rounded-xl border text-left transition duration-200",
         active
           ? "border-primary/50 shadow-[0_0_0_1px_hsl(var(--primary)/0.4),0_12px_32px_rgb(0_0_0_/_0.45)]"
           : "border-white/[0.10] hover:border-primary/30 hover:shadow-[0_10px_28px_rgb(0_0_0_/_0.4)]",
@@ -1390,29 +1392,24 @@ function MenuSquareTile({
         className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#080604]/95 via-[#080604]/45 to-[#080604]/15 transition duration-300 group-hover:via-[#080604]/35"
         aria-hidden
       />
-      <span className={cn("relative z-[1] flex flex-1 items-start justify-start", hero ? "p-3 sm:p-4" : "p-2")}>
+      <span className="relative z-[1] flex flex-1 items-start justify-start p-2">
         <span
           className={cn(
-            "flex items-center justify-center rounded-lg border border-white/20 bg-black/35 backdrop-blur-md transition duration-200 group-hover:border-primary/40 group-hover:bg-black/50",
-            hero ? "h-11 w-11 sm:h-12 sm:w-12" : "h-8 w-8 sm:h-9 sm:w-9",
+            "flex h-8 w-8 items-center justify-center rounded-lg border border-white/20 bg-black/35 backdrop-blur-md transition duration-200 group-hover:border-primary/40 group-hover:bg-black/50 sm:h-9 sm:w-9",
             active && "border-primary/50 bg-primary/20",
           )}
         >
           <Icon
-            className={cn(
-              hero ? "h-5 w-5 sm:h-6 sm:w-6" : "h-4 w-4 sm:h-[18px] sm:w-[18px]",
-              active ? "text-primary" : "text-cream",
-            )}
+            className={cn("h-4 w-4 sm:h-[18px] sm:w-[18px]", active ? "text-primary" : "text-cream")}
             strokeWidth={2}
             aria-hidden
           />
         </span>
       </span>
-      <span className={cn("relative z-[1] shrink-0 pt-1", hero ? "px-3 pb-3 sm:px-4 sm:pb-4" : "px-2 pb-2 sm:px-2.5 sm:pb-2.5")}>
+      <span className="relative z-[1] shrink-0 px-2 pb-2 pt-1 sm:px-2.5 sm:pb-2.5">
         <span
           className={cn(
-            "block truncate font-serif leading-tight",
-            hero ? "text-base sm:text-lg" : "text-[11px] sm:text-xs",
+            "block truncate font-serif text-[11px] leading-tight sm:text-xs",
             active ? "text-primary" : "text-cream",
           )}
         >
@@ -1420,10 +1417,7 @@ function MenuSquareTile({
         </span>
         {tagline ? (
           <span
-            className={cn(
-              "mt-0.5 block line-clamp-2 leading-snug text-cream/55",
-              hero ? "text-[11px] sm:text-xs" : "text-[8px] sm:text-[9px]",
-            )}
+            className="mt-0.5 block line-clamp-2 text-[8px] leading-snug text-cream/55 sm:text-[9px]"
           >
             {tagline}
           </span>

@@ -1976,28 +1976,6 @@
   align-content: start;
 }
 
-/* Solo dock categories (Watch, Music, Chat) — one hero tile, centered */
-.dr-dock-grid--solo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  align-content: center;
-  padding: 0.5rem 0 1rem;
-}
-
-.dr-dock-grid--solo .dr-dock-tile {
-  width: min(18rem, 52vw, 46vh);
-  max-width: 100%;
-  aspect-ratio: 1;
-  flex-shrink: 0;
-}
-
-@media (min-width: 640px) {
-  .dr-dock-grid--solo .dr-dock-tile {
-    width: min(20rem, 38vw, 50vh);
-  }
-}
-
 .dr-dock-tile img {
   opacity: 0.72;
   filter: saturate(0.88) brightness(0.78);
