@@ -56,13 +56,15 @@ export function ActivityInvite({
       <div
         key={activityId}
         className={cn(
-          "pointer-events-auto flex w-full max-w-[480px] items-center gap-3 rounded-2xl border border-primary/35 bg-[#141019]/85 p-2.5 pr-3 shadow-[0_18px_56px_rgba(0,0,0,0.55),0_0_0_1px_hsl(var(--primary)/0.12)] backdrop-blur-xl",
+          // Sized to sit inside the room's top-bar band on desktop (the stage
+          // header below it is already busy: theme chip, partner status).
+          "pointer-events-auto flex w-full max-w-[480px] items-center gap-3 rounded-2xl border border-primary/35 bg-[#141019]/85 p-2 pr-3 shadow-[0_18px_56px_rgba(0,0,0,0.55),0_0_0_1px_hsl(var(--primary)/0.12)] backdrop-blur-xl",
           "animate-in fade-in slide-in-from-top-3 duration-300",
         )}
       >
         {/* Who + what: the partner's face over the activity's tile. */}
-        <div className="relative h-14 w-14 shrink-0">
-          <div className="h-14 w-14 overflow-hidden rounded-xl bg-white/[0.06]">
+        <div className="relative h-11 w-11 shrink-0">
+          <div className="h-11 w-11 overflow-hidden rounded-xl bg-white/[0.06]">
             {tileSrc ? (
               <img src={tileSrc} alt="" className="h-full w-full object-cover" draggable={false} />
             ) : (
@@ -71,13 +73,13 @@ export function ActivityInvite({
               </div>
             )}
           </div>
-          <div className="absolute -bottom-1.5 -right-1.5 h-7 w-7 overflow-hidden rounded-full border-2 border-[#141019] bg-primary/20">
+          <div className="absolute -bottom-1.5 -right-1.5 h-6 w-6 overflow-hidden rounded-full border-2 border-[#141019] bg-primary/20">
             <UserAvatarImg
               src={partnerPhotoUrl}
               alt=""
               className="h-full w-full object-cover"
               fallback={
-                <span className="flex h-full w-full items-center justify-center text-[11px] font-bold text-primary">
+                <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-primary">
                   {initial}
                 </span>
               }
@@ -86,7 +88,7 @@ export function ActivityInvite({
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 text-sm font-semibold leading-snug text-cream">{headline}</p>
+          <p className="line-clamp-1 text-sm font-semibold leading-snug text-cream">{headline}</p>
           <p className="text-xs text-cream/65">Want to join them?</p>
         </div>
 

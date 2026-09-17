@@ -1891,8 +1891,12 @@
   --lobby-gap: 0.5rem;
 }
 
-.dr-lobby-compact .dr-shelf-even {
-  grid-template-columns: repeat(var(--shelf-cols), minmax(0, 1fr));
+/* One column per tile from tablet up; phones keep the two-column grid the
+   markup declares (six one-per-column tiles at 360px were unreadable). */
+@media (min-width: 640px) {
+  .dr-lobby-compact .dr-shelf-even {
+    grid-template-columns: repeat(var(--shelf-cols), minmax(0, 1fr));
+  }
 }
 
 .dr-shelf-tile .dr-shelf-frame img {
