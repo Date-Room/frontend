@@ -37,11 +37,16 @@ import {
   Loader2,
   Check,
   ShieldCheck,
-  Columns2,
-  PictureInPicture2,
-  Circle,
+  GripVertical,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
+import {
+  clampPaneWidth,
+  setCallMode,
+  setPaneWidth,
+  useCallMode,
+  usePaneWidth,
+} from "@/lib/callLayout";
 import { ActivityHelp, GameIntro, hasActivityHelp, shouldShowGameIntro } from "@/components/ActivityHelp";
 import { RoomAmbianceSheet } from "@/components/RoomAmbianceSheet";
 import { RoomThemeChip } from "@/components/RoomThemeChip";
@@ -205,29 +210,19 @@ const COMPACT_LANDSCAPE = { w: 252, h: 168 };
 // is exactly where every game puts its controls (the four cook buttons,
 // the This-or-That halves, every Next round).
 const COMPACT_BUBBLE = { w: 96, h: 96 };
-// Desktop bubble: a touch larger so a face still reads on a big monitor.
-const DESKTOP_BUBBLE = { w: 128, h: 128 };
-
-/** Desktop (≥1024px) call layouts, Zoom View-menu style. `split` is the
- *  50/50 pane; `corner` the draggable/resizable window the mid-size
- *  viewports already use; `bubble` the round tile phones use. Remembered
- *  per device, not per room — it is a preference about your screen. */
-type CallMode = "split" | "corner" | "bubble";
-const CALL_MODE_KEY = "dr:call-layout";
-const CALL_MODES: { id: CallMode; label: string; icon: LucideIcon }[] = [
-  { id: "split", label: "Side by side", icon: Columns2 },
-  { id: "corner", label: "Corner window", icon: PictureInPicture2 },
-  { id: "bubble", label: "Bubble", icon: Circle },
-];
-function readCallMode(): CallMode {
-  try {
-    const v = localStorage.getItem(CALL_MODE_KEY);
-    if (v === "split" || v === "corner" || v === "bubble") return v;
-  } catch {
-    /* ignore */
-  }
-  return "split";
-}
+// Desktop pair bubble: their face as a 128px circle, yours as a small one
+// on its lower-right shoulder — the box is wide enough for the overhang.
+const PAIR_BUBBLE = { w: 156, h: 128 };
+// Watch fullscreen, opened from the bubble: a small 16:9 tile over the film.
+const FS_TILE = { w: 384, h: 216 };
+// Fullscreen insets: no app header above, and the player's control bar
+// lives along the bottom.
+const FS_EDGE = 16;
+const FS_BOTTOM_PAD = 88;
+// Below this pane width the two faces stack instead of sitting side by side.
+const PANE_STACK_BELOW = 520;
+// Desktop call layout (side by side with a draggable divider, or the pair
+// bubble) lives in lib/callLayout so the top-bar switcher shares it.
 /** Default size is the biggest; drag-resize shrinks down to 2/3 of it. */
 const MIN_SCALE = 2 / 3;
 type Corner = "nw" | "ne" | "sw" | "se";
@@ -263,8 +258,8 @@ function useWideViewport(): boolean {
 /**
  * The Our Room "stage" — a Vision-Board-sized card that mounts the chosen
  * activity/wall, an app dock below the card (Room / Games / Watch / Music / Chat),
- * and call video (desktop: side by side / corner window / bubble, the
- * person's choice; smaller screens: draggable PiP, phones: bubble).
+ * and call video (desktop: a resizable side pane or a floating pair bubble,
+ * the person's choice; smaller screens: draggable PiP; phones: bubble).
  * The last thing staged persists per room.
  */
 export function RoomStage({
@@ -520,22 +515,66 @@ export function RoomStage({
   }, [room.channel, room.senderId, partnerName]);
   const compact = useCompactViewport();
   const wide = useWideViewport();
-  const [callMode, setCallModeState] = useState<CallMode>(readCallMode);
-  const setCallMode = useCallback((m: CallMode) => {
-    setCallModeState(m);
-    try {
-      localStorage.setItem(CALL_MODE_KEY, m);
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const callMode = useCallMode();
   // Watch's native fullscreen only paints its own subtree, so while it is
   // up the call must float over it regardless of the chosen desktop mode.
   const [watchFullscreen, setWatchFullscreen] = useState(false);
+  /** Desktop fullscreen override: pair bubble by default, one tap for a tile. */
+  const fsOverlay = wide && watchFullscreen;
+  const [fsExpanded, setFsExpanded] = useState(false);
   /** The right-hand call pane is rendered. */
   const splitCallLayout = callActive && wide && callMode === "split";
   /** The call renders as the floating window (PiP/bubble) rather than in the pane. */
   const floatingCall = !splitCallLayout || watchFullscreen;
+
+  // ── Side-by-side pane width (desktop) ──
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [rowW, setRowW] = useState(0);
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setRowW(entry.contentRect.width));
+    ro.observe(el);
+    setRowW(el.getBoundingClientRect().width);
+    return () => ro.disconnect();
+  }, []);
+  const savedPaneW = usePaneWidth();
+  const paneW = rowW > 0 ? clampPaneWidth(savedPaneW ?? rowW / 2, rowW) : savedPaneW ?? 0;
+  const paneStacked = paneW > 0 && paneW < PANE_STACK_BELOW;
+  const divider = useRef<{ right: number } | null>(null);
+  const onDividerMove = useCallback((e: PointerEvent) => {
+    const d = divider.current;
+    const row = rowRef.current;
+    if (!d || !row) return;
+    setPaneWidth(clampPaneWidth(d.right - e.clientX, row.getBoundingClientRect().width));
+  }, []);
+  const onDividerUp = useCallback(() => {
+    divider.current = null;
+    document.body.style.cursor = "";
+    window.removeEventListener("pointermove", onDividerMove);
+    window.removeEventListener("pointerup", onDividerUp);
+  }, [onDividerMove]);
+  function startDividerDrag(e: React.PointerEvent) {
+    const row = rowRef.current;
+    if (!row) return;
+    e.preventDefault();
+    divider.current = { right: row.getBoundingClientRect().right };
+    document.body.style.cursor = "col-resize";
+    window.addEventListener("pointermove", onDividerMove);
+    window.addEventListener("pointerup", onDividerUp);
+  }
+  function nudgeDivider(delta: number) {
+    const row = rowRef.current;
+    if (!row) return;
+    setPaneWidth(clampPaneWidth(paneW + delta, row.getBoundingClientRect().width));
+  }
+  useEffect(
+    () => () => {
+      window.removeEventListener("pointermove", onDividerMove);
+      window.removeEventListener("pointerup", onDividerUp);
+    },
+    [onDividerMove, onDividerUp],
+  );
   const [portrait, setPortrait] = useState(true);
   const [scale, setScale] = useState(1);
   // Phones start as a small bubble; expand toggles a large (near-fullscreen)
@@ -560,14 +599,21 @@ export function RoomStage({
     setCallOpen(false);
     setManualBubble(false);
   }, [staged]);
-  const bubble = wide
-    ? floatingCall && callMode === "bubble"
-    : compact && (activityStaged ? !callOpen : manualBubble);
-  const base = bubble
-    ? wide
-      ? DESKTOP_BUBBLE
-      : COMPACT_BUBBLE
-    : expanded
+  const bubble = fsOverlay
+    ? !fsExpanded
+    : wide
+      ? floatingCall && callMode === "bubble"
+      : compact && (activityStaged ? !callOpen : manualBubble);
+  const pairBubble = bubble && wide;
+  const base = fsOverlay
+    ? fsExpanded
+      ? FS_TILE
+      : PAIR_BUBBLE
+    : bubble
+      ? wide
+        ? PAIR_BUBBLE
+        : COMPACT_BUBBLE
+      : expanded
       ? portrait
         ? PORTRAIT
         : LANDSCAPE
@@ -640,22 +686,30 @@ export function RoomStage({
   // ── Call PiP drag ──
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const drag = useRef<{ dx: number; dy: number } | null>(null);
+  // In fullscreen there is no app header above and the player's controls
+  // sit along the bottom, so the safe band moves.
+  const padTop = fsOverlay ? FS_EDGE : TOP_PAD;
+  const padBottom = fsOverlay ? FS_BOTTOM_PAD : BOTTOM_PAD;
   const clamp = useCallback(
     (x: number, y: number, w: number, h: number) => ({
       x: Math.min(Math.max(x, EDGE), Math.max(EDGE, window.innerWidth - w - EDGE)),
-      y: Math.min(Math.max(y, TOP_PAD), Math.max(TOP_PAD, window.innerHeight - h - BOTTOM_PAD)),
+      y: Math.min(Math.max(y, padTop), Math.max(padTop, window.innerHeight - h - padBottom)),
     }),
-    [],
+    [padTop, padBottom],
+  );
+  const dockTopRight = useCallback(
+    (w: number) => ({
+      x: Math.max(EDGE, window.innerWidth - w - EDGE),
+      y: padTop + (fsOverlay ? 0 : 8),
+    }),
+    [padTop, fsOverlay],
   );
   useEffect(() => {
     if (pos !== null || !callActive) return;
     // Top-right on every viewport: the bottom of the stage belongs to the
     // activity's controls, so the call never starts on top of them.
-    setPos({
-      x: Math.max(EDGE, window.innerWidth - curW - EDGE),
-      y: TOP_PAD + 8,
-    });
-  }, [pos, callActive, curW, curH]);
+    setPos(dockTopRight(curW));
+  }, [pos, callActive, curW, curH, dockTopRight]);
 
   // Re-dock when the call changes mode (bubble ↔ open), so it can't be left
   // sitting over the controls it just grew past.
@@ -664,12 +718,27 @@ export function RoomStage({
     if (prevBubble.current === bubble) return;
     prevBubble.current = bubble;
     if (!callActive) return;
-    setPos({
-      x: Math.max(EDGE, window.innerWidth - curW - EDGE),
-      y: TOP_PAD + 8,
-    });
+    setPos(dockTopRight(curW));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bubble, callActive]);
+
+  // Fullscreen is an exception, not a continuation: on the way in, park the
+  // room position and start as a pair bubble top-right (clear of the film's
+  // controls); on the way out, put the call back exactly where it was.
+  const roomPosRef = useRef<{ x: number; y: number } | null>(null);
+  const prevFs = useRef(fsOverlay);
+  useEffect(() => {
+    if (prevFs.current === fsOverlay) return;
+    prevFs.current = fsOverlay;
+    if (fsOverlay) {
+      roomPosRef.current = pos;
+      setFsExpanded(false);
+      setPos(dockTopRight(PAIR_BUBBLE.w));
+    } else {
+      setPos(roomPosRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fsOverlay]);
 
   // Keep the window on-screen when its size changes (expand/collapse/rotate).
   useEffect(() => {
@@ -831,18 +900,19 @@ export function RoomStage({
       )}
     >
       <div
+        ref={rowRef}
         className={cn(
           "flex h-full min-h-0 w-full gap-2 sm:gap-2.5",
           splitCallLayout
-            ? "max-w-none flex-col lg:flex-row lg:items-stretch lg:gap-3"
+            ? "max-w-none flex-col lg:flex-row lg:items-stretch lg:gap-0"
             : "mx-auto max-w-6xl flex-col",
         )}
       >
-        {/* Left — lobby card + app dock (half width when in a call on desktop). */}
+        {/* Left — stage + app dock. Takes whatever the call pane leaves. */}
         <div
           className={cn(
             "flex min-h-0 min-w-0 flex-col gap-2 sm:gap-2.5",
-            splitCallLayout ? "flex-1 lg:w-1/2 lg:flex-none" : "h-full flex-1",
+            splitCallLayout ? "flex-1" : "h-full flex-1",
           )}
         >
         {/* Call initiator — full-width on mobile; on desktop it sits in the
@@ -974,7 +1044,6 @@ export function RoomStage({
                   <p className="truncate text-xs text-cream/80">
                     {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
                   </p>
-                  {wide && <CallLayoutSwitcher mode={callMode} onChange={setCallMode} />}
                 </div>
               ) : !callActive ? (
                 (() => {
@@ -1139,7 +1208,35 @@ export function RoomStage({
 
         {/* Right — call video fills half the canvas on desktop. */}
         {splitCallLayout && (
-          <aside className="dr-call-pane hidden min-h-0 w-full shrink-0 flex-col lg:flex lg:w-1/2">
+          <>
+            {/* Divider — drag (or arrow keys) to trade stage for call. */}
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize the call pane"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={rowW > 0 ? Math.round((paneW / rowW) * 100) : 50}
+              tabIndex={0}
+              onPointerDown={startDividerDrag}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft") nudgeDivider(24);
+                else if (e.key === "ArrowRight") nudgeDivider(-24);
+                else if (e.key === "Home") setPaneWidth(null);
+                else return;
+                e.preventDefault();
+              }}
+              onDoubleClick={() => setPaneWidth(null)}
+              title="Drag to resize · double-click for half"
+              className="dr-call-divider focus-ring group hidden w-3 shrink-0 cursor-col-resize touch-none items-center justify-center lg:flex"
+            >
+              <GripVertical className="h-4 w-4 text-cream/30 transition group-hover:text-primary group-focus-visible:text-primary" aria-hidden />
+            </div>
+          <aside
+            className="dr-call-pane hidden min-h-0 w-full shrink-0 flex-col lg:flex"
+            // Before the row has been measured, hold the classic half.
+            style={{ width: paneW > 0 ? paneW : "50%" }}
+          >
             <section className="perm-wall-frame flex min-h-0 flex-1 flex-col overflow-hidden !p-0">
               <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 py-2 sm:px-4">
                 <Video className="h-3.5 w-3.5 text-primary" aria-hidden />
@@ -1158,13 +1255,13 @@ export function RoomStage({
                   <p className="truncate text-xs text-cream/80">
                     {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
                   </p>
-                  <CallLayoutSwitcher mode={callMode} onChange={setCallMode} />
                 </div>
               </div>
               {/* The live call is re-homed into this slot (see splitSlotRef). */}
               <div ref={splitSlotRef} className="relative min-h-0 flex-1 overflow-hidden bg-black/40" />
             </section>
           </aside>
+          </>
         )}
       </div>
 
@@ -1224,25 +1321,31 @@ export function RoomStage({
         pipHostRef.current &&
         createPortal(
         <div
-          className={
-            floatingCall
-              ? "group fixed z-40 select-none rounded-2xl glass p-1 shadow-[0_20px_56px_rgba(0,0,0,0.55)] touch-none"
-              : "relative h-full w-full"
-          }
+          className={cn(
+            floatingCall ? "group fixed z-40 select-none touch-none" : "relative h-full w-full",
+            // The pair bubble draws its own rings; everything else gets the glass card.
+            floatingCall && !pairBubble && "rounded-2xl glass p-1 shadow-[0_20px_56px_rgba(0,0,0,0.55)]",
+          )}
           style={floatingCall && pos ? { left: pos.x, top: pos.y, width: curW, height: curH } : undefined}
         >
           <div
             className={cn(
-              "relative h-full w-full overflow-hidden",
+              "relative h-full w-full",
+              !pairBubble && "overflow-hidden",
               floatingCall && "cursor-grab active:cursor-grabbing",
-              floatingCall && (bubble ? "rounded-full" : "rounded-xl"),
+              floatingCall && !pairBubble && (bubble ? "rounded-full" : "rounded-xl"),
             )}
             onPointerDown={floatingCall ? startDrag : undefined}
+            title={pairBubble ? (fsOverlay ? "Tap for a bigger view" : "Tap to open the call") : undefined}
             onClick={() => {
               // A tap (not a drag) on the bubble opens the call properly.
               if (!bubble || draggedRef.current) return;
+              if (fsOverlay) {
+                setFsExpanded(true);
+                return;
+              }
               if (wide) {
-                setCallMode("corner");
+                setCallMode("split");
                 return;
               }
               setCallOpen(true);
@@ -1253,41 +1356,42 @@ export function RoomStage({
             <RoomVideo
               variant={floatingCall ? "pip" : "full"}
               collapsed={bubble}
+              pair={pairBubble}
+              stacked={!floatingCall && paneStacked}
               onLeave={onLeaveCall}
-              // Pane → corner window (the button RoomVideo has had all along).
-              onMinimize={!floatingCall ? () => setCallMode("corner") : undefined}
-              // Desktop: corner → side by side. Below that: bubble ↔ compact
-              // window ↔ large call, as before.
+              // Pane → bubble (the shrink button RoomVideo has had all along).
+              onMinimize={!floatingCall ? () => setCallMode("bubble") : undefined}
+              // Desktop fullscreen tile: only "back to the bubble". Desktop
+              // otherwise never shows a floating window. Below desktop: bubble ↔
+              // compact window ↔ large call, as before.
               onExpand={
-                !floatingCall
+                !floatingCall || wide
                   ? undefined
-                  : wide
-                    ? watchFullscreen
-                      ? undefined
-                      : () => setCallMode("split")
-                    : expanded
-                      ? undefined
-                      : () => setExpanded(true)
+                  : expanded
+                    ? undefined
+                    : () => setExpanded(true)
               }
               onCollapse={
                 !floatingCall
                   ? undefined
-                  : wide
-                    ? () => setCallMode("bubble")
-                    : expanded
-                      ? () => setExpanded(false)
-                      : compact
-                        ? () => {
-                            // On a phone the shrink control always has somewhere
-                            // to go: down to the bubble.
-                            if (activityStaged) setCallOpen(false);
-                            else setManualBubble(true);
-                          }
-                        : undefined
+                  : fsOverlay
+                    ? () => setFsExpanded(false)
+                    : wide
+                      ? undefined
+                      : expanded
+                        ? () => setExpanded(false)
+                        : compact
+                          ? () => {
+                              // On a phone the shrink control always has somewhere
+                              // to go: down to the bubble.
+                              if (activityStaged) setCallOpen(false);
+                              else setManualBubble(true);
+                            }
+                          : undefined
               }
             />
           </div>
-          {floatingCall && bubble && (
+          {floatingCall && bubble && !pairBubble && (
             <span
               className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-[9px] font-semibold uppercase tracking-[0.14em] text-cream/80 drop-shadow"
               aria-hidden
@@ -1295,7 +1399,7 @@ export function RoomStage({
               tap
             </span>
           )}
-          {floatingCall && !bubble && (
+          {floatingCall && !bubble && !wide && (
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
@@ -1310,6 +1414,7 @@ export function RoomStage({
               phones use the expand/shrink toggle instead). */}
           {floatingCall &&
             !compact &&
+            !bubble &&
             (["nw", "ne", "sw", "se"] as Corner[]).map((corner) => (
               <span
                 key={corner}
@@ -1372,38 +1477,6 @@ export function RoomStage({
       />
     </main>
     </MusicRoomProvider>
-  );
-}
-
-/** Desktop call layout switcher — three small toggles, Zoom View-menu style. */
-function CallLayoutSwitcher({ mode, onChange }: { mode: CallMode; onChange: (m: CallMode) => void }) {
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Call layout"
-      className="flex shrink-0 items-center gap-0.5 rounded-full border border-white/10 bg-black/30 p-0.5"
-    >
-      {CALL_MODES.map((m) => {
-        const active = m.id === mode;
-        return (
-          <button
-            key={m.id}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            aria-label={m.label}
-            title={m.label}
-            onClick={() => onChange(m.id)}
-            className={cn(
-              "flex h-6 w-6 items-center justify-center rounded-full transition",
-              active ? "bg-primary/25 text-primary" : "text-cream/55 hover:bg-white/[0.06] hover:text-cream",
-            )}
-          >
-            <m.icon className={cn("h-3.5 w-3.5", m.id === "bubble" && "fill-current")} aria-hidden />
-          </button>
-        );
-      })}
-    </div>
   );
 }
 

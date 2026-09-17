@@ -33,6 +33,7 @@ import {
   useRoomCustomization,
 } from "@/context/RoomCustomizationContext";
 import { RoomStage, type StageItem } from "@/components/RoomStage";
+import { CallLayoutSwitcher } from "@/components/CallLayoutSwitcher";
 import { ChatWithBoundary } from "@/components/Chat";
 import { WatchTogether } from "@/components/WatchTogether";
 import { VisionBoard } from "@/components/VisionBoard";
@@ -586,6 +587,9 @@ function RoomShell({
                 )}
               </div>
             )}
+            {/* Desktop call layout — in the top bar so it is reachable in
+                every mode and every stage state. */}
+            {liveMode && <CallLayoutSwitcher className="hidden lg:flex" />}
             <button
               type="button"
               onClick={() => setTellUsOpen(true)}

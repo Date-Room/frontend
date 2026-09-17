@@ -1907,9 +1907,19 @@
   transform: scale(1);
 }
 
-/* In-call desktop split — lobby left, video right (50/50) */
+/* In-call desktop split — stage left, call pane right, divider between.
+   The pane's width is the person's (lib/callLayout), 280px up to half. */
 .dr-call-pane {
   min-height: 0;
+}
+
+.dr-call-divider {
+  border-radius: 999px;
+  transition: background-color 0.2s ease;
+}
+.dr-call-divider:hover,
+.dr-call-divider:focus-visible {
+  background-color: rgb(255 255 255 / 0.05);
 }
 
 .dr-call-pane .perm-wall-frame {
