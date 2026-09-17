@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useReducer,
   useRef,
@@ -36,6 +37,9 @@ import {
   Loader2,
   Check,
   ShieldCheck,
+  Columns2,
+  PictureInPicture2,
+  Circle,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
 import { ActivityHelp, GameIntro, hasActivityHelp, shouldShowGameIntro } from "@/components/ActivityHelp";
@@ -201,6 +205,29 @@ const COMPACT_LANDSCAPE = { w: 252, h: 168 };
 // is exactly where every game puts its controls (the four cook buttons,
 // the This-or-That halves, every Next round).
 const COMPACT_BUBBLE = { w: 96, h: 96 };
+// Desktop bubble: a touch larger so a face still reads on a big monitor.
+const DESKTOP_BUBBLE = { w: 128, h: 128 };
+
+/** Desktop (≥1024px) call layouts, Zoom View-menu style. `split` is the
+ *  50/50 pane; `corner` the draggable/resizable window the mid-size
+ *  viewports already use; `bubble` the round tile phones use. Remembered
+ *  per device, not per room — it is a preference about your screen. */
+type CallMode = "split" | "corner" | "bubble";
+const CALL_MODE_KEY = "dr:call-layout";
+const CALL_MODES: { id: CallMode; label: string; icon: LucideIcon }[] = [
+  { id: "split", label: "Side by side", icon: Columns2 },
+  { id: "corner", label: "Corner window", icon: PictureInPicture2 },
+  { id: "bubble", label: "Bubble", icon: Circle },
+];
+function readCallMode(): CallMode {
+  try {
+    const v = localStorage.getItem(CALL_MODE_KEY);
+    if (v === "split" || v === "corner" || v === "bubble") return v;
+  } catch {
+    /* ignore */
+  }
+  return "split";
+}
 /** Default size is the biggest; drag-resize shrinks down to 2/3 of it. */
 const MIN_SCALE = 2 / 3;
 type Corner = "nw" | "ne" | "sw" | "se";
@@ -236,7 +263,8 @@ function useWideViewport(): boolean {
 /**
  * The Our Room "stage" — a Vision-Board-sized card that mounts the chosen
  * activity/wall, an app dock below the card (Room / Games / Watch / Music / Chat),
- * and call video (50/50 split on desktop, draggable PiP on smaller screens).
+ * and call video (desktop: side by side / corner window / bubble, the
+ * person's choice; smaller screens: draggable PiP, phones: bubble).
  * The last thing staged persists per room.
  */
 export function RoomStage({
@@ -492,7 +520,22 @@ export function RoomStage({
   }, [room.channel, room.senderId, partnerName]);
   const compact = useCompactViewport();
   const wide = useWideViewport();
-  const splitCallLayout = callActive && wide;
+  const [callMode, setCallModeState] = useState<CallMode>(readCallMode);
+  const setCallMode = useCallback((m: CallMode) => {
+    setCallModeState(m);
+    try {
+      localStorage.setItem(CALL_MODE_KEY, m);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  // Watch's native fullscreen only paints its own subtree, so while it is
+  // up the call must float over it regardless of the chosen desktop mode.
+  const [watchFullscreen, setWatchFullscreen] = useState(false);
+  /** The right-hand call pane is rendered. */
+  const splitCallLayout = callActive && wide && callMode === "split";
+  /** The call renders as the floating window (PiP/bubble) rather than in the pane. */
+  const floatingCall = !splitCallLayout || watchFullscreen;
   const [portrait, setPortrait] = useState(true);
   const [scale, setScale] = useState(1);
   // Phones start as a small bubble; expand toggles a large (near-fullscreen)
@@ -517,9 +560,13 @@ export function RoomStage({
     setCallOpen(false);
     setManualBubble(false);
   }, [staged]);
-  const bubble = compact && (activityStaged ? !callOpen : manualBubble);
+  const bubble = wide
+    ? floatingCall && callMode === "bubble"
+    : compact && (activityStaged ? !callOpen : manualBubble);
   const base = bubble
-    ? COMPACT_BUBBLE
+    ? wide
+      ? DESKTOP_BUBBLE
+      : COMPACT_BUBBLE
     : expanded
       ? portrait
         ? PORTRAIT
@@ -645,21 +692,38 @@ export function RoomStage({
     pipHostRef.current.style.display = "contents";
   }
   const pipAnchorRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  // The split pane's video slot — the host's third home (desktop side by
+  // side). One <RoomVideo> lives in the host for the whole call; switching
+  // layouts moves the node, so LiveKit never disconnects.
+  const splitSlotRef = useRef<HTMLDivElement>(null);
+  // Layout effect, not effect: React has just detached the pane (and the
+  // host with it) when leaving split mode. A <video> removed from the
+  // document pauses once the task yields, so re-home it in the same task.
+  useLayoutEffect(() => {
     const host = pipHostRef.current;
-    const anchor = pipAnchorRef.current;
-    if (!host || !anchor) return;
+    if (!host) return;
     const place = () => {
       const fsEl = document.fullscreenElement as HTMLElement | null;
-      const target = fsEl?.getAttribute("data-dr-watch-fs") === "1" ? fsEl : anchor;
-      if (host.parentElement !== target) target.appendChild(host);
+      const inWatchFs = fsEl?.getAttribute("data-dr-watch-fs") === "1";
+      setWatchFullscreen(Boolean(inWatchFs));
+      const target = inWatchFs
+        ? fsEl
+        : splitCallLayout
+          ? splitSlotRef.current
+          : pipAnchorRef.current;
+      if (!target || host.parentElement === target) return;
+      target.appendChild(host);
+      host.querySelectorAll("video").forEach((v) => {
+        if (v.paused) void v.play().catch(() => {});
+      });
     };
     place();
     document.addEventListener("fullscreenchange", place);
-    return () => {
-      document.removeEventListener("fullscreenchange", place);
-      host.remove();
-    };
+    return () => document.removeEventListener("fullscreenchange", place);
+  }, [splitCallLayout]);
+  useEffect(() => {
+    const host = pipHostRef.current;
+    return () => host?.remove();
   }, []);
   const onMove = useCallback(
     (e: PointerEvent) => {
@@ -910,6 +974,7 @@ export function RoomStage({
                   <p className="truncate text-xs text-cream/80">
                     {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
                   </p>
+                  {wide && <CallLayoutSwitcher mode={callMode} onChange={setCallMode} />}
                 </div>
               ) : !callActive ? (
                 (() => {
@@ -1093,12 +1158,11 @@ export function RoomStage({
                   <p className="truncate text-xs text-cream/80">
                     {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
                   </p>
+                  <CallLayoutSwitcher mode={callMode} onChange={setCallMode} />
                 </div>
               </div>
-              <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
-                <ChaperonSeam className="rounded-none" />
-                <RoomVideo variant="full" onLeave={onLeaveCall} />
-              </div>
+              {/* The live call is re-homed into this slot (see splitSlotRef). */}
+              <div ref={splitSlotRef} className="relative min-h-0 flex-1 overflow-hidden bg-black/40" />
             </section>
           </aside>
         )}
@@ -1157,49 +1221,73 @@ export function RoomStage({
 
       <div ref={pipAnchorRef} className="contents" />
       {callActive &&
-        !splitCallLayout &&
         pipHostRef.current &&
         createPortal(
         <div
-          className="group fixed z-40 select-none rounded-2xl glass p-1 shadow-[0_20px_56px_rgba(0,0,0,0.55)] touch-none"
-          style={pos ? { left: pos.x, top: pos.y, width: curW, height: curH } : undefined}
+          className={
+            floatingCall
+              ? "group fixed z-40 select-none rounded-2xl glass p-1 shadow-[0_20px_56px_rgba(0,0,0,0.55)] touch-none"
+              : "relative h-full w-full"
+          }
+          style={floatingCall && pos ? { left: pos.x, top: pos.y, width: curW, height: curH } : undefined}
         >
           <div
             className={cn(
-              "relative h-full w-full cursor-grab overflow-hidden active:cursor-grabbing",
-              bubble ? "rounded-full" : "rounded-xl",
+              "relative h-full w-full overflow-hidden",
+              floatingCall && "cursor-grab active:cursor-grabbing",
+              floatingCall && (bubble ? "rounded-full" : "rounded-xl"),
             )}
-            onPointerDown={startDrag}
+            onPointerDown={floatingCall ? startDrag : undefined}
             onClick={() => {
               // A tap (not a drag) on the bubble opens the call properly.
               if (!bubble || draggedRef.current) return;
+              if (wide) {
+                setCallMode("corner");
+                return;
+              }
               setCallOpen(true);
               setManualBubble(false);
             }}
           >
-            {!bubble && <ChaperonSeam />}
+            {!bubble && <ChaperonSeam className={floatingCall ? undefined : "rounded-none"} />}
             <RoomVideo
-              variant="pip"
+              variant={floatingCall ? "pip" : "full"}
               collapsed={bubble}
               onLeave={onLeaveCall}
-              // bubble ↔ compact window ↔ large call. On a phone the shrink
-              // control returns to the bubble rather than doing nothing.
-              onExpand={expanded ? undefined : () => setExpanded(true)}
+              // Pane → corner window (the button RoomVideo has had all along).
+              onMinimize={!floatingCall ? () => setCallMode("corner") : undefined}
+              // Desktop: corner → side by side. Below that: bubble ↔ compact
+              // window ↔ large call, as before.
+              onExpand={
+                !floatingCall
+                  ? undefined
+                  : wide
+                    ? watchFullscreen
+                      ? undefined
+                      : () => setCallMode("split")
+                    : expanded
+                      ? undefined
+                      : () => setExpanded(true)
+              }
               onCollapse={
-                expanded
-                  ? () => setExpanded(false)
-                  : compact
-                    ? () => {
-                        // On a phone the shrink control always has somewhere
-                        // to go: down to the bubble.
-                        if (activityStaged) setCallOpen(false);
-                        else setManualBubble(true);
-                      }
-                    : undefined
+                !floatingCall
+                  ? undefined
+                  : wide
+                    ? () => setCallMode("bubble")
+                    : expanded
+                      ? () => setExpanded(false)
+                      : compact
+                        ? () => {
+                            // On a phone the shrink control always has somewhere
+                            // to go: down to the bubble.
+                            if (activityStaged) setCallOpen(false);
+                            else setManualBubble(true);
+                          }
+                        : undefined
               }
             />
           </div>
-          {bubble && (
+          {floatingCall && bubble && (
             <span
               className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-[9px] font-semibold uppercase tracking-[0.14em] text-cream/80 drop-shadow"
               aria-hidden
@@ -1207,7 +1295,7 @@ export function RoomStage({
               tap
             </span>
           )}
-          {!bubble && (
+          {floatingCall && !bubble && (
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
@@ -1220,7 +1308,8 @@ export function RoomStage({
           )}
           {/* Corner resize handles — desktop only (invisible/unusable on touch;
               phones use the expand/shrink toggle instead). */}
-          {!compact &&
+          {floatingCall &&
+            !compact &&
             (["nw", "ne", "sw", "se"] as Corner[]).map((corner) => (
               <span
                 key={corner}
@@ -1283,6 +1372,38 @@ export function RoomStage({
       />
     </main>
     </MusicRoomProvider>
+  );
+}
+
+/** Desktop call layout switcher — three small toggles, Zoom View-menu style. */
+function CallLayoutSwitcher({ mode, onChange }: { mode: CallMode; onChange: (m: CallMode) => void }) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Call layout"
+      className="flex shrink-0 items-center gap-0.5 rounded-full border border-white/10 bg-black/30 p-0.5"
+    >
+      {CALL_MODES.map((m) => {
+        const active = m.id === mode;
+        return (
+          <button
+            key={m.id}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={m.label}
+            title={m.label}
+            onClick={() => onChange(m.id)}
+            className={cn(
+              "flex h-6 w-6 items-center justify-center rounded-full transition",
+              active ? "bg-primary/25 text-primary" : "text-cream/55 hover:bg-white/[0.06] hover:text-cream",
+            )}
+          >
+            <m.icon className={cn("h-3.5 w-3.5", m.id === "bubble" && "fill-current")} aria-hidden />
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
