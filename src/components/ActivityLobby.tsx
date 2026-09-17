@@ -67,7 +67,7 @@ const CARDS: ShelfCard[] = [
     id: "games",
     name: "Play a Game",
     blurb: "Short rounds with a reveal at the end. Warm and silly, or close and honest.",
-    tag: "Six ready",
+    tag: "Ready",
     minutes: "10–20 min each",
     glyph: "🃏",
     grad: "radial-gradient(120% 120% at 50% 0%, #1a2e1a 0%, #0a1009 70%)",
@@ -78,7 +78,7 @@ const CARDS: ShelfCard[] = [
     id: "talk",
     name: "Just Talk",
     blurb: "Questions that do the awkward part for you, at whatever depth you choose.",
-    tag: "Two ready",
+    tag: "Ready",
     minutes: "20–60 min",
     glyph: "🕯️",
     grad: "radial-gradient(120% 120% at 30% 90%, #1a2832 0%, #0a0e12 70%)",
@@ -177,10 +177,15 @@ export function ActivityLobby({
       window.dispatchEvent(new CustomEvent("dr:booth:capture"));
       return;
     }
-    setOpen(open === c.id ? null : c.id);
   }
 
   const openCard = open ? cards.find((c) => c.id === open) : null;
+  /** Games and Just Talk are pickers; everything else IS the thing, so the
+   *  first tap opens it (no detail step, no "Open it" button). */
+  const expandable = (id: string) => id === "games" || id === "talk";
+  const readyTag = (n: number) => `${n} ready`;
+  const tagFor = (c: ShelfCard) =>
+    c.id === "games" ? readyTag(gamePicks.length) : c.id === "talk" ? readyTag(talkPicks.length) : c.tag;
 
   if (showWalls) {
     return (
@@ -225,7 +230,7 @@ export function ActivityLobby({
             <li key={c.id} className="min-h-0 min-w-0">
               <CompactShelfTile
                 title={c.name}
-                tag={c.tag}
+                tag={tagFor(c)}
                 glyph={c.glyph}
                 image={c.image}
                 grad={c.grad}
@@ -362,8 +367,8 @@ export function ActivityLobby({
               >
                 <button
                   type="button"
-                  aria-expanded={isOpen}
-                  onClick={() => setOpen(isOpen ? null : c.id)}
+                  aria-expanded={expandable(c.id) ? isOpen : undefined}
+                  onClick={() => handleTonightTap(c)}
                   className="focus-ring flex h-full w-full flex-col text-left"
                 >
                   <span
@@ -390,7 +395,7 @@ export function ActivityLobby({
                         background: "rgb(0 0 0 / 0.45)",
                       }}
                     >
-                      {c.tag}
+                      {tagFor(c)}
                     </span>
                     {c.soon && (
                       <span className="absolute right-2.5 top-2.5 z-10 rounded-full border border-white/20 bg-black/40 px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] text-muted-foreground backdrop-blur-sm">
@@ -405,7 +410,7 @@ export function ActivityLobby({
                       <Clock className="h-3 w-3 shrink-0" aria-hidden />
                       <span className="truncate">{c.minutes}</span>
                       <span className="ml-auto shrink-0" style={{ color: "var(--room-accent)" }}>
-                        {isOpen ? "Close" : "Open"}
+                        {expandable(c.id) ? (isOpen ? "Close" : "Choose") : "Open →"}
                       </span>
                     </span>
                   </span>
@@ -436,47 +441,6 @@ export function ActivityLobby({
                           </li>
                         ))}
                       </ul>
-                    )}
-
-                    {(c.id === "watch" || c.id === "dj") && (
-                      <button
-                        type="button"
-                        onClick={() => start(c.id)}
-                        className="focus-ring mt-3 rounded-full px-5 py-2 text-sm text-primary-foreground transition hover:opacity-90"
-                        style={{ backgroundColor: "var(--room-accent)" }}
-                      >
-                        Open it →
-                      </button>
-                    )}
-
-                    {c.id === "chaperon" && (
-                      <button
-                        type="button"
-                        onClick={openChaperonSetup}
-                        className="focus-ring mt-3 rounded-full px-5 py-2 text-sm text-primary-foreground transition hover:opacity-90"
-                        style={{ backgroundColor: "var(--room-accent)" }}
-                      >
-                        Open the chaperon setup →
-                      </button>
-                    )}
-
-                    {c.id === "booth" && (
-                      <div className="mt-3 flex flex-col items-start gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            window.dispatchEvent(new CustomEvent("dr:booth:capture"));
-                            setOpen(null);
-                          }}
-                          className="focus-ring rounded-full px-5 py-2 text-sm text-primary-foreground transition hover:opacity-90"
-                          style={{ backgroundColor: "var(--room-accent)" }}
-                        >
-                          Take the shot →
-                        </button>
-                        <p className="text-[11px] text-muted-foreground">
-                          The call needs to be running — the countdown lands on both screens.
-                        </p>
-                      </div>
                     )}
 
                     {c.soon && (

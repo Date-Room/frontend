@@ -27,9 +27,12 @@ describe("activity help coverage", () => {
     expect(hasActivityHelp("nope")).toBe(false);
   });
 
-  it("lobby and room settings skip the intro gate", () => {
-    expect(shouldShowGameIntro("lobby")).toBe(false);
-    expect(shouldShowGameIntro("room_details")).toBe(false);
-    expect(shouldShowGameIntro("rank_it")).toBe(true);
+  it("only games get the intro gate; utilities and walls open directly", () => {
+    for (const id of ["lobby", "room_details", "watch", "dj", "chat", "vision_board", "fridge_notes", "bookshelf"]) {
+      expect(shouldShowGameIntro(id), id).toBe(false);
+    }
+    for (const id of ["rank_it", "guacamole", "questions", "the_36", "this_or_that"]) {
+      expect(shouldShowGameIntro(id), id).toBe(true);
+    }
   });
 });
