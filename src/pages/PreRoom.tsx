@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   Check,
   Copy,
+  Download,
   Share2,
   Trash2,
   UserPlus,
@@ -22,6 +23,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
+import { RoomLifecycleBanner } from "@/components/RoomLifecycleBanner";
 import { UserAvatarImg } from "@/components/UserAvatarImg";
 import {
   DropdownMenu,
@@ -31,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { downloadBlob, isResting, restingReason, roomCapabilities } from "@/lib/roomLifecycle";
 import {
   listMyRooms,
   startRoom,
@@ -39,6 +42,7 @@ import {
   kickParticipant,
   rotateRoomPin,
   updateRoom,
+  exportRoom,
   renewRoom,
   requestRoomDestroyOtp,
   confirmRoomDestroy,
@@ -556,7 +560,7 @@ export default function PreRoom() {
       await renewRoom(room.id);
       await queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
       await queryClient.invalidateQueries({ queryKey: ["entitlement"] });
-      toast.success("Room renewed — 30 more days.");
+      toast.success(isResting(room) ? "The room is back." : "Room kept — 30 more days.");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Couldn't renew the room.";
       if (/subscription|credit|402/i.test(msg)) {
@@ -565,6 +569,17 @@ export default function PreRoom() {
         return;
       }
       toast.error(msg);
+    }
+  }
+
+  async function onSaveCopy() {
+    if (!room) return;
+    try {
+      const blob = await exportRoom(room.id);
+      downloadBlob(blob, `dateroom-${room.code}.zip`);
+      toast.success("Your copy is downloading.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't save a copy.");
     }
   }
 
@@ -599,8 +614,14 @@ export default function PreRoom() {
     setDestroyBusy(true);
     try {
       await confirmRoomDestroy(room.id, destroyCode.trim());
-      toast.success("Room destroyed.");
-      navigate("/home");
+      if (room.persistence === "persistent") {
+        await queryClient.invalidateQueries({ queryKey: ["my-rooms"] });
+        toast.success("We've told your partner. The room closes in 72 hours unless one of you keeps it.");
+        setDestroyOpen(false);
+      } else {
+        toast.success("Room destroyed.");
+        navigate("/home");
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not destroy the room.");
     } finally {
@@ -662,7 +683,12 @@ export default function PreRoom() {
         </DropdownMenuItem>
         {room.persistence === "persistent" && (
           <DropdownMenuItem onClick={() => void onRenew()} className="gap-2">
-            <RefreshCw className="h-4 w-4" /> Renew (30 days)
+            <RefreshCw className="h-4 w-4" /> Keep the room
+          </DropdownMenuItem>
+        )}
+        {room.persistence === "persistent" && roomCapabilities(room).can_export && (
+          <DropdownMenuItem onClick={() => void onSaveCopy()} className="gap-2">
+            <Download className="h-4 w-4" /> Save a copy
           </DropdownMenuItem>
         )}
         {room.persistence === "persistent" && (
@@ -681,7 +707,7 @@ export default function PreRoom() {
               }}
               className="gap-2 text-destructive focus:text-destructive"
             >
-              <Trash2 className="h-4 w-4" /> Destroy room
+              <Trash2 className="h-4 w-4" /> Close this room
             </DropdownMenuItem>
           </>
         )}
@@ -729,6 +755,16 @@ export default function PreRoom() {
             )}
             {roomActionsMenu}
           </header>
+
+          {room && isResting(room) && (
+            <div className="relative z-10 border-b border-white/[0.06] px-3 py-3 sm:px-4">
+              <RoomLifecycleBanner
+                room={room}
+                meId={me?.id ?? null}
+                partnerName={effectivePartnerName}
+              />
+            </div>
+          )}
 
           <div className="relative z-10 grid min-h-0 flex-1 lg:grid-cols-[1.08fr_0.92fr]">
             {/* Left — mirror check fills the column height */}
@@ -950,12 +986,23 @@ export default function PreRoom() {
               <div className="mt-auto space-y-2 pt-1">
                 <button
                   type="button"
-                  onClick={start}
+                  onClick={() => {
+                    if (room && !roomCapabilities(room).can_call) {
+                      toast.message(restingReason("can_call", room));
+                      return;
+                    }
+                    start();
+                  }}
                   disabled={!room || starting}
+                  aria-disabled={room ? !roomCapabilities(room).can_call : undefined}
                   className="btn-primary flex w-full items-center justify-center gap-2 rounded-full py-4 text-base font-bold tracking-wide shadow-[0_16px_40px_rgba(232,166,83,0.25)] transition hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
                 >
                   {starting ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden /> : null}
-                  {live ? "Rejoin room" : "Enter room"}
+                  {room && !roomCapabilities(room).can_call
+                    ? "Room is resting"
+                    : live
+                      ? "Rejoin room"
+                      : "Enter room"}
                 </button>
                 {chaperonAvailable && (
                   <button
@@ -991,14 +1038,16 @@ export default function PreRoom() {
       <Dialog open={destroyOpen} onOpenChange={(o) => !destroyBusy && setDestroyOpen(o)}>
         <DialogContent className="border-white/10 bg-card/95 text-cream sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-serif text-xl font-semibold">Destroy this room?</DialogTitle>
+            <DialogTitle className="font-serif text-xl font-semibold">
+              {room?.persistence === "persistent" ? "Close this room?" : "Destroy this room?"}
+            </DialogTitle>
           </DialogHeader>
           {destroyStep === "request" ? (
             <div className="space-y-5">
               <p className="text-sm leading-relaxed text-muted-foreground">
-                This permanently deletes the room and everything in it — vision board, notes,
-                captures, recap. It can&apos;t be undone. To confirm, we&apos;ll email a code to
-                your address.
+                {room?.persistence === "persistent"
+                  ? `${effectivePartnerName || "Your partner"} will be told and can save a copy. The room closes in 72 hours unless one of you keeps it. To confirm, we'll email a code to your address.`
+                  : "This permanently deletes the room and everything in it — vision board, notes, captures, recap. It can't be undone. To confirm, we'll email a code to your address."}
               </p>
               <button
                 type="button"
@@ -1012,7 +1061,9 @@ export default function PreRoom() {
           ) : (
             <div className="space-y-5">
               <p className="text-sm leading-relaxed text-muted-foreground">
-                Enter the 6-digit code we emailed you to permanently destroy this room.
+                {room?.persistence === "persistent"
+                  ? "Enter the 6-digit code we emailed you to start closing this room."
+                  : "Enter the 6-digit code we emailed you to permanently destroy this room."}
               </p>
               <Input
                 inputMode="numeric"
@@ -1029,7 +1080,11 @@ export default function PreRoom() {
                 disabled={destroyBusy || destroyCode.trim().length < 6}
                 className="w-full rounded-[1.15rem] bg-destructive py-3.5 text-sm font-semibold text-cream transition hover:bg-destructive/80 disabled:opacity-50"
               >
-                {destroyBusy ? "Destroying…" : "Destroy room permanently"}
+                {destroyBusy
+                  ? "Working…"
+                  : room?.persistence === "persistent"
+                    ? "Close the room"
+                    : "Destroy room permanently"}
               </button>
               <button
                 type="button"

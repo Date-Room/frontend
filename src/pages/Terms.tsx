@@ -131,11 +131,16 @@ export default function Terms() {
             and you keep access until then.
           </p>
           <p>
-            Persistent rooms require an active Together subscription on the
-            host's account. If the host's subscription lapses, the room enters a{" "}
-            <span className="text-cream/90">sub_lapsed</span> state and is
-            read-only until the subscription is renewed. Content is not deleted
-            during that window — see the Privacy policy for retention details.
+            Persistent rooms require an active Together subscription held by
+            at least one member of the room. If no member holds one, the room
+            rests for 30 days: for the first 7 days nothing changes; from day
+            7 calls and games pause while the wall, journal and photos stay;
+            from day 21 the room is read-only. Any member can keep the room at
+            any point in that window, and can download a copy of its contents.
+            At the end of the 30 days the room closes and its contents are
+            deleted. Any member can also ask to close a room; the other member
+            is told and the room closes 72 hours later unless one of them
+            keeps it. See the Privacy policy for retention details.
           </p>
         </>
       ),
