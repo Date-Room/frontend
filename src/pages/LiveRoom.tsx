@@ -65,6 +65,8 @@ import { authClient } from "@/lib/authClient";
 // (DATE_NAME removed — header shows the brand wordmark)
 import { BRAND_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { RoomLifecycleBanner } from "@/components/RoomLifecycleBanner";
+import { isResting, restingReason, roomCapabilities } from "@/lib/roomLifecycle";
 
 function Loading({ label }: { label: string }) {
   return (
@@ -159,6 +161,7 @@ const ACTIVITY_TABS: TabDef[] = [
 ];
 
 const ALL_TABS: TabDef[] = [...WALL_TABS, ...ACTIVITY_TABS];
+const WALL_TAB_IDS = new Set<ActivityTabId>(WALL_TABS.map((t) => t.id));
 
 /* ───────────────── RoomShell ───────────────── */
 
@@ -192,6 +195,10 @@ function RoomShell({
   });
   const room: Room | undefined = rooms?.find((r) => r.id === roomId);
   const isPersistent = room?.persistence === "persistent";
+  // A resting Together room takes things away in stages; the server
+  // computes these and refuses anything they forbid, so the UI only
+  // hides or dims to match.
+  const caps = roomCapabilities(room);
 
   const [tab, setTab] = useState<ActivityTabId>("questions");
   const wallRoom = isSubscriptionPackage(roomPackage);
@@ -444,6 +451,9 @@ function RoomShell({
   );
   const visibleTabs = useMemo(
     () => ALL_TABS.filter((t) => {
+      // Resting rooms: games and shared media rest from Quiet onward;
+      // the wall and chat stay so people can look back and write.
+      if (!caps.can_play && !WALL_TAB_IDS.has(t.id) && t.id !== "chat") return false;
       if (t.id === "fridge_notes") return wallRoom;
       if (t.id === "bookshelf" || t.curatableId === "vision_board" || t.curatableId === "fridge") {
         if (!wallRoom) return false;
@@ -452,7 +462,7 @@ function RoomShell({
       }
       return t.curatableId === null || isActivityEnabled(t.curatableId, curated, roomPackage);
     }),
-    [curated, roomPackage, wallRoom],
+    [curated, roomPackage, wallRoom, caps.can_play],
   );
 
   const tabBarDividerBefore = useMemo(() => {
@@ -616,6 +626,16 @@ function RoomShell({
           roomId={roomId}
         />
 
+        {room && isResting(room) && (
+          <RoomLifecycleBanner
+            room={room}
+            meId={session.senderId}
+            partnerName={partnerInfo.name}
+            variant="compact"
+            className="mx-3 mt-2 sm:mx-4"
+          />
+        )}
+
         <ChatProvider>
         <RoomStage
           roomId={roomId}
@@ -628,7 +648,13 @@ function RoomShell({
           partnerInCall={partnerInfo.inCall}
           partnerPresent={partnerPresent}
           callActive={liveMode}
-          onCallIn={() => enterLiveMode("vision_board")}
+          onCallIn={() => {
+            if (!caps.can_call) {
+              toast.message(restingReason("can_call", room));
+              return;
+            }
+            enterLiveMode("vision_board");
+          }}
           onLeaveCall={exitLiveMode}
         />
         </ChatProvider>

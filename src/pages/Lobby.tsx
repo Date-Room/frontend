@@ -12,7 +12,9 @@ import { AmbientSceneStack } from "@/components/AmbientSceneStack";
 import { toast } from "sonner";
 
 const OPEN_BUFFER_MS = 5 * 60 * 1000;
-const ENDED_STATES = new Set(["ended", "grace", "purged", "sub_lapsed"]);
+// A resting (sub_lapsed) Together room still shows its card: members
+// can look back and either can keep it. Closing and purged are over.
+const ENDED_STATES = new Set(["ended", "grace", "purged", "closing"]);
 
 function formatRemaining(ms: number): string {
   if (ms <= 0) return "now";
