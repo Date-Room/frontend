@@ -40,15 +40,11 @@ import {
   Loader2,
   Check,
   ShieldCheck,
-  GripVertical,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
 import {
-  clampPaneWidth,
-  setCallMode,
-  setPaneWidth,
-  useCallMode,
-  usePaneWidth,
+  isSidePane,
+  useCallLayout,
 } from "@/lib/callLayout";
 import {
   ActivityHelp,
@@ -235,7 +231,6 @@ const FS_TILE = { w: 384, h: 216 };
 const FS_EDGE = 16;
 const FS_BOTTOM_PAD = 88;
 // Below this pane width the two faces stack instead of sitting side by side.
-const PANE_STACK_BELOW = 520;
 // Desktop call layout (side by side with a draggable divider, or the pair
 // bubble) lives in lib/callLayout so the top-bar switcher shares it.
 /** Default size is the biggest; drag-resize shrinks down to 2/3 of it. */
@@ -526,66 +521,18 @@ export function RoomStage({
   }, [room.channel, room.senderId, partnerName]);
   const compact = useCompactViewport();
   const wide = useWideViewport();
-  const callMode = useCallMode();
+  const [callLayout, chooseCallLayout] = useCallLayout();
   // Watch's native fullscreen only paints its own subtree, so while it is
   // up the call must float over it regardless of the chosen desktop mode.
   const [watchFullscreen, setWatchFullscreen] = useState(false);
   /** Desktop fullscreen override: pair bubble by default, one tap for a tile. */
   const fsOverlay = wide && watchFullscreen;
   const [fsExpanded, setFsExpanded] = useState(false);
-  /** The right-hand call pane is rendered. */
-  const splitCallLayout = callActive && wide && callMode === "split";
-  /** The call renders as the floating window (PiP/bubble) rather than in the pane. */
+  /** The right-hand call pane is rendered — `side` and `side-pip` both use it. */
+  const splitCallLayout = callActive && wide && isSidePane(callLayout);
+  /** The call renders as the floating window rather than in the pane. */
   const floatingCall = !splitCallLayout || watchFullscreen;
 
-  // ── Side-by-side pane width (desktop) ──
-  const rowRef = useRef<HTMLDivElement>(null);
-  const [rowW, setRowW] = useState(0);
-  useEffect(() => {
-    const el = rowRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => setRowW(entry.contentRect.width));
-    ro.observe(el);
-    setRowW(el.getBoundingClientRect().width);
-    return () => ro.disconnect();
-  }, []);
-  const savedPaneW = usePaneWidth();
-  const paneW = rowW > 0 ? clampPaneWidth(savedPaneW ?? rowW / 2, rowW) : savedPaneW ?? 0;
-  const paneStacked = paneW > 0 && paneW < PANE_STACK_BELOW;
-  const divider = useRef<{ right: number } | null>(null);
-  const onDividerMove = useCallback((e: PointerEvent) => {
-    const d = divider.current;
-    const row = rowRef.current;
-    if (!d || !row) return;
-    setPaneWidth(clampPaneWidth(d.right - e.clientX, row.getBoundingClientRect().width));
-  }, []);
-  const onDividerUp = useCallback(() => {
-    divider.current = null;
-    document.body.style.cursor = "";
-    window.removeEventListener("pointermove", onDividerMove);
-    window.removeEventListener("pointerup", onDividerUp);
-  }, [onDividerMove]);
-  function startDividerDrag(e: React.PointerEvent) {
-    const row = rowRef.current;
-    if (!row) return;
-    e.preventDefault();
-    divider.current = { right: row.getBoundingClientRect().right };
-    document.body.style.cursor = "col-resize";
-    window.addEventListener("pointermove", onDividerMove);
-    window.addEventListener("pointerup", onDividerUp);
-  }
-  function nudgeDivider(delta: number) {
-    const row = rowRef.current;
-    if (!row) return;
-    setPaneWidth(clampPaneWidth(paneW + delta, row.getBoundingClientRect().width));
-  }
-  useEffect(
-    () => () => {
-      window.removeEventListener("pointermove", onDividerMove);
-      window.removeEventListener("pointerup", onDividerUp);
-    },
-    [onDividerMove, onDividerUp],
-  );
   // Orientation drives the capture shape, so the window's frame matches the
   // stream inside it — and so the partner receives the framing you chose.
   // Not part of the layout preference: that is upstream's, above.
@@ -622,7 +569,7 @@ export function RoomStage({
   const bubble = fsOverlay
     ? !fsExpanded
     : wide
-      ? floatingCall && callMode === "bubble"
+      ? floatingCall && callLayout === "float"
       : compact && (activityStaged ? !callOpen : manualBubble);
   const pairBubble = bubble && wide;
   const base = fsOverlay
@@ -945,7 +892,6 @@ export function RoomStage({
       style={{ paddingBottom: stagePadBottom }}
     >
       <div
-        ref={rowRef}
         className={cn(
           "flex h-full min-h-0 w-full gap-2 sm:gap-2.5",
           splitCallLayout
@@ -1147,34 +1093,7 @@ export function RoomStage({
         {/* Right — call video fills half the canvas on desktop. */}
         {splitCallLayout && (
           <>
-            {/* Divider — drag (or arrow keys) to trade stage for call. */}
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="Resize the call pane"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={rowW > 0 ? Math.round((paneW / rowW) * 100) : 50}
-              tabIndex={0}
-              onPointerDown={startDividerDrag}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowLeft") nudgeDivider(24);
-                else if (e.key === "ArrowRight") nudgeDivider(-24);
-                else if (e.key === "Home") setPaneWidth(null);
-                else return;
-                e.preventDefault();
-              }}
-              onDoubleClick={() => setPaneWidth(null)}
-              title="Drag to resize · double-click for half"
-              className="dr-call-divider focus-ring group hidden w-3 shrink-0 cursor-col-resize touch-none items-center justify-center lg:flex"
-            >
-              <GripVertical className="h-4 w-4 text-cream/30 transition group-hover:text-primary group-focus-visible:text-primary" aria-hidden />
-            </div>
-          <aside
-            className="dr-call-pane hidden min-h-0 w-full shrink-0 flex-col lg:flex"
-            // Before the row has been measured, hold the classic half.
-            style={{ width: paneW > 0 ? paneW : "50%" }}
-          >
+          <aside className="dr-call-pane hidden min-h-0 w-full shrink-0 flex-col lg:flex lg:w-1/2">
             <section className="perm-wall-frame flex min-h-0 flex-1 flex-col overflow-hidden !p-0">
               <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 py-2 sm:px-4">
                 <Video className="h-3.5 w-3.5 text-primary" aria-hidden />
@@ -1408,7 +1327,7 @@ export function RoomStage({
                 return;
               }
               if (wide) {
-                setCallMode("split");
+                chooseCallLayout("side");
                 return;
               }
               setCallOpen(true);
@@ -1417,13 +1336,16 @@ export function RoomStage({
           >
             {!bubble && <ChaperonSeam className={floatingCall ? undefined : "rounded-none"} />}
             <RoomVideo
-              variant={floatingCall ? "pip" : "full"}
+              // In the pane, `side-pip` gives the phone-call shape — one feed
+              // full-bleed with the other floating over it — while `side`
+              // shows both tiles.
+              variant={floatingCall || callLayout === "side-pip" ? "pip" : "full"}
+              framed={!floatingCall}
               collapsed={bubble}
               pair={pairBubble}
-              stacked={!floatingCall && paneStacked}
               onLeave={onLeaveCall}
               // Pane → bubble (the shrink button RoomVideo has had all along).
-              onMinimize={!floatingCall ? () => setCallMode("bubble") : undefined}
+              onMinimize={!floatingCall ? () => chooseCallLayout("float") : undefined}
               // Desktop fullscreen tile: only "back to the bubble". Desktop
               // otherwise never shows a floating window. Below desktop: bubble ↔
               // compact window ↔ large call, as before.

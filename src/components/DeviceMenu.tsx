@@ -6,6 +6,7 @@ import {
   Check,
   ChevronUp,
   Columns2,
+  LayoutTemplate,
   Mic,
   PictureInPicture2,
   Settings,
@@ -21,7 +22,7 @@ import {
   speakerSelectionSupported,
   type DeviceKind,
 } from "@/lib/devices";
-import { setCallMode, useCallMode, type CallMode } from "@/lib/callLayout";
+import { useCallLayout, type CallLayout } from "@/lib/callLayout";
 import { cn } from "@/lib/utils";
 
 /** One kind's device list inside the menu. Uses LiveKit's hook (enumeration
@@ -235,22 +236,28 @@ export function CallSettingsMenu({
 }) {
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   const ref = useRef<HTMLButtonElement>(null);
-  const layout = useCallMode();
+  const [layout, chooseLayout] = useCallLayout();
 
   // Mirrors the top-bar switcher rather than inventing a second vocabulary:
   // one set of modes, one store.
-  const options: { id: CallMode; label: string; hint: string; Icon: LucideIcon }[] = [
+  const options: { id: CallLayout; label: string; hint: string; Icon: LucideIcon }[] = [
     {
-      id: "split",
+      id: "side",
       label: "Side by side",
-      hint: "Call in its own pane beside the activity",
+      hint: "Both of you, stacked in the pane",
       Icon: Columns2,
     },
     {
-      id: "bubble",
-      label: "Bubble",
-      hint: "A small pair of faces over the activity",
+      id: "side-pip",
+      label: "Pane + inset",
+      hint: "One feed fills the pane, the other floats on it",
       Icon: PictureInPicture2,
+    },
+    {
+      id: "float",
+      label: "Floating",
+      hint: "Call over the activity, drag anywhere",
+      Icon: LayoutTemplate,
     },
   ];
 
@@ -275,14 +282,14 @@ export function CallSettingsMenu({
             </p>
             {options.map((o) => {
               const active = layout === o.id;
-              const unavailable = o.id === "split" && !canSplit;
+              const unavailable = o.id !== "float" && !canSplit;
               return (
                 <button
                   key={o.id}
                   type="button"
                   disabled={unavailable}
                   onClick={() => {
-                    setCallMode(o.id);
+                    chooseLayout(o.id);
                     setAnchor(null);
                   }}
                   className={cn(

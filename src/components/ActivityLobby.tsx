@@ -171,10 +171,10 @@ export function ActivityLobby({
   return (
     <div className="dr-lobby-compact relative flex h-full min-h-0 flex-col gap-2 overflow-y-auto p-3 sm:gap-2.5 sm:overflow-hidden sm:p-4 animate-fade-in">
       <div className="flex shrink-0 items-baseline justify-between gap-3">
-        <p className="font-serif text-title italic text-cream sm:text-title lg:text-2xl">
+        <p className="font-serif text-lg italic text-cream sm:text-xl lg:text-2xl">
           {showWalls ? "Your room" : "What are we doing tonight?"}
         </p>
-        <p className="hidden truncate text-label text-muted-foreground sm:block sm:max-w-[50%] sm:text-right">
+        <p className="hidden truncate text-[10px] text-muted-foreground sm:block sm:max-w-[50%] sm:text-right">
           {showWalls ? "The walls stay up between dates. The shelf below is for tonight." : "Either of you can start anything."}
         </p>
       </div>
@@ -203,7 +203,7 @@ export function ActivityLobby({
       )}
 
       {showWalls && (
-        <p className="shrink-0 text-label font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+        <p className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
           Tonight
         </p>
       )}
@@ -239,7 +239,7 @@ export function ActivityLobby({
               key={t.id}
               type="button"
               onClick={() => start(t.id)}
-              className="focus-ring flex items-center gap-2 rounded-full border border-white/[0.12] px-3.5 py-2 text-label text-cream transition hover:border-primary/50"
+              className="focus-ring flex items-center gap-2 rounded-full border border-white/[0.12] px-3.5 py-2 text-xs text-cream transition hover:border-primary/50"
             >
               <span aria-hidden>{t.icon}</span> {t.label}
             </button>
@@ -250,11 +250,11 @@ export function ActivityLobby({
       {openCard && expandable(openCard.id) && (
         <div className="absolute inset-0 z-20 flex flex-col bg-[#0e0b09]/96 p-3 backdrop-blur-md animate-fade-in sm:p-4">
           <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
-            <p className="font-serif text-body italic text-cream sm:text-title">{openCard.name}</p>
+            <p className="font-serif text-base italic text-cream sm:text-lg">{openCard.name}</p>
             <button
               type="button"
               onClick={() => setOpen(null)}
-              className="focus-ring rounded-full border border-white/10 px-3 py-1 text-label uppercase tracking-[0.16em] text-muted-foreground transition hover:text-cream"
+              className="focus-ring rounded-full border border-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground transition hover:text-cream"
             >
               Close
             </button>
@@ -267,10 +267,10 @@ export function ActivityLobby({
                   onClick={() => start(p.id)}
                   className="focus-ring flex w-full flex-col gap-0.5 rounded-xl border border-white/[0.12] p-2.5 text-left transition hover:border-primary/50 hover:bg-white/[0.04] sm:p-3"
                 >
-                  <span className="text-body text-cream">{p.name}</span>
-                  <span className="text-label leading-snug text-muted-foreground">{p.line}</span>
+                  <span className="text-sm text-cream">{p.name}</span>
+                  <span className="text-[11px] leading-snug text-muted-foreground">{p.line}</span>
                   <span
-                    className="mt-0.5 text-label uppercase tracking-[0.16em]"
+                    className="mt-0.5 text-[9px] uppercase tracking-[0.16em]"
                     style={{ color: "var(--room-accent)" }}
                   >
                     {p.minutes ? `${p.minutes} · ` : ""}Start →
@@ -323,7 +323,7 @@ function ShelfTile({
           {glyph}
         </span>
         <span
-          className="absolute left-2 top-2 z-10 rounded-full border px-1.5 py-0.5 text-label uppercase tracking-[0.14em] backdrop-blur-sm"
+          className="absolute left-2 top-2 z-10 rounded-full border px-1.5 py-0.5 text-[8px] uppercase tracking-[0.14em] backdrop-blur-sm"
           style={{
             color: "var(--room-accent)",
             borderColor: "color-mix(in srgb, var(--room-accent) 40%, transparent)",
@@ -333,7 +333,7 @@ function ShelfTile({
           {tag}
         </span>
         <span className="absolute bottom-0 left-0 right-0 z-10 p-2 sm:p-2.5">
-          <span className="block truncate font-serif text-body leading-tight text-cream sm:text-body lg:text-body">{title}</span>
+          <span className="block truncate font-serif text-[13px] leading-tight text-cream sm:text-sm lg:text-base">{title}</span>
         </span>
       </span>
     </button>

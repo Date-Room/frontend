@@ -456,5 +456,5 @@ export function GameIntro({
 /** In-game help — live “right now” line + step pin; opened from ? in the stage header. */
 export function ActivityHelp({ id, onClose }: { id: string; onClose: () => void }) {
   if (!ACTIVITY_HELP[id]) return null;
-  return <HelpShell id={id} mode="help" onDismiss={onClose} dismissLabel="Back to the game" />;
+  return <HelpShell id={id} mode="help" onDismiss={onClose} dismissLabel="Okay" />;
 }

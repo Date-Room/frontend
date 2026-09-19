@@ -1,10 +1,11 @@
-import { Circle, Columns2, type LucideIcon } from "lucide-react";
+import { Columns2, PictureInPicture2, LayoutTemplate, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { setCallMode, useCallMode, type CallMode } from "@/lib/callLayout";
+import { useCallLayout, type CallLayout } from "@/lib/callLayout";
 
-const MODES: { id: CallMode; label: string; icon: LucideIcon }[] = [
-  { id: "split", label: "Side by side", icon: Columns2 },
-  { id: "bubble", label: "Bubble", icon: Circle },
+const MODES: { id: CallLayout; label: string; icon: LucideIcon }[] = [
+  { id: "side", label: "Side by side", icon: Columns2 },
+  { id: "side-pip", label: "Pane + inset", icon: PictureInPicture2 },
+  { id: "float", label: "Floating", icon: LayoutTemplate },
 ];
 
 /**
@@ -13,7 +14,7 @@ const MODES: { id: CallMode; label: string; icon: LucideIcon }[] = [
  * drill-in and the call pane itself all displace the stage header).
  */
 export function CallLayoutSwitcher({ className }: { className?: string }) {
-  const mode = useCallMode();
+  const [mode, choose] = useCallLayout();
   return (
     <div
       role="radiogroup"
@@ -33,13 +34,13 @@ export function CallLayoutSwitcher({ className }: { className?: string }) {
             aria-checked={active}
             aria-label={m.label}
             title={m.label}
-            onClick={() => setCallMode(m.id)}
+            onClick={() => choose(m.id)}
             className={cn(
               "focus-ring flex h-6 w-6 items-center justify-center rounded-full transition",
               active ? "bg-primary/25 text-primary" : "text-cream/55 hover:bg-white/[0.06] hover:text-cream",
             )}
           >
-            <m.icon className={cn("h-3.5 w-3.5", m.id === "bubble" && "fill-current")} aria-hidden />
+            <m.icon className="h-3.5 w-3.5" aria-hidden />
           </button>
         );
       })}
