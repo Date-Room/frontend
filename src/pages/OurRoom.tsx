@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -16,7 +16,7 @@ import {
 import { PageShell } from "@/components/PageShell";
 import { UserAvatarImg } from "@/components/UserAvatarImg";
 import { getConnection, lastMetLabel, type Connection } from "@/lib/connections";
-import { createRoom } from "@/lib/rooms";
+import { createRoom, listMyRooms } from "@/lib/rooms";
 import { listJournal, type JournalEntry } from "@/lib/journal";
 
 type Tab = "tonight" | "journal" | "library" | "about";
@@ -51,7 +51,24 @@ export default function OurRoom() {
     staleTime: 30_000,
   });
 
-  if (isLoading) {
+  // This route is keyed by connection id, but the lifecycle emails (and
+  // anything else that only knows the room) may hand us a *room* id.
+  // When the connection lookup fails, check whether the id is one of my
+  // rooms and send the person to that room's front door instead of a
+  // dead end.
+  const { data: fallbackRoom, isLoading: fallbackLoading } = useQuery({
+    queryKey: ["our-room-fallback", id],
+    queryFn: async () => (await listMyRooms()).find((r) => r.id === id) ?? null,
+    enabled: !!id && !!error,
+    staleTime: 30_000,
+  });
+  useEffect(() => {
+    if (fallbackRoom) {
+      navigate(`/rooms/${fallbackRoom.id}/pre${window.location.search}`, { replace: true });
+    }
+  }, [fallbackRoom, navigate]);
+
+  if (isLoading || (error && (fallbackLoading || fallbackRoom))) {
     return (
       <PageShell className="flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-rosegold animate-spin" aria-hidden />
