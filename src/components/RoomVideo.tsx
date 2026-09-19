@@ -39,7 +39,8 @@ import { useLowPowerMode } from "@/hooks/useLowPowerMode";
 import { partnerFromPresence } from "@/lib/stagecraft/usePartnerName";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { authClient } from "@/lib/authClient";
-import { useCallLayout, useVideoOrientation, useWideViewport } from "@/lib/callLayout";
+import { useVideoOrientation } from "@/lib/videoOrientation";
+import { useWideViewport } from "@/lib/viewport";
 import type { PresenceState } from "@/lib/realtime/roomChannel";
 
 // Adaptive stream + dynacast let LiveKit stop sending layers nobody is
@@ -474,6 +475,7 @@ function Tile({
   contain,
   square,
   forceOff,
+  bare,
 }: {
   participant?: ReturnType<typeof useTracks>[number];
   isLocal?: boolean;
@@ -482,14 +484,15 @@ function Tile({
   photoUrl?: string | null;
   /** Show the whole camera frame (no crop) so both sides see the same thing. */
   contain?: boolean;
-  /** Square corners. The side-by-side pane sits flush against the stage, so a
-   *  rounded video reads as a card inside a card. The floating window keeps
-   *  its radius, where the rounding matches the frame around it. */
+  /** Square corners. A pane that sits flush against the stage makes a
+   *  rounded video read as a card inside a card. */
   square?: boolean;
   /** Show the placeholder now, without waiting for the track to report muted.
    *  Your own tile uses this so turning the camera off looks immediate even
    *  though releasing the device doesn't finish for another moment. */
   forceOff?: boolean;
+  /** No caption, no card chrome — for round bubbles that bring their own ring. */
+  bare?: boolean;
 }) {
   // A placeholder ref (no publication yet) can't feed <VideoTrack> — treat it
   // like a muted camera and show the avatar instead.
@@ -501,10 +504,14 @@ function Tile({
   return (
     <div
       className={cn(
-        "relative w-full h-full overflow-hidden bg-black border border-white/[0.08]",
-        square ? "rounded-none" : "rounded-2xl",
+        "relative h-full w-full overflow-hidden bg-black",
+        // `bare` drops the chrome entirely (round bubbles bring their own
+        // ring); otherwise the only question is whether the corners are
+        // rounded, which depends on whether the tile sits flush in a pane.
+        !bare && "border border-white/[0.08]",
+        !bare && (square ? "rounded-none" : "rounded-2xl"),
       )}
-      style={{ boxShadow: "0 12px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)" }}
+      style={bare ? undefined : { boxShadow: "0 12px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)" }}
     >
       {!videoTrackRef ? (
         participant ? (
@@ -543,9 +550,11 @@ function Tile({
           )}
         </>
       )}
-      <span className="absolute bottom-2.5 left-3 text-label uppercase tracking-[0.2em] text-cream/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">
-        {label}
-      </span>
+      {!bare && (
+        <span className="absolute bottom-2.5 left-3 text-label uppercase tracking-[0.2em] text-cream/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">
+          {label}
+        </span>
+      )}
     </div>
   );
 }
@@ -569,6 +578,10 @@ type CallControls = {
   compact?: boolean;
   /** Bubble mode — just the video, no controls (call stays live). */
   collapsed?: boolean;
+  /** Bubble as a PAIR: their face large, yours small on its shoulder. */
+  pair?: boolean;
+  /** Full variant in a narrow pane: stack the two tiles instead of side by side. */
+  stacked?: boolean;
   /** pip → expand to fullscreen */
   onExpand?: () => void;
   /** full → shrink back to pip */
@@ -585,6 +598,8 @@ function Stage({
   framed,
   compact = false,
   collapsed = false,
+  pair = false,
+  stacked = false,
   onExpand,
   onMinimize,
   onCollapse,
@@ -636,8 +651,10 @@ function Stage({
   // Cropping locally would only change what you see; publishing a stream that
   // is genuinely this shape is what makes the other person see the same
   // framing you do.
-  const [callLayout] = useCallLayout();
-  const [orientation] = useVideoOrientation(callLayout);
+  // Not pinned to the layout any more: upstream's side pane is resizable, so
+  // "the pane can only be portrait" stopped being true. Orientation is now a
+  // free preference again.
+  const [orientation] = useVideoOrientation();
   const appliedOrientation = useRef<string | null>(null);
   useEffect(() => {
     if (!camActual) {
@@ -807,6 +824,21 @@ function Stage({
   // Collapsed bubble — just the primary video, no controls. Call stays live.
   if (collapsed) {
     const primary = remotes[0] ?? local;
+    // Pair bubble (desktop): their face is the big circle, yours a small one
+    // overlapping its lower-right shoulder — a self-check without a second
+    // thing to drag. Falls back to the single bubble while alone.
+    if (pair && remotes[0] && local) {
+      return (
+        <div className="relative h-full w-full">
+          <div className="absolute inset-y-0 left-0 aspect-square overflow-hidden rounded-full border border-white/[0.16] shadow-[0_16px_40px_rgba(0,0,0,0.55)]">
+            <Tile participant={remotes[0]} label={remotes[0].participant.name || partnerDisplay.name} bare />
+          </div>
+          <div className="absolute bottom-0 right-0 h-[42%] w-[42%] overflow-hidden rounded-full border-2 border-[#141019] shadow-[0_10px_24px_rgba(0,0,0,0.5)]">
+            <Tile participant={local} isLocal label="you" bare />
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="h-full w-full">
         {primary ? (
@@ -992,7 +1024,7 @@ function Stage({
           )}
         </div>
       ) : (
-        <div className={`flex-1 min-h-0 grid ${gridClass(tileCount)} auto-rows-fr`}>
+        <div className={`flex-1 min-h-0 grid ${stacked ? "grid-cols-1" : gridClass(tileCount)} auto-rows-fr`}>
           <div ref={selfWrapRef} className="min-h-0">
             <Tile participant={local} isLocal label="you" photoUrl={myPhotoUrl} forceOff={!isCameraEnabled} square />
           </div>
@@ -1032,7 +1064,7 @@ function Stage({
         {variant === "full" && onMinimize && (
           <button
             onClick={onMinimize}
-            aria-label="Minimize to corner"
+            aria-label="Shrink the call to a bubble"
             className="h-11 w-11 rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center justify-center transition"
           >
             <Minimize2 className="w-4 h-4 text-cream" />
@@ -1122,6 +1154,8 @@ export function RoomVideo({
   framed,
   compact,
   collapsed,
+  pair,
+  stacked,
   onExpand,
   onMinimize,
   onCollapse,
@@ -1248,6 +1282,8 @@ export function RoomVideo({
         framed={framed}
         compact={compact}
         collapsed={collapsed}
+        pair={pair}
+        stacked={stacked}
         onExpand={onExpand}
         onMinimize={onMinimize}
         onCollapse={onCollapse}

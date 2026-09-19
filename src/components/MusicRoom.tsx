@@ -173,6 +173,25 @@ export function MusicRoomProvider({
     if (until > suppressUntilRef.current) suppressUntilRef.current = until;
   };
   const isSuppressed = () => Date.now() < suppressUntilRef.current;
+  // Guests can't write durable state: their enqueue lands only when a
+  // signed-in member is in the room to persist it. Until then the guest
+  // keeps what it queued and replays it when someone arrives and asks
+  // (`sync_request`, sent when this provider mounts). Pruned as tracks land.
+  const pendingRef = useRef<DjTrack[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  useEffect(() => {
+    if (pendingRef.current.length === 0) return;
+    const landed = new Set(tracks.map((t) => t.id));
+    pendingRef.current = pendingRef.current.filter((t) => !landed.has(t.id));
+    setPendingCount(pendingRef.current.length);
+  }, [tracks]);
+  const replayTimersRef = useRef<number[]>([]);
+  useEffect(() => () => replayTimersRef.current.forEach((t) => window.clearTimeout(t)), []);
+  const rememberPending = (track: DjTrack) => {
+    if (room.canPersist) return;
+    pendingRef.current = [...pendingRef.current, track];
+    setPendingCount(pendingRef.current.length);
+  };
   // Whoever last pressed play/pause/added is the drift "leader" so only one
   // side emits ticks (avoids the two clients fighting over the timeline).
   const isController = lastController === userId;
@@ -453,6 +472,17 @@ export function MusicRoomProvider({
     if (!session) return;
     return session.onEvent((e) => {
       if (e.userId === userId) return;
+      if (e.type === "sync_request") {
+        // Someone arrived. Signed-in sides have nothing to add (durable
+        // covers them); a guest replays what it queued that never landed,
+        // spaced out so the receiver's reducer sees each one.
+        if (room.canPersist || pendingRef.current.length === 0) return;
+        replayTimersRef.current.forEach((t) => window.clearTimeout(t));
+        replayTimersRef.current = pendingRef.current.map((track, i) =>
+          window.setTimeout(() => void session.sendEvent("enqueue", { track }), i * 700),
+        );
+        return;
+      }
       const p = playerRef.current;
       const ts = typeof e.payload.timestamp_seconds === "number" ? e.payload.timestamp_seconds : undefined;
       if (e.type === "enqueue") {
@@ -538,6 +568,12 @@ export function MusicRoomProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, userId, room.canPersist, nowPlaying, tracks, currentIdx]);
 
+  // Ask the room what's on (a guest holding unlanded songs answers).
+  useEffect(() => {
+    if (!session) return;
+    void session.sendEvent("sync_request", {});
+  }, [session]);
+
   // Autoplay watchdog: the play intent is set optimistically, but Safari
   // blocks unmuted playback started outside a user gesture. If the engine
   // still isn't running shortly after we meant to play, offer the tap-to-
@@ -619,6 +655,7 @@ export function MusicRoomProvider({
       const list = [...tracks, track];
       const recap = { event_type: "queued_track", payload: { text: `youtu.be/${id}` } };
       void session?.sendEvent("enqueue", { track });
+      rememberPending(track);
       if (nowPlaying != null) {
         persistDj({ queue: list }, recap);
       } else {
@@ -670,6 +707,7 @@ export function MusicRoomProvider({
         payload: { text: trackUrl.replace(/^https:\/\//, "") },
       };
       void session?.sendEvent("enqueue", { track });
+      rememberPending(track);
       if (nowPlaying != null) {
         persistDj({ queue: list }, recap);
       } else {
@@ -998,6 +1036,7 @@ export function MusicRoomProvider({
     tracks,
     currentId,
     upcomingCount,
+    pendingCount,
     playing,
     silence,
     videoId,
@@ -1440,7 +1479,12 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
             {m.trackTitle ?? "Nothing playing yet"}
           </p>
           <p className="truncate text-label text-muted-foreground">
-            {m.trackChannel ?? (m.upcomingCount > 0 ? `${m.upcomingCount} up next` : "Add a song to start")}
+            {m.trackChannel ??
+              (m.upcomingCount > 0
+                ? `${m.upcomingCount} up next`
+                : m.pendingCount > 0
+                  ? "Queued. It starts when your date arrives"
+                  : "Add a song to start")}
           </p>
         </div>
 

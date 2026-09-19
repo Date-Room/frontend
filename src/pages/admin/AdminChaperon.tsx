@@ -114,7 +114,7 @@ export default function AdminChaperon() {
 
   if (isLoading || !data) {
     return (
-      <div className="flex h-64 items-center justify-center text-slate-400">
+      <div className="flex h-64 items-center justify-center text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin" />
       </div>
     );
@@ -125,8 +125,8 @@ export default function AdminChaperon() {
       <header className="flex items-center gap-3">
         <ShieldCheck className="h-6 w-6 text-emerald-400" />
         <div>
-          <h1 className="text-xl font-semibold text-slate-100">Chaperon AI</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-2xl font-semibold tracking-tight text-cream">Chaperon AI</h1>
+          <p className="text-sm text-muted-foreground">
             Which model the whisper rail uses. Keys are set in the server env; this
             only picks the active provider.
           </p>
@@ -136,7 +136,7 @@ export default function AdminChaperon() {
       <StatsStrip data={data} />
 
       <Tabs defaultValue="providers" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 bg-slate-900/60">
+        <TabsList className="grid w-full grid-cols-3 bg-card/60">
           <TabsTrigger value="providers">Providers</TabsTrigger>
           <TabsTrigger value="access">Access</TabsTrigger>
           <TabsTrigger value="activity">Activity &amp; cost</TabsTrigger>
@@ -144,7 +144,7 @@ export default function AdminChaperon() {
 
         <TabsContent value="providers" className="space-y-8">
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Provider
         </h2>
         <ul className="space-y-2">
@@ -158,15 +158,15 @@ export default function AdminChaperon() {
                   "flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition",
                   provider === p.id
                     ? "border-emerald-500/50 bg-emerald-500/10"
-                    : "border-slate-800 bg-slate-900/40 hover:bg-slate-900",
+                    : "border-white/[0.08] bg-card/40 hover:bg-white/[0.05]",
                   !p.configured && "cursor-not-allowed opacity-50",
                 )}
               >
                 <div>
-                  <p className="text-sm font-medium text-slate-100">
+                  <p className="text-sm font-medium text-cream">
                     {PROVIDER_LABELS[p.id] ?? p.id}
                   </p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted-foreground/70">
                     {p.configured
                       ? p.default_model
                         ? `Suggested model: ${p.default_model}`
@@ -189,7 +189,7 @@ export default function AdminChaperon() {
         <section className="space-y-2">
           <label
             htmlFor="chaperon-model"
-            className="text-sm font-semibold uppercase tracking-wide text-slate-400"
+            className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
           >
             Model
           </label>
@@ -202,7 +202,7 @@ export default function AdminChaperon() {
                 setModel(v === CUSTOM_MODEL ? "" : v);
                 setTestResult(null);
               }}
-              className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 focus:border-emerald-500/50 focus:outline-none"
+              className="w-full rounded-lg border border-white/[0.08] bg-card px-4 py-2.5 text-sm text-cream focus:border-primary/50 focus:outline-none"
             >
               {knownModels.map((m) => (
                 <option key={m} value={m}>
@@ -220,11 +220,11 @@ export default function AdminChaperon() {
                 setTestResult(null);
               }}
               placeholder={selected?.default_model || "model id"}
-              className="w-full rounded-lg border border-slate-800 bg-slate-900 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500/50 focus:outline-none"
+              className="w-full rounded-lg border border-white/[0.08] bg-card px-4 py-2.5 text-sm text-cream placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none"
             />
           )}
           {provider === "openai_compat" && (
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-muted-foreground/70">
               Custom endpoint — set <code>CHAPERON_OPENAI_BASE_URL</code> + key in the
               server env.
             </p>
@@ -239,7 +239,7 @@ export default function AdminChaperon() {
             type="button"
             disabled={testing}
             onClick={() => void test()}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.14] bg-card px-4 py-2 text-sm font-medium text-cream/90 transition hover:bg-white/[0.08] disabled:opacity-40"
           >
             {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
             Test provider
@@ -285,12 +285,12 @@ export default function AdminChaperon() {
           type="button"
           disabled={!dirty || !selectedConfigured || saving}
           onClick={() => void save()}
-          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground neon-btn px-4 py-2.5 text-sm font-semibold transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           Save
         </button>
-        {dirty && <span className="text-xs text-slate-500">Unsaved changes</span>}
+        {dirty && <span className="text-xs text-muted-foreground/70">Unsaved changes</span>}
       </div>
 
       <SttSection />
@@ -322,10 +322,10 @@ function StreamCostSection() {
       <header className="flex items-center gap-2">
         <Activity className="h-5 w-5 text-emerald-400" />
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-cream/80">
             STT stream cost · last 30 days
           </h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground/70">
             Voiced audio streamed to the vendor across monitored dates. Estimate only —
             the real invoice is the vendor's.
           </p>
@@ -333,11 +333,11 @@ function StreamCostSection() {
       </header>
 
       {isLoading || !data ? (
-        <div className="flex h-24 items-center justify-center text-slate-500">
+        <div className="flex h-24 items-center justify-center text-muted-foreground/70">
           <Loader2 className="h-5 w-5 animate-spin" />
         </div>
       ) : data.vendors.length === 0 ? (
-        <p className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-6 text-center text-sm text-slate-500">
+        <p className="rounded-lg border border-white/[0.08] bg-card/40 px-4 py-6 text-center text-sm text-muted-foreground/70">
           No monitored dates yet. Costs appear here once the agent runs.
         </p>
       ) : (
@@ -350,17 +350,17 @@ function StreamCostSection() {
             ].map((s) => (
               <div
                 key={s.label}
-                className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3"
+                className="rounded-lg border border-white/[0.08] bg-card/40 px-4 py-3"
               >
-                <p className="text-xs uppercase tracking-wide text-slate-500">{s.label}</p>
-                <p className="mt-1 text-lg font-semibold tabular-nums text-slate-100">{s.value}</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground/70">{s.label}</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-cream">{s.value}</p>
               </div>
             ))}
           </div>
-          <div className="overflow-x-auto rounded-lg border border-slate-800">
+          <div className="overflow-x-auto rounded-lg border border-white/[0.08]">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs uppercase tracking-wide text-slate-500">
+                <tr className="text-xs uppercase tracking-wide text-muted-foreground/70">
                   <th className="px-4 py-2 text-left font-medium">Vendor</th>
                   <th className="px-4 py-2 text-right font-medium">Dates</th>
                   <th className="px-4 py-2 text-right font-medium">Stream-hrs</th>
@@ -369,15 +369,15 @@ function StreamCostSection() {
               </thead>
               <tbody>
                 {data.vendors.map((v) => (
-                  <tr key={v.vendor} className="border-t border-slate-800">
-                    <td className="px-4 py-2.5 text-slate-200">{v.vendor}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">
+                  <tr key={v.vendor} className="border-t border-white/[0.08]">
+                    <td className="px-4 py-2.5 text-cream/90">{v.vendor}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-cream/80">
                       {v.sessions}
                     </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-300">
+                    <td className="px-4 py-2.5 text-right tabular-nums text-cream/80">
                       {v.stream_hours.toFixed(1)}
                     </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-slate-100">
+                    <td className="px-4 py-2.5 text-right tabular-nums text-cream">
                       ${v.est_cost_usd.toFixed(2)}
                     </td>
                   </tr>
@@ -417,14 +417,14 @@ function ProtectMeteringSection() {
   }
 
   return (
-    <section className="space-y-3 border-t border-slate-800 pt-8">
+    <section className="space-y-3 border-t border-white/[0.08] pt-8">
       <header className="flex items-center gap-2">
         <ShieldCheck className="h-5 w-5 text-emerald-400" />
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-cream/80">
             Protect metering
           </h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground/70">
             Off = Protect is free on every date. On = one free date per account, then
             credits (grant per user on the Users page). Leave off until STT cost is live.
           </p>
@@ -437,7 +437,7 @@ function ProtectMeteringSection() {
             onChange={(e) => void toggle(e.target.checked)}
             className="h-4 w-4 accent-emerald-500"
           />
-          <span className="text-sm text-slate-200">
+          <span className="text-sm text-cream/90">
             {data.metering_enabled ? "Metered" : "Free for all"}
           </span>
         </label>
@@ -503,12 +503,12 @@ function SttSection() {
   }
 
   return (
-    <section className="space-y-3 border-t border-slate-800 pt-8">
+    <section className="space-y-3 border-t border-white/[0.08] pt-8">
       <header>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-cream/80">
           Speech-to-text
         </h2>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted-foreground/70">
           Which vendor transcribes the call audio. Keys are set in the server env;
           this only picks the active vendor. (The live audio pipeline is a separate
           build — this switch is ready for it.)
@@ -530,13 +530,13 @@ function SttSection() {
                 "flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition",
                 provider === p.id
                   ? "border-emerald-500/50 bg-emerald-500/10"
-                  : "border-slate-800 bg-slate-900/40 hover:bg-slate-900",
+                  : "border-white/[0.08] bg-card/40 hover:bg-white/[0.05]",
                 !p.configured && "cursor-not-allowed opacity-50",
               )}
             >
               <div>
-                <p className="text-sm font-medium text-slate-100">{STT_LABELS[p.id] ?? p.id}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm font-medium text-cream">{STT_LABELS[p.id] ?? p.id}</p>
+                <p className="text-xs text-muted-foreground/70">
                   {p.configured ? "Key configured" : "No API key configured on the server"}
                 </p>
               </div>
@@ -554,7 +554,7 @@ function SttSection() {
             type="button"
             disabled={testing}
             onClick={() => void test()}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800 disabled:opacity-40"
+            className="inline-flex items-center gap-2 rounded-lg border border-white/[0.14] bg-card px-4 py-2 text-sm font-medium text-cream/90 transition hover:bg-white/[0.08] disabled:opacity-40"
           >
             {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
             Test vendor
@@ -597,12 +597,12 @@ function SttSection() {
           type="button"
           disabled={!dirty || !configured || saving}
           onClick={() => void save()}
-          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary text-primary-foreground neon-btn px-4 py-2.5 text-sm font-semibold transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}
           Save
         </button>
-        {dirty && <span className="text-xs text-slate-500">Unsaved changes</span>}
+        {dirty && <span className="text-xs text-muted-foreground/70">Unsaved changes</span>}
       </div>
     </section>
   );
@@ -617,31 +617,31 @@ function CoachBetaSection() {
   });
 
   return (
-    <section className="space-y-3 border-t border-slate-800 pt-8">
+    <section className="space-y-3 border-t border-white/[0.08] pt-8">
       <header className="flex items-center gap-2">
-        <Sparkles className="h-5 w-5 text-amber-400" />
+        <Sparkles className="h-5 w-5 text-fuchsia-400" />
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-cream/80">
             Coach beta — applications
           </h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-muted-foreground/70">
             Grant a small quota of Coach date sessions. One call is spent per date;
             Protect is always free and never listed here.
           </p>
         </div>
         {data && data.pending_count > 0 && (
-          <span className="ml-auto rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-300">
+          <span className="ml-auto rounded-full bg-fuchsia-500/15 px-2.5 py-1 text-xs font-semibold text-fuchsia-300">
             {data.pending_count} pending
           </span>
         )}
       </header>
 
       {isLoading || !data ? (
-        <div className="flex h-24 items-center justify-center text-slate-500">
+        <div className="flex h-24 items-center justify-center text-muted-foreground/70">
           <Loader2 className="h-5 w-5 animate-spin" />
         </div>
       ) : data.items.length === 0 ? (
-        <p className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-6 text-center text-sm text-slate-500">
+        <p className="rounded-lg border border-white/[0.08] bg-card/40 px-4 py-6 text-center text-sm text-muted-foreground/70">
           No pending applications.
         </p>
       ) : (
@@ -685,16 +685,16 @@ function CoachBetaApplicationRow({
   }
 
   return (
-    <li className="flex flex-col gap-3 rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3 sm:flex-row sm:items-center">
+    <li className="flex flex-col gap-3 rounded-lg border border-white/[0.08] bg-card/40 px-4 py-3 sm:flex-row sm:items-center">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-slate-100">
+        <p className="truncate text-sm font-medium text-cream">
           {app.display_name || "—"}{" "}
-          <span className="font-normal text-slate-500">· {app.email}</span>
+          <span className="font-normal text-muted-foreground/70">· {app.email}</span>
         </p>
         {app.reason && (
-          <p className="mt-0.5 text-xs italic text-slate-400">“{app.reason}”</p>
+          <p className="mt-0.5 text-xs italic text-muted-foreground">“{app.reason}”</p>
         )}
-        <p className="mt-0.5 text-[11px] text-slate-600">
+        <p className="mt-0.5 text-[11px] text-muted-foreground/50">
           Applied {new Date(app.created_at).toLocaleDateString()} · has{" "}
           {app.calls_remaining} call{app.calls_remaining === 1 ? "" : "s"} now
         </p>
@@ -706,7 +706,7 @@ function CoachBetaApplicationRow({
           type="button"
           disabled={granting}
           onClick={() => void grant()}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-40"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary text-primary-foreground neon-btn px-3 py-2 text-sm font-semibold transition hover:bg-primary/90 disabled:opacity-40"
         >
           {granting && <Loader2 className="h-4 w-4 animate-spin" />}
           Grant
@@ -729,17 +729,17 @@ function Stepper({
   max: number;
 }) {
   return (
-    <div className="flex items-center rounded-lg border border-slate-700 bg-slate-900">
+    <div className="flex items-center rounded-lg border border-white/[0.14] bg-card">
       <button
         type="button"
         aria-label="Fewer calls"
         disabled={value <= min}
         onClick={() => onChange(Math.max(min, value - 1))}
-        className="p-2 text-slate-300 transition hover:text-white disabled:opacity-30"
+        className="p-2 text-cream/80 transition hover:text-white disabled:opacity-30"
       >
         <Minus className="h-4 w-4" />
       </button>
-      <span className="w-6 text-center text-sm font-semibold tabular-nums text-slate-100">
+      <span className="w-6 text-center text-sm font-semibold tabular-nums text-cream">
         {value}
       </span>
       <button
@@ -747,7 +747,7 @@ function Stepper({
         aria-label="More calls"
         disabled={value >= max}
         onClick={() => onChange(Math.min(max, value + 1))}
-        className="p-2 text-slate-300 transition hover:text-white disabled:opacity-30"
+        className="p-2 text-cream/80 transition hover:text-white disabled:opacity-30"
       >
         <Plus className="h-4 w-4" />
       </button>
@@ -770,10 +770,10 @@ function StatsStrip({ data }: { data: ChaperonConfig }) {
       {tiles.map((t) => (
         <div
           key={t.label}
-          className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3"
+          className="rounded-lg border border-white/[0.08] bg-card/40 px-4 py-3"
         >
-          <p className="text-xs text-slate-500">{t.label}</p>
-          <p className="mt-1 text-lg font-semibold tabular-nums text-slate-100">{t.value}</p>
+          <p className="text-xs text-muted-foreground/70">{t.label}</p>
+          <p className="mt-1 text-lg font-semibold tabular-nums text-cream">{t.value}</p>
         </div>
       ))}
     </div>

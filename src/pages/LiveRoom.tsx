@@ -12,7 +12,7 @@ import {
 import { isTryPackage, getRoomExperience, isActivityEnabled, getRoomPlan, saveRoomPlanFromServer, isSubscriptionPackage, type CuratableActivityId } from "@/lib/roomExperience";
 import { isWatchPartyRoom } from "@/lib/watchParty";
 import { getRoomExperienceApi, listMyRooms, type Room, type RoomPackage } from "@/lib/rooms";
-import { LogOut, Clock, Maximize2, Minimize2, Sparkles, ChevronLeft, Home } from "lucide-react";
+import { LogOut, Clock, Maximize2, Minimize2, Sparkles, ChevronLeft, Home, MessageSquareText } from "lucide-react";
 import { AmbientSceneStack } from "@/components/AmbientSceneStack";
 import type { LobbyMood } from "@/lib/ambiance";
 import { ambianceMeta, PLAIN_MOOD } from "@/lib/ambiance";
@@ -23,6 +23,8 @@ import { RoomSessionProvider, useRoomSession, type RoomIdentity } from "@/contex
 import { ChaperonProvider } from "@/context/ChaperonContext";
 import { CallPeersProvider, useCallPeers } from "@/context/CallPeersContext";
 import { ChaperonAnnounceBadge } from "@/components/ChaperonAnnounceBadge";
+import { TellUsSheet } from "@/components/TellUsSheet";
+import { ChatProvider } from "@/context/ChatContext";
 import type { ChaperonAnnouncement } from "@/lib/rooms";
 import { ChaperonMount } from "@/components/ChaperonMount";
 import {
@@ -31,6 +33,7 @@ import {
   useRoomCustomization,
 } from "@/context/RoomCustomizationContext";
 import { RoomStage, type StageItem } from "@/components/RoomStage";
+import { CallLayoutSwitcher } from "@/components/CallLayoutSwitcher";
 import { ChatWithBoundary } from "@/components/Chat";
 import { WatchTogether } from "@/components/WatchTogether";
 import { VisionBoard } from "@/components/VisionBoard";
@@ -62,6 +65,8 @@ import { authClient } from "@/lib/authClient";
 // (DATE_NAME removed — header shows the brand wordmark)
 import { BRAND_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { RoomLifecycleBanner } from "@/components/RoomLifecycleBanner";
+import { isResting, restingReason, roomCapabilities } from "@/lib/roomLifecycle";
 
 function Loading({ label }: { label: string }) {
   return (
@@ -156,6 +161,7 @@ const ACTIVITY_TABS: TabDef[] = [
 ];
 
 const ALL_TABS: TabDef[] = [...WALL_TABS, ...ACTIVITY_TABS];
+const WALL_TAB_IDS = new Set<ActivityTabId>(WALL_TABS.map((t) => t.id));
 
 /* ───────────────── RoomShell ───────────────── */
 
@@ -189,6 +195,10 @@ function RoomShell({
   });
   const room: Room | undefined = rooms?.find((r) => r.id === roomId);
   const isPersistent = room?.persistence === "persistent";
+  // A resting Together room takes things away in stages; the server
+  // computes these and refuses anything they forbid, so the UI only
+  // hides or dims to match.
+  const caps = roomCapabilities(room);
 
   const [tab, setTab] = useState<ActivityTabId>("questions");
   const wallRoom = isSubscriptionPackage(roomPackage);
@@ -217,6 +227,7 @@ function RoomShell({
       "Your partner";
     return {
       name,
+      photoUrl: typeof p?.photo_url === "string" && p.photo_url ? p.photo_url : null,
       inRoom: Boolean(p) || callPeers.length > 0,
       inCall: p?.is_in_call === true || callPeers.length > 0,
     };
@@ -366,6 +377,7 @@ function RoomShell({
     }
   }, [wallRoom]);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [tellUsOpen, setTellUsOpen] = useState(false);
   const [ambianceOpen, setAmbianceOpen] = useState(false);
   const [ambianceOverride, setAmbianceOverride] = useState<LobbyMood | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -439,6 +451,9 @@ function RoomShell({
   );
   const visibleTabs = useMemo(
     () => ALL_TABS.filter((t) => {
+      // Resting rooms: games and shared media rest from Quiet onward;
+      // the wall and chat stay so people can look back and write.
+      if (!caps.can_play && !WALL_TAB_IDS.has(t.id) && t.id !== "chat") return false;
       if (t.id === "fridge_notes") return wallRoom;
       if (t.id === "bookshelf" || t.curatableId === "vision_board" || t.curatableId === "fridge") {
         if (!wallRoom) return false;
@@ -447,7 +462,7 @@ function RoomShell({
       }
       return t.curatableId === null || isActivityEnabled(t.curatableId, curated, roomPackage);
     }),
-    [curated, roomPackage, wallRoom],
+    [curated, roomPackage, wallRoom, caps.can_play],
   );
 
   const tabBarDividerBefore = useMemo(() => {
@@ -582,6 +597,19 @@ function RoomShell({
                 )}
               </div>
             )}
+            {/* Desktop call layout — in the top bar so it is reachable in
+                every mode and every stage state. */}
+            {liveMode && <CallLayoutSwitcher className="hidden lg:flex" />}
+            <button
+              type="button"
+              onClick={() => setTellUsOpen(true)}
+              aria-label="Send feedback"
+              title="Send feedback"
+              className="focus-ring inline-flex items-center gap-1.5 rounded-full border border-white/[0.12] bg-white/[0.04] px-2.5 py-1 text-[11px] font-medium text-cream/80 transition hover:border-primary/40 hover:bg-primary/10 hover:text-cream"
+            >
+              <MessageSquareText className="h-3.5 w-3.5 text-primary" aria-hidden />
+              <span className="hidden sm:inline">Feedback</span>
+            </button>
             <button
               onClick={() => setShowLeaveConfirm(true)}
               className="text-xs uppercase tracking-[0.2em] text-muted-foreground transition hover:text-cream"
@@ -590,20 +618,46 @@ function RoomShell({
             </button>
           </div>
         </header>
+        <TellUsSheet
+          open={tellUsOpen}
+          onClose={() => setTellUsOpen(false)}
+          surface="room"
+          activityId={String(tab)}
+          roomId={roomId}
+        />
 
+        {room && isResting(room) && (
+          <RoomLifecycleBanner
+            room={room}
+            meId={session.senderId}
+            partnerName={partnerInfo.name}
+            variant="compact"
+            className="mx-3 mt-2 sm:mx-4"
+          />
+        )}
+
+        <ChatProvider>
         <RoomStage
           roomId={roomId}
           items={canvasItems}
           renderContent={renderRoomActivity}
           partnerStatus={partnerStatus}
           partnerName={partnerInfo.name}
+          partnerPhotoUrl={partnerInfo.photoUrl}
           partnerInRoom={partnerInfo.inRoom}
           partnerInCall={partnerInfo.inCall}
           partnerPresent={partnerPresent}
           callActive={liveMode}
-          onCallIn={() => enterLiveMode("vision_board")}
+          onCallIn={() => {
+            if (!caps.can_call) {
+              toast.message(restingReason("can_call", room));
+              return;
+            }
+            enterLiveMode("vision_board");
+          }}
           onLeaveCall={exitLiveMode}
         />
+        </ChatProvider>
 
         {showLeaveConfirm && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in pointer-events-auto">

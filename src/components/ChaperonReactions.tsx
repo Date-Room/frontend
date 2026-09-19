@@ -4,9 +4,10 @@
  * Protect (alert / warn): Agree · Wrong call. Coach (note / info): Right
  * call · Not that. Words are better labels than thumbs, and the negative
  * one asks a single why (did not happen / harmless / too late / already
- * knew) plus an explicit, off-by-default "share this cue with the team"
- * tick. That reason is the label the learning loop was missing; the tick
- * is the only way a whisper's text ever reaches a reviewer.
+ * knew) plus an off-by-default "flag this for the team" tick. The reason is
+ * the label the learning loop was missing; the tick puts this cue at the
+ * front of the team's review queue. No words travel: the team sees the
+ * check, a pattern code, the reason and the outcome, never the whisper.
  *
  * The rail and the toast render the same component so a whisper is rated
  * once, from either place, and the chosen word stays put.
@@ -109,8 +110,8 @@ export function ChaperonReactions({
             className="mt-0.5 h-3.5 w-3.5 accent-emerald-500"
           />
           <span>
-            Share this cue with the DateRoom team so we can fix it. Only this line, with names
-            removed.
+            Flag this for the DateRoom team to look at. They see what kind of cue it was and
+            your reason, never the words.
           </span>
         </label>
         <div className="flex gap-2">

@@ -198,8 +198,20 @@ const ACTIVITY_HELP: Record<string, HelpContent> = {
   },
 };
 
-/** Activities that get a pre-game intro gate (not lobby / room settings). */
-const INTRO_SKIP = new Set(["lobby", "room_details"]);
+/** Only games get the pre-game intro gate. Utilities (Watch, Music, Chat)
+ *  and the walls open straight onto what they do — a "Start" screen every
+ *  time you flip back to Chat is a tap tax, not an explainer. Their help
+ *  stays one tap away on the ? button. */
+const INTRO_SKIP = new Set([
+  "lobby",
+  "room_details",
+  "watch",
+  "dj",
+  "chat",
+  "vision_board",
+  "fridge_notes",
+  "bookshelf",
+]);
 
 export function hasActivityHelp(id: string): boolean {
   return id in ACTIVITY_HELP;

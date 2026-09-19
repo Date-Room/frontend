@@ -37,6 +37,8 @@ type Options = Omit<RequestInit, "body"> & {
   body?: unknown;
   /** Attach the bearer token (default true). Set false for public endpoints. */
   auth?: boolean;
+  /** Return the response body as a Blob (downloads) instead of parsed JSON. */
+  raw?: boolean;
 };
 
 /** Pull a human-readable message out of a FastAPI error body. */
@@ -60,7 +62,7 @@ function safeJson(text: string): unknown {
 }
 
 export async function apiFetch<T>(path: string, opts: Options = {}): Promise<T> {
-  const { body, auth = true, headers, ...rest } = opts;
+  const { body, auth = true, headers, raw = false, ...rest } = opts;
   const isForm = typeof FormData !== "undefined" && body instanceof FormData;
   const bodyToSend =
     body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body);
@@ -115,6 +117,9 @@ export async function apiFetch<T>(path: string, opts: Options = {}): Promise<T> 
     throw new ApiError(401, "Not authenticated", null);
   }
 
+  if (raw && res.ok) {
+    return (await res.blob()) as T;
+  }
   const text = await res.text();
   const data = text ? safeJson(text) : null;
   if (!res.ok) {

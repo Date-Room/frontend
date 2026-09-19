@@ -61,7 +61,7 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
             Your account is not authorized for the DateRoom admin portal. Contact the platform team
             if you believe this is an error.
           </p>
-          <a href="/home" className="inline-block mt-6 text-amber-400 text-body hover:underline">
+          <a href="/home" className="inline-block mt-6 text-fuchsia-400 text-body hover:underline">
             Back to app
           </a>
         </div>

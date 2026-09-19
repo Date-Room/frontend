@@ -3,7 +3,7 @@
  * `invites` / `room_state` tables. Shapes mirror the FastAPI Pydantic models
  * in `backend/app/schemas/room.py`.
  */
-import { api } from "@/lib/api";
+import { api, apiFetch } from "@/lib/api";
 
 export type RoomPersistence = "session" | "persistent";
 export type RoomPackage =
@@ -19,7 +19,39 @@ export type RoomStateName =
   | "grace"
   | "active"
   | "sub_lapsed"
+  | "closing"
   | "purged";
+
+/** Where a resting persistent room is in its 30-day dimming. Null unless
+ * `state === "sub_lapsed"`. notice: 0-7d, nothing changes; quiet: 7-21d,
+ * calls and games rest; keepsake: 21-30d, read only. */
+export type LapseStage = "notice" | "quiet" | "keepsake";
+
+/** What the room lets members do right now. Server-computed from the
+ * lapse stage and closing window; gate controls on these, never on
+ * dates or stage names. */
+export type RoomCapabilities = {
+  can_call: boolean;
+  can_play: boolean;
+  can_write: boolean;
+  can_export: boolean;
+  can_invite: boolean;
+};
+
+/** Present while a member's close request is in its 72-hour window. */
+export type RoomClosing = {
+  requested_by: string;
+  ends_at: string | null;
+  confirmed: boolean;
+};
+
+export const ALL_CAPABILITIES: RoomCapabilities = {
+  can_call: true,
+  can_play: true,
+  can_write: true,
+  can_export: true,
+  can_invite: true,
+};
 
 export type Room = {
   id: string;
@@ -47,6 +79,13 @@ export type Room = {
   /** Signed JWT — URL-bearer recap access. Embed in share URLs as
    *  `#k=<token>`. See backend services/rooms/invites.py. */
   recap_invite_token: string | null;
+  // Lapse lifecycle (see LapseStage). Older backends omit these; treat
+  // a missing `capabilities` as everything-on.
+  lapse_stage?: LapseStage | null;
+  lapsed_at?: string | null;
+  closes_at?: string | null;
+  closing?: RoomClosing | null;
+  capabilities?: RoomCapabilities;
 };
 
 export type ParticipantInfo = {
@@ -216,12 +255,16 @@ export function deleteRoom(roomId: string): Promise<void> {
   return api.delete<void>(`/v1/rooms/${roomId}`);
 }
 
-/** Email the host a code required to destroy the room (paid rooms are hard to delete). */
+/** Email the requesting member a code required to close the room (paid
+ * rooms are hard to delete). Persistent rooms then enter a 72-hour
+ * closing window; the other member is told and can keep or export. */
 export function requestRoomDestroyOtp(roomId: string): Promise<void> {
   return api.post<void>(`/v1/rooms/${roomId}/destroy/request`, {});
 }
 
-/** Verify the emailed code and permanently destroy the room. */
+/** Verify the emailed code. Persistent rooms enter the closing window
+ * (or purge now if the other member already asked); session rooms are
+ * destroyed immediately. */
 export function confirmRoomDestroy(roomId: string, code: string): Promise<void> {
   return api.post<void>(`/v1/rooms/${roomId}/destroy/confirm`, { code });
 }
@@ -237,10 +280,23 @@ export function kickParticipant(roomId: string, participantId: string): Promise<
   return api.delete<void>(`/v1/rooms/${roomId}/participants/${participantId}`);
 }
 
-/** Host-only — extend a credit-based persistent room by 30 days (spends a
- * Together/Crew credit; 402 when none, so the caller can route to purchase). */
+/** Any member — keep a persistent room. A subscribed member clears the
+ * lapse outright; otherwise spends a Together/Crew credit for 30 days
+ * (402 when none, so the caller can route to purchase). Also revives a
+ * room in its closing window. */
 export function renewRoom(roomId: string): Promise<Room> {
   return api.post<Room>(`/v1/rooms/${roomId}/renew`);
+}
+
+/** Either member keeps a room the other (or they) asked to close. */
+export function cancelRoomClosing(roomId: string): Promise<Room> {
+  return api.post<Room>(`/v1/rooms/${roomId}/closing/cancel`);
+}
+
+/** "Save a copy": download the room's journal, activity history and
+ * capture records as a zip. Any member, any state but purged. */
+export async function exportRoom(roomId: string): Promise<Blob> {
+  return apiFetch<Blob>(`/v1/rooms/${roomId}/export`, { raw: true });
 }
 
 export function updateRoom(

@@ -3,6 +3,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
   type ReactNode,
@@ -39,8 +40,16 @@ import {
   Loader2,
   Check,
   ShieldCheck,
+  GripVertical,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
+import {
+  clampPaneWidth,
+  setCallMode,
+  setPaneWidth,
+  useCallMode,
+  usePaneWidth,
+} from "@/lib/callLayout";
 import {
   ActivityHelp,
   GameIntro,
@@ -57,14 +66,21 @@ import { MusicPlayerBar, MusicRoomProvider } from "@/components/MusicRoom";
 import { ActivityBoundary } from "@/components/RoomErrorBoundary";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useBottomBarHeight } from "@/lib/bottomBar";
-import {
-  isSidePane,
-  useCallLayout,
-  useVideoOrientation,
-  useWideViewport,
-} from "@/lib/callLayout";
+import { useVideoOrientation } from "@/lib/videoOrientation";
+import { useWideViewport } from "@/lib/viewport";
 import { useChaperonController } from "@/context/ChaperonContext";
 import { ChaperonSeam } from "@/components/ChaperonSeam";
+import { ActivityInvite, inviteChime } from "@/components/ActivityInvite";
+import { ChatToast } from "@/components/ChatToast";
+import { useChatRoom } from "@/context/ChatContext";
+import {
+  INITIAL_INVITE_STATE,
+  inviteHeadline,
+  inviteReducer,
+  isInvitable,
+  pendingInvite,
+  starterStatus,
+} from "@/lib/activityInvite";
 import { useActivitySession } from "@/hooks/useActivitySession";
 import { backgroundMoodLabel } from "@/lib/roomAmbiance";
 import {
@@ -78,7 +94,8 @@ import {
 import { cn } from "@/lib/utils";
 
 /** Two-level launcher categories — mirrors the mobile activity menu.
- *  Single-item categories stage directly; multi-item ones drill in. */
+ *  Single-item categories stage directly (see pickCategory); multi-item
+ *  ones drill in. */
 const CATEGORIES: { id: string; label: string; icon: LucideIcon; itemIds: string[] }[] = [
   {
     id: "room",
@@ -100,7 +117,6 @@ const CATEGORIES: { id: string; label: string; icon: LucideIcon; itemIds: string
 /** Partner-action → notifier copy + which stage item to open. Maps the raw
  *  activity_id (as broadcast) to a friendly line and the stage target. */
 const NOTIF: Record<string, { verb: string; target: string }> = {
-  chat: { verb: "sent a message", target: "chat" },
   dj: { verb: "played a song", target: "dj" },
   watch: { verb: "started a video", target: "watch" },
   vision_board: { verb: "added a dream", target: "vision_board" },
@@ -119,7 +135,7 @@ const NOTIF: Record<string, { verb: string; target: string }> = {
   rank_it: { verb: "is playing Rank It", target: "rank_it" },
 };
 /** Chatty sync events that shouldn't pop a notification. */
-const NOTIF_NOISY = new Set(["tick", "seek", "cursor", "typing", "presence", "pause"]);
+const NOTIF_NOISY = new Set(["tick", "seek", "cursor", "typing", "presence", "pause", "sync", "sync_request"]);
 
 /** Lucide equivalents of the mobile activity-menu icons (Material) — keeps
  *  the two clients visually consistent (no ad-hoc emojis). */
@@ -140,6 +156,27 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   dj: Headphones,
   chat: MessageCircle,
   room_details: Settings,
+};
+
+
+/** Generated square backgrounds — used by the activity invite card. */
+const ITEM_TILE_IMAGES: Record<string, string> = {
+  vision_board: "/dock-tiles/vision-board.png",
+  fridge_notes: "/dock-tiles/fridge-notes.png",
+  bookshelf: "/dock-tiles/bookshelf.png",
+  room_details: "/dock-tiles/room-details.png",
+  questions: "/dock-tiles/questions.png",
+  this_or_that: "/dock-tiles/this-or-that.png",
+  the_36: "/dock-tiles/the-36.png",
+  "2_truths": "/dock-tiles/2-truths.png",
+  truth_or_dare: "/dock-tiles/truth-or-dare.png",
+  one_has_to_go: "/dock-tiles/one-has-to-go.png",
+  pick_a_door: "/dock-tiles/pick-a-door.png",
+  rank_it: "/dock-tiles/rank-it.png",
+  guacamole: "/dock-tiles/guacamole.png",
+  watch: "/dock-tiles/watch.png",
+  dj: "/dock-tiles/dj.png",
+  chat: "/dock-tiles/chat.png",
 };
 
 
@@ -188,6 +225,19 @@ const COMPACT_LANDSCAPE = { w: 252, h: 168 };
 // is exactly where every game puts its controls (the four cook buttons,
 // the This-or-That halves, every Next round).
 const COMPACT_BUBBLE = { w: 96, h: 96 };
+// Desktop pair bubble: their face as a 128px circle, yours as a small one
+// on its lower-right shoulder — the box is wide enough for the overhang.
+const PAIR_BUBBLE = { w: 156, h: 128 };
+// Watch fullscreen, opened from the bubble: a small 16:9 tile over the film.
+const FS_TILE = { w: 384, h: 216 };
+// Fullscreen insets: no app header above, and the player's control bar
+// lives along the bottom.
+const FS_EDGE = 16;
+const FS_BOTTOM_PAD = 88;
+// Below this pane width the two faces stack instead of sitting side by side.
+const PANE_STACK_BELOW = 520;
+// Desktop call layout (side by side with a draggable divider, or the pair
+// bubble) lives in lib/callLayout so the top-bar switcher shares it.
 /** Default size is the biggest; drag-resize shrinks down to 2/3 of it. */
 const MIN_SCALE = 2 / 3;
 type Corner = "nw" | "ne" | "sw" | "se";
@@ -209,7 +259,8 @@ function useCompactViewport(): boolean {
 /**
  * The Our Room "stage" — a Vision-Board-sized card that mounts the chosen
  * activity/wall, an app dock below the card (Room / Games / Watch / Music / Chat),
- * and call video (50/50 split on desktop, draggable PiP on smaller screens).
+ * and call video (desktop: a resizable side pane or a floating pair bubble,
+ * the person's choice; smaller screens: draggable PiP; phones: bubble).
  * The last thing staged persists per room.
  */
 export function RoomStage({
@@ -218,6 +269,7 @@ export function RoomStage({
   renderContent,
   partnerStatus,
   partnerName = "Your partner",
+  partnerPhotoUrl = null,
   partnerInRoom = false,
   partnerInCall = false,
   partnerPresent = false,
@@ -230,6 +282,7 @@ export function RoomStage({
   renderContent: (id: string, launch: (id: string) => void) => ReactNode;
   partnerStatus: string;
   partnerName?: string;
+  partnerPhotoUrl?: string | null;
   partnerInRoom?: boolean;
   partnerInCall?: boolean;
   partnerPresent?: boolean;
@@ -331,11 +384,98 @@ export function RoomStage({
     useRoomThemePicker();
   const [notif, setNotif] = useState<{ id: number; text: string; target: string } | null>(null);
 
+  const stagedRef = useRef(staged);
+  stagedRef.current = staged;
+
+  // ── "JJ started X, join them?" ─────────────────────────────────────────
+  // Where the partner is (from their `stage` broadcasts, or their activity
+  // events as a fallback for clients that don't send `stage`), reduced into
+  // one actionable invite. See lib/activityInvite.ts for the rules.
+  const [invite, dispatchInvite] = useReducer(inviteReducer, INITIAL_INVITE_STATE);
+  const openedAtRef = useRef<number | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  // Tell the partner what I opened (null = a wall, the lobby, or settings).
+  // Re-sent on reconnect and when the partner arrives, so a late joiner
+  // still gets invited into a game I'm already sitting in.
+  const partnerPresentRef = useRef(partnerPresent);
+  useEffect(() => {
+    openedAtRef.current = isInvitable(staged) ? Date.now() : null;
+    setNowTick(Date.now());
+    void room.channel.broadcast("stage", {
+      activity_id: isInvitable(staged) ? staged : null,
+      from: room.senderId,
+      name: room.displayName,
+      at: new Date().toISOString(),
+    });
+  }, [staged, room.channel, room.senderId, room.displayName]);
+  useEffect(() => {
+    const rose = partnerPresent && !partnerPresentRef.current;
+    partnerPresentRef.current = partnerPresent;
+    if (!partnerPresent) {
+      dispatchInvite({ type: "partner_left" });
+      return;
+    }
+    if (rose && isInvitable(stagedRef.current)) {
+      void room.channel.broadcast("stage", {
+        activity_id: stagedRef.current,
+        from: room.senderId,
+        name: room.displayName,
+        at: new Date().toISOString(),
+      });
+    }
+  }, [partnerPresent, room.channel, room.senderId, room.displayName]);
+  useEffect(() => {
+    if (channelStatus !== "subscribed" || !isInvitable(stagedRef.current)) return;
+    void room.channel.broadcast("stage", {
+      activity_id: stagedRef.current,
+      from: room.senderId,
+      name: room.displayName,
+      at: new Date().toISOString(),
+    });
+  }, [channelStatus, room.channel, room.senderId, room.displayName]);
+  // The "Inviting JJ…" chip on the starter's side times out on its own.
+  useEffect(() => {
+    if (openedAtRef.current == null) return;
+    const t = window.setTimeout(() => setNowTick(Date.now()), 46_000);
+    return () => window.clearTimeout(t);
+  }, [staged, nowTick]);
+  const inviteId = pendingInvite(invite, staged);
+  const lastChimedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!inviteId) {
+      lastChimedRef.current = null;
+      return;
+    }
+    if (lastChimedRef.current === inviteId) return;
+    lastChimedRef.current = inviteId;
+    inviteChime();
+  }, [inviteId]);
+  const declineInvite = useCallback(() => dispatchInvite({ type: "decline" }), []);
+
+  // ── Chat while the panel is closed: badge on the dock, toast up top ────
+  const chat = useChatRoom();
+  const chatUnread = chat?.unread ?? 0;
+  const [chatToast, setChatToast] = useState<{ id: string; text: string } | null>(null);
+  const lastIncomingId = chat?.lastIncoming?.id ?? null;
+  useEffect(() => {
+    const m = chat?.lastIncoming;
+    if (!m || !lastIncomingId) return;
+    if (stagedRef.current === "chat") return;
+    setChatToast({ id: m.id, text: m.text });
+    // Chat is how you reach someone when the mic or speakers are gone, so
+    // the arrival is audible whenever the panel isn't open (not only in a
+    // background tab).
+    inviteChime(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastIncomingId]);
+  useEffect(() => {
+    if (staged === "chat") setChatToast(null);
+  }, [staged]);
+  const dismissChatToast = useCallback(() => setChatToast(null), []);
+
   const notifTimer = useRef<number | undefined>(undefined);
   // Ids removed via the delete broadcast — dropped from pinned cards instantly.
   const [removedVisionIds, setRemovedVisionIds] = useState<Set<string>>(() => new Set());
-  const stagedRef = useRef(staged);
-  stagedRef.current = staged;
   useEffect(() => {
     const off = room.channel.onBroadcast((e) => {
       if (e.kind === "vision_removed") {
@@ -355,12 +495,24 @@ export function RoomStage({
         notifTimer.current = window.setTimeout(() => setNotif(null), 3400);
         return;
       }
+      if (e.kind === "stage") {
+        const d = e.payload as { activity_id?: string | null; from?: string; at?: string };
+        if (d.from === room.senderId) return;
+        const at = d.at ? Date.parse(d.at) || Date.now() : Date.now();
+        dispatchInvite({ type: "stage", id: d.activity_id ?? null, at });
+        return;
+      }
       if (e.kind !== "activity") return;
       const d = e.payload as { activity_id?: string; type?: string; user_id?: string };
       if (!d.activity_id || d.user_id === room.senderId) return;
       if (d.type && NOTIF_NOISY.has(d.type)) return;
       const meta = NOTIF[d.activity_id];
       if (!meta) return;
+      // Joinable activities get the invite card instead of the dock pill.
+      if (isInvitable(meta.target)) {
+        dispatchInvite({ type: "activity", id: meta.target, eventType: d.type, at: Date.now() });
+        return;
+      }
       // Already viewing that activity — no need to nudge me to open it.
       if (meta.target === stagedRef.current) return;
       setNotif({ id: Date.now(), text: `${partnerName} ${meta.verb}`, target: meta.target });
@@ -374,16 +526,70 @@ export function RoomStage({
   }, [room.channel, room.senderId, partnerName]);
   const compact = useCompactViewport();
   const wide = useWideViewport();
-  /** `side` puts the call in its own pane next to the stage, `float` keeps it
-   *  as the draggable window over it. Side-by-side needs width to be worth
-   *  anything, so a narrow screen floats regardless of what's stored. The
-   *  choice itself is offered in the in-call settings menu. */
-  const [callLayout, chooseCallLayout] = useCallLayout();
-  const splitCallLayout = callActive && wide && isSidePane(callLayout);
-  // The window's shape follows the capture orientation, so the frame always
-  // matches the stream inside it (and therefore what the partner receives).
-  const [orientation, chooseOrientation, orientationPinned] =
-    useVideoOrientation(callLayout);
+  const callMode = useCallMode();
+  // Watch's native fullscreen only paints its own subtree, so while it is
+  // up the call must float over it regardless of the chosen desktop mode.
+  const [watchFullscreen, setWatchFullscreen] = useState(false);
+  /** Desktop fullscreen override: pair bubble by default, one tap for a tile. */
+  const fsOverlay = wide && watchFullscreen;
+  const [fsExpanded, setFsExpanded] = useState(false);
+  /** The right-hand call pane is rendered. */
+  const splitCallLayout = callActive && wide && callMode === "split";
+  /** The call renders as the floating window (PiP/bubble) rather than in the pane. */
+  const floatingCall = !splitCallLayout || watchFullscreen;
+
+  // ── Side-by-side pane width (desktop) ──
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [rowW, setRowW] = useState(0);
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => setRowW(entry.contentRect.width));
+    ro.observe(el);
+    setRowW(el.getBoundingClientRect().width);
+    return () => ro.disconnect();
+  }, []);
+  const savedPaneW = usePaneWidth();
+  const paneW = rowW > 0 ? clampPaneWidth(savedPaneW ?? rowW / 2, rowW) : savedPaneW ?? 0;
+  const paneStacked = paneW > 0 && paneW < PANE_STACK_BELOW;
+  const divider = useRef<{ right: number } | null>(null);
+  const onDividerMove = useCallback((e: PointerEvent) => {
+    const d = divider.current;
+    const row = rowRef.current;
+    if (!d || !row) return;
+    setPaneWidth(clampPaneWidth(d.right - e.clientX, row.getBoundingClientRect().width));
+  }, []);
+  const onDividerUp = useCallback(() => {
+    divider.current = null;
+    document.body.style.cursor = "";
+    window.removeEventListener("pointermove", onDividerMove);
+    window.removeEventListener("pointerup", onDividerUp);
+  }, [onDividerMove]);
+  function startDividerDrag(e: React.PointerEvent) {
+    const row = rowRef.current;
+    if (!row) return;
+    e.preventDefault();
+    divider.current = { right: row.getBoundingClientRect().right };
+    document.body.style.cursor = "col-resize";
+    window.addEventListener("pointermove", onDividerMove);
+    window.addEventListener("pointerup", onDividerUp);
+  }
+  function nudgeDivider(delta: number) {
+    const row = rowRef.current;
+    if (!row) return;
+    setPaneWidth(clampPaneWidth(paneW + delta, row.getBoundingClientRect().width));
+  }
+  useEffect(
+    () => () => {
+      window.removeEventListener("pointermove", onDividerMove);
+      window.removeEventListener("pointerup", onDividerUp);
+    },
+    [onDividerMove, onDividerUp],
+  );
+  // Orientation drives the capture shape, so the window's frame matches the
+  // stream inside it — and so the partner receives the framing you chose.
+  // Not part of the layout preference: that is upstream's, above.
+  const [orientation, chooseOrientation] = useVideoOrientation();
   const portrait = orientation === "portrait";
   const setPortrait = useCallback(
     (fn: (v: boolean) => boolean) =>
@@ -413,10 +619,21 @@ export function RoomStage({
     setCallOpen(false);
     setManualBubble(false);
   }, [staged]);
-  const bubble = compact && (activityStaged ? !callOpen : manualBubble);
-  const base = bubble
-    ? COMPACT_BUBBLE
-    : expanded
+  const bubble = fsOverlay
+    ? !fsExpanded
+    : wide
+      ? floatingCall && callMode === "bubble"
+      : compact && (activityStaged ? !callOpen : manualBubble);
+  const pairBubble = bubble && wide;
+  const base = fsOverlay
+    ? fsExpanded
+      ? FS_TILE
+      : PAIR_BUBBLE
+    : bubble
+      ? wide
+        ? PAIR_BUBBLE
+        : COMPACT_BUBBLE
+      : expanded
       ? portrait
         ? PORTRAIT
         : LANDSCAPE
@@ -458,10 +675,14 @@ export function RoomStage({
     setMenuOpen((v) => !v);
   }
   function pickCategory(c: (typeof availCats)[number]) {
-    // A category with one thing in it is just that thing — don't make the
-    // user drill into a list of one.
+    // One thing inside (Watch, Music, Chat): open it. The drill-in list is
+    // for choosing between things, and a list of one is just a second tap.
     if (c.items.length === 1) {
+      // No list to return to either — Back goes to the lobby, not to a
+      // drill-in of one tile.
+      setLastCatId(null);
       commitStage(c.items[0].id);
+      setCatId(null);
       setMenuOpen(false);
       return;
     }
@@ -494,22 +715,30 @@ export function RoomStage({
   // ── Call PiP drag ──
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const drag = useRef<{ dx: number; dy: number } | null>(null);
+  // In fullscreen there is no app header above and the player's controls
+  // sit along the bottom, so the safe band moves.
+  const padTop = fsOverlay ? FS_EDGE : TOP_PAD;
+  const padBottom = fsOverlay ? FS_BOTTOM_PAD : BOTTOM_PAD;
   const clamp = useCallback(
     (x: number, y: number, w: number, h: number) => ({
       x: Math.min(Math.max(x, EDGE), Math.max(EDGE, window.innerWidth - w - EDGE)),
-      y: Math.min(Math.max(y, TOP_PAD), Math.max(TOP_PAD, window.innerHeight - h - BOTTOM_PAD)),
+      y: Math.min(Math.max(y, padTop), Math.max(padTop, window.innerHeight - h - padBottom)),
     }),
-    [],
+    [padTop, padBottom],
+  );
+  const dockTopRight = useCallback(
+    (w: number) => ({
+      x: Math.max(EDGE, window.innerWidth - w - EDGE),
+      y: padTop + (fsOverlay ? 0 : 8),
+    }),
+    [padTop, fsOverlay],
   );
   useEffect(() => {
     if (pos !== null || !callActive) return;
     // Top-right on every viewport: the bottom of the stage belongs to the
     // activity's controls, so the call never starts on top of them.
-    setPos({
-      x: Math.max(EDGE, window.innerWidth - curW - EDGE),
-      y: TOP_PAD + 8,
-    });
-  }, [pos, callActive, curW, curH]);
+    setPos(dockTopRight(curW));
+  }, [pos, callActive, curW, curH, dockTopRight]);
 
   // Re-dock when the call changes mode (bubble ↔ open), so it can't be left
   // sitting over the controls it just grew past.
@@ -518,12 +747,27 @@ export function RoomStage({
     if (prevBubble.current === bubble) return;
     prevBubble.current = bubble;
     if (!callActive) return;
-    setPos({
-      x: Math.max(EDGE, window.innerWidth - curW - EDGE),
-      y: TOP_PAD + 8,
-    });
+    setPos(dockTopRight(curW));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bubble, callActive]);
+
+  // Fullscreen is an exception, not a continuation: on the way in, park the
+  // room position and start as a pair bubble top-right (clear of the film's
+  // controls); on the way out, put the call back exactly where it was.
+  const roomPosRef = useRef<{ x: number; y: number } | null>(null);
+  const prevFs = useRef(fsOverlay);
+  useEffect(() => {
+    if (prevFs.current === fsOverlay) return;
+    prevFs.current = fsOverlay;
+    if (fsOverlay) {
+      roomPosRef.current = pos;
+      setFsExpanded(false);
+      setPos(dockTopRight(PAIR_BUBBLE.w));
+    } else {
+      setPos(roomPosRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fsOverlay]);
 
   // Keep the window on-screen when its size changes (expand/collapse/rotate).
   useEffect(() => {
@@ -546,21 +790,38 @@ export function RoomStage({
     pipHostRef.current.style.display = "contents";
   }
   const pipAnchorRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  // The split pane's video slot — the host's third home (desktop side by
+  // side). One <RoomVideo> lives in the host for the whole call; switching
+  // layouts moves the node, so LiveKit never disconnects.
+  const splitSlotRef = useRef<HTMLDivElement>(null);
+  // Layout effect, not effect: React has just detached the pane (and the
+  // host with it) when leaving split mode. A <video> removed from the
+  // document pauses once the task yields, so re-home it in the same task.
+  useLayoutEffect(() => {
     const host = pipHostRef.current;
-    const anchor = pipAnchorRef.current;
-    if (!host || !anchor) return;
+    if (!host) return;
     const place = () => {
       const fsEl = document.fullscreenElement as HTMLElement | null;
-      const target = fsEl?.getAttribute("data-dr-watch-fs") === "1" ? fsEl : anchor;
-      if (host.parentElement !== target) target.appendChild(host);
+      const inWatchFs = fsEl?.getAttribute("data-dr-watch-fs") === "1";
+      setWatchFullscreen(Boolean(inWatchFs));
+      const target = inWatchFs
+        ? fsEl
+        : splitCallLayout
+          ? splitSlotRef.current
+          : pipAnchorRef.current;
+      if (!target || host.parentElement === target) return;
+      target.appendChild(host);
+      host.querySelectorAll("video").forEach((v) => {
+        if (v.paused) void v.play().catch(() => {});
+      });
     };
     place();
     document.addEventListener("fullscreenchange", place);
-    return () => {
-      document.removeEventListener("fullscreenchange", place);
-      host.remove();
-    };
+    return () => document.removeEventListener("fullscreenchange", place);
+  }, [splitCallLayout]);
+  useEffect(() => {
+    const host = pipHostRef.current;
+    return () => host?.remove();
   }, []);
   const onMove = useCallback(
     (e: PointerEvent) => {
@@ -684,18 +945,19 @@ export function RoomStage({
       style={{ paddingBottom: stagePadBottom }}
     >
       <div
+        ref={rowRef}
         className={cn(
           "flex h-full min-h-0 w-full gap-2 sm:gap-2.5",
           splitCallLayout
-            ? "max-w-none flex-col lg:flex-row lg:items-stretch lg:gap-3"
+            ? "max-w-none flex-col lg:flex-row lg:items-stretch lg:gap-0"
             : "mx-auto max-w-6xl flex-col",
         )}
       >
-        {/* Left — lobby card + app dock (half width when in a call on desktop). */}
+        {/* Left — stage + app dock. Takes whatever the call pane leaves. */}
         <div
           className={cn(
             "flex min-h-0 min-w-0 flex-col gap-2 sm:gap-2.5",
-            splitCallLayout ? "flex-1 lg:w-1/2 lg:flex-none" : "h-full flex-1",
+            splitCallLayout ? "flex-1" : "h-full flex-1",
           )}
         >
         {/* Call initiator — full-width on mobile; on desktop it sits in the
@@ -771,6 +1033,30 @@ export function RoomStage({
                 {stagedItem.title}
               </span>
             )}
+            {(() => {
+              // Starter's side: did my date follow me in?
+              const st = starterStatus(invite, staged, partnerPresent, nowTick, 45_000, openedAtRef.current);
+              if (!st) return null;
+              return (
+                <span
+                  data-testid="stage-partner-status"
+                  className={cn(
+                    "hidden min-w-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-label sm:inline-flex",
+                    st === "together"
+                      ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+                      : "border-white/[0.1] bg-white/[0.04] text-cream/60",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "h-1.5 w-1.5 shrink-0 rounded-full",
+                      st === "together" ? "bg-emerald-400" : "bg-primary animate-pulse",
+                    )}
+                  />
+                  <span className="truncate">{st === "together" ? `${partnerName} is here` : `Inviting ${partnerName}…`}</span>
+                </span>
+              );
+            })()}
             <div className="ml-auto flex min-w-0 items-center gap-2">
               {staged === "lobby" && (
                 <RoomThemeChip
@@ -860,7 +1146,35 @@ export function RoomStage({
 
         {/* Right — call video fills half the canvas on desktop. */}
         {splitCallLayout && (
-          <aside className="dr-call-pane hidden min-h-0 w-full shrink-0 flex-col lg:flex lg:w-1/2">
+          <>
+            {/* Divider — drag (or arrow keys) to trade stage for call. */}
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize the call pane"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={rowW > 0 ? Math.round((paneW / rowW) * 100) : 50}
+              tabIndex={0}
+              onPointerDown={startDividerDrag}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowLeft") nudgeDivider(24);
+                else if (e.key === "ArrowRight") nudgeDivider(-24);
+                else if (e.key === "Home") setPaneWidth(null);
+                else return;
+                e.preventDefault();
+              }}
+              onDoubleClick={() => setPaneWidth(null)}
+              title="Drag to resize · double-click for half"
+              className="dr-call-divider focus-ring group hidden w-3 shrink-0 cursor-col-resize touch-none items-center justify-center lg:flex"
+            >
+              <GripVertical className="h-4 w-4 text-cream/30 transition group-hover:text-primary group-focus-visible:text-primary" aria-hidden />
+            </div>
+          <aside
+            className="dr-call-pane hidden min-h-0 w-full shrink-0 flex-col lg:flex"
+            // Before the row has been measured, hold the classic half.
+            style={{ width: paneW > 0 ? paneW : "50%" }}
+          >
             <section className="perm-wall-frame flex min-h-0 flex-1 flex-col overflow-hidden !p-0">
               <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 py-2 sm:px-4">
                 <Video className="h-3.5 w-3.5 text-primary" aria-hidden />
@@ -879,30 +1193,13 @@ export function RoomStage({
                   <p className="truncate text-label text-cream/80">
                     {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => chooseCallLayout("float")}
-                    aria-label="Float the call over the room"
-                    title="Float the call over the room"
-                    className="focus-ring flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/5 hover:text-cream"
-                  >
-                    <PictureInPicture2 className="h-4 w-4" />
-                  </button>
                 </div>
               </div>
-              <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
-                <ChaperonSeam className="rounded-none" />
-                {/* `side` fills the pane with both tiles; `side-pip` gives the
-                    pane the phone-call shape — one feed full-bleed, the other
-                    floating over it. */}
-                <RoomVideo
-                  variant={callLayout === "side-pip" ? "pip" : "full"}
-                  framed
-                  onLeave={onLeaveCall}
-                />
-              </div>
+              {/* The live call is re-homed into this slot (see splitSlotRef). */}
+              <div ref={splitSlotRef} className="relative min-h-0 flex-1 overflow-hidden bg-black/40" />
             </section>
           </aside>
+          </>
         )}
       </div>
 
@@ -1047,43 +1344,117 @@ export function RoomStage({
           Rendered into a persistent host (see pipHostRef) so it can be
           re-parented into the Watch fullscreen layer without remounting the
           call. The anchor marks its normal home in the room. */}
+      {inviteId &&
+        (() => {
+          const item = items.find((i) => i.id === inviteId);
+          const title = item?.title ?? inviteId;
+          return (
+            <ActivityInvite
+              partnerName={partnerName}
+              partnerPhotoUrl={partnerPhotoUrl}
+              activityId={inviteId}
+              activityTitle={title}
+              headline={inviteHeadline(partnerName, inviteId, title)}
+              tileSrc={ITEM_TILE_IMAGES[inviteId]}
+              Icon={ITEM_ICONS[inviteId]}
+              onJoin={() => commitStage(inviteId)}
+              onDecline={declineInvite}
+            />
+          );
+        })()}
+
+      {chatToast && (
+        <ChatToast
+          key={chatToast.id}
+          partnerName={partnerName}
+          partnerPhotoUrl={partnerPhotoUrl}
+          text={chatToast.text}
+          count={chatUnread}
+          offset={Boolean(inviteId)}
+          onOpen={() => {
+            setChatToast(null);
+            commitStage("chat");
+          }}
+          onDismiss={dismissChatToast}
+        />
+      )}
+
       <div ref={pipAnchorRef} className="contents" />
       {callActive &&
-        !splitCallLayout &&
         pipHostRef.current &&
         createPortal(
         <div
-          className="group fixed z-40 select-none rounded-2xl glass p-1 shadow-[0_20px_56px_rgba(0,0,0,0.55)] touch-none"
-          style={pos ? { left: pos.x, top: pos.y, width: curW, height: curH } : undefined}
+          className={cn(
+            floatingCall ? "group fixed z-40 select-none touch-none" : "relative h-full w-full",
+            // The pair bubble draws its own rings; everything else gets the glass card.
+            floatingCall && !pairBubble && "rounded-2xl glass p-1 shadow-[0_20px_56px_rgba(0,0,0,0.55)]",
+          )}
+          style={floatingCall && pos ? { left: pos.x, top: pos.y, width: curW, height: curH } : undefined}
         >
           <div
             className={cn(
-              "relative h-full w-full cursor-grab overflow-hidden active:cursor-grabbing",
-              bubble ? "rounded-full" : "rounded-xl",
+              "relative h-full w-full",
+              !pairBubble && "overflow-hidden",
+              floatingCall && "cursor-grab active:cursor-grabbing",
+              floatingCall && !pairBubble && (bubble ? "rounded-full" : "rounded-xl"),
             )}
-            onPointerDown={startDrag}
+            onPointerDown={floatingCall ? startDrag : undefined}
+            title={pairBubble ? (fsOverlay ? "Tap for a bigger view" : "Tap to open the call") : undefined}
             onClick={() => {
               // A tap (not a drag) on the bubble opens the call properly.
               if (!bubble || draggedRef.current) return;
+              if (fsOverlay) {
+                setFsExpanded(true);
+                return;
+              }
+              if (wide) {
+                setCallMode("split");
+                return;
+              }
               setCallOpen(true);
               setManualBubble(false);
             }}
           >
-            {!bubble && <ChaperonSeam />}
+            {!bubble && <ChaperonSeam className={floatingCall ? undefined : "rounded-none"} />}
             <RoomVideo
-              variant="pip"
+              variant={floatingCall ? "pip" : "full"}
               collapsed={bubble}
+              pair={pairBubble}
+              stacked={!floatingCall && paneStacked}
               onLeave={onLeaveCall}
-              // bubble ↔ compact window ↔ large call. On a phone the shrink
-              // control returns to the bubble rather than doing nothing.
-              onExpand={expanded ? undefined : () => setExpanded(true)}
-              // No shrink control: below a certain size the in-video control
-              // row has nowhere to lay out and collapses on itself. The window
-              // is draggable and corner-resizable, which covers getting it out
-              // of the way without a button that can wreck its own UI.
+              // Pane → bubble (the shrink button RoomVideo has had all along).
+              onMinimize={!floatingCall ? () => setCallMode("bubble") : undefined}
+              // Desktop fullscreen tile: only "back to the bubble". Desktop
+              // otherwise never shows a floating window. Below desktop: bubble ↔
+              // compact window ↔ large call, as before.
+              onExpand={
+                !floatingCall || wide
+                  ? undefined
+                  : expanded
+                    ? undefined
+                    : () => setExpanded(true)
+              }
+              onCollapse={
+                !floatingCall
+                  ? undefined
+                  : fsOverlay
+                    ? () => setFsExpanded(false)
+                    : wide
+                      ? undefined
+                      : expanded
+                        ? () => setExpanded(false)
+                        : compact
+                          ? () => {
+                              // On a phone the shrink control always has somewhere
+                              // to go: down to the bubble.
+                              if (activityStaged) setCallOpen(false);
+                              else setManualBubble(true);
+                            }
+                          : undefined
+              }
             />
           </div>
-          {bubble && (
+          {floatingCall && bubble && !pairBubble && (
             <span
               className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-label font-semibold uppercase tracking-[0.14em] text-cream/80 drop-shadow"
               aria-hidden
@@ -1091,7 +1462,7 @@ export function RoomStage({
               tap
             </span>
           )}
-          {!bubble && !orientationPinned && (
+          {floatingCall && !bubble && !wide && (
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
@@ -1103,24 +1474,11 @@ export function RoomStage({
             <RotateCw className="h-3.5 w-3.5" />
           </button>
           )}
-          {/* Dock it beside the stage. Only offered where there is room for
-              two panes — on a phone the side-by-side layout has nothing to
-              give, so the control would be a dead end. */}
-          {!bubble && wide && (
-          <button
-            type="button"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => chooseCallLayout("side")}
-            aria-label="Dock the call beside the room"
-            title="Dock the call beside the room"
-            className="absolute right-11 top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-cream opacity-0 backdrop-blur transition duration-200 hover:bg-black/70 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
-          >
-            <Columns2 className="h-3.5 w-3.5" />
-          </button>
-          )}
           {/* Corner resize handles — desktop only (invisible/unusable on touch;
               phones use the expand/shrink toggle instead). */}
-          {!compact &&
+          {floatingCall &&
+            !compact &&
+            !bubble &&
             (["nw", "ne", "sw", "se"] as Corner[]).map((corner) => (
               <span
                 key={corner}
@@ -1194,12 +1552,15 @@ function MenuTile({
   label,
   active,
   badge,
+  badgeTone,
   onClick,
 }: {
   Icon: LucideIcon;
   label: string;
   active: boolean;
   badge?: number;
+  /** "alert" = unread-style (filled, like a phone app badge). */
+  badgeTone?: "alert";
   onClick: () => void;
 }) {
   return (
@@ -1226,8 +1587,16 @@ function MenuTile({
       >
         <Icon className="h-[42%] w-[42%] text-primary" strokeWidth={2.25} aria-hidden />
         {badge ? (
-          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-card px-1 text-label font-semibold text-cream ring-1 ring-white/15">
-            {badge}
+          <span
+            data-testid={badgeTone === "alert" ? "unread-badge" : undefined}
+            className={cn(
+              "absolute -right-1 -top-1 z-[2] flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full border px-1 text-label font-bold shadow-md",
+              badgeTone === "alert"
+                ? "border-[#141019] bg-rose-500 text-white shadow-[0_0_12px_rgba(244,63,94,0.55)] animate-in zoom-in-50 duration-200"
+                : "border-white/20 bg-[#141019] text-primary",
+            )}
+          >
+            {badge > 99 ? "99+" : badge}
           </span>
         ) : null}
       </span>

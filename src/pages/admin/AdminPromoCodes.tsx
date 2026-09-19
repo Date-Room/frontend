@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCursorPages } from "@/hooks/useCursorPages";
+import { Pager } from "@/components/admin/Pager";
 import { Copy, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -15,7 +17,7 @@ import { ApiError } from "@/lib/api";
 import {
   createPromoCode,
   generatePromoCodes,
-  listPromoCodes,
+  listAdminPromoCodes,
   updatePromoCode,
   type PromoCode,
 } from "@/lib/admin";
@@ -289,10 +291,14 @@ function BenefitFields({
 
 export default function AdminPromoCodes() {
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({
-    queryKey: ["admin-promo"],
-    queryFn: listPromoCodes,
+  const [labelFilter, setLabelFilter] = useState("");
+  const pages = useCursorPages<PromoCode>({
+    queryKey: ["admin-promo", labelFilter],
+    fetchPage: (cursor, limit) => listAdminPromoCodes({ label: labelFilter || undefined, cursor, limit }),
+    perPage: 25,
   });
+  const data = { items: pages.items };
+  const isLoading = pages.isLoading;
 
   const [generating, setGenerating] = useState(false);
   const [customSubmitting, setCustomSubmitting] = useState(false);
@@ -393,8 +399,8 @@ export default function AdminPromoCodes() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-semibold text-white">Promo codes</h2>
-        <p className="text-slate-400 text-sm mt-1">
+        <h2 className="text-2xl font-semibold tracking-tight text-cream">Promo codes</h2>
+        <p className="text-muted-foreground text-sm mt-1">
           Generate single-use codes in batches, or create a custom code by hand.
         </p>
       </div>
@@ -414,13 +420,13 @@ export default function AdminPromoCodes() {
 
       <form
         onSubmit={(e) => void submitGenerate(e)}
-        className="rounded-xl border border-slate-700 bg-slate-900/60 p-6 space-y-4 max-w-2xl"
+        className="rounded-xl border border-white/[0.14] bg-card/60 p-6 space-y-4 max-w-2xl"
       >
         <div className="flex items-center gap-2 text-white">
-          <Sparkles className="h-4 w-4 text-amber-300" aria-hidden />
+          <Sparkles className="h-4 w-4 text-fuchsia-300" aria-hidden />
           <h3 className="font-medium">Generate codes</h3>
         </div>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted-foreground">
           The system mints unique codes automatically. Each code is single-use by default.
         </p>
 
@@ -521,13 +527,13 @@ export default function AdminPromoCodes() {
             readOnly
             value={generatedCodesText}
             rows={Math.min(8, Math.max(3, generatedCodes.length))}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950/80 px-3 py-2 font-mono text-sm text-slate-200"
+            className="w-full rounded-lg border border-white/[0.14] bg-background/80 px-3 py-2 font-mono text-sm text-cream/90"
           />
         </div>
       )}
 
-      <details className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 max-w-2xl">
-        <summary className="cursor-pointer text-sm font-medium text-slate-300">
+      <details className="rounded-xl border border-white/[0.08] bg-card/40 p-5 max-w-2xl">
+        <summary className="cursor-pointer text-sm font-medium text-cream/80">
           Custom code (manual)
         </summary>
         <form onSubmit={(e) => void submitCustom(e)} className="mt-4 grid sm:grid-cols-2 gap-4">
@@ -568,9 +574,15 @@ export default function AdminPromoCodes() {
         </form>
       </details>
 
-      <div className="rounded-xl border border-slate-800 overflow-hidden">
+      <input
+        value={labelFilter}
+        onChange={(e) => setLabelFilter(e.target.value)}
+        placeholder="Filter by campaign label…"
+        className="w-full max-w-sm rounded-lg border border-white/[0.14] bg-card px-3 py-2 text-sm text-cream placeholder:text-muted-foreground/50 focus:border-primary/50 focus:outline-none"
+      />
+      <div className="rounded-xl border border-white/[0.08] overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-900/80 text-slate-500 text-left">
+          <thead className="bg-card/80 text-muted-foreground/70 text-left">
             <tr>
               <th className="px-4 py-3">Code</th>
               <th className="px-4 py-3">Benefit</th>
@@ -581,35 +593,35 @@ export default function AdminPromoCodes() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground/70">
                   Loading…
                 </td>
               </tr>
             )}
             {!isLoading && data?.items.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground/70">
                   No promo codes yet — generate a batch above.
                 </td>
               </tr>
             )}
             {data?.items.map((row) => (
-              <tr key={row.id} className="border-t border-slate-800">
+              <tr key={row.id} className="border-t border-white/[0.08]">
                 <td className="px-4 py-3">
                   <div className="flex items-start gap-2">
                     <div className="min-w-0">
                       <p className="admin-code-text">{row.code}</p>
-                      <p className="text-xs text-slate-400">{row.label}</p>
+                      <p className="text-xs text-muted-foreground">{row.label}</p>
                     </div>
                     <CopyCodeButton code={row.code} label={`Copy ${row.code}`} className="mt-0.5" />
                   </div>
                 </td>
-                <td className="px-4 py-3 text-slate-400 text-xs">
+                <td className="px-4 py-3 text-muted-foreground text-xs">
                   {row.kind}
                   {row.tier_product && ` → ${row.tier_product}`}
                   {row.percent_off && ` (${row.percent_off}%)`}
                 </td>
-                <td className="px-4 py-3 text-slate-400 tabular-nums">
+                <td className="px-4 py-3 text-muted-foreground tabular-nums">
                   {row.redemption_count}
                   {row.max_redemptions != null && ` / ${row.max_redemptions}`}
                 </td>
@@ -619,7 +631,7 @@ export default function AdminPromoCodes() {
                     onClick={() => void toggleActive(row)}
                     className={cn(
                       "text-xs uppercase tracking-wider",
-                      row.is_active ? "text-emerald-400" : "text-slate-500",
+                      row.is_active ? "text-emerald-400" : "text-muted-foreground/70",
                     )}
                   >
                     {row.is_active ? "Active" : "Paused"}
@@ -629,6 +641,7 @@ export default function AdminPromoCodes() {
             ))}
           </tbody>
         </table>
+        <Pager from={pages.from} to={pages.to} total={pages.total} perPage={pages.perPage} onPerPage={pages.setPerPage} hasPrev={pages.hasPrev} hasNext={pages.hasNext} onPrev={pages.prev} onNext={pages.next} noun="codes" busy={pages.isFetching} />
       </div>
     </div>
   );

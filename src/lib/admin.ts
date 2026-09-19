@@ -92,12 +92,13 @@ export function getAdminStats() {
   return api.get<AdminStats>("/v1/admin/stats");
 }
 
-export function listAdminUsers(params?: { search?: string; cursor?: string }) {
+export function listAdminUsers(params?: { search?: string; cursor?: string; limit?: number }) {
   const qs = new URLSearchParams();
   if (params?.search) qs.set("search", params.search);
   if (params?.cursor) qs.set("cursor", params.cursor);
+  if (params?.limit) qs.set("limit", String(params.limit));
   const q = qs.toString();
-  return api.get<Page<AdminUserRow>>(`/v1/admin/users${q ? `?${q}` : ""}`);
+  return api.get<Page<AdminUserRow> & { total?: number | null }>(`/v1/admin/users${q ? `?${q}` : ""}`);
 }
 
 export function getAdminUser(id: string) {
@@ -135,14 +136,6 @@ export function updatePromoCode(id: string, body: Record<string, unknown>) {
   return api.patch<PromoCode>(`/v1/admin/promo-codes/${id}`, body);
 }
 
-export function listAdminRooms(state?: string) {
-  const q = state ? `?state=${encodeURIComponent(state)}` : "";
-  return api.get<Page<AdminRoomRow>>(`/v1/admin/rooms${q}`);
-}
-
-export function listAdminAudit() {
-  return api.get<Page<AdminAuditRow>>("/v1/admin/audit");
-}
 
 // --- Chaperon (AI observer) provider config -------------------------------
 
@@ -197,6 +190,9 @@ export type CoachBetaApplication = {
   status: string;
   created_at: string;
   calls_remaining: number;
+  decided_at?: string | null;
+  decline_reason?: string | null;
+  is_team?: boolean;
 };
 
 export type CoachBetaApplicationsResponse = {
@@ -311,4 +307,231 @@ export function redeemPromoCode(code: string) {
     "/v1/billing/redeem-promo",
     { code },
   );
+}
+
+// --- Beta console (structure only: pseudonyms, pattern codes, no words) -----
+
+export type BetaReview = { verdict: string; tag: string | null; note: string; at: string };
+
+export type BetaSignalRow = {
+  event_id: string;
+  at: string;
+  call: string;
+  tester: string;
+  team: boolean;
+  mode: string;
+  family: "protect" | "coach";
+  check_id: string;
+  severity: string;
+  confidence: number;
+  pattern: string;
+  provider: string;
+  model: string;
+  rubric_version: string;
+  elapsed_sec: number;
+  outcome: string;
+  reaction: string | null;
+  reaction_reason: string | null;
+  shared: boolean;
+  probe: boolean;
+  review: BetaReview | null;
+};
+
+export type BetaFeedFilters = {
+  family?: "protect" | "coach";
+  outcome?: "shown" | "suppressed" | "pending";
+  reacted?: boolean;
+  reviewed?: boolean;
+  probe?: boolean;
+  shared?: boolean;
+  mine?: boolean;
+  team?: boolean;
+  call?: string;
+};
+
+function qs(params: Record<string, string | number | boolean | undefined>): string {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") p.set(k, String(v));
+  const s = p.toString();
+  return s ? `?${s}` : "";
+}
+
+export function getBetaFeed(filters: BetaFeedFilters, cursor?: string, limit = 50) {
+  return api.get<{ items: BetaSignalRow[]; next_cursor: string | null }>(
+    `/v1/admin/beta/feed${qs({ ...filters, cursor, limit })}`,
+  );
+}
+
+export type BetaOverview = {
+  on_air: { sessions: number; coached: number; guardian: number };
+  today: Record<string, number | null>;
+  yesterday: Record<string, number | null>;
+  unreviewed: number;
+};
+
+export function getBetaOverview() {
+  return api.get<BetaOverview>("/v1/admin/beta/overview");
+}
+
+export type BetaLiveSession = {
+  session_id: string;
+  call: string;
+  tester: string;
+  team: boolean;
+  mode: string;
+  started_at: string;
+  signals: number;
+  shown: number;
+  probe_armed: boolean;
+  newest: { check_id: string; confidence: number; at: string; outcome: string } | null;
+};
+
+export function getBetaLive() {
+  return api.get<{ sessions: BetaLiveSession[] }>("/v1/admin/beta/live");
+}
+
+export function getBetaReviewQueue(limit = 10) {
+  return api.get<{ items: BetaSignalRow[]; unreviewed: number }>(
+    `/v1/admin/beta/review/queue${qs({ limit })}`,
+  );
+}
+
+export type BetaVerdict = "correct" | "wrong" | "borderline";
+export type BetaVerdictTag = "user_right" | "missed_worse" | "wording_off" | "rubric_gap";
+
+export function postBetaVerdict(body: {
+  event_id: string;
+  verdict: BetaVerdict;
+  tag?: BetaVerdictTag;
+  note?: string;
+}) {
+  return api.post<void>("/v1/admin/beta/review/verdicts", body);
+}
+
+export type BetaNeedsYou = {
+  id: string;
+  severity: "alert" | "warn";
+  title: string;
+  detail: string;
+  action: "end_sessions" | null;
+  rooms: string[];
+};
+
+export type BetaHealth = {
+  builds: { api: string; worker: string };
+  needs_you: BetaNeedsYou[];
+  stuck_sessions: { room_id: string; call: string; started_at: string; hours: number }[];
+  cost: { rows_today: number; sessions_ended_today: number };
+  unwritten_debriefs: number;
+  suppression: { signals: number; agent: number; gate: number };
+  judges: {
+    provider: string;
+    model: string;
+    signals: number;
+    shown: number;
+    probes: number;
+    agree_rate_pct: number | null;
+    evals: number;
+    errors: number;
+    error_rate_pct: number | null;
+    mean_latency_ms: number | null;
+    slow: number;
+  }[];
+  by_check: { check_id: string; signals: number; shown: number; agree_rate_pct: number | null }[];
+};
+
+export function getBetaHealth() {
+  return api.get<BetaHealth>("/v1/admin/beta/health");
+}
+
+export function postBetaEndSessions(room_ids: string[]) {
+  return api.post<{ ended: number }>("/v1/admin/beta/health/end-sessions", { room_ids });
+}
+
+export type CoachBetaDeclineReason = "no_reason" | "duplicate_device" | "not_yet" | "other";
+
+export function declineCoachBeta(body: { user_id: string; reason: CoachBetaDeclineReason }) {
+  return api.post<{ status: string; reason: string }>("/v1/admin/chaperon/coach-beta/decline", body);
+}
+
+export function listCoachBetaApplicationsBy(status: "pending" | "granted" | "declined" | "all") {
+  return api.get<CoachBetaApplicationsResponse>(
+    `/v1/admin/chaperon/coach-beta/applications${qs({ status })}`,
+  );
+}
+
+// --- Admin ramp: dashboard, search, feedback ------------------------------
+
+export type AdminStatsDeltas = {
+  days: number;
+  current: Record<string, number | null>;
+  prior: Record<string, number | null>;
+  now: { total_users: number; live_rooms: number; live_dates: number; live_persistent: number; active_subscriptions: number };
+  signups_by_source: Record<string, number>;
+};
+export function getAdminStatsDeltas(days = 30) {
+  return api.get<AdminStatsDeltas>(`/v1/admin/stats/deltas${qs({ days })}`);
+}
+
+export type AdminNeedsActionRow = {
+  id: string;
+  severity: "alert" | "warn";
+  title: string;
+  detail: string;
+  action: "end_sessions" | null;
+  href: string | null;
+  rooms: string[];
+};
+export function getAdminNeedsAction() {
+  return api.get<{ items: AdminNeedsActionRow[] }>("/v1/admin/needs-action");
+}
+
+export type AdminTimeseries = { days: number; points: { day: string; revenue_kes: number; rooms_opened: number }[] };
+export function getAdminTimeseries(days = 30) {
+  return api.get<AdminTimeseries>(`/v1/admin/timeseries${qs({ days })}`);
+}
+
+export type AdminSearchResult = {
+  users: { id: string; email: string; display_name: string }[];
+  rooms: { id: string; code: string; state: string }[];
+  promo_codes: { id: string; code: string; label: string }[];
+};
+export function adminSearch(q: string) {
+  return api.get<AdminSearchResult>(`/v1/admin/search${qs({ q })}`);
+}
+
+export type AdminFeedbackRow = {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  display_name: string;
+  email: string;
+  team: boolean;
+  surface: string;
+  activity_id: string | null;
+  kind: "confusing" | "broken" | "idea" | "loved";
+  text: string;
+  platform: string;
+  app_version: string | null;
+  status: "new" | "seen" | "done";
+  admin_note: string;
+  updated_at: string;
+};
+export function listAdminFeedback(params: { status?: string; kind?: string; cursor?: string; limit?: number }) {
+  return api.get<{ items: AdminFeedbackRow[]; next_cursor: string | null; total: number; counts: Record<string, number> }>(
+    `/v1/admin/feedback${qs(params)}`,
+  );
+}
+export function updateAdminFeedback(id: string, body: { status?: "new" | "seen" | "done"; admin_note?: string }) {
+  return api.patch<AdminFeedbackRow>(`/v1/admin/feedback/${id}`, body);
+}
+
+export function listAdminRooms(params: { state?: string; persistence?: string; cursor?: string; limit?: number }) {
+  return api.get<Page<AdminRoomRow> & { total?: number | null }>(`/v1/admin/rooms${qs(params)}`);
+}
+export function listAdminAudit(params: { action?: string; cursor?: string; limit?: number }) {
+  return api.get<Page<AdminAuditRow> & { total?: number | null }>(`/v1/admin/audit${qs(params)}`);
+}
+export function listAdminPromoCodes(params: { label?: string; cursor?: string; limit?: number }) {
+  return api.get<Page<PromoCode> & { total?: number | null }>(`/v1/admin/promo-codes${qs(params)}`);
 }

@@ -12,6 +12,7 @@ import {
   Search,
   Timer,
   UserPlus,
+  Moon,
   Play,
   X,
 } from "lucide-react";
@@ -32,9 +33,14 @@ import { ProfilePlanSection } from "@/components/ProfilePlanSection";
 import { ShimmerSkeleton } from "@/components/ui/skeleton";
 import { UserAvatarImg } from "@/components/UserAvatarImg";
 import { cn } from "@/lib/utils";
+import { lifecycleView } from "@/lib/roomLifecycle";
 
 const ALIVE_STATES = new Set<RoomStateName>(["created", "waiting", "live", "active"]);
-const ENDED_STATES = new Set<RoomStateName>(["ended", "grace", "sub_lapsed"]);
+const ENDED_STATES = new Set<RoomStateName>(["ended", "grace"]);
+// A resting or closing Together room stays on the shelf, with its
+// lifecycle line instead of "Enter room": members can still look back
+// and either can keep it.
+const RESTING_STATES = new Set<RoomStateName>(["sub_lapsed", "closing"]);
 
 type Tab = "history" | "rooms" | "profile";
 
@@ -176,8 +182,12 @@ export default function Home() {
     return out;
   }, [rooms, cardQueries]);
 
-  const aliveRooms = rooms.filter((r) => ALIVE_STATES.has(r.state));
-  const endedRooms = rooms.filter((r) => ENDED_STATES.has(r.state));
+  const aliveRooms = rooms.filter(
+    (r) => ALIVE_STATES.has(r.state) || (r.persistence === "persistent" && RESTING_STATES.has(r.state)),
+  );
+  const endedRooms = rooms.filter(
+    (r) => ENDED_STATES.has(r.state) || (r.persistence !== "persistent" && RESTING_STATES.has(r.state)),
+  );
 
   // Tick once per minute so the "Ends in Xm" / grace countdown stays
   // current without spinning up a 1s interval.
@@ -578,6 +588,7 @@ function RoomTileRow({
 }) {
   const isHost = me?.id ? room.host_id === me.id : false;
   const isPersistent = room.persistence === "persistent";
+  const lifecycle = lifecycleView(room, { meId: me?.id ?? null });
   const partner = pickPartner(card, me);
   // If we're the guest, the InviteCard host attribution is our partner.
   const effectivePartner = partner ?? (!isHost && card?.host_display_name
@@ -635,7 +646,18 @@ function RoomTileRow({
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-0.5">
-          {isPersistent ? (
+          {isPersistent && lifecycle ? (
+            <span className="flex items-center gap-1 rounded-full bg-amber/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-amber/90 ring-1 ring-amber/25">
+              <Moon className="h-2.5 w-2.5" />
+              {lifecycle.tone === "closing"
+                ? "Closing"
+                : lifecycle.tone === "notice"
+                  ? "Month ended"
+                  : lifecycle.tone === "quiet"
+                    ? "Resting"
+                    : "Read only"}
+            </span>
+          ) : isPersistent ? (
             <span className="flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-primary ring-1 ring-primary/25">
               <Play className="h-2.5 w-2.5" fill="currentColor" />
               Enter room
