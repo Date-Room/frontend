@@ -256,7 +256,7 @@ export function ChaperonMount() {
               SEVERITY_STYLES[currentWhisper.severity],
             )}
           >
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-cream/60">
+            <div className="flex items-center gap-2 text-label font-semibold uppercase tracking-[0.14em] text-cream/60">
               <FamilyIcon severity={currentWhisper.severity} className="h-3.5 w-3.5" />
               <span>{currentWhisper.probe ? "Your test" : checkLabel(currentWhisper.check_id)}</span>
               <button
@@ -268,7 +268,7 @@ export function ChaperonMount() {
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
-            <p className="mt-1.5 font-serif text-[15px] italic leading-snug text-cream">
+            <p className="mt-1.5 text-body italic leading-snug text-cream">
               {currentWhisper.whisper}
             </p>
             {currentEventId && (

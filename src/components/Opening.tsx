@@ -14,22 +14,22 @@ export function Opening({ name, onEnter }: { name: string; onEnter: () => void }
         />
 
         <div className="space-y-3 max-w-sm">
-          <h1 className="font-serif font-semibold text-cream text-3xl sm:text-4xl leading-snug">
+          <h1 className="font-serif font-semibold text-cream text-display sm:text-4xl leading-snug">
             Welcome, {name}
           </h1>
-          <p className="text-muted-foreground text-sm leading-relaxed">
+          <p className="text-muted-foreground text-body leading-relaxed">
             The room is ready. Take a moment, then step inside.
           </p>
         </div>
 
         <button
           onClick={onEnter}
-          className="btn-primary text-base px-10 py-4 animate-breathe"
+          className="btn-primary text-body px-10 py-4 animate-breathe"
         >
           Enter the room
         </button>
 
-        <p className="text-[10px] uppercase tracking-[0.3em] text-muted-foreground/50">
+        <p className="text-label uppercase tracking-[0.3em] text-muted-foreground/50">
           {BRAND_NAME}
         </p>
       </div>

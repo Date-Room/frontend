@@ -49,8 +49,8 @@ export function RoomAmbianceSheet({
       <DialogContent className="max-h-[min(92dvh,820px)] overflow-hidden border-white/10 bg-[#100e14]/95 p-0 text-cream sm:max-w-[min(720px,94vw)]">
         <div className="border-b border-white/[0.06] px-5 pb-4 pt-5 sm:px-6">
           <DialogHeader className="space-y-1 text-left">
-            <DialogTitle className="font-serif text-2xl italic">Set the mood</DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">
+            <DialogTitle className="font-serif text-display italic">Set the mood</DialogTitle>
+            <DialogDescription className="text-body text-muted-foreground">
               Backdrop and accent colors update instantly for everyone in the room.
             </DialogDescription>
           </DialogHeader>
@@ -90,14 +90,14 @@ export function RoomAmbianceSheet({
               )}
               <div className="dr-mood-hero__shimmer pointer-events-none absolute inset-0" aria-hidden />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent px-4 pb-4 pt-10 sm:px-5">
-                <p className="flex items-center gap-2 font-serif text-xl italic text-cream sm:text-2xl">
+                <p className="flex items-center gap-2 font-serif text-title italic text-cream">
                   <span aria-hidden>{preview.emoji}</span>
                   {preview.label}
                 </p>
-                <p className="mt-0.5 text-xs text-cream/75 sm:text-sm">{preview.hint}</p>
+                <p className="mt-0.5 text-label text-cream/75">{preview.hint}</p>
               </div>
               {previewId === current && (
-                <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-primary backdrop-blur-md">
+                <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/20 px-2.5 py-1 text-label font-bold uppercase tracking-[0.14em] text-primary backdrop-blur-md">
                   <Check className="h-3 w-3" aria-hidden />
                   Active
                 </span>
@@ -150,7 +150,7 @@ export function RoomAmbianceSheet({
                       className="absolute inset-0 opacity-80"
                       style={{ background: moodSwatchGradient(m.id) }}
                     />
-                    <span className="absolute left-2 top-2 text-lg drop-shadow-md" aria-hidden>
+                    <span className="absolute left-2 top-2 text-title drop-shadow-md" aria-hidden>
                       {m.emoji}
                     </span>
                     {isCurrent && (
@@ -160,8 +160,8 @@ export function RoomAmbianceSheet({
                     )}
                   </span>
                   <span className="px-2.5 py-2 sm:px-3 sm:py-2.5">
-                    <span className="block text-xs font-semibold text-cream sm:text-sm">{m.label}</span>
-                    <span className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted-foreground">
+                    <span className="block text-label font-semibold text-cream">{m.label}</span>
+                    <span className="mt-0.5 line-clamp-2 text-label leading-snug text-muted-foreground">
                       {m.hint}
                     </span>
                   </span>

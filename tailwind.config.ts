@@ -99,6 +99,22 @@ export default {
         "3xl": "1.5rem",
         "4xl": "2rem",
       },
+      // ── Room type scale ────────────────────────────────────────────────
+      // Four sizes, and everything in the room experience lands on one of
+      // them. The floor is 12px: the room had 230 usages below that (down to
+      // 8px), which was the real readability problem — more so than the serif.
+      // `display` is the ONLY Playfair size; it's one title per screen.
+      // Numerals-as-graphics (capture countdown, scoreboards, timers) sit
+      // outside this scale on purpose.
+      fontSize: {
+        label: ["0.75rem", { lineHeight: "1.35", fontWeight: "500" }],
+        body: ["0.9375rem", { lineHeight: "1.5" }],
+        title: ["1.25rem", { lineHeight: "1.25", fontWeight: "600" }],
+        display: [
+          "clamp(1.75rem, 1.4rem + 1.6vw, 2.125rem)",
+          { lineHeight: "1.15", fontWeight: "600" },
+        ],
+      },
       boxShadow: {
         glow: "var(--shadow-glow)",
         "glow-lg": "var(--shadow-glow-lg)",

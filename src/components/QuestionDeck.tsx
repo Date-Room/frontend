@@ -149,14 +149,14 @@ export function QuestionDeck() {
               onClick={() => emit("choose_length", { target: n })}
               className="focus-ring flex flex-col items-center gap-0.5 rounded-2xl border border-white/15 px-6 py-3 transition hover:border-primary/50 hover:bg-white/[0.04]"
             >
-              <span className="font-serif text-2xl text-cream">{n}</span>
-              <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              <span className="font-serif text-display text-cream">{n}</span>
+              <span className="text-label uppercase tracking-[0.18em] text-muted-foreground">
                 {n / 3} topics · {n === 15 ? "≈ 45 min" : "the long way round"}
               </span>
             </button>
           ))}
         </div>
-        <p className="text-[11px] text-muted-foreground">Whoever picks the length drafts first.</p>
+        <p className="text-label text-muted-foreground">Whoever picks the length drafts first.</p>
       </GameLanding>
     );
   }
@@ -166,10 +166,10 @@ export function QuestionDeck() {
     return (
       <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
         <div className="flex shrink-0 flex-col items-center gap-1 text-center">
-          <p className="font-serif text-xl italic text-cream">
+          <p className="text-title italic text-cream">
             {myTurn ? "Your topic" : `${partnerName} is choosing`}
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-label text-muted-foreground">
             {slots - state.claims.length} pick{slots - state.claims.length === 1 ? "" : "s"} left between you. Each topic deals three questions.
           </p>
         </div>
@@ -194,10 +194,10 @@ export function QuestionDeck() {
                   myTurn && !taken ? "hover:-translate-y-0.5 hover:border-primary/50 cursor-pointer" : "",
                 ].join(" ")}
               >
-                <span className={["text-[9px] uppercase tracking-[0.2em]", HEAT_STYLE[t.heat]].join(" ")}>{t.heat}</span>
-                <span className="font-serif text-sm text-cream leading-tight">{t.name}</span>
-                <span className="text-[11px] leading-snug text-muted-foreground">{t.note}</span>
-                <span className="mt-0.5 text-[9px] uppercase tracking-[0.18em] text-muted-foreground/80">
+                <span className={["text-label uppercase tracking-[0.2em]", HEAT_STYLE[t.heat]].join(" ")}>{t.heat}</span>
+                <span className="text-body text-cream leading-tight">{t.name}</span>
+                <span className="text-label leading-snug text-muted-foreground">{t.note}</span>
+                <span className="mt-0.5 text-label uppercase tracking-[0.18em] text-muted-foreground/80">
                   {byMe ? "yours" : taken ? `${partnerName}'s` : "3 questions"}
                 </span>
               </button>
@@ -213,13 +213,13 @@ export function QuestionDeck() {
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
         <div className="flex shrink-0 flex-col items-center gap-1 text-center">
-          <p className="font-serif text-xl italic text-cream">One of your own</p>
-          <p className="max-w-sm text-xs text-muted-foreground">
+          <p className="text-title italic text-cream">One of your own</p>
+          <p className="max-w-sm text-label text-muted-foreground">
             It replaces a card rather than adding one, and it buys you a veto of one of {partnerName}&apos;s topics.
           </p>
         </div>
         {iWrote ? (
-          <p className="text-sm text-muted-foreground animate-pulse">sealed · waiting for {partnerName}&apos;s question…</p>
+          <p className="text-body text-muted-foreground animate-pulse">sealed · waiting for {partnerName}&apos;s question…</p>
         ) : (
           <>
             <textarea
@@ -228,9 +228,9 @@ export function QuestionDeck() {
               value={draftText}
               onChange={(e) => setDraftText(e.target.value)}
               placeholder={`Ask ${partnerName} the thing you wouldn't put in a message…`}
-              className="w-full max-w-md rounded-2xl border border-white/15 bg-secondary/60 p-4 text-sm text-cream outline-none focus:border-primary/50"
+              className="w-full max-w-md rounded-2xl border border-white/15 bg-secondary/60 p-4 text-body text-cream outline-none focus:border-primary/50"
             />
-            <p className="text-[10px] text-muted-foreground">{draftText.length}/{OB_WRITE_MAX}</p>
+            <p className="text-label text-muted-foreground">{draftText.length}/{OB_WRITE_MAX}</p>
             <Button
               onClick={() => emit("write", { text: draftText })}
               disabled={draftText.trim().length < OB_WRITE_MIN}
@@ -256,10 +256,10 @@ export function QuestionDeck() {
     return (
       <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
         <div className="flex shrink-0 flex-col items-center gap-1 text-center">
-          <p className="font-serif text-xl italic text-cream">
+          <p className="text-title italic text-cream">
             {iVetoed ? "Veto sealed" : `Bin one of ${partnerName}'s`}
           </p>
-          <p className="max-w-sm text-xs text-muted-foreground">
+          <p className="max-w-sm text-label text-muted-foreground">
             {iVetoed
               ? `waiting for ${partnerName}'s veto… one of yours goes the same way.`
               : "Writing a question bought you this. Choose what replaces it."}
@@ -278,7 +278,7 @@ export function QuestionDeck() {
                     disabled={gone}
                     onClick={() => setBinPick(c.topic)}
                     className={[
-                      "focus-ring rounded-full border px-3 py-1.5 text-xs transition",
+                      "focus-ring rounded-full border px-3 py-1.5 text-label transition",
                       binPick === c.topic
                         ? "border-destructive/60 text-destructive line-through"
                         : "border-white/15 text-cream hover:border-destructive/50",
@@ -292,7 +292,7 @@ export function QuestionDeck() {
             </div>
             {binPick && (
               <>
-                <p className="text-center text-[10px] uppercase tracking-[0.22em] text-muted-foreground">replace it with</p>
+                <p className="text-center text-label uppercase tracking-[0.22em] text-muted-foreground">replace it with</p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {options.map((t) => (
                     <button
@@ -300,7 +300,7 @@ export function QuestionDeck() {
                       type="button"
                       onClick={() => setSwapPick(t.id)}
                       className={[
-                        "focus-ring rounded-full border px-3 py-1.5 text-xs transition",
+                        "focus-ring rounded-full border px-3 py-1.5 text-label transition",
                         swapPick === t.id ? "border-primary text-primary" : "border-white/15 text-cream hover:border-primary/50",
                       ].join(" ")}
                     >
@@ -351,8 +351,8 @@ export function QuestionDeck() {
     return (
       <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
         <div className="flex shrink-0 flex-col items-center gap-1 text-center">
-          <p className="font-serif text-2xl italic text-cream">The whole night</p>
-          <p className="max-w-sm text-xs text-muted-foreground">
+          <p className="font-serif text-display italic text-cream">The whole night</p>
+          <p className="max-w-sm text-label text-muted-foreground">
             {deck.length - state.passes.length} of {deck.length} answered.{" "}
             {comeBack.length
               ? "The passed and dodged ones are worth coming back to."
@@ -361,13 +361,13 @@ export function QuestionDeck() {
         </div>
         {showTallies && (
           <div className="flex shrink-0 flex-col items-center gap-1 text-center">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+            <p className="text-label font-semibold uppercase tracking-[0.24em] text-muted-foreground">
               How you showed up
             </p>
-            <p className="text-xs text-cream/85">
+            <p className="text-label text-cream/85">
               <span className="text-primary">You</span> · {tallyLine(myTally)}
             </p>
-            <p className="text-xs text-cream/85">
+            <p className="text-label text-cream/85">
               <span className="text-rose">{partnerName}</span> · {tallyLine(theirTally)}
             </p>
           </div>
@@ -386,13 +386,13 @@ export function QuestionDeck() {
                   passed ? "border-dashed border-white/15 opacity-70" : "border-white/[0.08] bg-white/[0.02]",
                 ].join(" ")}
               >
-                <p className="text-sm leading-relaxed text-cream/90">&ldquo;{c.q}&rdquo;</p>
-                <p className="mt-1 flex flex-wrap items-center gap-2 text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                <p className="text-body leading-relaxed text-cream/90">&ldquo;{c.q}&rdquo;</p>
+                <p className="mt-1 flex flex-wrap items-center gap-2 text-label uppercase tracking-[0.18em] text-muted-foreground">
                   <span className={c.by === senderId ? "text-primary" : "text-rose"}>
                     {c.written ? `written by ${c.by === senderId ? "you" : partnerName}` : `${c.topicName} · ${c.by === senderId ? "yours" : `${partnerName}'s`}`}
                   </span>
                   {rx.map((e, j) => (
-                    <span key={j} className="text-sm">{e}</span>
+                    <span key={j} className="text-body">{e}</span>
                   ))}
                   {chip && <span className={chip[1]}>{chip[0]}</span>}
                   {passed && <span className="text-destructive">passed</span>}
@@ -425,10 +425,10 @@ export function QuestionDeck() {
       <div className="dr-stageroom-shade" aria-hidden />
 
       <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Card {Math.min(state.card + 1, deck.length)} of {deck.length}
         </p>
-        <p className="font-serif text-xl italic text-cream">
+        <p className="text-title italic text-cream">
           {dealRank < 2 ? "Shuffling" : card?.heat === "Close" ? "Deeper in" : card?.topicName}
         </p>
       </div>
@@ -445,7 +445,7 @@ export function QuestionDeck() {
             ))}
           </div>
           {dealRank >= 1 && (
-            <div className="flex flex-col items-center gap-1 text-xs text-muted-foreground animate-fade-in">
+            <div className="flex flex-col items-center gap-1 text-label text-muted-foreground animate-fade-in">
               {theirVeto && (
                 <p>
                   {partnerName} binned <span className="text-rose">{obTopic(theirVeto.binned)?.name}</span> from your side.
@@ -469,12 +469,12 @@ export function QuestionDeck() {
               style={card.written ? { borderColor: "color-mix(in srgb, var(--room-accent) 70%, transparent)" } : undefined}
             >
               <span className="dr-plaque-glyph" aria-hidden>{card.written ? "✍" : "?"}</span>
-              <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.24em]" style={{ color: "var(--room-accent)" }}>
+              <p className="flex items-center gap-2 text-label font-semibold uppercase tracking-[0.24em]" style={{ color: "var(--room-accent)" }}>
                 {card.written
                   ? `written by ${card.by === senderId ? "you" : partnerName}`
                   : `${card.topicName} · ${card.heat} · ${card.by === senderId ? "yours" : `${partnerName}'s`}`}
               </p>
-              <p aria-live="polite" className="mt-2 font-serif text-lg sm:text-xl italic leading-snug text-cream">
+              <p aria-live="polite" className="mt-2 text-title italic leading-snug text-cream">
                 {typed.shown}
                 {!typed.complete && <span className="dr-caret" aria-hidden />}
               </p>
@@ -490,7 +490,7 @@ export function QuestionDeck() {
                     aria-label={`React ${r}`}
                     onClick={() => emit("react", { index: state.card, emoji: r })}
                     className={[
-                      "focus-ring flex h-10 w-10 items-center justify-center rounded-full border text-lg transition hover:-translate-y-0.5",
+                      "focus-ring flex h-10 w-10 items-center justify-center rounded-full border text-title transition hover:-translate-y-0.5",
                       mineNow ? "border-primary bg-primary/15 scale-110" : "border-white/15",
                     ].join(" ")}
                   >
@@ -508,7 +508,7 @@ export function QuestionDeck() {
                 // The card is theirs — I answer it.
                 !state.answered ? (
                   <div className="flex flex-col items-center gap-2 animate-fade-in">
-                    <p className="text-xs text-muted-foreground">This one's for you. Out loud.</p>
+                    <p className="text-label text-muted-foreground">This one's for you. Out loud.</p>
                     <div className="flex gap-2">
                       <Button
                         onClick={() => emit("my_answer", { index: state.card })}
@@ -528,18 +528,18 @@ export function QuestionDeck() {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground animate-pulse">
+                  <p className="text-body text-muted-foreground animate-pulse">
                     {partnerName} heard you. They&apos;re ruling it…
                   </p>
                 )
               ) : // The card is mine — they answer, then I rule it.
               !state.answered ? (
-                <p className="text-sm text-muted-foreground animate-fade-in">
+                <p className="text-body text-muted-foreground animate-fade-in">
                   {partnerName} answers this one. Listen.
                 </p>
               ) : (
                 <div className="flex flex-col items-center gap-2 animate-fade-in">
-                  <p className="text-xs text-muted-foreground">Did they? Your ruling is noticing, not scoring.</p>
+                  <p className="text-label text-muted-foreground">Did they? Your ruling is noticing, not scoring.</p>
                   <div className="flex flex-wrap justify-center gap-2">
                     <Button
                       onClick={() =>

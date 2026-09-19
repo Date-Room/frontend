@@ -74,7 +74,7 @@ export function ChaperonAnnounceBadge({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={`${who} has a chaperon on`}
-        className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-black/50 px-3 py-1.5 text-[12px] font-medium text-cream/85 backdrop-blur transition hover:bg-black/70"
+        className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-black/50 px-3 py-1.5 text-label font-medium text-cream/85 backdrop-blur transition hover:bg-black/70"
       >
         <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" aria-hidden />
         <span className="truncate">{who} has a chaperon on</span>
@@ -83,7 +83,7 @@ export function ChaperonAnnounceBadge({
         <div
           role="dialog"
           aria-label="About the chaperon"
-          className="pointer-events-auto mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-card/95 p-4 text-[13px] leading-relaxed text-cream/85 shadow-xl backdrop-blur-xl"
+          className="pointer-events-auto mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-card/95 p-4 text-body leading-relaxed text-cream/85 shadow-xl backdrop-blur-xl"
         >
           <div className="flex items-start justify-between gap-3">
             <p>
@@ -100,7 +100,7 @@ export function ChaperonAnnounceBadge({
             </button>
           </div>
           {isGuest && (
-            <p className="mt-3 text-[12px] text-muted-foreground">
+            <p className="mt-3 text-label text-muted-foreground">
               Want one watching out for you?{" "}
               <Link to="/auth?src=badge" className="text-primary hover:underline">
                 Sign in to get yours

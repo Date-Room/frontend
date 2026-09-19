@@ -74,11 +74,11 @@ export function ChaperonReview({
 
   return (
     <section className="mb-8 animate-float-up" aria-label="From your chaperon">
-      <p className="mb-2 flex items-center gap-1.5 px-1 text-[10px] uppercase tracking-[0.28em] text-emerald-300/80">
+      <p className="mb-2 flex items-center gap-1.5 px-1 text-label uppercase tracking-[0.28em] text-emerald-300/80">
         <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
         Private review · only you
       </p>
-      <h2 className="mb-4 px-1 font-serif text-2xl italic leading-snug text-cream">
+      <h2 className="mb-4 px-1 font-serif text-display italic leading-snug text-cream">
         {debrief.headline}
       </h2>
 
@@ -97,10 +97,10 @@ export function ChaperonReview({
               className={cn("h-4 w-4", p.tone === "flagged" ? "text-rose-300" : "text-emerald-400")}
               aria-hidden
             />
-            <p className="text-sm font-semibold text-cream">Protect</p>
+            <p className="text-body font-semibold text-cream">Protect</p>
             <span
               className={cn(
-                "ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                "ml-auto rounded-full px-2 py-0.5 text-label font-semibold uppercase tracking-wide",
                 p.tone === "flagged"
                   ? "bg-rose-500/15 text-rose-300"
                   : "bg-emerald-500/15 text-emerald-300",
@@ -109,18 +109,18 @@ export function ChaperonReview({
               {p.pill}
             </span>
           </div>
-          {p.test && <p className="mt-1.5 text-[13px] text-cream/85">{p.test}</p>}
+          {p.test && <p className="mt-1.5 text-body text-cream/85">{p.test}</p>}
           {debrief.moments.length > 0 ? (
             <ul className="mt-2 space-y-1.5">
               {debrief.moments.map((m) => (
-                <li key={m} className="flex items-start gap-2.5 text-[13px] text-cream/85">
+                <li key={m} className="flex items-start gap-2.5 text-body text-cream/85">
                   <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cream/40" aria-hidden />
                   {m}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="mt-1.5 text-[13px] text-muted-foreground">
+            <p className="mt-1.5 text-body text-muted-foreground">
               Nothing to flag with {them}: no pressure, no push to move off DateRoom, no money
               talk.
             </p>
@@ -132,23 +132,23 @@ export function ChaperonReview({
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.05] px-4 py-3">
             <div className="flex items-center gap-2">
               <Compass className="h-4 w-4 text-amber-400" aria-hidden />
-              <p className="text-sm font-semibold text-cream">Coach</p>
-              <span className="ml-auto rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+              <p className="text-body font-semibold text-cream">Coach</p>
+              <span className="ml-auto rounded-full bg-amber-500/15 px-2 py-0.5 text-label font-semibold uppercase tracking-wide text-amber-300">
                 {res.counts.coach} nudge{res.counts.coach === 1 ? "" : "s"}
               </span>
             </div>
             {debrief.tip ? (
-              <p className="mt-1.5 flex items-start gap-2 text-[13px] text-cream/85">
+              <p className="mt-1.5 flex items-start gap-2 text-body text-cream/85">
                 <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-300/80" aria-hidden />
                 {debrief.tip}
               </p>
             ) : (
-              <p className="mt-1.5 text-[13px] text-muted-foreground">Nothing to add this time.</p>
+              <p className="mt-1.5 text-body text-muted-foreground">Nothing to add this time.</p>
             )}
           </div>
         )}
         {!coached && debrief.tip && (
-          <p className="flex items-start gap-2 px-1 text-[13px] text-muted-foreground">
+          <p className="flex items-start gap-2 px-1 text-body text-muted-foreground">
             <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-cream/50" aria-hidden />
             {debrief.tip}
           </p>
@@ -156,7 +156,7 @@ export function ChaperonReview({
 
         {/* The third label */}
         <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3">
-          <p className="text-sm text-cream">Was this review fair?</p>
+          <p className="text-body text-cream">Was this review fair?</p>
           <div className="mt-2 flex gap-2" role="group" aria-label="Was this review fair?">
             {RATINGS.map((r) => (
               <button
@@ -166,7 +166,7 @@ export function ChaperonReview({
                 disabled={rate.isPending}
                 onClick={() => rate.mutate(r.id)}
                 className={cn(
-                  "focus-ring rounded-full border px-4 py-1.5 text-[13px] transition disabled:opacity-60",
+                  "focus-ring rounded-full border px-4 py-1.5 text-body transition disabled:opacity-60",
                   rating === r.id
                     ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-200"
                     : "border-white/15 bg-white/[0.04] text-cream/85 hover:bg-white/10",
@@ -175,22 +175,22 @@ export function ChaperonReview({
                 {r.label}
               </button>
             ))}
-            {rating && <span className="self-center text-[12px] text-muted-foreground">Thanks.</span>}
+            {rating && <span className="self-center text-label text-muted-foreground">Thanks.</span>}
           </div>
         </div>
 
         {/* Next date */}
         <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3">
           <div className="flex items-center gap-2">
-            <p className="text-sm text-cream">Next date</p>
-            <span className="ml-auto rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-cream/70">
+            <p className="text-body text-cream">Next date</p>
+            <span className="ml-auto rounded-full bg-white/[0.06] px-2 py-0.5 text-label font-semibold uppercase tracking-wide text-cream/70">
               Protect · {pill.label}
               {coach && coach.calls_remaining > 0
                 ? ` · Coach · ${coach.calls_remaining} call${coach.calls_remaining === 1 ? "" : "s"}`
                 : ""}
             </span>
           </div>
-          <p className="mt-1 text-[12px] text-muted-foreground">
+          <p className="mt-1 text-label text-muted-foreground">
             {pill.tone === "empty"
               ? "Your free Protect date is used. Protect comes with the Chaperoned Datepack."
               : "Turn it on from the room before your next date."}

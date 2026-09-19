@@ -279,7 +279,7 @@ export function GuacamolePanic() {
         <p
           key={b.id}
           className={[
-            "rounded-full px-4 py-1.5 text-xs font-semibold shadow-lg animate-fade-in",
+            "rounded-full px-4 py-1.5 text-label font-semibold shadow-lg animate-fade-in",
             b.tone === "bad" ? "bg-rose text-white" : "bg-emerald-500/90 text-white",
           ].join(" ")}
         >
@@ -305,7 +305,7 @@ export function GuacamolePanic() {
         ]}
       >
         {iReady ? (
-          <p className="text-sm text-muted-foreground animate-pulse">
+          <p className="text-body text-muted-foreground animate-pulse">
             waiting for {partnerName} to be ready…
           </p>
         ) : (
@@ -352,7 +352,7 @@ export function GuacamolePanic() {
     const capped = tryRoom && state.batches_played + 1 >= TRY_CAPS.guacamole_batches;
     return (
       <div className="flex h-full min-h-0 flex-col items-center gap-5 overflow-y-auto p-5 sm:p-6 text-center animate-fade-in">
-        <p className="font-serif text-2xl italic text-cream">{verdict}</p>
+        <p className="font-serif text-display italic text-cream">{verdict}</p>
         <div className="flex items-end justify-center gap-8">
           {[
             { label: "You", r: mine, pct: state.progress[senderId] ?? 0, cls: "text-primary" },
@@ -366,19 +366,19 @@ export function GuacamolePanic() {
                 </div>
                 {(side.r?.splats ?? 0) > 0 && <TrashHeap count={side.r?.splats ?? 0} />}
               </div>
-              <p className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${side.cls}`}>{side.label}</p>
-              <p className="font-serif text-xl text-cream">{side.r?.score ?? "—"}</p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className={`text-label font-semibold uppercase tracking-[0.18em] ${side.cls}`}>{side.label}</p>
+              <p className="text-title text-cream">{side.r?.score ?? "—"}</p>
+              <p className="text-label text-muted-foreground">
                 {side.r ? `${side.r.made} in the bowl · ${side.r.splats} on the floor` : "no result"}
               </p>
-              <p className="max-w-[9rem] text-xs italic leading-snug text-cream/85">{guacTaste(side.r)}</p>
+              <p className="max-w-[9rem] text-label italic leading-snug text-cream/85">{guacTaste(side.r)}</p>
             </div>
           ))}
         </div>
         {confessions.length > 0 && (
           <div className="flex flex-col gap-1">
             {confessions.map((c, i) => (
-              <p key={i} className="text-xs text-muted-foreground">{c}</p>
+              <p key={i} className="text-label text-muted-foreground">{c}</p>
             ))}
           </div>
         )}
@@ -434,7 +434,7 @@ export function GuacamolePanic() {
       </div>
 
       <div className="flex shrink-0 items-center justify-between">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Batch {state.batch + 1} · {secondsLeft}s
         </p>
         <div className="flex items-center gap-2">
@@ -442,7 +442,7 @@ export function GuacamolePanic() {
             <button
               type="button"
               onClick={() => emit("steal", { batch: state.batch })}
-              className="dr-guac-steal focus-ring rounded-full border border-amber-300/60 bg-amber-300/15 px-3 py-1 text-[11px] font-semibold text-amber-300"
+              className="dr-guac-steal focus-ring rounded-full border border-amber-300/60 bg-amber-300/15 px-3 py-1 text-label font-semibold text-amber-300"
             >
               Steal their lime 😈
             </button>
@@ -451,7 +451,7 @@ export function GuacamolePanic() {
             type="button"
             onClick={doPeek}
             disabled={!cooking || peeksLeft <= 0}
-            className="focus-ring rounded-full border border-white/20 px-3 py-1 text-[11px] text-cream disabled:opacity-40"
+            className="focus-ring rounded-full border border-white/20 px-3 py-1 text-label text-cream disabled:opacity-40"
           >
             👀 Peek ({peeksLeft})
           </button>
@@ -465,8 +465,8 @@ export function GuacamolePanic() {
           </p>
         ) : doneRef.current ? (
           <div className="flex flex-col items-center gap-2 text-center">
-            <p className="font-serif text-2xl italic text-cream">Hands up! 🥑</p>
-            <p className="text-sm text-muted-foreground">waiting for {partnerName}&apos;s bowl…</p>
+            <p className="font-serif text-display italic text-cream">Hands up! 🥑</p>
+            <p className="text-body text-muted-foreground">waiting for {partnerName}&apos;s bowl…</p>
             <Button
               onClick={() => emit("force_reveal", { batch: state.batch })}
               variant="outline"
@@ -480,7 +480,7 @@ export function GuacamolePanic() {
             {ingredient && (
               <div key={idx} ref={cardRef} className="dr-guac-card">
                 <span className="text-6xl" aria-hidden>{ingredient.emoji}</span>
-                <p className="font-serif text-lg text-cream">{ingredient.name}</p>
+                <p className="font-serif text-title text-cream">{ingredient.name}</p>
                 <div className="dr-guac-timer" aria-hidden>
                   <div
                     className="dr-guac-timer-fill"
@@ -494,16 +494,16 @@ export function GuacamolePanic() {
             {frozen && (
               <div className="dr-guac-freeze" aria-live="assertive">
                 <span className="text-4xl" aria-hidden>🧊</span>
-                <p className="text-sm font-semibold text-cream">Frozen!</p>
+                <p className="text-body font-semibold text-cream">Frozen!</p>
               </div>
             )}
             {peeking && otherId != null && (
               <div className="dr-guac-freeze" style={{ background: "rgb(0 0 0 / 0.75)" }}>
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{partnerName}&apos;s bowl</p>
+                <p className="text-label uppercase tracking-[0.2em] text-muted-foreground">{partnerName}&apos;s bowl</p>
                 <div className="dr-guac-bowl dr-guac-bowl--mini" aria-hidden>
                   <div className="dr-guac-fill" style={{ height: `${Math.round(theirPct * 100)}%` }} />
                 </div>
-                <p className="text-[11px] text-muted-foreground">your bowl waits while you snoop…</p>
+                <p className="text-label text-muted-foreground">your bowl waits while you snoop…</p>
               </div>
             )}
           </>
@@ -515,7 +515,7 @@ export function GuacamolePanic() {
           <div ref={bowlRef} className="dr-guac-bowl dr-guac-bowl--mini" aria-hidden>
             <div className="dr-guac-fill" style={{ height: `${Math.round(myPct * 100)}%` }} />
           </div>
-          <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">your bowl</p>
+          <p className="text-label uppercase tracking-[0.18em] text-muted-foreground">your bowl</p>
         </div>
         <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
           {GUAC_ACTIONS.map((a) => (
@@ -529,14 +529,14 @@ export function GuacamolePanic() {
                 flash && flash.action === a.id ? (flash.hit ? "dr-guac-btn--hit" : "dr-guac-btn--miss") : "",
               ].join(" ")}
             >
-              <span className="text-3xl" aria-hidden>{a.emoji}</span>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cream">{a.label}</span>
+              <span className="text-display" aria-hidden>{a.emoji}</span>
+              <span className="text-label font-semibold uppercase tracking-[0.16em] text-cream">{a.label}</span>
             </button>
           ))}
         </div>
         <div className="flex w-16 flex-col items-center gap-1">
-          <p className="font-serif text-2xl leading-none text-cream">{score}</p>
-          <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">pts</p>
+          <p className="font-serif text-display leading-none text-cream">{score}</p>
+          <p className="text-label uppercase tracking-[0.18em] text-muted-foreground">pts</p>
           <TrashHeap count={splats} />
         </div>
       </div>

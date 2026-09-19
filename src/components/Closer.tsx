@@ -144,24 +144,24 @@ export function Closer() {
                 stretchPick === v ? "border-primary bg-primary/10" : "border-white/15 hover:border-primary/50",
               ].join(" ")}
             >
-              <span className="font-serif text-2xl text-cream">{v}</span>
-              <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+              <span className="font-serif text-display text-cream">{v}</span>
+              <span className="text-label uppercase tracking-[0.16em] text-muted-foreground">
                 {v === 3 ? "a taste · 10 min" : v === 6 ? "a stretch · 25 min" : "a full set · the long one"}
               </span>
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 text-label text-muted-foreground">
           <span>Start at question</span>
           <button type="button" onClick={() => setStartAt((v) => Math.max(0, v - 1))} className="focus-ring h-7 w-7 rounded-full border border-white/15 text-cream">−</button>
-          <span className="w-6 text-center font-serif text-base text-cream tabular-nums">{startAt + 1}</span>
+          <span className="w-6 text-center text-body text-cream tabular-nums">{startAt + 1}</span>
           <button type="button" onClick={() => setStartAt((v) => Math.min(CL_TOTAL - 1, v + 1))} className="focus-ring h-7 w-7 rounded-full border border-white/15 text-cream">+</button>
           <span className="text-muted-foreground/70">(picked up from a past date)</span>
         </div>
         <Button onClick={() => emit("begin", { stretch: stretchPick, start_at: startAt })} className={accentBtn} style={accentStyle}>
           Begin at question {startAt + 1}
         </Button>
-        <p className="text-[10px] text-muted-foreground/70">After Aron et al. (1997).</p>
+        <p className="text-label text-muted-foreground/70">After Aron et al. (1997).</p>
       </GameLanding>
     );
   }
@@ -175,8 +175,8 @@ export function Closer() {
     return (
       <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
         <div className="flex shrink-0 flex-col items-center gap-1 text-center">
-          <p className="font-serif text-2xl italic text-cream">{state.banked ? "Banked" : "The whole thing"}</p>
-          <p className="max-w-sm text-xs text-muted-foreground">
+          <p className="font-serif text-display italic text-cream">{state.banked ? "Banked" : "The whole thing"}</p>
+          <p className="max-w-sm text-label text-muted-foreground">
             {state.banked
               ? `You stopped at question ${state.n + 1} on purpose. Set ${q.set}, ${CL_SET_NAMES[q.set]}, is where you pick up next date.`
               : state.did_eyes
@@ -187,13 +187,13 @@ export function Closer() {
 
         {state.keeps.length > 0 && (
           <div className="flex flex-col gap-2">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>What you kept</p>
+            <p className="text-label font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>What you kept</p>
             {state.keeps.map((k, i) => (
               <div key={i} className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-3">
-                <p className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{CL_QUESTIONS[k.q]?.q}</p>
-                <p className="mt-1 text-sm italic text-cream/90">
+                <p className="text-label uppercase tracking-[0.16em] text-muted-foreground">{CL_QUESTIONS[k.q]?.q}</p>
+                <p className="mt-1 text-body italic text-cream/90">
                   &ldquo;{k.note}&rdquo;
-                  <span className="ml-2 text-[10px] not-italic uppercase tracking-[0.16em] text-muted-foreground">
+                  <span className="ml-2 text-label not-italic uppercase tracking-[0.16em] text-muted-foreground">
                     kept by {k.by === senderId ? "you" : partnerName}
                   </span>
                 </p>
@@ -203,13 +203,13 @@ export function Closer() {
         )}
 
         <div className="flex flex-col gap-2">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>How you showed up</p>
-          <div className="grid grid-cols-2 gap-2 text-center text-xs">
+          <p className="text-label font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>How you showed up</p>
+          <div className="grid grid-cols-2 gap-2 text-center text-label">
             {[{ name: "You", e: mine }, theirs ? { name: partnerName, e: theirs } : null].map(
               (row) =>
                 row && (
                   <div key={row.name} className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-3">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{row.name}</p>
+                    <p className="text-label uppercase tracking-[0.2em] text-muted-foreground">{row.name}</p>
                     <p className="mt-1 text-cream/90">
                       {row.e.answered} answered · {row.e.half} half · {row.e.dodged} dodged
                     </p>
@@ -218,7 +218,7 @@ export function Closer() {
             )}
           </div>
           {dodged.length > 0 && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-label text-muted-foreground">
               Worth returning to: {dodged.map((r) => `"${CL_QUESTIONS[r.q]?.q}"`).join("  ")}
             </p>
           )}
@@ -239,13 +239,13 @@ export function Closer() {
       <div className="dr-stageroom dr-stageroom--dim flex h-full min-h-0 flex-col items-center justify-center gap-6 p-6 animate-fade-in">
         <div className="dr-stageroom-shade" aria-hidden />
         <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
-          <p className="font-serif text-2xl italic text-cream">Four minutes</p>
-          <p className="text-xs text-muted-foreground">No talking. Look at each other until the time runs out.</p>
+          <p className="font-serif text-display italic text-cream">Four minutes</p>
+          <p className="text-label text-muted-foreground">No talking. Look at each other until the time runs out.</p>
         </div>
         <div className="dr-breathe relative flex h-44 w-44 items-center justify-center rounded-full border border-white/15" aria-hidden>
           <span className="h-24 w-24 rounded-full" style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--room-accent) 35%, transparent), transparent 70%)" }} />
         </div>
-        <p className="relative font-serif text-3xl text-cream tabular-nums">{mmss(eyesLeft)}</p>
+        <p className="relative font-serif text-display text-cream tabular-nums">{mmss(eyesLeft)}</p>
         <Button onClick={() => emit("end_eyes")} variant="outline" className={quietBtn + " relative"}>
           End it early
         </Button>
@@ -260,8 +260,8 @@ export function Closer() {
     return (
       <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in">
         <div className="flex shrink-0 flex-col items-center gap-1 text-center">
-          <p className="font-serif text-xl italic text-cream">{iKept ? "Kept" : "Keep one"}</p>
-          <p className="max-w-sm text-xs text-muted-foreground">
+          <p className="text-title italic text-cream">{iKept ? "Kept" : "Keep one"}</p>
+          <p className="max-w-sm text-label text-muted-foreground">
             {iKept
               ? `waiting for ${partnerName} to keep one…`
               : `One answer of ${partnerName}'s from this stretch stays with you. Note what you heard.`}
@@ -276,7 +276,7 @@ export function Closer() {
                   type="button"
                   onClick={() => setKeepPick(qi)}
                   className={[
-                    "focus-ring rounded-2xl border p-3 text-left text-sm transition",
+                    "focus-ring rounded-2xl border p-3 text-left text-body transition",
                     keepPick === qi ? "border-primary bg-primary/10 text-cream" : "border-white/[0.10] text-cream/85 hover:border-primary/50",
                   ].join(" ")}
                 >
@@ -292,7 +292,7 @@ export function Closer() {
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder={`What ${partnerName} said, as you heard it…`}
-                  className="w-full rounded-2xl border border-white/15 bg-secondary/60 p-3 text-sm text-cream outline-none focus:border-primary/50"
+                  className="w-full rounded-2xl border border-white/15 bg-secondary/60 p-3 text-body text-cream outline-none focus:border-primary/50"
                 />
                 <div className="flex justify-center">
                   <Button
@@ -319,17 +319,17 @@ export function Closer() {
     const next = CL_QUESTIONS[Math.min(state.n + 1, CL_TOTAL - 1)];
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center gap-4 overflow-y-auto p-5 sm:p-6 animate-fade-in text-center">
-        <p className="font-serif text-xl italic text-cream">
+        <p className="text-title italic text-cream">
           {atEnd ? "That's all thirty-six" : `Stop here, or ${state.stretch} more`}
         </p>
-        <p className="max-w-sm text-xs text-muted-foreground">
+        <p className="max-w-sm text-label text-muted-foreground">
           {state.n + 1} of {CL_TOTAL} asked · {state.keeps.length} kept.{" "}
           {atEnd
             ? "There's one thing left, and it isn't a question."
             : `This is a real stopping point. Next up: set ${next.set}, ${CL_SET_NAMES[next.set]}.${next.set === 3 && q.set !== 3 ? " Set three goes to heavy places; go there on purpose." : ""}`}
         </p>
         {state.keeps.slice(-2).map((k, i) => (
-          <p key={i} className="max-w-sm text-xs italic text-cream/80">
+          <p key={i} className="max-w-sm text-label italic text-cream/80">
             &ldquo;{k.note}&rdquo; <span className="not-italic text-muted-foreground">· kept by {k.by === senderId ? "you" : partnerName}</span>
           </p>
         ))}
@@ -355,7 +355,7 @@ export function Closer() {
           <button
             type="button"
             onClick={() => emit("start_eyes", { at: new Date().toISOString() })}
-            className="text-xs text-muted-foreground underline hover:text-cream"
+            className="text-label text-muted-foreground underline hover:text-cream"
           >
             Skip to the four minutes of silence
           </button>
@@ -374,13 +374,13 @@ export function Closer() {
       <div className="dr-stageroom-shade" aria-hidden />
 
       <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Question {state.n + 1} of {CL_TOTAL} · <span className={SET_TONE[q.set]}>Set {q.set} · {CL_SET_NAMES[q.set]}</span>
         </p>
-        <p className="font-serif text-xl italic text-cream">
+        <p className="text-title italic text-cream">
           {state.sub === "ruling" ? `${answererName === "you" ? "Your" : `${partnerName}'s`} answer, ${answererName === "you" ? `${partnerName} rules` : "your call"}` : iAnswer ? "Your turn to answer" : `${partnerName} answers`}
         </p>
-        <p aria-live="polite" className="min-h-[1rem] text-xs text-muted-foreground">
+        <p aria-live="polite" className="min-h-[1rem] text-label text-muted-foreground">
           {state.sub === "ruling"
             ? answererName === "you"
               ? "Noticing, not scoring."
@@ -410,20 +410,20 @@ export function Closer() {
         <div className="dr-beam" aria-hidden />
         <blockquote key={state.n} className={["dr-plaque w-full max-w-md text-left", typed.complete ? "dr-plaque--settled" : ""].join(" ")}>
           <span className="dr-plaque-glyph" aria-hidden>{state.n + 1}</span>
-          <p className="font-serif text-lg sm:text-xl italic leading-snug text-cream">
+          <p className="text-title italic leading-snug text-cream">
             {typed.shown}
             {!typed.complete && <span className="dr-caret" aria-hidden />}
           </p>
         </blockquote>
 
         <div className="flex items-center gap-3">
-          <span className={["rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em]", iAnswer || (state.sub === "ruling" && state.answerer_id === senderId) ? "border-primary text-primary" : "border-white/15 text-muted-foreground"].join(" ")}>
+          <span className={["rounded-full border px-3 py-1 text-label uppercase tracking-[0.18em]", iAnswer || (state.sub === "ruling" && state.answerer_id === senderId) ? "border-primary text-primary" : "border-white/15 text-muted-foreground"].join(" ")}>
             You
           </span>
-          <span className={["font-serif text-xl tabular-nums", clock < 0 ? "text-amber-300" : "text-cream"].join(" ")}>
+          <span className={["text-title tabular-nums", clock < 0 ? "text-amber-300" : "text-cream"].join(" ")}>
             {clock < 0 ? `+${mmss(-clock)} over` : mmss(clock)}
           </span>
-          <span className={["rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em]", !iAnswer && state.sub === "answering" ? "border-rose text-rose" : state.sub === "ruling" && state.answerer_id !== senderId ? "border-rose text-rose" : "border-white/15 text-muted-foreground"].join(" ")}>
+          <span className={["rounded-full border px-3 py-1 text-label uppercase tracking-[0.18em]", !iAnswer && state.sub === "answering" ? "border-rose text-rose" : state.sub === "ruling" && state.answerer_id !== senderId ? "border-rose text-rose" : "border-white/15 text-muted-foreground"].join(" ")}>
             {partnerName}
           </span>
         </div>
@@ -460,10 +460,10 @@ export function Closer() {
         )}
 
         {state.sub === "ruling" && state.answerer_id === senderId && (
-          <p className="text-sm text-muted-foreground animate-pulse">{partnerName} is ruling it…</p>
+          <p className="text-body text-muted-foreground animate-pulse">{partnerName} is ruling it…</p>
         )}
         {state.sub === "answering" && !iAnswer && (
-          <p className="text-sm text-muted-foreground animate-pulse">listening…</p>
+          <p className="text-body text-muted-foreground animate-pulse">listening…</p>
         )}
       </div>
     </div>

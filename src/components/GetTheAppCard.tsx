@@ -22,15 +22,15 @@ export function GetTheAppCard({ className }: { className?: string }) {
       rel="noreferrer noopener"
       className={cn("editorial-card hover-lift focus-ring block p-5 text-left", className)}
     >
-      <p className="flex items-center gap-2 font-serif text-lg text-cream">
+      <p className="flex items-center gap-2 text-title text-cream">
         <Smartphone className="h-4 w-4 text-primary" />
         Better on your phone
       </p>
-      <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+      <p className="mt-1.5 text-label leading-relaxed text-muted-foreground">
         The app plays video, music and games natively, without the browser getting in the
         way. Same rooms, same six-digit codes.
       </p>
-      <p className="mt-2 text-[10px] uppercase tracking-[0.2em] text-primary">
+      <p className="mt-2 text-label uppercase tracking-[0.2em] text-primary">
         Get it on {storeNameFor(platform)}
       </p>
     </a>

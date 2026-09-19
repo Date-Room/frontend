@@ -17,14 +17,14 @@ export function GameStageHeader({
 }) {
   return (
     <div className="dr-game-header relative flex shrink-0 flex-col items-center gap-1 text-center">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{kicker}</p>
-      <p key={titleKey ?? title} className="dr-game-header__title font-serif text-xl italic text-cream">
+      <p className="text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">{kicker}</p>
+      <p key={titleKey ?? title} className="dr-game-header__title text-title italic text-cream">
         {title}
       </p>
       <p
         key={statusKey ?? status}
         aria-live="polite"
-        className="dr-game-header__status min-h-[1rem] max-w-sm text-xs text-muted-foreground"
+        className="dr-game-header__status min-h-[1rem] max-w-sm text-label text-muted-foreground"
       >
         {status}
       </p>

@@ -77,8 +77,8 @@ export function RankIt() {
   if (rankItIsFinished(state)) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center animate-fade-in">
-        <p className="font-serif text-2xl italic text-cream">{RANK_ROUNDS.length} rounds of priorities</p>
-        <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
+        <p className="font-serif text-display italic text-cream">{RANK_ROUNDS.length} rounds of priorities</p>
+        <p className="max-w-xs text-body leading-relaxed text-muted-foreground">
           You&apos;ve each seen what the other puts first. That&apos;s more than most first dates manage.
         </p>
         <Button onClick={() => emit("restart")} className={accentBtn} style={accentStyle}>
@@ -112,13 +112,13 @@ export function RankIt() {
   return (
     <GameStage gameId="rank_it" dimmed={dimmed && !onBoard}>
       <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Round {state.round + 1} of {RANK_ROUNDS.length} · {round.title}
         </p>
-        <p className="font-serif text-xl italic text-cream">
+        <p className="text-title italic text-cream">
           {!revealing ? round.prompt : onBoard ? "Side by side" : chapter === "theirs" ? `${partnerName}'s order` : chapter === "clash" ? "Furthest apart" : chapter === "agree" ? "Closest agreement" : "The order is set"}
         </p>
-        <p key={status} className="text-xs text-muted-foreground animate-fade-in">{status}</p>
+        <p key={status} className="text-label text-muted-foreground animate-fade-in">{status}</p>
       </div>
 
       {!revealing && (
@@ -257,7 +257,7 @@ function OrderPhase({
             ].join(" ")}
             style={dragItem === item ? { transform: `translateY(${dragDy}px)` } : undefined}
           >
-            <span className="w-6 text-center font-serif text-lg text-primary tabular-nums">{pos + 1}</span>
+            <span className="w-6 text-center text-title text-primary tabular-nums">{pos + 1}</span>
             <button
               type="button"
               onPointerDown={(e) => onPointerDown(e, item)}
@@ -266,8 +266,8 @@ function OrderPhase({
             >
               <GripVertical className="h-4 w-4" />
             </button>
-            <span className="text-xl" aria-hidden>{round.items[item].emoji}</span>
-            <span className="flex-1 text-sm text-cream">{round.items[item].label}</span>
+            <span className="text-title" aria-hidden>{round.items[item].emoji}</span>
+            <span className="flex-1 text-body text-cream">{round.items[item].label}</span>
             {!submitted && (
               <span className="flex gap-1">
                 <button
@@ -295,13 +295,13 @@ function OrderPhase({
       </ol>
       <div className="min-h-[3.5rem] flex flex-col items-center justify-center gap-1.5">
         {submitted ? (
-          <p className="text-sm text-muted-foreground animate-pulse">waiting for their ranking…</p>
+          <p className="text-body text-muted-foreground animate-pulse">waiting for their ranking…</p>
         ) : (
           <>
             <Button onClick={() => onLock(order)} className={accentBtn} style={accentStyle}>
               Lock it in
             </Button>
-            <p className="text-[11px] text-muted-foreground">{partnerName} can&apos;t see it until you both lock.</p>
+            <p className="text-label text-muted-foreground">{partnerName} can&apos;t see it until you both lock.</p>
           </>
         )}
       </div>
@@ -354,12 +354,12 @@ function ChapterView({
                 "border-white/[0.10] bg-white/[0.03]",
               ].join(" ")}
             >
-              <span className="w-6 text-center font-serif text-lg text-rose tabular-nums">{pos + 1}</span>
-              <span className="text-xl" aria-hidden>{round.items[item].emoji}</span>
-              <span className="flex-1 text-sm text-cream">{round.items[item].label}</span>
+              <span className="w-6 text-center text-title text-rose tabular-nums">{pos + 1}</span>
+              <span className="text-title" aria-hidden>{round.items[item].emoji}</span>
+              <span className="flex-1 text-body text-cream">{round.items[item].label}</span>
               <span
                 className={[
-                  "px-2 py-0.5 rounded-full border text-[10px] uppercase tracking-[0.18em]",
+                  "px-2 py-0.5 rounded-full border text-label uppercase tracking-[0.18em]",
                   agreed
                     ? "border-emerald-400/50 text-emerald-300"
                     : "border-white/15 text-muted-foreground",
@@ -395,7 +395,7 @@ function ChapterView({
             ].join(" ")}
             style={hot ? { borderColor: "color-mix(in srgb, var(--room-accent) 55%, transparent)", background: "color-mix(in srgb, var(--room-accent) 8%, transparent)" } : undefined}
           >
-            <p className="font-serif text-lg italic text-cream">
+            <p className="text-title italic text-cream">
               <span aria-hidden>{round.items[item].emoji}</span> {round.items[item].label}
             </p>
             <div className="mt-3 flex items-center justify-center gap-3">
@@ -403,7 +403,7 @@ function ChapterView({
               <span className="h-px w-10 bg-white/20" aria-hidden />
               <Medallion label={partnerName} rank={theirRank} kind="them" />
             </div>
-            <p className={["mt-3 text-xs", hot ? "text-cream/80" : "text-emerald-300"].join(" ")}>
+            <p className={["mt-3 text-label", hot ? "text-cream/80" : "text-emerald-300"].join(" ")}>
               {gap === 0 ? "Same place · no argument here" : `${gap} place${gap > 1 ? "s" : ""} apart`}
             </p>
           </div>
@@ -415,10 +415,10 @@ function ChapterView({
 
 function Medallion({ label, rank, kind }: { label: string; rank: number; kind: "you" | "them" }) {
   return (
-    <span className="flex flex-col items-center gap-1 text-[9px] uppercase tracking-[0.2em] text-muted-foreground">
+    <span className="flex flex-col items-center gap-1 text-label uppercase tracking-[0.2em] text-muted-foreground">
       <span
         className={[
-          "grid h-9 w-9 place-items-center rounded-full font-serif text-base",
+          "grid h-9 w-9 place-items-center rounded-full text-body",
           kind === "you" ? "text-primary-foreground" : "border-2 border-rose text-rose",
         ].join(" ")}
         style={kind === "you" ? { backgroundColor: "var(--room-accent)" } : undefined}
@@ -459,7 +459,7 @@ function FlipBoard({
 
   const pill = (active: boolean) =>
     [
-      "rounded-full px-4 py-1.5 text-xs uppercase tracking-[0.15em] border transition",
+      "rounded-full px-4 py-1.5 text-label uppercase tracking-[0.15em] border transition",
       active ? "text-primary-foreground border-transparent" : "border-white/20 text-muted-foreground hover:text-cream",
     ].join(" ");
 
@@ -497,15 +497,15 @@ function FlipBoard({
                   : {}),
               }}
             >
-              <span className="text-lg" aria-hidden>{item.emoji}</span>
-              <span className="flex-1 truncate text-sm text-cream">{item.label}</span>
-              <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground min-w-[3.8rem] text-right">
+              <span className="text-title" aria-hidden>{item.emoji}</span>
+              <span className="flex-1 truncate text-body text-cream">{item.label}</span>
+              <span className="text-label uppercase tracking-[0.15em] text-muted-foreground min-w-[3.8rem] text-right">
                 {gap === 0 ? "same spot" : `${gap} apart`}
               </span>
-              <span className="grid h-8 w-8 place-items-center rounded-full font-serif text-sm text-primary-foreground" style={{ backgroundColor: "var(--room-accent)" }} aria-label={`You ranked ${item.label} number ${myRank}`}>
+              <span className="grid h-8 w-8 place-items-center rounded-full text-body text-primary-foreground" style={{ backgroundColor: "var(--room-accent)" }} aria-label={`You ranked ${item.label} number ${myRank}`}>
                 {myRank}
               </span>
-              <span className="grid h-8 w-8 place-items-center rounded-full border-2 border-rose font-serif text-sm text-rose" aria-label={`${partnerName} ranked ${item.label} number ${theirRank}`}>
+              <span className="grid h-8 w-8 place-items-center rounded-full border-2 border-rose text-body text-rose" aria-label={`${partnerName} ranked ${item.label} number ${theirRank}`}>
                 {theirRank}
               </span>
             </div>
@@ -514,7 +514,7 @@ function FlipBoard({
       </div>
 
       <div className="flex flex-col items-center gap-3 text-center">
-        <p className="max-w-sm text-sm leading-relaxed text-cream/85">
+        <p className="max-w-sm text-body leading-relaxed text-cream/85">
           {identical ? (
             <>Identical rankings. Either soulmates or someone&apos;s copying. 👀</>
           ) : (

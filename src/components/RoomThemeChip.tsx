@@ -35,15 +35,15 @@ export function RoomThemeChip({
         className,
       )}
     >
-      <span className={cn("leading-none", compact ? "text-sm" : "text-base")} aria-hidden>
+      <span className={cn("leading-none", compact ? "text-body" : "text-body")} aria-hidden>
         {meta.emoji}
       </span>
       <span className="min-w-0">
-        <span className="block text-[9px] font-bold uppercase tracking-[0.16em] text-primary/85">
+        <span className="block text-label font-bold uppercase tracking-[0.16em] text-primary/85">
           Theme
         </span>
         {!compact && (
-          <span className="block max-w-[7rem] truncate text-xs font-semibold text-cream sm:max-w-[9rem]">
+          <span className="block max-w-[7rem] truncate text-label font-semibold text-cream sm:max-w-[9rem]">
             {meta.label}
           </span>
         )}

@@ -125,8 +125,8 @@ export function ThisOrThat() {
     return (
       <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in">
         <div className="flex shrink-0 flex-col items-center gap-1 text-center">
-          <p className="font-serif text-2xl italic text-cream">How you two line up</p>
-          <p className="max-w-sm text-xs text-muted-foreground">
+          <p className="font-serif text-display italic text-cream">How you two line up</p>
+          <p className="max-w-sm text-label text-muted-foreground">
             {state.same_count >= 4
               ? "You want almost the same life. Check the one you didn't."
               : state.same_count <= 1
@@ -151,22 +151,22 @@ export function ThisOrThat() {
                 ].join(" ")}
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="flex-1 text-sm text-cream/90">
-                    {p.a.label} <span className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">or</span> {p.b.label}
+                  <span className="flex-1 text-body text-cream/90">
+                    {p.a.label} <span className="text-label uppercase tracking-[0.2em] text-muted-foreground">or</span> {p.b.label}
                   </span>
-                  <span className="rounded-full border border-primary/50 px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] text-primary">
+                  <span className="rounded-full border border-primary/50 px-2 py-0.5 text-label uppercase tracking-[0.16em] text-primary">
                     you · {sideLabel(mine)?.emoji}
                   </span>
-                  <span className="rounded-full border border-rose/50 px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] text-rose">
+                  <span className="rounded-full border border-rose/50 px-2 py-0.5 text-label uppercase tracking-[0.16em] text-rose">
                     {partnerName} · {sideLabel(theirs)?.emoji}
                   </span>
                 </div>
-                {!same && <p className="mt-1.5 text-xs text-muted-foreground">{p.split}</p>}
+                {!same && <p className="mt-1.5 text-label text-muted-foreground">{p.split}</p>}
               </div>
             );
           })}
         </div>
-        <div className="flex flex-col items-center gap-1 text-center text-xs text-muted-foreground">
+        <div className="flex flex-col items-center gap-1 text-center text-label text-muted-foreground">
           {mySlow.ms > 800 && (
             <p>
               You hesitated longest on {set[mySlow.i].a.label} or {set[mySlow.i].b.label} · {(mySlow.ms / 1000).toFixed(1)}s. The pause said something.
@@ -297,12 +297,12 @@ export function ThisOrThat() {
             className={["dr-ring", clock <= 3 ? "dr-ring--urgent" : ""].join(" ")}
             style={{ ["--p" as string]: clock / TOT_CLOCK_SECONDS }}
           >
-            <span className="font-serif tabular-nums">{clock}</span>
+            <span className="tabular-nums">{clock}</span>
           </div>
         )}
         {settled && (
           <div className="flex flex-col items-center gap-2 animate-fade-in">
-            <p className={["text-xs", theyReadMe ? "text-rose" : "text-muted-foreground"].join(" ")}>
+            <p className={["text-label", theyReadMe ? "text-rose" : "text-muted-foreground"].join(" ")}>
               {theyReadMe ? `👀 ${partnerName} read you too.` : `${partnerName} thought you'd go the other way.`}
             </p>
             {scoreboard}

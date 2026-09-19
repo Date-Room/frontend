@@ -186,8 +186,8 @@ export function ActivityLobby({
     return (
       <div className="dr-lobby-compact relative flex h-full min-h-0 flex-col gap-2 overflow-hidden p-3 sm:gap-2.5 sm:p-4 animate-fade-in">
         <div className="flex shrink-0 items-baseline justify-between gap-3">
-          <p className="font-serif text-lg italic text-cream sm:text-xl">Your room</p>
-          <p className="hidden truncate text-[10px] text-muted-foreground sm:block sm:max-w-[50%] sm:text-right">
+          <p className="text-title italic text-cream">Your room</p>
+          <p className="hidden truncate text-label text-muted-foreground sm:block sm:max-w-[50%] sm:text-right">
             The walls stay up between dates. The shelf below is for tonight.
           </p>
         </div>
@@ -213,7 +213,7 @@ export function ActivityLobby({
           })}
         </ul>
 
-        <p className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+        <p className="shrink-0 text-label font-semibold uppercase tracking-[0.22em] text-muted-foreground">
           Tonight
         </p>
 
@@ -238,11 +238,11 @@ export function ActivityLobby({
         {openCard && (openCard.id === "games" || openCard.id === "talk") && (
           <div className="absolute inset-0 z-20 flex flex-col bg-[#0e0b09]/96 p-3 backdrop-blur-md animate-fade-in sm:p-4">
             <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
-              <p className="font-serif text-base italic text-cream">{openCard.name}</p>
+              <p className="text-body italic text-cream">{openCard.name}</p>
               <button
                 type="button"
                 onClick={() => setOpen(null)}
-                className="focus-ring rounded-full border border-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground transition hover:text-cream"
+                className="focus-ring rounded-full border border-white/10 px-3 py-1 text-label uppercase tracking-[0.16em] text-muted-foreground transition hover:text-cream"
               >
                 Close
               </button>
@@ -255,10 +255,10 @@ export function ActivityLobby({
                     onClick={() => start(p.id)}
                     className="focus-ring flex w-full flex-col gap-0.5 rounded-xl border border-white/[0.12] p-2.5 text-left transition hover:border-primary/50 hover:bg-white/[0.04]"
                   >
-                    <span className="text-sm text-cream">{p.name}</span>
-                    <span className="text-[11px] leading-snug text-muted-foreground">{p.line}</span>
+                    <span className="text-body text-cream">{p.name}</span>
+                    <span className="text-label leading-snug text-muted-foreground">{p.line}</span>
                     <span
-                      className="mt-0.5 text-[9px] uppercase tracking-[0.16em]"
+                      className="mt-0.5 text-label uppercase tracking-[0.16em]"
                       style={{ color: "var(--room-accent)" }}
                     >
                       {p.minutes ? `${p.minutes} · ` : ""}Start →
@@ -277,10 +277,10 @@ export function ActivityLobby({
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-4 pb-8 sm:gap-4 sm:p-5 sm:pb-10 lg:p-6 lg:pb-12 animate-fade-in">
       <div className="flex shrink-0 flex-col gap-1 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div className="min-w-0">
-          <p className="font-serif text-2xl italic text-cream lg:text-3xl">
+          <p className="font-serif text-display italic text-cream">
             {showWalls ? "Your room" : "What are we doing tonight?"}
           </p>
-          <p className="mt-1 max-w-2xl text-xs text-muted-foreground sm:text-sm">
+          <p className="mt-1 max-w-2xl text-label text-muted-foreground">
             {showWalls
               ? "The walls stay up between dates. The shelf below is for tonight."
               : "Nothing is loaded until one of you picks. Either of you can start anything."}
@@ -320,13 +320,13 @@ export function ActivityLobby({
                     </span>
                   </span>
                   <span className="flex min-h-[7.5rem] flex-1 flex-col gap-1.5 p-3.5 sm:p-4">
-                    <span className="font-serif text-base text-cream sm:text-lg">{t.label}</span>
+                    <span className="text-body text-cream">{t.label}</span>
                     {meta && (
-                      <span className="line-clamp-2 text-xs leading-snug text-cream/75 sm:text-[13px]">
+                      <span className="line-clamp-2 text-label leading-snug text-cream/75">
                         {meta.blurb}
                       </span>
                     )}
-                    <span className="mt-auto pt-1 text-[9px] uppercase tracking-[0.18em]" style={{ color: "var(--room-accent)" }}>
+                    <span className="mt-auto pt-1 text-label uppercase tracking-[0.18em]" style={{ color: "var(--room-accent)" }}>
                       Open →
                     </span>
                   </span>
@@ -338,7 +338,7 @@ export function ActivityLobby({
       )}
 
       {showWalls && (
-        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+        <p className="text-label font-semibold uppercase tracking-[0.24em] text-muted-foreground">
           Tonight
         </p>
       )}
@@ -383,7 +383,7 @@ export function ActivityLobby({
                       {c.glyph}
                     </span>
                     <span
-                      className="absolute left-2.5 top-2.5 z-10 rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] backdrop-blur-sm"
+                      className="absolute left-2.5 top-2.5 z-10 rounded-full border px-2 py-0.5 text-label uppercase tracking-[0.16em] backdrop-blur-sm"
                       style={{
                         color: "var(--room-accent)",
                         borderColor: "color-mix(in srgb, var(--room-accent) 40%, transparent)",
@@ -393,15 +393,15 @@ export function ActivityLobby({
                       {c.tag}
                     </span>
                     {c.soon && (
-                      <span className="absolute right-2.5 top-2.5 z-10 rounded-full border border-white/20 bg-black/40 px-2 py-0.5 text-[9px] uppercase tracking-[0.16em] text-muted-foreground backdrop-blur-sm">
+                      <span className="absolute right-2.5 top-2.5 z-10 rounded-full border border-white/20 bg-black/40 px-2 py-0.5 text-label uppercase tracking-[0.16em] text-muted-foreground backdrop-blur-sm">
                         Soon
                       </span>
                     )}
                   </span>
                   <span className="flex min-h-[7.5rem] flex-1 flex-col gap-1 p-3.5 sm:p-4">
-                    <span className="font-serif text-base text-cream sm:text-lg">{c.name}</span>
-                    <span className="line-clamp-2 text-xs leading-relaxed text-cream/75 sm:text-[13px]">{c.blurb}</span>
-                    <span className="mt-auto flex items-center gap-1.5 pt-1 text-[9px] uppercase tracking-[0.18em] text-muted-foreground">
+                    <span className="text-body text-cream">{c.name}</span>
+                    <span className="line-clamp-2 text-label leading-relaxed text-cream/75">{c.blurb}</span>
+                    <span className="mt-auto flex items-center gap-1.5 pt-1 text-label uppercase tracking-[0.18em] text-muted-foreground">
                       <Clock className="h-3 w-3 shrink-0" aria-hidden />
                       <span className="truncate">{c.minutes}</span>
                       <span className="ml-auto shrink-0" style={{ color: "var(--room-accent)" }}>
@@ -413,7 +413,7 @@ export function ActivityLobby({
 
                 {isOpen && (
                   <div className="border-t border-white/[0.08] p-3.5 animate-fade-in">
-                    <p className="text-xs leading-relaxed text-cream/80">{c.detail}</p>
+                    <p className="text-label leading-relaxed text-cream/80">{c.detail}</p>
 
                     {(c.id === "games" || c.id === "talk") && (
                       <ul className="mt-3 grid list-none grid-cols-1 gap-2 p-0 sm:grid-cols-2 lg:grid-cols-3">
@@ -424,10 +424,10 @@ export function ActivityLobby({
                               onClick={() => start(p.id)}
                               className="focus-ring flex w-full flex-col gap-0.5 rounded-xl border border-white/[0.12] p-3 text-left transition hover:-translate-y-0.5 hover:border-primary/50 hover:bg-white/[0.04]"
                             >
-                              <span className="text-sm text-cream">{p.name}</span>
-                              <span className="text-[11px] leading-snug text-muted-foreground">{p.line}</span>
+                              <span className="text-body text-cream">{p.name}</span>
+                              <span className="text-label leading-snug text-muted-foreground">{p.line}</span>
                               <span
-                                className="mt-0.5 text-[9px] uppercase tracking-[0.16em]"
+                                className="mt-0.5 text-label uppercase tracking-[0.16em]"
                                 style={{ color: "var(--room-accent)" }}
                               >
                                 {p.minutes ? `${p.minutes} · ` : ""}Start →
@@ -442,7 +442,7 @@ export function ActivityLobby({
                       <button
                         type="button"
                         onClick={() => start(c.id)}
-                        className="focus-ring mt-3 rounded-full px-5 py-2 text-sm text-primary-foreground transition hover:opacity-90"
+                        className="focus-ring mt-3 rounded-full px-5 py-2 text-body text-primary-foreground transition hover:opacity-90"
                         style={{ backgroundColor: "var(--room-accent)" }}
                       >
                         Open it →
@@ -453,7 +453,7 @@ export function ActivityLobby({
                       <button
                         type="button"
                         onClick={openChaperonSetup}
-                        className="focus-ring mt-3 rounded-full px-5 py-2 text-sm text-primary-foreground transition hover:opacity-90"
+                        className="focus-ring mt-3 rounded-full px-5 py-2 text-body text-primary-foreground transition hover:opacity-90"
                         style={{ backgroundColor: "var(--room-accent)" }}
                       >
                         Open the chaperon setup →
@@ -468,19 +468,19 @@ export function ActivityLobby({
                             window.dispatchEvent(new CustomEvent("dr:booth:capture"));
                             setOpen(null);
                           }}
-                          className="focus-ring rounded-full px-5 py-2 text-sm text-primary-foreground transition hover:opacity-90"
+                          className="focus-ring rounded-full px-5 py-2 text-body text-primary-foreground transition hover:opacity-90"
                           style={{ backgroundColor: "var(--room-accent)" }}
                         >
                           Take the shot →
                         </button>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-label text-muted-foreground">
                           The call needs to be running — the countdown lands on both screens.
                         </p>
                       </div>
                     )}
 
                     {c.soon && (
-                      <p className="mt-3 text-[11px] text-muted-foreground">Not built yet. It has a shelf waiting.</p>
+                      <p className="mt-3 text-label text-muted-foreground">Not built yet. It has a shelf waiting.</p>
                     )}
                   </div>
                 )}
@@ -497,7 +497,7 @@ export function ActivityLobby({
               key={t.id}
               type="button"
               onClick={() => start(t.id)}
-              className="focus-ring flex items-center gap-2 rounded-full border border-white/[0.12] px-3.5 py-2 text-xs text-cream transition hover:border-primary/50"
+              className="focus-ring flex items-center gap-2 rounded-full border border-white/[0.12] px-3.5 py-2 text-label text-cream transition hover:border-primary/50"
             >
               <span aria-hidden>{t.icon}</span> {t.label}
             </button>
@@ -505,7 +505,7 @@ export function ActivityLobby({
         </div>
       )}
 
-      <p className="pb-2 text-center text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70">
+      <p className="pb-2 text-center text-label uppercase tracking-[0.2em] text-muted-foreground/70">
         Whatever you start, there is always a way back to this shelf.
       </p>
     </div>
@@ -542,11 +542,11 @@ function CompactShelfTile({
           className="absolute inset-0 bg-gradient-to-t from-[#080604]/95 via-[#080604]/35 to-transparent"
           aria-hidden
         />
-        <span className="dr-shelf-glyph absolute right-2 top-1/2 z-10 -translate-y-1/2 text-2xl opacity-80 sm:text-3xl" aria-hidden>
+        <span className="dr-shelf-glyph absolute right-2 top-1/2 z-10 -translate-y-1/2 text-display opacity-80" aria-hidden>
           {glyph}
         </span>
         <span
-          className="absolute left-2 top-2 z-10 rounded-full border px-1.5 py-0.5 text-[8px] uppercase tracking-[0.14em] backdrop-blur-sm"
+          className="absolute left-2 top-2 z-10 rounded-full border px-1.5 py-0.5 text-label uppercase tracking-[0.14em] backdrop-blur-sm"
           style={{
             color: "var(--room-accent)",
             borderColor: "color-mix(in srgb, var(--room-accent) 40%, transparent)",
@@ -556,7 +556,7 @@ function CompactShelfTile({
           {tag}
         </span>
         <span className="absolute bottom-0 left-0 right-0 z-10 p-2 sm:p-2.5">
-          <span className="block truncate font-serif text-[13px] leading-tight text-cream sm:text-sm">{title}</span>
+          <span className="block truncate text-body leading-tight text-cream">{title}</span>
         </span>
       </span>
     </button>

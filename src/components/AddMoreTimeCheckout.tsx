@@ -84,7 +84,7 @@ export function AddMoreTimeCheckout({
 
   if (!canPay) {
     return (
-      <p className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-muted-foreground">
+      <p className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-body text-muted-foreground">
         Sign in to add more time to this session.
       </p>
     );
@@ -93,7 +93,7 @@ export function AddMoreTimeCheckout({
   return (
     <div className="space-y-4">
       {loadError && (
-        <div className="rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 text-xs leading-relaxed text-amber/90">
+        <div className="rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 text-label leading-relaxed text-amber/90">
           <p>{loadError}</p>
           <button
             type="button"
@@ -106,13 +106,13 @@ export function AddMoreTimeCheckout({
       )}
 
       {config.dev_checkout_enabled && (
-        <p className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2.5 text-xs leading-relaxed text-emerald-100/90">
+        <p className="rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2.5 text-label leading-relaxed text-emerald-100/90">
           Dev checkout — purchases apply instantly without Stripe or M-Pesa.
         </p>
       )}
 
       {blocked && !isStore && (
-        <p className="rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 text-xs leading-relaxed text-amber/90">
+        <p className="rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 text-label leading-relaxed text-amber/90">
           {blocked}
         </p>
       )}
@@ -131,10 +131,10 @@ export function AddMoreTimeCheckout({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-cream">{product.label}</p>
-                <p className="text-xs text-muted-foreground">{price}</p>
+                <p className="text-label text-muted-foreground">{price}</p>
               </div>
               {isStore ? (
-                <span className="shrink-0 rounded-full border border-white/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                <span className="shrink-0 rounded-full border border-white/10 px-3 py-2 text-label font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                   In app
                 </span>
               ) : (
@@ -148,7 +148,7 @@ export function AddMoreTimeCheckout({
                   }
                   onClick={() => void handleBuy(product)}
                   className={cn(
-                    "shrink-0 rounded-full border border-primary/35 bg-primary/15 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-primary transition hover:bg-primary/25 disabled:opacity-50",
+                    "shrink-0 rounded-full border border-primary/35 bg-primary/15 px-3 py-2 text-label font-bold uppercase tracking-[0.12em] text-primary transition hover:bg-primary/25 disabled:opacity-50",
                   )}
                 >
                   {busy ? (
@@ -171,7 +171,7 @@ export function AddMoreTimeCheckout({
         <div className="space-y-2">
           <label
             htmlFor="time-mpesa-phone"
-            className="block text-[11px] uppercase tracking-[0.22em] text-muted-foreground"
+            className="block text-label uppercase tracking-[0.22em] text-muted-foreground"
           >
             M-Pesa number
           </label>
@@ -188,10 +188,10 @@ export function AddMoreTimeCheckout({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="07XX XXX XXX"
-              className="w-full rounded-xl border border-white/[0.08] bg-black/25 py-3.5 pl-10 pr-4 text-sm text-cream placeholder:text-muted-foreground/45 focus:border-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/35"
+              className="w-full rounded-xl border border-white/[0.08] bg-black/25 py-3.5 pl-10 pr-4 text-body text-cream placeholder:text-muted-foreground/45 focus:border-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/35"
             />
           </div>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
+          <p className="text-label leading-relaxed text-muted-foreground">
             Tap Add on a duration — you&apos;ll get an STK prompt on this phone via{" "}
             {paymentRailLabel(config.payment_provider)}.
           </p>
@@ -199,14 +199,14 @@ export function AddMoreTimeCheckout({
       )}
 
       {!isStore && !isMpesa && !blocked && (
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
+        <p className="text-label leading-relaxed text-muted-foreground">
           Tap Add — you&apos;ll complete payment with{" "}
           {paymentRailLabel(config.payment_provider)} and return here with extra time.
         </p>
       )}
 
       {isFetching && !loadError && (
-        <p className="text-center text-[11px] text-muted-foreground/70">
+        <p className="text-center text-label text-muted-foreground/70">
           Updating checkout…
         </p>
       )}

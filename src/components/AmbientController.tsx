@@ -144,7 +144,7 @@ export function AmbientController() {
   if (!enabled || mode !== "ambient") return null;
   return (
     <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center">
-      <div className="flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-[11px] text-cream/90 backdrop-blur">
+      <div className="flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-label text-cream/90 backdrop-blur">
         <Moon className="h-3.5 w-3.5" aria-hidden />
         Ambient — tap or talk to wake
       </div>

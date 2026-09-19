@@ -87,7 +87,7 @@ export function EmptyState({
       <h2 className="font-serif text-5xl font-medium italic leading-[0.92] text-cream drop-shadow-[0_2px_18px_hsl(var(--primary)/0.35)] sm:text-6xl">
         {title}
       </h2>
-      {subtitle && <p className="max-w-xs text-sm text-muted-foreground">{subtitle}</p>}
+      {subtitle && <p className="max-w-xs text-body text-muted-foreground">{subtitle}</p>}
       {onAdd && (
         <button
           type="button"

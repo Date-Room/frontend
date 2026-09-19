@@ -115,8 +115,8 @@ export function TwoTruths() {
   if (!round) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center animate-fade-in">
-        <p className="font-serif text-2xl italic text-cream">Two truths and a lie</p>
-        <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
+        <p className="font-serif text-display italic text-cream">Two truths and a lie</p>
+        <p className="max-w-xs text-body leading-relaxed text-muted-foreground">
           One of you tells three things, two true and one made up. The other presses, stakes, and calls the lie.
         </p>
         {scoreboard}
@@ -144,8 +144,8 @@ export function TwoTruths() {
     if (!isStoryteller) {
       return (
         <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center animate-fade-in">
-          <p className="text-lg font-medium text-cream">{partnerName} is writing their three…</p>
-          <p className="text-xs text-muted-foreground">Two are true. One is about to be invented.</p>
+          <p className="text-title font-medium text-cream">{partnerName} is writing their three…</p>
+          <p className="text-label text-muted-foreground">Two are true. One is about to be invented.</p>
           {scoreboard}
         </div>
       );
@@ -154,8 +154,8 @@ export function TwoTruths() {
     return (
       <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6">
         <div className="flex shrink-0 flex-col items-center gap-1 text-center">
-          <p className="font-serif text-xl italic text-cream">Write three</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-title italic text-cream">Write three</p>
+          <p className="text-label text-muted-foreground">
             Two true, one made up. Mark the lie — {partnerName} never sees the mark.
           </p>
         </div>
@@ -167,7 +167,7 @@ export function TwoTruths() {
                 onClick={() => setLie(i)}
                 aria-pressed={lie === i}
                 aria-label={`Mark statement ${i + 1} as the lie`}
-                className={`focus-ring h-8 w-8 shrink-0 rounded-full border text-[10px] uppercase transition ${
+                className={`focus-ring h-8 w-8 shrink-0 rounded-full border text-label uppercase transition ${
                   lie === i
                     ? "border-primary bg-primary text-primary-foreground shadow-[0_0_0_4px_hsl(var(--primary)/0.18)]"
                     : "border-muted-foreground/40 text-muted-foreground hover:border-primary/50"
@@ -184,7 +184,7 @@ export function TwoTruths() {
             </div>
           ))}
         </div>
-        <p className="text-center text-[11px] text-muted-foreground">
+        <p className="text-center text-label text-muted-foreground">
           Stuck? The hints are sparks — the best lie sits right next to a strange truth.
         </p>
         <Button
@@ -264,8 +264,8 @@ export function TwoTruths() {
   return (
     <GameStage gameId="2_truths" dimmed={revealing && unmask.witnessed && !settled}>
       <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
-        <p key={title} className="font-serif text-xl italic text-cream animate-fade-in">{title}</p>
-        <p key={status} aria-live="polite" className="min-h-[1rem] max-w-sm text-xs text-muted-foreground animate-fade-in">
+        <p key={title} className="text-title italic text-cream animate-fade-in">{title}</p>
+        <p key={status} aria-live="polite" className="min-h-[1rem] max-w-sm text-label text-muted-foreground animate-fade-in">
           {status}
         </p>
       </div>
@@ -322,23 +322,23 @@ export function TwoTruths() {
               ].join(" ")}
             >
               <span className="flex items-start gap-3">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/15 font-serif text-sm text-cream/80">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/15 text-body text-cream/80">
                   {i + 1}
                 </span>
-                <span className="flex-1 text-sm sm:text-base leading-relaxed text-cream">{text}</span>
+                <span className="flex-1 text-body leading-relaxed text-cream">{text}</span>
               </span>
               <span className="absolute -bottom-2.5 right-3 flex gap-1.5">
                 {isPressed && (
-                  <span className="rounded-full border border-rose/60 bg-background px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-rose">pressed</span>
+                  <span className="rounded-full border border-rose/60 bg-background px-2 py-0.5 text-label uppercase tracking-[0.18em] text-rose">pressed</span>
                 )}
                 {(isCalled && (revealing || settled)) && (
-                  <span className="rounded-full border border-primary/60 bg-background px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-primary">the call</span>
+                  <span className="rounded-full border border-primary/60 bg-background px-2 py-0.5 text-label uppercase tracking-[0.18em] text-primary">the call</span>
                 )}
                 {sealedTrue && (
-                  <span className="rounded-full border border-emerald-400/60 bg-background px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-emerald-300">true</span>
+                  <span className="rounded-full border border-emerald-400/60 bg-background px-2 py-0.5 text-label uppercase tracking-[0.18em] text-emerald-300">true</span>
                 )}
                 {flipped && (
-                  <span className="rounded-full border border-destructive/60 bg-background px-2 py-0.5 text-[9px] uppercase tracking-[0.18em] text-destructive">the lie</span>
+                  <span className="rounded-full border border-destructive/60 bg-background px-2 py-0.5 text-label uppercase tracking-[0.18em] text-destructive">the lie</span>
                 )}
               </span>
             </button>
@@ -386,8 +386,8 @@ export function TwoTruths() {
                     stake === n ? "border-primary bg-primary/10" : "border-white/15",
                   ].join(" ")}
                 >
-                  <span className="block font-serif text-lg text-cream">{n === 1 ? "1 · Play it safe" : "2 · I've got them"}</span>
-                  <span className="block text-[10px] text-muted-foreground">
+                  <span className="block text-title text-cream">{n === 1 ? "1 · Play it safe" : "2 · I've got them"}</span>
+                  <span className="block text-label text-muted-foreground">
                     {n === 1 ? "One point either way." : `Wrong, and ${partnerName} takes two.`}
                   </span>
                 </button>
@@ -402,7 +402,7 @@ export function TwoTruths() {
         )}
 
         {guessing && isStoryteller && (
-          <p className="text-sm text-muted-foreground animate-pulse">
+          <p className="text-body text-muted-foreground animate-pulse">
             {round.pressed != null ? "elaborate, then hold your nerve…" : `waiting on ${partnerName}'s call…`}
           </p>
         )}

@@ -16,8 +16,8 @@ export function TryCurtain({ line }: { line?: string }) {
       }}
     >
       <Sparkles className="h-4 w-4" style={{ color: "var(--room-accent)" }} aria-hidden />
-      <p className="font-serif text-base italic text-cream">That's the free taste.</p>
-      <p className="text-xs leading-relaxed text-muted-foreground">
+      <p className="text-body italic text-cream">That's the free taste.</p>
+      <p className="text-label leading-relaxed text-muted-foreground">
         {line ?? "The whole night lives in a date room — plan one after this call."}
       </p>
     </div>

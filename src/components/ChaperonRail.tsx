@@ -51,7 +51,7 @@ export function ChaperonRail({
     filter === "all" ? entries : entries.filter((e) => familyOf(e.signal.severity) === filter);
   const seg = (on: boolean) =>
     cn(
-      "focus-ring flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums transition",
+      "focus-ring flex items-center gap-1 rounded-full px-2 py-0.5 text-label font-semibold tabular-nums transition",
       on ? "bg-white/15 text-cream" : "text-white/45 hover:text-white/80",
     );
 
@@ -112,16 +112,16 @@ export function ChaperonRail({
                   className={cn("h-1.5 w-1.5 shrink-0 rounded-full", DOT[e.signal.severity])}
                   aria-hidden
                 />
-                <span className="text-[10px] font-medium tabular-nums text-white/40">
+                <span className="text-label font-medium tabular-nums text-white/40">
                   {formatElapsed(e.elapsedSec)}
                 </span>
                 {e.signal.probe && (
-                  <span className="rounded-full bg-sky-400/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-sky-300">
+                  <span className="rounded-full bg-sky-400/15 px-1.5 py-px text-label font-semibold uppercase tracking-wide text-sky-300">
                     Your test
                   </span>
                 )}
               </div>
-              <p className="mt-1 text-[12px] leading-snug text-cream/90">{e.signal.whisper}</p>
+              <p className="mt-1 text-label leading-snug text-cream/90">{e.signal.whisper}</p>
               {eventId && (
                 <div className="mt-1.5">
                   <ChaperonReactions

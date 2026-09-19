@@ -115,7 +115,7 @@ export function WelcomeBackGate({ enabled }: Props) {
         {/* Pinned note */}
         {hasNote && greetingNote && (
           <>
-            <p className="font-serif italic text-cream/90 text-lg sm:text-xl">
+            <p className="italic text-cream/90 text-title">
               {greetingNote.emergency ? "A note was waiting for you" : "Something was left for you"}
             </p>
             <div className="relative mx-auto max-w-sm">
@@ -124,10 +124,10 @@ export function WelcomeBackGate({ enabled }: Props) {
                 aria-hidden
               />
               <div className="rounded-2xl bg-[#F5E6D3] px-6 py-8 text-left shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
-                <p className="font-serif text-[#2A2018] text-lg leading-relaxed whitespace-pre-wrap">
+                <p className="text-[#2A2018] text-title leading-relaxed whitespace-pre-wrap">
                   {greetingNote.text}
                 </p>
-                <p className="mt-4 text-xs uppercase tracking-[0.18em] text-[#2A2018]/45">
+                <p className="mt-4 text-label uppercase tracking-[0.18em] text-[#2A2018]/45">
                   from {greetingNote.pinned_by_name}
                 </p>
               </div>
@@ -170,7 +170,7 @@ function UpdateChip({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
     <div className="mx-auto flex max-w-sm items-center gap-3 rounded-xl bg-white/[0.06] px-4 py-3 ring-1 ring-white/[0.08]">
       <span className="text-amber">{icon}</span>
-      <span className="text-sm text-cream/85">{text}</span>
+      <span className="text-body text-cream/85">{text}</span>
     </div>
   );
 }

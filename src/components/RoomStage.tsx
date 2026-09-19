@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -10,6 +11,9 @@ import { createPortal } from "react-dom";
 import {
   RotateCw,
   LayoutGrid,
+  X,
+  Columns2,
+  PictureInPicture2,
   Video,
   Sparkles,
   StickyNote,
@@ -37,7 +41,14 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
-import { ActivityHelp, GameIntro, hasActivityHelp, shouldShowGameIntro } from "@/components/ActivityHelp";
+import {
+  ActivityHelp,
+  GameIntro,
+  hasActivityHelp,
+  hasSeenGameIntro,
+  markGameIntroSeen,
+  shouldShowGameIntro,
+} from "@/components/ActivityHelp";
 import { RoomAmbianceSheet } from "@/components/RoomAmbianceSheet";
 import { RoomThemeChip } from "@/components/RoomThemeChip";
 import { useRoomThemePicker } from "@/hooks/useRoomThemePicker";
@@ -45,6 +56,13 @@ import { useHelpNow } from "@/lib/activityHelpNow";
 import { MusicPlayerBar, MusicRoomProvider } from "@/components/MusicRoom";
 import { ActivityBoundary } from "@/components/RoomErrorBoundary";
 import { useRoomSession } from "@/context/RoomSessionContext";
+import { useBottomBarHeight } from "@/lib/bottomBar";
+import {
+  isSidePane,
+  useCallLayout,
+  useVideoOrientation,
+  useWideViewport,
+} from "@/lib/callLayout";
 import { useChaperonController } from "@/context/ChaperonContext";
 import { ChaperonSeam } from "@/components/ChaperonSeam";
 import { useActivitySession } from "@/hooks/useActivitySession";
@@ -124,25 +142,6 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   room_details: Settings,
 };
 
-/** Generated square backgrounds for dock drill-in tiles. */
-const ITEM_TILE_IMAGES: Record<string, string> = {
-  vision_board: "/dock-tiles/vision-board.png",
-  fridge_notes: "/dock-tiles/fridge-notes.png",
-  bookshelf: "/dock-tiles/bookshelf.png",
-  room_details: "/dock-tiles/room-details.png",
-  questions: "/dock-tiles/questions.png",
-  this_or_that: "/dock-tiles/this-or-that.png",
-  the_36: "/dock-tiles/the-36.png",
-  "2_truths": "/dock-tiles/2-truths.png",
-  truth_or_dare: "/dock-tiles/truth-or-dare.png",
-  one_has_to_go: "/dock-tiles/one-has-to-go.png",
-  pick_a_door: "/dock-tiles/pick-a-door.png",
-  rank_it: "/dock-tiles/rank-it.png",
-  guacamole: "/dock-tiles/guacamole.png",
-  watch: "/dock-tiles/watch.png",
-  dj: "/dock-tiles/dj.png",
-  chat: "/dock-tiles/chat.png",
-};
 
 /** One-line taglines for the drilled-in list rows — mirror the mobile menu. */
 const ITEM_TAGLINES: Record<string, string> = {
@@ -207,20 +206,6 @@ function useCompactViewport(): boolean {
   return compact;
 }
 
-/** Desktop-wide viewport — drives the 50/50 call split layout. */
-function useWideViewport(): boolean {
-  const [wide, setWide] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches,
-  );
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const on = () => setWide(mq.matches);
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-  return wide;
-}
-
 /**
  * The Our Room "stage" — a Vision-Board-sized card that mounts the chosen
  * activity/wall, an app dock below the card (Room / Games / Watch / Music / Chat),
@@ -277,7 +262,8 @@ export function RoomStage({
   const commitStage = useCallback((id: string) => setStaged(id), []);
 
   const [helpOpen, setHelpOpen] = useState(false);
-  /** Pre-game intro — shown each time you open an activity until you tap Start. */
+  /** Pre-game intro — shown the FIRST time you open an activity. After that
+   *  the ? in the stage header is the way back to it. */
   const [introOpen, setIntroOpen] = useState(false);
   // The ? button pulses briefly when the game's "right now" step changes —
   // a reminder of where help lives at exactly the moments its answer is new.
@@ -294,11 +280,20 @@ export function RoomStage({
     }
     prevStepRef.current = step;
   }, [helpSnap?.step]);
-  // Pre-game intro: every time you open an activity, learn the flow first,
-  // then tap Start. Mid-game reference lives on the ? button.
+  // Pre-game intro: learn the flow before your first go at a game. Once it
+  // has been read and dismissed, opening the game drops you straight in —
+  // the ? button in the stage header reopens the same card any time.
   useEffect(() => {
     setHelpOpen(false);
-    setIntroOpen(shouldShowGameIntro(staged));
+    setIntroOpen(shouldShowGameIntro(staged) && !hasSeenGameIntro(staged));
+  }, [staged]);
+
+  /** Close the intro and don't open it for this game again. Both exits count:
+   *  reading the card is what "seen" means, whether you then start or step
+   *  back out. */
+  const dismissIntro = useCallback(() => {
+    if (staged) markGameIntroSeen(staged);
+    setIntroOpen(false);
   }, [staged]);
   // Two-level launcher (mirrors mobile): null = category list, else drilled in.
   const [catId, setCatId] = useState<string | null>(null);
@@ -379,8 +374,22 @@ export function RoomStage({
   }, [room.channel, room.senderId, partnerName]);
   const compact = useCompactViewport();
   const wide = useWideViewport();
-  const splitCallLayout = callActive && wide;
-  const [portrait, setPortrait] = useState(true);
+  /** `side` puts the call in its own pane next to the stage, `float` keeps it
+   *  as the draggable window over it. Side-by-side needs width to be worth
+   *  anything, so a narrow screen floats regardless of what's stored. The
+   *  choice itself is offered in the in-call settings menu. */
+  const [callLayout, chooseCallLayout] = useCallLayout();
+  const splitCallLayout = callActive && wide && isSidePane(callLayout);
+  // The window's shape follows the capture orientation, so the frame always
+  // matches the stream inside it (and therefore what the partner receives).
+  const [orientation, chooseOrientation, orientationPinned] =
+    useVideoOrientation(callLayout);
+  const portrait = orientation === "portrait";
+  const setPortrait = useCallback(
+    (fn: (v: boolean) => boolean) =>
+      chooseOrientation(fn(portrait) ? "portrait" : "landscape"),
+    [chooseOrientation, portrait],
+  );
   const [scale, setScale] = useState(1);
   // Phones start as a small bubble; expand toggles a large (near-fullscreen)
   // call. Desktop keeps the large window and freeform corner-resize. Lazy
@@ -432,40 +441,55 @@ export function RoomStage({
     [items],
   );
   const activeCat = catId ? availCats.find((c) => c.id === catId) ?? null : null;
-  const dockExpanded = Boolean(activeCat);
+  /** The launcher is a floating dropup again, not a resident dock: the stage
+   *  keeps the full canvas and the menu is summoned over it. `menuOpen` is
+   *  the dropup; `activeCat` is which level it is showing. */
+  const [menuOpen, setMenuOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelH, setPanelH] = useState(0);
+  useLayoutEffect(() => {
+    if (menuOpen && panelRef.current) setPanelH(panelRef.current.scrollHeight);
+  }, [menuOpen, catId, availCats]);
   /** Dock category used to open the current activity — powers “back to Games” etc. */
   const [lastCatId, setLastCatId] = useState<string | null>(null);
 
+  function openMenu() {
+    setCatId(null);
+    setMenuOpen((v) => !v);
+  }
   function pickCategory(c: (typeof availCats)[number]) {
+    // A category with one thing in it is just that thing — don't make the
+    // user drill into a list of one.
+    if (c.items.length === 1) {
+      commitStage(c.items[0].id);
+      setMenuOpen(false);
+      return;
+    }
     setCatId(c.id);
   }
   function pickItem(id: string) {
     if (activeCat) setLastCatId(activeCat.id);
     commitStage(id);
+    setMenuOpen(false);
     setCatId(null);
   }
 
+  /** Back always means "out of this activity", since the menu is no longer
+   *  part of the layout — closing it is what the pill and the scrim do. */
   function goBack() {
-    if (staged !== "lobby") {
-      commitStage("lobby");
-      setCatId(lastCatId);
-      return;
-    }
-    if (dockExpanded) {
-      setCatId(null);
-      setLastCatId(null);
-    }
+    if (staged === "lobby") return;
+    commitStage("lobby");
+    setCatId(null);
   }
 
   const backLabel = useMemo(() => {
-    if (dockExpanded) return "Lobby";
     if (staged !== "lobby" && lastCatId) {
       return availCats.find((c) => c.id === lastCatId)?.label ?? "Lobby";
     }
     return "Lobby";
-  }, [dockExpanded, staged, lastCatId, availCats]);
+  }, [staged, lastCatId, availCats]);
 
-  const showBack = dockExpanded || staged !== "lobby";
+  const showBack = staged !== "lobby";
 
   // ── Call PiP drag ──
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -626,22 +650,38 @@ export function RoomStage({
     () => parseFridgeNotes(fridgeState).notes.filter((n) => n.stage_pinned),
     [fridgeState],
   );
-  // Whether the bottom music bar is showing, so the launcher lifts above it.
-  const { state: djState } = useActivitySession("dj");
-  const musicActive =
-    djState?.closed !== true &&
-    (Boolean(djState?.now_playing) || (Array.isArray(djState?.queue) && djState.queue.length > 0));
-  // Watch shows its own bottom bar while it's staged with a video.
-  const { state: watchState } = useActivitySession("watch");
-  const bottomBarActive = musicActive || (staged === "watch" && Boolean(watchState?.video_id));
+
+
+  // The launcher sits in the gutter between the stage and whatever is pinned
+  // to the bottom of the screen, with the SAME gap above and below it. Both
+  // heights are measured rather than assumed: the player bar's height is
+  // content-driven (it grows with its controls), and the old hardcoded
+  // `bottom-[80px]` guess is what let the pill drift up over the stage.
+  const GUTTER = 14;
+  const launcherRef = useRef<HTMLDivElement>(null);
+  const barH = useBottomBarHeight();
+  const [pillH, setPillH] = useState(44);
+  useLayoutEffect(() => {
+    const el = launcherRef.current;
+    if (!el) return;
+    const read = () => setPillH(el.offsetHeight || 44);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  /** Where the launcher floats, and how much room the stage gives up for it. */
+  const launcherBottom = barH + GUTTER;
+  const stagePadBottom = barH + GUTTER + pillH + GUTTER;
 
   return (
     <MusicRoomProvider watchActive={staged === "watch"}>
     <main
       className={cn(
-        "relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-2 pt-1 sm:px-6",
+        "relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-4 pt-1 transition-[padding-bottom] duration-300 ease-out sm:px-6",
         splitCallLayout ? "lg:px-5" : "lg:px-8",
       )}
+      style={{ paddingBottom: stagePadBottom }}
     >
       <div
         className={cn(
@@ -667,7 +707,7 @@ export function RoomStage({
             <div className="perm-status-bar lg:hidden">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" />
-                <p className="truncate text-sm text-cream/80">{`Ringing ${partnerName}…`}</p>
+                <p className="truncate text-body text-cream/80">{`Ringing ${partnerName}…`}</p>
               </div>
             </div>
           ) : null
@@ -693,8 +733,8 @@ export function RoomStage({
                   <Video className="h-[18px] w-[18px]" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-semibold leading-tight">{title}</span>
-                  <span className="block truncate text-xs leading-tight text-muted-foreground">{sub}</span>
+                  <span className="block text-body font-semibold leading-tight">{title}</span>
+                  <span className="block truncate text-label leading-tight text-muted-foreground">{sub}</span>
                 </span>
                 <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
               </button>
@@ -702,24 +742,14 @@ export function RoomStage({
           })()
         )}
 
-        {/* Stage — collapses to a strip when a dock category is open. */}
-        <section
-          className={cn(
-            "perm-wall-frame flex flex-col overflow-hidden !p-0 transition-[flex] duration-300",
-            dockExpanded ? "shrink-0" : "min-h-0 flex-1",
-          )}
-        >
-          <div
-            className={cn(
-              "flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 sm:px-4",
-              dockExpanded ? "py-1.5" : "py-2",
-            )}
-          >
+        {/* Stage — owns the canvas. The launcher floats over it. */}
+        <section className="perm-wall-frame flex min-h-0 flex-1 flex-col overflow-hidden !p-0">
+          <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 py-2 sm:px-4">
             {showBack ? (
               <button
                 type="button"
                 onClick={goBack}
-                className="focus-ring -ml-1 inline-flex items-center gap-1 rounded-full py-0.5 pl-0.5 pr-2.5 text-[11px] font-medium text-primary transition hover:bg-white/[0.06]"
+                className="focus-ring -ml-1 inline-flex items-center gap-1 rounded-full py-0.5 pl-0.5 pr-2.5 text-label font-medium text-primary transition hover:bg-white/[0.06]"
               >
                 <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
                 <span className="truncate">Back to {backLabel}</span>
@@ -731,13 +761,13 @@ export function RoomStage({
                     const Icon = ITEM_ICONS[stagedItem.id] ?? LayoutGrid;
                     return <Icon className="h-3.5 w-3.5 text-primary" aria-hidden />;
                   })()}
-                <span className="text-xs font-medium uppercase tracking-[0.16em] text-cream/80">
+                <span className="text-label font-medium uppercase tracking-[0.16em] text-cream/80">
                   {stagedItem?.title ?? "Stage"}
                 </span>
               </>
             )}
-            {showBack && !dockExpanded && staged !== "lobby" && stagedItem && (
-              <span className="truncate text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            {showBack && stagedItem && (
+              <span className="truncate text-label uppercase tracking-[0.14em] text-muted-foreground">
                 {stagedItem.title}
               </span>
             )}
@@ -747,7 +777,6 @@ export function RoomStage({
                   current={themeMood}
                   onClick={() => setThemeOpen(true)}
                   disabled={themeBusy}
-                  compact={dockExpanded}
                 />
               )}
               {callActive && !splitCallLayout ? (
@@ -760,7 +789,7 @@ export function RoomStage({
                         : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse",
                     )}
                   />
-                  <p className="truncate text-xs text-cream/80">
+                  <p className="truncate text-label text-cream/80">
                     {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
                   </p>
                 </div>
@@ -786,8 +815,8 @@ export function RoomStage({
                         <Video className="h-4 w-4" />
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-xs font-semibold leading-tight">{title}</span>
-                        <span className="block truncate text-[10px] leading-tight text-muted-foreground">{sub}</span>
+                        <span className="block text-label font-semibold leading-tight">{title}</span>
+                        <span className="block truncate text-label leading-tight text-muted-foreground">{sub}</span>
                       </span>
                       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
                     </button>
@@ -809,123 +838,22 @@ export function RoomStage({
               )}
             </div>
           </div>
-          {!dockExpanded && (
-            <div key={staged} className="animate-stage-swell relative min-h-0 flex-1 overflow-hidden">
-              {staged ? (
-                <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
-                  <div
-                    className={[
-                      "h-full min-h-0 transition duration-300",
-                      introOpen ? "pointer-events-none scale-[0.98] opacity-40 blur-[2px]" : "",
-                    ].join(" ")}
-                    aria-hidden={introOpen}
-                  >
-                    {renderContent(staged, commitStage)}
-                  </div>
-                </ActivityBoundary>
-              ) : null}
-            </div>
-          )}
-        </section>
-
-        {/* App dock — expands when a category is open; lobby collapses above. */}
-        <nav
-          aria-label="Activities"
-          className={cn(
-            "dr-app-dock flex min-h-0 flex-col",
-            dockExpanded ? "min-h-0 flex-1" : "shrink-0",
-            bottomBarActive && !dockExpanded && "mb-14",
-          )}
-        >
-          {notif && (
-            <button
-              type="button"
-              onClick={() => {
-                commitStage(notif.target);
-                setNotif(null);
-              }}
-              className="focus-ring mb-2 flex w-full items-center gap-2 rounded-full border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs text-cream backdrop-blur-md transition hover:border-primary/55 hover:bg-primary/20"
-            >
-              {(() => {
-                const NotifIcon = ITEM_ICONS[notif.target] ?? LayoutGrid;
-                return <NotifIcon className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />;
-              })()}
-              <span className="truncate">{notif.text}</span>
-            </button>
-          )}
-
-          <div
-            className={cn(
-              "flex flex-col rounded-2xl border border-white/[0.12] bg-[#141019]/75 p-2 shadow-[0_16px_48px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-2.5",
-              dockExpanded && "min-h-0 flex-1",
-            )}
-          >
-            {activeCat ? (
-              <>
-                <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cream/70">
-                    {activeCat.label}
-                  </p>
-                  <span className="text-[9px] uppercase tracking-[0.16em] text-cream/40">
-                    {activeCat.items.length} items
-                  </span>
-                </div>
+          <div key={staged} className="animate-stage-swell relative min-h-0 flex-1 overflow-hidden">
+            {staged ? (
+              <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
                 <div
-                  className={cn(
-                    "dr-dock-grid min-h-0 flex-1 gap-2 overflow-y-auto",
-                    activeCat.items.length === 1
-                      ? "dr-dock-grid--solo"
-                      : cn(
-                          "grid",
-                          activeCat.items.length <= 4
-                            ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
-                            : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5",
-                        ),
-                  )}
+                  className={[
+                    "h-full min-h-0 transition duration-300",
+                    introOpen ? "pointer-events-none scale-[0.98] opacity-40 blur-[2px]" : "",
+                  ].join(" ")}
+                  aria-hidden={introOpen}
                 >
-                  {activeCat.items.map((it) => (
-                    <MenuSquareTile
-                      key={it.id}
-                      Icon={ITEM_ICONS[it.id] ?? LayoutGrid}
-                      label={it.title}
-                      tagline={ITEM_TAGLINES[it.id]}
-                      image={ITEM_TILE_IMAGES[it.id]}
-                      active={staged === it.id}
-                      hero={activeCat.items.length === 1}
-                      onClick={() => pickItem(it.id)}
-                    />
-                  ))}
+                  {renderContent(staged, commitStage)}
                 </div>
-              </>
-            ) : (
-              <div
-                className="grid gap-1.5 sm:gap-2"
-                style={{ gridTemplateColumns: `repeat(${Math.max(availCats.length, 1)}, minmax(0, 1fr))` }}
-              >
-                {availCats.map((c) => (
-                  <MenuTile
-                    key={c.id}
-                    Icon={c.icon}
-                    label={c.label}
-                    active={c.items.some((i) => i.id === staged) || catId === c.id}
-                    badge={c.items.length > 1 ? c.items.length : undefined}
-                    onClick={() => pickCategory(c)}
-                  />
-                ))}
-                {/* Chaperon lives in the dock too, so it is reachable mid-game
-                    (the lobby card is hidden once an activity is up). */}
-                {chaperon?.enabled && (
-                  <MenuTile
-                    Icon={ShieldCheck}
-                    label="Chaperon"
-                    active={chaperon.active}
-                    onClick={() => window.dispatchEvent(new CustomEvent("dr:chaperon:open-setup"))}
-                  />
-                )}
-              </div>
-            )}
+              </ActivityBoundary>
+            ) : null}
           </div>
-        </nav>
+        </section>
 
         {splitCallLayout && <MusicPlayerBar onOpenList={() => commitStage("dj")} />}
         </div>
@@ -936,7 +864,7 @@ export function RoomStage({
             <section className="perm-wall-frame flex min-h-0 flex-1 flex-col overflow-hidden !p-0">
               <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 py-2 sm:px-4">
                 <Video className="h-3.5 w-3.5 text-primary" aria-hidden />
-                <span className="text-xs font-medium uppercase tracking-[0.16em] text-cream/80">
+                <span className="text-label font-medium uppercase tracking-[0.16em] text-cream/80">
                   Call
                 </span>
                 <div className="ml-auto flex min-w-0 items-center gap-2">
@@ -948,18 +876,159 @@ export function RoomStage({
                         : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse",
                     )}
                   />
-                  <p className="truncate text-xs text-cream/80">
+                  <p className="truncate text-label text-cream/80">
                     {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => chooseCallLayout("float")}
+                    aria-label="Float the call over the room"
+                    title="Float the call over the room"
+                    className="focus-ring flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/5 hover:text-cream"
+                  >
+                    <PictureInPicture2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
               <div className="relative min-h-0 flex-1 overflow-hidden bg-black/40">
                 <ChaperonSeam className="rounded-none" />
-                <RoomVideo variant="full" onLeave={onLeaveCall} />
+                {/* `side` fills the pane with both tiles; `side-pip` gives the
+                    pane the phone-call shape — one feed full-bleed, the other
+                    floating over it. */}
+                <RoomVideo
+                  variant={callLayout === "side-pip" ? "pip" : "full"}
+                  framed
+                  onLeave={onLeaveCall}
+                />
               </div>
             </section>
           </aside>
         )}
+      </div>
+
+      {/* Launcher — one pill at the bottom of the screen with an animated
+          dropup. It floats over the stage instead of occupying a row of it,
+          which is the whole point: the activity gets the canvas, the menu is
+          summoned and dismissed. */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} aria-hidden />
+      )}
+      <div
+        className="pointer-events-none fixed inset-x-0 z-40 flex justify-center px-3 transition-[bottom] duration-300 ease-out"
+        style={{ bottom: launcherBottom }}
+      >
+        <div ref={launcherRef} className="relative">
+          <div
+            className={cn(
+              "absolute bottom-full left-1/2 mb-3 w-[min(29rem,94vw)] -translate-x-1/2 overflow-hidden rounded-3xl border border-white/10 bg-card/90 shadow-[0_24px_64px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-all duration-300 ease-out",
+              menuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
+            )}
+            style={{ height: menuOpen ? panelH : 0 }}
+          >
+            {/* Content scales up from the bottom as the tray grows, so the
+                whole menu (icons included) opens as one motion. */}
+            <div
+              ref={panelRef}
+              className={cn(
+                "origin-bottom p-5 transition-transform duration-300 ease-out",
+                menuOpen ? "scale-100" : "scale-90",
+              )}
+            >
+              {activeCat ? (
+                /* Level 2 — the category's activities as a list. */
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setCatId(null)}
+                    className="mb-2.5 -ml-1 inline-flex items-center gap-1 rounded-full px-2 py-1 text-label font-semibold uppercase tracking-[0.16em] text-muted-foreground transition hover:text-cream"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                    {activeCat.label}
+                  </button>
+                  <div className="flex max-h-[min(28rem,56vh)] flex-col gap-2.5 overflow-y-auto">
+                    {activeCat.items.map((it) => (
+                      <MenuListRow
+                        key={it.id}
+                        Icon={ITEM_ICONS[it.id] ?? LayoutGrid}
+                        label={it.title}
+                        tagline={ITEM_TAGLINES[it.id]}
+                        active={staged === it.id}
+                        onClick={() => pickItem(it.id)}
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : (
+                /* Level 1 — categories (Room / Games / Watch / DJ / Chat),
+                   centered squircle tiles. Chaperon sits alongside them so it
+                   stays reachable mid-activity. */
+                <div className="flex flex-wrap justify-center gap-4">
+                  {availCats.map((c) => (
+                    <MenuTile
+                      key={c.id}
+                      Icon={c.icon}
+                      label={c.label}
+                      active={c.items.some((i) => i.id === staged)}
+                      badge={c.items.length > 1 ? c.items.length : undefined}
+                      onClick={() => pickCategory(c)}
+                    />
+                  ))}
+                  {chaperon?.enabled && (
+                    <MenuTile
+                      Icon={ShieldCheck}
+                      label="Chaperon"
+                      active={chaperon.active}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        window.dispatchEvent(new CustomEvent("dr:chaperon:open-setup"));
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          {(() => {
+            // The pill doubles as the nudge surface: when an activity wants
+            // attention it becomes that invitation, and tapping takes you
+            // there instead of opening the menu.
+            const showNotif = notif && !menuOpen;
+            const NotifIcon = showNotif ? ITEM_ICONS[notif.target] ?? LayoutGrid : LayoutGrid;
+            return (
+              <button
+                type="button"
+                onClick={
+                  showNotif
+                    ? () => {
+                        commitStage(notif.target);
+                        setNotif(null);
+                      }
+                    : openMenu
+                }
+                className={cn(
+                  "focus-ring pointer-events-auto flex max-w-[80vw] items-center gap-2 rounded-full border px-5 py-2.5 text-body font-medium text-cream shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-300",
+                  showNotif
+                    ? "border-primary/40 bg-primary/20"
+                    : "border-white/10 bg-card/85 hover:border-primary/30",
+                )}
+              >
+                {showNotif ? (
+                  <NotifIcon className="h-4 w-4 shrink-0 text-primary" />
+                ) : menuOpen ? (
+                  <X className="h-4 w-4" />
+                ) : (
+                  <LayoutGrid className="h-4 w-4 text-primary" />
+                )}
+                <span
+                  key={showNotif ? notif.id : menuOpen ? "close" : "activities"}
+                  className="animate-fade-in truncate"
+                >
+                  {showNotif ? notif.text : menuOpen ? "Close" : "Activities"}
+                </span>
+              </button>
+            );
+          })()}
+        </div>
       </div>
 
       {!splitCallLayout && <MusicPlayerBar onOpenList={() => commitStage("dj")} />}
@@ -1008,37 +1077,45 @@ export function RoomStage({
               // bubble ↔ compact window ↔ large call. On a phone the shrink
               // control returns to the bubble rather than doing nothing.
               onExpand={expanded ? undefined : () => setExpanded(true)}
-              onCollapse={
-                expanded
-                  ? () => setExpanded(false)
-                  : compact
-                    ? () => {
-                        // On a phone the shrink control always has somewhere
-                        // to go: down to the bubble.
-                        if (activityStaged) setCallOpen(false);
-                        else setManualBubble(true);
-                      }
-                    : undefined
-              }
+              // No shrink control: below a certain size the in-video control
+              // row has nowhere to lay out and collapses on itself. The window
+              // is draggable and corner-resizable, which covers getting it out
+              // of the way without a button that can wreck its own UI.
             />
           </div>
           {bubble && (
             <span
-              className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-[9px] font-semibold uppercase tracking-[0.14em] text-cream/80 drop-shadow"
+              className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-label font-semibold uppercase tracking-[0.14em] text-cream/80 drop-shadow"
               aria-hidden
             >
               tap
             </span>
           )}
-          {!bubble && (
+          {!bubble && !orientationPinned && (
           <button
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => setPortrait((v) => !v)}
-            aria-label="Rotate call"
+            aria-label={portrait ? "Switch to landscape" : "Switch to portrait"}
+            title={portrait ? "Switch to landscape" : "Switch to portrait"}
             className="absolute right-2 top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-cream opacity-0 backdrop-blur transition duration-200 hover:bg-black/70 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
           >
             <RotateCw className="h-3.5 w-3.5" />
+          </button>
+          )}
+          {/* Dock it beside the stage. Only offered where there is room for
+              two panes — on a phone the side-by-side layout has nothing to
+              give, so the control would be a dead end. */}
+          {!bubble && wide && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => chooseCallLayout("side")}
+            aria-label="Dock the call beside the room"
+            title="Dock the call beside the room"
+            className="absolute right-11 top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-cream opacity-0 backdrop-blur transition duration-200 hover:bg-black/70 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+          >
+            <Columns2 className="h-3.5 w-3.5" />
           </button>
           )}
           {/* Corner resize handles — desktop only (invisible/unusable on touch;
@@ -1064,8 +1141,11 @@ export function RoomStage({
       {introOpen && staged && shouldShowGameIntro(staged) && (
         <GameIntro
           id={staged}
-          onStart={() => setIntroOpen(false)}
-          onBack={goBack}
+          onStart={dismissIntro}
+          onBack={() => {
+            dismissIntro();
+            goBack();
+          }}
           backLabel={backLabel === "Lobby" ? "Back to lobby" : `Back to ${backLabel}`}
         />
       )}
@@ -1078,7 +1158,7 @@ export function RoomStage({
           role="status"
           aria-live="polite"
           className={cn(
-            "pointer-events-none fixed left-1/2 top-3 z-[90] flex -translate-x-1/2 items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium shadow-lg backdrop-blur-md animate-fade-in",
+            "pointer-events-none fixed left-1/2 top-3 z-[90] flex -translate-x-1/2 items-center gap-2 rounded-full border px-3.5 py-1.5 text-label font-medium shadow-lg backdrop-blur-md animate-fade-in",
             linkDown
               ? "border-amber-300/50 bg-black/70 text-amber-200"
               : "border-emerald-400/50 bg-black/70 text-emerald-200",
@@ -1127,33 +1207,34 @@ function MenuTile({
       type="button"
       onClick={onClick}
       title={label}
-      className="group flex min-w-0 flex-col items-center gap-1.5 px-0.5"
+      // shrink-0: these wrap onto rows of differing counts, and a shrinkable
+      // tile ends up a different size per row.
+      className="group flex w-[4rem] shrink-0 flex-col items-center gap-2.5"
     >
+      {/* Squircle app icon — the drilled-in row's icon chip at tile size:
+          the same primary wash (bg-primary/15) and amber glyph. Tinting from
+          `primary` rather than white means a themed room retints these with
+          everything else; a white wash would stay grey while the room warmed
+          around it. */}
       <span
         className={cn(
-          "dr-app-icon relative mx-auto flex aspect-square w-full max-w-[3.75rem] items-center justify-center rounded-[24%] border border-white/[0.14] sm:max-w-[4.25rem]",
-          active ? "dr-app-icon-active" : "dr-app-icon-idle",
+          "relative flex aspect-square w-full items-center justify-center rounded-[26%] border transition duration-150 group-active:scale-90",
+          active
+            ? "border-primary/50 bg-primary/20"
+            : "border-primary/20 bg-primary/10 group-hover:bg-primary/15",
         )}
       >
-        <span className="dr-app-icon-shine pointer-events-none absolute inset-0 rounded-[inherit]" aria-hidden />
-        <Icon
-          className={cn(
-            "relative z-[1] h-[44%] w-[44%] transition duration-200",
-            active ? "text-[#1a1207]" : "text-[#1a1207]/90",
-          )}
-          strokeWidth={2.15}
-          aria-hidden
-        />
+        <Icon className="h-[42%] w-[42%] text-primary" strokeWidth={2.25} aria-hidden />
         {badge ? (
-          <span className="absolute -right-1 -top-1 z-[2] flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full border border-white/20 bg-[#141019] px-1 text-[9px] font-bold text-primary shadow-md">
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-card px-1 text-label font-semibold text-cream ring-1 ring-white/15">
             {badge}
           </span>
         ) : null}
       </span>
       <span
         className={cn(
-          "max-w-full truncate text-center text-[10px] font-medium leading-tight tracking-[0.06em] sm:text-[11px]",
-          active ? "text-primary" : "text-cream/75 group-hover:text-cream",
+          "max-w-full truncate text-label font-medium",
+          active ? "text-cream" : "text-cream/70",
         )}
       >
         {label}
@@ -1162,90 +1243,43 @@ function MenuTile({
   );
 }
 
-/** Drilled-in activity — image-backed square with classic icon + label. */
-function MenuSquareTile({
+/** A drilled-in activity as a list row — icon chip + title + tagline +
+ *  chevron. The compact form the dropup wants; the dock's big square tiles
+ *  needed a grid the stage can no longer spare. */
+function MenuListRow({
   Icon,
   label,
   tagline,
-  image,
   active,
-  hero,
   onClick,
 }: {
   Icon: LucideIcon;
   label: string;
   tagline?: string;
-  image?: string;
   active: boolean;
-  hero?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      title={tagline ? `${label} — ${tagline}` : label}
       className={cn(
-        "dr-dock-tile group relative flex aspect-square min-w-0 flex-col overflow-hidden border text-left transition duration-200",
-        hero ? "rounded-[1.15rem]" : "rounded-xl",
+        "flex items-center gap-3.5 rounded-2xl border p-3.5 text-left transition",
         active
-          ? "border-primary/50 shadow-[0_0_0_1px_hsl(var(--primary)/0.4),0_12px_32px_rgb(0_0_0_/_0.45)]"
-          : "border-white/[0.10] hover:border-primary/30 hover:shadow-[0_10px_28px_rgb(0_0_0_/_0.4)]",
+          ? "border-primary/40 bg-primary/[0.08]"
+          : "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05]",
       )}
     >
-      {image ? (
-        <img
-          src={image}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
-        />
-      ) : (
-        <span className="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-black/50" aria-hidden />
-      )}
-      <span
-        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#080604]/95 via-[#080604]/45 to-[#080604]/15 transition duration-300 group-hover:via-[#080604]/35"
-        aria-hidden
-      />
-      <span className={cn("relative z-[1] flex flex-1 items-start justify-start", hero ? "p-3 sm:p-4" : "p-2")}>
-        <span
-          className={cn(
-            "flex items-center justify-center rounded-lg border border-white/20 bg-black/35 backdrop-blur-md transition duration-200 group-hover:border-primary/40 group-hover:bg-black/50",
-            hero ? "h-11 w-11 sm:h-12 sm:w-12" : "h-8 w-8 sm:h-9 sm:w-9",
-            active && "border-primary/50 bg-primary/20",
-          )}
-        >
-          <Icon
-            className={cn(
-              hero ? "h-5 w-5 sm:h-6 sm:w-6" : "h-4 w-4 sm:h-[18px] sm:w-[18px]",
-              active ? "text-primary" : "text-cream",
-            )}
-            strokeWidth={2}
-            aria-hidden
-          />
-        </span>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+        <Icon className="h-[18px] w-[18px] text-primary" aria-hidden />
       </span>
-      <span className={cn("relative z-[1] shrink-0 pt-1", hero ? "px-3 pb-3 sm:px-4 sm:pb-4" : "px-2 pb-2 sm:px-2.5 sm:pb-2.5")}>
-        <span
-          className={cn(
-            "block truncate font-serif leading-tight",
-            hero ? "text-base sm:text-lg" : "text-[11px] sm:text-xs",
-            active ? "text-primary" : "text-cream",
-          )}
-        >
-          {label}
-        </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-body font-semibold text-cream">{label}</span>
         {tagline ? (
-          <span
-            className={cn(
-              "mt-0.5 block line-clamp-2 leading-snug text-cream/55",
-              hero ? "text-[11px] sm:text-xs" : "text-[8px] sm:text-[9px]",
-            )}
-          >
-            {tagline}
-          </span>
+          <span className="block truncate text-label text-muted-foreground">{tagline}</span>
         ) : null}
       </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
     </button>
   );
 }
@@ -1331,7 +1365,7 @@ function PinnedVisionCard({
         ) : (
           <div className={cn("flex h-full w-full items-center justify-center bg-gradient-to-br", gradient)}>
             {media === "pdf" && (
-              <span className="rounded-full bg-black/45 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber">
+              <span className="rounded-full bg-black/45 px-2 py-0.5 text-label font-semibold uppercase tracking-wider text-amber">
                 PDF
               </span>
             )}
@@ -1341,7 +1375,7 @@ function PinnedVisionCard({
           <Pin className="h-3 w-3 fill-current" />
         </span>
       </div>
-      <p className="truncate px-0.5 pt-1.5 text-center text-xs font-medium text-cream/90">{label}</p>
+      <p className="truncate px-0.5 pt-1.5 text-center text-label font-medium text-cream/90">{label}</p>
     </div>
   );
 }

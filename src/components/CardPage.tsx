@@ -42,7 +42,7 @@ export function CardPage({
                 <ArrowLeft className="h-5 w-5" />
               </button>
             )}
-            {title && <h1 className="font-serif text-lg text-cream truncate">{title}</h1>}
+            {title && <h1 className="text-title text-cream truncate">{title}</h1>}
             {headerRight && <div className="ml-auto">{headerRight}</div>}
           </header>
           <div className={cn("px-5 sm:px-6 pb-12 pt-6", bodyClassName)}>{children}</div>

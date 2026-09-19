@@ -54,7 +54,7 @@ function PreviewCard({ item }: { item: VisionBoardItem }) {
         )}
       </div>
       {item.caption && (
-        <p className="mt-1.5 px-0.5 text-center font-serif text-[11px] italic leading-snug text-cream/85">
+        <p className="mt-1.5 px-0.5 text-center text-label italic leading-snug text-cream/85">
           {item.caption}
         </p>
       )}
@@ -95,8 +95,8 @@ export function VisionBoardWallPreview({ onOpen }: Props) {
           </div>
         ) : items.length === 0 ? (
           <div className="flex h-full min-h-[240px] flex-col items-center justify-center px-6 text-center">
-            <p className="font-serif text-base italic text-cream/55">Pin your first dream together</p>
-            <p className="mt-2 text-xs text-cream/40">Tap to add photos, words, and goals</p>
+            <p className="text-body italic text-cream/55">Pin your first dream together</p>
+            <p className="mt-2 text-label text-cream/40">Tap to add photos, words, and goals</p>
           </div>
         ) : (
           items

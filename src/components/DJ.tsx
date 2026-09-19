@@ -542,7 +542,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
         {reactions.map((r, i) => (
           <span
             key={r.id}
-            className="absolute bottom-20 text-3xl"
+            className="absolute bottom-20 text-display"
             style={{ left: `${20 + ((i * 17) % 60)}%`, animation: "float-up 2.4s ease-out forwards" }}
           >
             {r.emoji}
@@ -598,15 +598,15 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
         {/* Title + channel — bigger typographic mass on desktop where
             we have the room for it. */}
         <div>
-          <p className="truncate text-base font-semibold text-cream lg:text-lg">
+          <p className="truncate text-body font-semibold text-cream">
             {silence
               ? `Silence, chosen by ${djName}`
               : trackTitle ?? "Nothing playing yet"}
           </p>
           {!silence && trackChannel ? (
-            <p className="truncate text-xs text-muted-foreground lg:text-sm">{trackChannel}</p>
+            <p className="truncate text-label text-muted-foreground">{trackChannel}</p>
           ) : !silence && !trackTitle ? (
-            <p className="text-xs text-muted-foreground lg:text-sm">Paste a YouTube link below to start the queue.</p>
+            <p className="text-label text-muted-foreground">Paste a YouTube link below to start the queue.</p>
           ) : null}
         </div>
 
@@ -626,7 +626,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
         {needsAudioGesture && playing && (
           <button
             onClick={enableAudio}
-            className="w-full rounded-full py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90"
+            className="w-full rounded-full py-2.5 text-body font-medium text-primary-foreground hover:opacity-90"
             style={{ backgroundColor: "var(--room-accent)" }}
           >
             Tap to enable audio
@@ -647,7 +647,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
               className="flex-1"
               style={{ accentColor: "var(--room-accent)" }}
             />
-            <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">{volume}</span>
+            <span className="w-8 text-right text-label tabular-nums text-muted-foreground">{volume}</span>
           </div>
         )}
       </section>
@@ -659,14 +659,14 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       {queue.length > 0 && (
         <section className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between px-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <p className="text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Up next · {queue.length}
             </p>
             {isDJ && (
               <button
                 type="button"
                 onClick={() => persistDj({ queue: [] })}
-                className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground transition hover:text-cream"
+                className="text-label uppercase tracking-[0.18em] text-muted-foreground transition hover:text-cream"
               >
                 Clear
               </button>
@@ -687,12 +687,12 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
                       // eslint-disable-next-line jsx-a11y/alt-text
                       <img src={tThumb} className="h-full w-full object-cover" />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-[10px] text-muted-foreground">
+                      <div className="flex h-full w-full items-center justify-center text-label text-muted-foreground">
                         ▶
                       </div>
                     )}
                   </div>
-                  <p className="min-w-0 flex-1 truncate text-[13px] text-cream">
+                  <p className="min-w-0 flex-1 truncate text-body text-cream">
                     {t.title || "Track"}
                   </p>
                   {isDJ && (
@@ -704,7 +704,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
                         })
                       }
                       aria-label="Remove from queue"
-                      className="text-[11px] text-muted-foreground transition hover:text-cream"
+                      className="text-label text-muted-foreground transition hover:text-cream"
                     >
                       ✕
                     </button>
@@ -719,7 +719,7 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
       {/* ───────── 5. Paste-URL field — DJ-only ───────── */}
       {isDJ && (
         <form onSubmit={playUrl} className="space-y-1">
-          <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          <p className="px-1 text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             Add a track
           </p>
           <div className="flex gap-2">
@@ -731,13 +731,13 @@ export function DJ({ watchActive = false }: { watchActive?: boolean } = {}) {
             />
             <button
               type="submit"
-              className="focus-ring rounded-full px-5 text-sm font-medium text-primary-foreground hover:opacity-90"
+              className="focus-ring rounded-full px-5 text-body font-medium text-primary-foreground hover:opacity-90"
               style={{ backgroundColor: "var(--room-accent)" }}
             >
               Add
             </button>
           </div>
-          {urlError && <p className="px-1 text-xs text-rose">{urlError}</p>}
+          {urlError && <p className="px-1 text-label text-rose">{urlError}</p>}
         </form>
       )}
 
@@ -844,12 +844,12 @@ export function DjFooter({
     <div className="mt-auto rounded-2xl border border-white/[0.06] bg-card/50 p-4">
       <div className="flex items-center gap-3">
         <Music className="h-4 w-4" style={{ color: "var(--room-accent)" }} />
-        <p className="flex-1 text-sm text-cream">{statusLine}</p>
+        <p className="flex-1 text-body text-cream">{statusLine}</p>
         {!hasDj && (
           <button
             type="button"
             onClick={onTake}
-            className="rounded-full px-4 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
+            className="rounded-full px-4 py-1.5 text-label font-semibold text-primary-foreground hover:opacity-90"
             style={{ backgroundColor: "var(--room-accent)" }}
           >
             Take turn
@@ -859,7 +859,7 @@ export function DjFooter({
           <button
             type="button"
             onClick={onEnd}
-            className="rounded-full border px-4 py-1.5 text-xs font-semibold hover:bg-[var(--room-accent)]/10"
+            className="rounded-full border px-4 py-1.5 text-label font-semibold hover:bg-[var(--room-accent)]/10"
             style={{
               borderColor: "color-mix(in srgb, var(--room-accent) 40%, transparent)",
               color: "var(--room-accent)",

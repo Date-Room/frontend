@@ -171,7 +171,7 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
     <div className="flex flex-col gap-5 p-5">
       {/* Share — Room ID + PIN tiles, then the link beneath. */}
       <section className="space-y-3">
-        <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Share</p>
+        <p className="text-label uppercase tracking-[0.28em] text-muted-foreground">Share</p>
         {room ? (
           <div className="rounded-2xl border border-primary/25 bg-primary/[0.06] p-4 space-y-4">
             <div className="grid grid-cols-2 gap-3">
@@ -180,14 +180,14 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
             </div>
             <div className="flex items-center gap-3" aria-hidden>
               <span className="flex-1 h-px bg-white/10" />
-              <span className="text-[10px] uppercase tracking-[0.32em] text-muted-foreground">or</span>
+              <span className="text-label uppercase tracking-[0.32em] text-muted-foreground">or</span>
               <span className="flex-1 h-px bg-white/10" />
             </div>
             <button
               type="button"
               onClick={() => void copy(inviteUrl, "link")}
               className={cn(
-                "w-full flex items-center justify-center gap-2 rounded-full border border-white/15 py-2.5 text-sm text-cream hover:bg-white/5 transition",
+                "w-full flex items-center justify-center gap-2 rounded-full border border-white/15 py-2.5 text-body text-cream hover:bg-white/5 transition",
                 copiedKey === "link" && "border-emerald-400/40 text-emerald-200",
               )}
             >
@@ -205,7 +205,7 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
               type="button"
               onClick={onRotate}
               disabled={rotating}
-              className="w-full flex items-center justify-center gap-2 rounded-full border py-2.5 text-sm transition disabled:opacity-50 hover:bg-[var(--room-accent)]/10"
+              className="w-full flex items-center justify-center gap-2 rounded-full border py-2.5 text-body transition disabled:opacity-50 hover:bg-[var(--room-accent)]/10"
               style={{
                 borderColor: "color-mix(in srgb, var(--room-accent) 40%, transparent)",
                 color: "var(--room-accent)",
@@ -216,7 +216,7 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
             </button>
           </div>
         ) : (
-          <div className="rounded-2xl border border-white/10 bg-card/40 p-4 text-sm text-muted-foreground">Loading…</div>
+          <div className="rounded-2xl border border-white/10 bg-card/40 p-4 text-body text-muted-foreground">Loading…</div>
         )}
       </section>
 
@@ -239,14 +239,14 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
             return false;
           };
           return (
-            <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
+            <p className="text-label uppercase tracking-[0.28em] text-muted-foreground">
               In the room ({session.presence.filter((p) => !isEjected(p)).length})
             </p>
           );
         })()}
         <div className="rounded-2xl border border-border bg-card/60 divide-y divide-white/[0.06]">
           {session.presence.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-muted-foreground">Just you — waiting on your guest.</p>
+            <p className="px-4 py-3 text-body text-muted-foreground">Just you — waiting on your guest.</p>
           ) : (
             session.presence
               .filter((p) => {
@@ -277,10 +277,10 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
               return (
                 <div key={`${p.sender_id}-${p.slot}`} className="flex items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-cream truncate">
-                      {(typeof p.name === "string" && p.name) || (isSelf ? "You" : "Guest")} {isSelf && <span className="text-muted-foreground text-xs">· you</span>}
+                    <p className="text-body text-cream truncate">
+                      {(typeof p.name === "string" && p.name) || (isSelf ? "You" : "Guest")} {isSelf && <span className="text-muted-foreground text-label">· you</span>}
                     </p>
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    <p className="text-label uppercase tracking-[0.18em] text-muted-foreground">
                       Seat {String(p.slot || "?").toUpperCase()} {p.is_host ? "· host" : ""}
                     </p>
                   </div>
@@ -289,7 +289,7 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
                       type="button"
                       onClick={() => void onKick(resolvedPid, (p.name as string | undefined) ?? "Guest")}
                       disabled={kicking === resolvedPid}
-                      className="flex items-center gap-1.5 rounded-full border border-destructive/30 text-destructive/80 hover:text-destructive hover:bg-destructive/10 px-3 py-1.5 text-[11px] uppercase tracking-[0.2em] transition disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-full border border-destructive/30 text-destructive/80 hover:text-destructive hover:bg-destructive/10 px-3 py-1.5 text-label uppercase tracking-[0.2em] transition disabled:opacity-50"
                     >
                       {kicking === resolvedPid ? (
                         <Loader2 className="w-3 h-3 animate-spin" aria-hidden />
@@ -309,7 +309,7 @@ function RoomDetails({ onLeave }: { onLeave: () => void }) {
       <button
         type="button"
         onClick={onLeave}
-        className="flex items-center justify-center gap-2 rounded-full border border-destructive/40 text-destructive py-3 text-sm hover:bg-destructive/10 transition"
+        className="flex items-center justify-center gap-2 rounded-full border border-destructive/40 text-destructive py-3 text-body hover:bg-destructive/10 transition"
       >
         <LogOut className="w-4 h-4" /> Leave the room
       </button>
@@ -340,10 +340,10 @@ function CopyTile({
       )}
     >
       <div className="flex items-center justify-between">
-        <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">{label}</p>
+        <p className="text-label uppercase tracking-[0.28em] text-muted-foreground">{label}</p>
         {copied ? <Check className="w-3.5 h-3.5 text-emerald-300" aria-hidden /> : <Copy className="w-3.5 h-3.5 text-muted-foreground opacity-60 group-hover:opacity-100 transition" aria-hidden />}
       </div>
-      <p className="mt-1 font-serif text-2xl tracking-[0.3em] text-primary tabular-nums select-all">{value}</p>
+      <p className="mt-1 font-serif text-display tracking-[0.3em] text-primary tabular-nums select-all">{value}</p>
     </button>
   );
 }
@@ -377,7 +377,7 @@ function ActivityView({ id, onLeave }: { id: string; onLeave: () => void }) {
     default:
       return (
         <div className="flex h-full items-center justify-center p-8 text-center">
-          <p className="font-serif italic text-cream/70 text-sm max-w-xs leading-relaxed">Coming to the web soon.</p>
+          <p className="italic text-cream/70 text-body max-w-xs leading-relaxed">Coming to the web soon.</p>
         </div>
       );
   }
@@ -528,7 +528,7 @@ export function ActivityTray({
           ) : (
             <span className="w-5" />
           )}
-          <span className="flex-1 text-center font-serif italic text-cream">{title}</span>
+          <span className="flex-1 text-center italic text-cream">{title}</span>
           {actId && hasActivityHelp(actId) ? (
             <button
               type="button"
@@ -579,11 +579,11 @@ export function ActivityTray({
                   className="flex items-center gap-3 rounded-2xl border border-border bg-secondary/40 p-4 text-left hover:border-primary/30 transition"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-cream flex items-center gap-2">
+                    <p className="text-body text-cream flex items-center gap-2">
                       {a.label}
-                      {!a.ready && <span className="text-[9px] uppercase tracking-wider text-muted-foreground border border-border rounded-full px-1.5 py-0.5">soon</span>}
+                      {!a.ready && <span className="text-label uppercase tracking-wider text-muted-foreground border border-border rounded-full px-1.5 py-0.5">soon</span>}
                     </p>
-                    {a.tagline && <p className="text-xs text-muted-foreground mt-0.5">{a.tagline}</p>}
+                    {a.tagline && <p className="text-label text-muted-foreground mt-0.5">{a.tagline}</p>}
                   </div>
                   <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
                 </button>

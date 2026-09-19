@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useReportBottomBarHeight } from "@/lib/bottomBar";
 import { Input } from "@/components/ui/input";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
@@ -1061,7 +1062,7 @@ export function MusicRoomProvider({
             /* Below the video: YouTube's MINI layout puts its controls (and
                the speaker button) along the TOP edge — live-tested: a top
                caption covered the very button it pointed at. */
-            <p className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/75 px-2 py-1.5 text-center text-[11px] font-medium text-cream">
+            <p className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/75 px-2 py-1.5 text-center text-label font-medium text-cream">
               Tap the speaker icon to unmute
             </p>
           )}
@@ -1150,12 +1151,12 @@ export function MusicLibrary() {
           <button
             type="button"
             onClick={() => setAdding(false)}
-            className="absolute left-0 inline-flex items-center gap-1.5 text-sm text-primary transition hover:opacity-80"
+            className="absolute left-0 inline-flex items-center gap-1.5 text-body text-primary transition hover:opacity-80"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
           </button>
-          <p className="text-sm font-semibold text-cream">Add Song</p>
+          <p className="text-body font-semibold text-cream">Add Song</p>
         </div>
         <form onSubmit={submit} className="space-y-3">
           <Input
@@ -1165,11 +1166,11 @@ export function MusicLibrary() {
             placeholder="Paste a YouTube, SoundCloud or Spotify link…"
             className="focus-ring bg-secondary/60 border-white/[0.10] focus-visible:border-primary/40"
           />
-          {urlError && <p className="px-1 text-xs text-rose">{urlError}</p>}
+          {urlError && <p className="px-1 text-label text-rose">{urlError}</p>}
           <button
             type="submit"
             disabled={resolving}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full py-2.5 text-body font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
             style={{ backgroundColor: "var(--room-accent)" }}
           >
             <Plus className="h-4 w-4" /> {resolving ? "Finding it…" : "Add song"}
@@ -1184,7 +1185,7 @@ export function MusicLibrary() {
       {m.tracks.length > 0 ? (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between px-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            <p className="text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               {m.tracks.length} song{m.tracks.length === 1 ? "" : "s"} · drag to reorder
             </p>
             <div className="flex items-center gap-3">
@@ -1192,7 +1193,7 @@ export function MusicLibrary() {
               <button
                 type="button"
                 onClick={() => setConfirmClear(true)}
-                className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground transition hover:text-rose"
+                className="text-label uppercase tracking-[0.18em] text-muted-foreground transition hover:text-rose"
               >
                 Clear list
               </button>
@@ -1255,15 +1256,15 @@ export function MusicLibrary() {
       {confirmClear && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
           <div className="w-full max-w-xs rounded-2xl border border-white/10 bg-card p-5 text-center shadow-2xl">
-            <p className="font-serif text-lg text-cream">Clear the list?</p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="text-title text-cream">Clear the list?</p>
+            <p className="mt-1 text-body text-muted-foreground">
               This removes the current song and everything queued, for both of you.
             </p>
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
                 onClick={() => setConfirmClear(false)}
-                className="flex-1 rounded-full border border-white/10 py-2 text-sm text-cream transition hover:bg-white/5"
+                className="flex-1 rounded-full border border-white/10 py-2 text-body text-cream transition hover:bg-white/5"
               >
                 Cancel
               </button>
@@ -1273,7 +1274,7 @@ export function MusicLibrary() {
                   m.clearQueue();
                   setConfirmClear(false);
                 }}
-                className="flex-1 rounded-full bg-rose py-2 text-sm font-semibold text-white transition hover:opacity-90"
+                className="flex-1 rounded-full bg-rose py-2 text-body font-semibold text-white transition hover:opacity-90"
               >
                 Clear
               </button>
@@ -1333,13 +1334,13 @@ function LibraryRow({
             // eslint-disable-next-line jsx-a11y/alt-text
             <img src={thumb} className="h-full w-full object-cover" />
           ) : (
-            <span className="flex h-full w-full items-center justify-center text-[10px] text-muted-foreground">▶</span>
+            <span className="flex h-full w-full items-center justify-center text-label text-muted-foreground">▶</span>
           )}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] text-cream">{track.title || "Track"}</span>
+          <span className="block truncate text-body text-cream">{track.title || "Track"}</span>
           {track.channel_title && (
-            <span className="block truncate text-[11px] text-muted-foreground">{track.channel_title}</span>
+            <span className="block truncate text-label text-muted-foreground">{track.channel_title}</span>
           )}
         </span>
       </button>
@@ -1372,11 +1373,18 @@ function LibraryRow({
 
 export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
   const m = useMusicRoom();
-  if (!m.hasContent || m.closed) return null;
+  const visible = m.hasContent && !m.closed;
+  const barRef = useReportBottomBarHeight("music", visible);
+
+  if (!visible) return null;
   const pct = m.duration > 0 ? Math.min(100, (m.position / m.duration) * 100) : 0;
 
   return (
-    <div className="pointer-events-auto fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-card/60 backdrop-blur-sm">
+    <div
+      ref={barRef}
+      data-dr-bottom-bar
+      className="pointer-events-auto fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-card/60 backdrop-blur-sm"
+    >
       {/* Edge-to-edge progress / seek bar */}
       <button
         type="button"
@@ -1397,7 +1405,7 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
           {m.reactions.map((r, i) => (
             <span
               key={r.id}
-              className="absolute bottom-8 text-2xl"
+              className="absolute bottom-8 text-display"
               style={{ left: `${20 + ((i * 17) % 60)}%`, animation: "float-up 2.4s ease-out forwards" }}
             >
               {r.emoji}
@@ -1428,10 +1436,10 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-cream">
+          <p className="truncate text-body font-semibold text-cream">
             {m.trackTitle ?? "Nothing playing yet"}
           </p>
-          <p className="truncate text-[11px] text-muted-foreground">
+          <p className="truncate text-label text-muted-foreground">
             {m.trackChannel ?? (m.upcomingCount > 0 ? `${m.upcomingCount} up next` : "Add a song to start")}
           </p>
         </div>
@@ -1526,14 +1534,14 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
         m.nowPlaying?.source === "soundcloud" ? (
           <button
             onClick={m.enableAudio}
-            className="mt-1.5 w-full rounded-full py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
+            className="mt-1.5 w-full rounded-full py-1.5 text-label font-medium text-primary-foreground hover:opacity-90"
             style={{ backgroundColor: "var(--room-accent)" }}
           >
             Tap to enable audio
           </button>
         ) : (
           <p
-            className="mt-1.5 w-full rounded-full py-1.5 text-center text-xs font-medium"
+            className="mt-1.5 w-full rounded-full py-1.5 text-center text-label font-medium"
             style={{ backgroundColor: "color-mix(in srgb, var(--room-accent) 18%, transparent)", color: "var(--room-accent)" }}
           >
             Sound is blocked — unmute the small video, bottom left ↙

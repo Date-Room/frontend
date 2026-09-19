@@ -132,14 +132,14 @@ export function MediaMiniPlayer({ currentActivityId, onOpenActivity, bottomOffse
           // eslint-disable-next-line jsx-a11y/alt-text
           <img src={thumb} className="h-full w-full object-cover" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">▶</div>
+          <div className="flex h-full w-full items-center justify-center text-label text-muted-foreground">▶</div>
         )}
       </div>
 
       {/* Title + subtitle */}
       <div className="min-w-0 flex-1 text-left">
-        <p className="truncate text-[13px] font-semibold text-cream">{title}</p>
-        <p className="truncate text-[11px] text-muted-foreground">{subtitle}</p>
+        <p className="truncate text-body font-semibold text-cream">{title}</p>
+        <p className="truncate text-label text-muted-foreground">{subtitle}</p>
       </div>
 
       {/* Back 10s — Watch only (track has no "previous"; DJ has no rewind). */}

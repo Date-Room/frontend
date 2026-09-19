@@ -151,22 +151,22 @@ export function PlaylistShelf({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="focus-ring inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground transition hover:text-cream"
+          className="focus-ring inline-flex items-center gap-1.5 text-label uppercase tracking-[0.18em] text-muted-foreground transition hover:text-cream"
         >
           <ListMusic className="h-3.5 w-3.5" /> Playlists
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72">
-        <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        <DropdownMenuLabel className="text-label font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           Your playlists
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {loading ? (
-          <div className="flex items-center justify-center gap-2 px-3 py-4 text-xs text-muted-foreground">
+          <div className="flex items-center justify-center gap-2 px-3 py-4 text-label text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
           </div>
         ) : collections.length === 0 ? (
-          <p className="px-3 py-3 text-xs text-muted-foreground">
+          <p className="px-3 py-3 text-label text-muted-foreground">
             Nothing saved yet. Name the current list below and it follows your
             account into every room.
           </p>
@@ -183,8 +183,8 @@ export function PlaylistShelf({
                   }}
                   className="focus-ring min-w-0 flex-1 rounded-md px-1 py-1 text-left transition hover:bg-white/[0.06]"
                 >
-                  <span className="block truncate text-sm text-cream">{c.name}</span>
-                  <span className="block text-[11px] text-muted-foreground">
+                  <span className="block truncate text-body text-cream">{c.name}</span>
+                  <span className="block text-label text-muted-foreground">
                     {c.items.length} song{c.items.length === 1 ? "" : "s"} · tap to queue
                   </span>
                 </button>
@@ -214,25 +214,25 @@ export function PlaylistShelf({
               onChange={(e) => setName(e.target.value)}
               placeholder="Save current list as…"
               maxLength={80}
-              className="h-8 bg-secondary/60 text-xs border-white/[0.10]"
+              className="h-8 bg-secondary/60 text-label border-white/[0.10]"
             />
             <Button
               type="submit"
               size="sm"
               disabled={saving || !name.trim() || !canSave}
-              className="h-8 shrink-0 rounded-full text-xs text-primary-foreground"
+              className="h-8 shrink-0 rounded-full text-label text-primary-foreground"
               style={{ backgroundColor: "var(--room-accent)" }}
             >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save"}
             </Button>
           </form>
         ) : (
-          <p className="px-3 py-2 text-[11px] text-muted-foreground">
+          <p className="px-3 py-2 text-label text-muted-foreground">
             Add some songs first, then save the list here.
           </p>
         )}
         {!canSave && !loading && savable.length > 0 && (
-          <p className="px-3 pb-2 text-[11px] text-muted-foreground">
+          <p className="px-3 pb-2 text-label text-muted-foreground">
             Saving comes with any paid pass or Together plan.
           </p>
         )}

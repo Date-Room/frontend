@@ -99,7 +99,7 @@ export function RoomSettings() {
     <div className="flex h-full flex-col gap-5 overflow-y-auto p-4 sm:p-6">
       {/* Invite — mirrors the pre-room share block. */}
       <section className="flex flex-col gap-3">
-        <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="px-1 text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Invite
         </p>
         <div className="grid grid-cols-2 gap-3">
@@ -112,7 +112,7 @@ export function RoomSettings() {
             onClick={() => copy(inviteUrl, "link")}
             disabled={!inviteUrl}
             className={cn(
-              "flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/[0.02] py-2.5 text-xs font-medium text-cream transition hover:bg-white/5 disabled:opacity-50",
+              "flex items-center justify-center gap-2 rounded-full border border-white/15 bg-white/[0.02] py-2.5 text-label font-medium text-cream transition hover:bg-white/5 disabled:opacity-50",
               copied === "link" && "border-emerald-500/40 bg-emerald-500/5 text-emerald-300",
             )}
           >
@@ -130,7 +130,7 @@ export function RoomSettings() {
             type="button"
             onClick={share}
             disabled={!inviteUrl}
-            className="flex items-center justify-center gap-2 rounded-full py-2.5 text-xs font-semibold text-primary-foreground shadow-md transition hover:opacity-90 disabled:opacity-50"
+            className="flex items-center justify-center gap-2 rounded-full py-2.5 text-label font-semibold text-primary-foreground shadow-md transition hover:opacity-90 disabled:opacity-50"
             style={{ backgroundColor: "var(--room-accent)" }}
           >
             <Share2 className="h-3.5 w-3.5" /> Invite partner…
@@ -140,7 +140,7 @@ export function RoomSettings() {
 
       {/* Background — the chosen preset also sets the room accent. */}
       <section className="flex flex-col gap-2">
-        <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="px-1 text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Background {busy && <Loader2 className="ml-1 inline h-3 w-3 animate-spin" />}
         </p>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
@@ -150,7 +150,7 @@ export function RoomSettings() {
               type="button"
               onClick={() => void pickBackground(b.id)}
               className={cn(
-                "rounded-xl border px-3 py-2.5 text-sm capitalize transition",
+                "rounded-xl border px-3 py-2.5 text-body capitalize transition",
                 bgId === b.id
                   ? "border-primary/50 bg-primary/[0.08] text-cream"
                   : "border-white/[0.08] bg-white/[0.02] text-muted-foreground hover:text-cream",
@@ -163,7 +163,7 @@ export function RoomSettings() {
       </section>
 
       {!session.canPersist && (
-        <p className="px-1 text-xs text-muted-foreground">Sign in as a member to change the room.</p>
+        <p className="px-1 text-label text-muted-foreground">Sign in as a member to change the room.</p>
       )}
     </div>
   );
@@ -191,14 +191,14 @@ function CodeCopyTile({
       )}
     >
       <div className="flex items-center justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
+        <p className="text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">{label}</p>
         {copied ? (
           <Check className="h-3 w-3 text-emerald-300" />
         ) : (
           <Copy className="h-3 w-3 text-muted-foreground/70" />
         )}
       </div>
-      <p className="select-all text-lg font-semibold tracking-wider text-primary tabular-nums">{value || "—"}</p>
+      <p className="select-all text-title font-semibold tracking-wider text-primary tabular-nums">{value || "—"}</p>
     </button>
   );
 }

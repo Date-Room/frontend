@@ -34,26 +34,26 @@ export function GameLanding({
         <div className="dr-game-landing__hero" style={{ backgroundImage: `url(${hero})` }} aria-hidden />
       )}
       <div className="dr-game-landing__content relative flex flex-col items-center gap-2">
-        <p className="dr-game-landing__title font-serif text-3xl italic text-cream">{title}</p>
-        <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">{promise}</p>
+        <p className="dr-game-landing__title font-serif text-display italic text-cream">{title}</p>
+        <p className="max-w-xs text-body leading-relaxed text-muted-foreground">{promise}</p>
         <p
-          className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em]"
+          className="flex items-center gap-1.5 text-label uppercase tracking-[0.22em]"
           style={{ color: "var(--room-accent)" }}
         >
           <Clock className="h-3.5 w-3.5" aria-hidden /> {minutes}
         </p>
       </div>
-      <div className="dr-game-landing__beats relative flex w-full max-w-sm flex-col gap-2">
+      <div className="dr-game-landing__beats relative flex w-full max-w-sm flex-col gap-2.5">
         {beats.map((b, i) => (
           <div
             key={i}
-            className="dr-game-landing__beat flex items-start gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-3 text-left"
+            className="dr-game-landing__beat flex items-start gap-3.5 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-3.5 text-left"
             style={{ animationDelay: `${120 + i * 90}ms` }}
           >
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/15 font-serif text-xs text-cream/80">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/15 text-label text-cream/80">
               {i + 1}
             </span>
-            <span className="text-sm leading-relaxed text-cream/90">{b}</span>
+            <span className="text-body leading-relaxed text-cream/90">{b}</span>
           </div>
         ))}
       </div>
