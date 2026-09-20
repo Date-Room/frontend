@@ -55,17 +55,18 @@ import {
   shouldShowGameIntro,
 } from "@/components/ActivityHelp";
 import { RoomAmbianceSheet } from "@/components/RoomAmbianceSheet";
-import { RoomThemeChip } from "@/components/RoomThemeChip";
 import { useRoomThemePicker } from "@/hooks/useRoomThemePicker";
 import { useHelpNow } from "@/lib/activityHelpNow";
 import { MusicPlayerBar, MusicRoomProvider } from "@/components/MusicRoom";
 import { ActivityBoundary } from "@/components/RoomErrorBoundary";
 import { useRoomSession } from "@/context/RoomSessionContext";
+import { ACTIVITY_TILES } from "@/lib/activityTiles";
 import { useBottomBarHeight } from "@/lib/bottomBar";
 import { useVideoOrientation } from "@/lib/videoOrientation";
 import { useWideViewport } from "@/lib/viewport";
 import { useChaperonController } from "@/context/ChaperonContext";
 import { ChaperonSeam } from "@/components/ChaperonSeam";
+import { CHAT_OPEN_EVENT, ChatDrawer } from "@/components/ChatDrawer";
 import { ActivityInvite, inviteChime } from "@/components/ActivityInvite";
 import { ChatToast } from "@/components/ChatToast";
 import { useChatRoom } from "@/context/ChatContext";
@@ -107,7 +108,6 @@ const CATEGORIES: { id: string; label: string; icon: LucideIcon; itemIds: string
   },
   { id: "watch", label: "Watch", icon: PlayCircle, itemIds: ["watch"] },
   { id: "music", label: "Music", icon: Headphones, itemIds: ["dj"] },
-  { id: "chat", label: "Chat", icon: MessageCircle, itemIds: ["chat"] },
 ];
 
 /** Partner-action → notifier copy + which stage item to open. Maps the raw
@@ -155,25 +155,6 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
 };
 
 
-/** Generated square backgrounds — used by the activity invite card. */
-const ITEM_TILE_IMAGES: Record<string, string> = {
-  vision_board: "/dock-tiles/vision-board.png",
-  fridge_notes: "/dock-tiles/fridge-notes.png",
-  bookshelf: "/dock-tiles/bookshelf.png",
-  room_details: "/dock-tiles/room-details.png",
-  questions: "/dock-tiles/questions.png",
-  this_or_that: "/dock-tiles/this-or-that.png",
-  the_36: "/dock-tiles/the-36.png",
-  "2_truths": "/dock-tiles/2-truths.png",
-  truth_or_dare: "/dock-tiles/truth-or-dare.png",
-  one_has_to_go: "/dock-tiles/one-has-to-go.png",
-  pick_a_door: "/dock-tiles/pick-a-door.png",
-  rank_it: "/dock-tiles/rank-it.png",
-  guacamole: "/dock-tiles/guacamole.png",
-  watch: "/dock-tiles/watch.png",
-  dj: "/dock-tiles/dj.png",
-  chat: "/dock-tiles/chat.png",
-};
 
 
 /** One-line taglines for the drilled-in list rows — mirror the mobile menu. */
@@ -203,6 +184,12 @@ export type StageItem = {
   /** Walls (Vision Board / Fridge / Bookshelf) group first in the launcher. */
   isWall?: boolean;
 };
+
+/** How much wider than tall the stage group sits, before the ceiling. */
+const STAGE_WIDTH_RATIO = 1.32;
+
+/** Gap between the detached bar and the card (Tailwind `gap-2`). */
+const STAGE_GAP = 8;
 
 const EDGE = 12;
 const TOP_PAD = 68;
@@ -377,6 +364,14 @@ export function RoomStage({
   }, [channelStatus]);
   const { current: themeMood, open: themeOpen, setOpen: setThemeOpen, pick: pickTheme, busy: themeBusy } =
     useRoomThemePicker();
+  // Room theming used to sit permanently on top of the stage. It belongs
+  // with the room's settings, not over every activity, so Room info opens it.
+  useEffect(() => {
+    const open = () => setThemeOpen(true);
+    window.addEventListener("dr:room:open-theme", open);
+    return () => window.removeEventListener("dr:room:open-theme", open);
+  }, [setThemeOpen]);
+
   const [notif, setNotif] = useState<{ id: number; text: string; target: string } | null>(null);
 
   const stagedRef = useRef(staged);
@@ -447,7 +442,13 @@ export function RoomStage({
   }, [inviteId]);
   const declineInvite = useCallback(() => dispatchInvite({ type: "decline" }), []);
 
-  // ── Chat while the panel is closed: badge on the dock, toast up top ────
+  // ── Chat: a drawer over the room, not a stage activity ────────────────
+  const [chatOpen, setChatOpen] = useState(false);
+  useEffect(() => {
+    const onOpen = () => setChatOpen(true);
+    window.addEventListener(CHAT_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(CHAT_OPEN_EVENT, onOpen);
+  }, []);
   const chat = useChatRoom();
   const chatUnread = chat?.unread ?? 0;
   const [chatToast, setChatToast] = useState<{ id: string; text: string } | null>(null);
@@ -455,7 +456,7 @@ export function RoomStage({
   useEffect(() => {
     const m = chat?.lastIncoming;
     if (!m || !lastIncomingId) return;
-    if (stagedRef.current === "chat") return;
+    if (chatOpenRef.current) return;
     setChatToast({ id: m.id, text: m.text });
     // Chat is how you reach someone when the mic or speakers are gone, so
     // the arrival is audible whenever the panel isn't open (not only in a
@@ -463,9 +464,11 @@ export function RoomStage({
     inviteChime(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastIncomingId]);
+  const chatOpenRef = useRef(chatOpen);
+  chatOpenRef.current = chatOpen;
   useEffect(() => {
-    if (staged === "chat") setChatToast(null);
-  }, [staged]);
+    if (chatOpen) setChatToast(null);
+  }, [chatOpen]);
   const dismissChatToast = useCallback(() => setChatToast(null), []);
 
   const notifTimer = useRef<number | undefined>(undefined);
@@ -566,10 +569,14 @@ export function RoomStage({
     setCallOpen(false);
     setManualBubble(false);
   }, [staged]);
+  // On desktop, `float` means the draggable picture-in-picture window — big
+  // feed with the other inset in it — not a pair of small round tiles. The
+  // bubble is a phone affordance (and the Watch-fullscreen overlay); it was
+  // never what "floating" meant on a large screen.
   const bubble = fsOverlay
     ? !fsExpanded
     : wide
-      ? floatingCall && callLayout === "float"
+      ? false
       : compact && (activityStaged ? !callOpen : manualBubble);
   const pairBubble = bubble && wide;
   const base = fsOverlay
@@ -657,7 +664,6 @@ export function RoomStage({
     return "Lobby";
   }, [staged, lastCatId, availCats]);
 
-  const showBack = staged !== "lobby";
 
   // ── Call PiP drag ──
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -878,6 +884,50 @@ export function RoomStage({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  // Roughly square where the screen allows, without locking a ratio: the
+  // width is capped to the height of the bar-and-stage group. Measuring the
+  // GROUP rather than the stage alone matters — once the bar was lifted out
+  // into its own card, measuring only the stage cut the width by the bar's
+  // height and left the card thin. Measured rather than derived from viewport
+  // maths, so it stays right when the chrome around it changes (the launcher
+  // gutter grows with the music bar). A little wider than tall reads better
+  // than a true square now the bar is its own card above it, so the height is
+  // scaled before it becomes the cap; the 54rem ceiling still keeps room
+  // around the card on a wide screen.
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [stageH, setStageH] = useState(0);
+  const [stageW, setStageW] = useState(0);
+  useLayoutEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const read = () => {
+      const r = el.getBoundingClientRect();
+      setStageH(r.height);
+      setStageW(r.width);
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // The card is a fixed height — everything under the detached bar. The lobby
+  // fills it by growing its own cards rather than by the card shrinking.
+  const stageBarRef = useRef<HTMLDivElement>(null);
+  const [stageBarH, setStageBarH] = useState(0);
+  useLayoutEffect(() => {
+    const el = stageBarRef.current;
+    if (!el) return;
+    const read = () => setStageBarH(el.getBoundingClientRect().height);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  /** The card's height: everything under the bar. */
+  const stageCardH = Math.max(0, stageH - stageBarH - STAGE_GAP) || undefined;
+
   /** Where the launcher floats, and how much room the stage gives up for it. */
   const launcherBottom = barH + GUTTER;
   const stagePadBottom = barH + GUTTER + pillH + GUTTER;
@@ -896,7 +946,7 @@ export function RoomStage({
           "flex h-full min-h-0 w-full gap-2 sm:gap-2.5",
           splitCallLayout
             ? "max-w-none flex-col lg:flex-row lg:items-stretch lg:gap-0"
-            : "mx-auto max-w-6xl flex-col",
+            : "mx-auto max-w-[57.6rem] flex-col",
         )}
       >
         {/* Left — stage + app dock. Takes whatever the call pane leaves. */}
@@ -950,127 +1000,222 @@ export function RoomStage({
           })()
         )}
 
-        {/* Stage — owns the canvas. The launcher floats over it. */}
-        <section className="perm-wall-frame flex min-h-0 flex-1 flex-col overflow-hidden !p-0">
-          <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 py-2 sm:px-4">
-            {showBack ? (
-              <button
-                type="button"
-                onClick={goBack}
-                className="focus-ring -ml-1 inline-flex items-center gap-1 rounded-full py-0.5 pl-0.5 pr-2.5 text-label font-medium text-primary transition hover:bg-white/[0.06]"
-              >
-                <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="truncate">Back to {backLabel}</span>
-              </button>
-            ) : (
-              <>
-                {stagedItem &&
+        {/* The bar hangs above the stage as its own surface — same width, same
+            centre, but a separate card with a gap between them. */}
+        <div
+          ref={stageRef}
+          className={cn(
+            "flex min-h-0 flex-1 flex-col gap-2",
+            // `self-center` is what lets the cap bite: a flex column stretches
+            // its children across the cross axis, which would override any
+            // max-width.
+            !splitCallLayout && "w-full self-center",
+          )}
+          style={
+            !splitCallLayout && stageH > 0
+              ? { maxWidth: `min(60rem, ${Math.round(stageH * STAGE_WIDTH_RATIO)}px)` }
+              : undefined
+          }
+        >
+            <div
+              ref={stageBarRef}
+              className="perm-wall-frame flex shrink-0 items-center gap-2 !px-3 !py-2 sm:!px-4"
+            >
+              {(() => {
+                // Starter's side: did my date follow me in?
+                const st = starterStatus(invite, staged, partnerPresent, nowTick, 45_000, openedAtRef.current);
+                if (!st) return null;
+                return (
+                  <span
+                    data-testid="stage-partner-status"
+                    className={cn(
+                      "hidden min-w-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-label sm:inline-flex",
+                      st === "together"
+                        ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+                        : "border-white/[0.1] bg-white/[0.04] text-cream/60",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "h-1.5 w-1.5 shrink-0 rounded-full",
+                        st === "together" ? "bg-emerald-400" : "bg-primary animate-pulse",
+                      )}
+                    />
+                    <span className="truncate">{st === "together" ? `${partnerName} is here` : `Inviting ${partnerName}…`}</span>
+                  </span>
+                );
+              })()}
+              <div className="ml-auto flex min-w-0 items-center gap-2">
+                {/* Chat sits with the call, not with the games: it is how you
+                    reach someone while everything else carries on. Same pill
+                    as the call so the two read as a pair — inverted, so you
+                    can tell them apart without reading either. */}
+                {(() => {
+                  const unread = chatUnread > 0;
+                  const title = unread
+                    ? chatUnread === 1
+                      ? "1 new message"
+                      : `${chatUnread} new messages`
+                    : "Send a message";
+                  const sub = unread
+                    ? `From ${partnerName}`
+                    : partnerInRoom
+                      ? `${partnerName} is here`
+                      : "They'll see it when they arrive";
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setChatOpen(true)}
+                        className={cn(
+                          "group hidden max-w-md items-center gap-2.5 rounded-full border py-1.5 pl-1.5 pr-3 text-left text-cream transition lg:flex",
+                          unread
+                            ? "border-primary/40 bg-primary/[0.10] hover:bg-primary/[0.16]"
+                            : "border-white/10 bg-white/[0.04] hover:border-primary/30 hover:bg-white/[0.07]",
+                        )}
+                      >
+                        {/* Tinted circle, accent glyph — the call carries the
+                            solid fill, so the pair stays distinguishable at a
+                            glance. */}
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                          <MessageCircle className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-label font-semibold leading-tight">{title}</span>
+                          <span className="block truncate text-label leading-tight text-muted-foreground">
+                            {sub}
+                          </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
+                      </button>
+
+                      {/* Below the pill's breakpoint the call CTA is a
+                          full-width row elsewhere, so chat keeps a compact
+                          control here rather than crowding the bar. */}
+                      <button
+                        type="button"
+                        onClick={() => setChatOpen(true)}
+                        aria-label={unread ? `Chat, ${chatUnread} unread` : "Chat"}
+                        title="Chat"
+                        className="focus-ring relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-primary/15 text-primary transition hover:bg-primary/25 lg:hidden"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        {unread && (
+                          <span
+                            data-testid="unread-badge"
+                            className="absolute -right-0.5 -top-0.5 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full border border-[#141019] bg-rose-500 px-1 text-[9px] font-bold text-white shadow-[0_0_12px_rgba(244,63,94,0.55)]"
+                          >
+                            {chatUnread > 99 ? "99+" : chatUnread}
+                          </span>
+                        )}
+                      </button>
+                    </>
+                  );
+                })()}
+                {callActive && !splitCallLayout ? (
+                  <div className="hidden min-w-0 items-center gap-2 lg:flex">
+                    <span
+                      className={cn(
+                        "h-2 w-2 shrink-0 rounded-full",
+                        partnerInCall
+                          ? "bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.65)]"
+                          : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse",
+                      )}
+                    />
+                    <p className="truncate text-label text-cream/80">
+                      {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
+                    </p>
+                  </div>
+                ) : !callActive ? (
                   (() => {
-                    const Icon = ITEM_ICONS[stagedItem.id] ?? LayoutGrid;
-                    return <Icon className="h-3.5 w-3.5 text-primary" aria-hidden />;
-                  })()}
-                <span className="text-label font-medium uppercase tracking-[0.16em] text-cream/80">
-                  {stagedItem?.title ?? "Stage"}
-                </span>
+                    const title = partnerInCall
+                      ? "Join the call"
+                      : partnerInRoom
+                        ? "Invite them to the call"
+                        : "Start the call";
+                    const sub = partnerInCall
+                      ? `${partnerName} is in the call`
+                      : partnerInRoom
+                        ? `${partnerName} is in the room`
+                        : `${partnerName} isn't in yet`;
+                    return (
+                      <button
+                        type="button"
+                        onClick={onCallIn}
+                        className="group hidden max-w-md items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] py-1.5 pl-1.5 pr-3 text-left text-cream transition hover:border-primary/30 hover:bg-white/[0.07] lg:flex"
+                      >
+                        <span
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary-foreground"
+                          style={{ backgroundColor: "var(--room-accent, hsl(var(--primary)))" }}
+                        >
+                          <Video className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-label font-semibold leading-tight">{title}</span>
+                          <span className="block truncate text-label leading-tight text-muted-foreground">{sub}</span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
+                      </button>
+                    );
+                  })()
+                ) : null}
+              </div>
+            </div>
+
+        {/* Stage — owns the canvas. The launcher floats over it. */}
+        <section
+          className={cn(
+            "perm-wall-frame flex min-h-0 shrink-0 flex-col overflow-hidden !p-0",
+            "transition-[height] duration-[420ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]",
+            "motion-reduce:transition-none",
+          )}
+          style={stageCardH ? { height: stageCardH } : undefined}
+        >
+          <div
+            key={staged}
+            className={cn(
+              "animate-stage-swell relative min-h-0 flex-1 overflow-hidden",
+              // Clear the back/title and help controls in one place rather
+              // than teaching fifteen activities where the chrome sits.
+              staged !== "lobby" && "pt-12",
+            )}
+          >
+            {/* An activity's own controls sit on it, not in a bar above
+                everything: back and the name on the left, help on the right. */}
+            {staged !== "lobby" && !introOpen && (
+              <>
+                <div className="absolute left-3 top-3 z-30 flex animate-in items-center gap-2 fade-in slide-in-from-left-3 duration-300">
+                  <button
+                    type="button"
+                    onClick={() => commitStage("lobby")}
+                    aria-label="Back to the lobby"
+                    title="Back"
+                    className="focus-ring flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.14] bg-black/35 text-cream/80 backdrop-blur-md transition hover:bg-black/55 hover:text-cream"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  {stagedItem && (
+                    <span className="truncate text-label font-medium text-cream/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">
+                      {stagedItem.title}
+                    </span>
+                  )}
+                </div>
+                {hasActivityHelp(staged) && (
+                  <button
+                    type="button"
+                    onClick={() => setHelpOpen(true)}
+                    aria-label="How this works"
+                    title="How this works"
+                    className={cn(
+                      "focus-ring absolute right-3 top-3 z-30 flex h-8 w-8 animate-in items-center justify-center rounded-full border border-white/[0.14] bg-black/35 text-cream/80 backdrop-blur-md transition fade-in slide-in-from-right-3 duration-300 hover:bg-black/55 hover:text-cream",
+                      helpPulse && "dr-help-pulse",
+                    )}
+                  >
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                )}
               </>
             )}
-            {showBack && stagedItem && (
-              <span className="truncate text-label uppercase tracking-[0.14em] text-muted-foreground">
-                {stagedItem.title}
-              </span>
-            )}
-            {(() => {
-              // Starter's side: did my date follow me in?
-              const st = starterStatus(invite, staged, partnerPresent, nowTick, 45_000, openedAtRef.current);
-              if (!st) return null;
-              return (
-                <span
-                  data-testid="stage-partner-status"
-                  className={cn(
-                    "hidden min-w-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-label sm:inline-flex",
-                    st === "together"
-                      ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
-                      : "border-white/[0.1] bg-white/[0.04] text-cream/60",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "h-1.5 w-1.5 shrink-0 rounded-full",
-                      st === "together" ? "bg-emerald-400" : "bg-primary animate-pulse",
-                    )}
-                  />
-                  <span className="truncate">{st === "together" ? `${partnerName} is here` : `Inviting ${partnerName}…`}</span>
-                </span>
-              );
-            })()}
-            <div className="ml-auto flex min-w-0 items-center gap-2">
-              {staged === "lobby" && (
-                <RoomThemeChip
-                  current={themeMood}
-                  onClick={() => setThemeOpen(true)}
-                  disabled={themeBusy}
-                />
-              )}
-              {callActive && !splitCallLayout ? (
-                <div className="hidden min-w-0 items-center gap-2 lg:flex">
-                  <span
-                    className={cn(
-                      "h-2 w-2 shrink-0 rounded-full",
-                      partnerInCall
-                        ? "bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.65)]"
-                        : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse",
-                    )}
-                  />
-                  <p className="truncate text-label text-cream/80">
-                    {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
-                  </p>
-                </div>
-              ) : !callActive ? (
-                (() => {
-                  const title = partnerInCall
-                    ? "Join the call"
-                    : partnerInRoom
-                      ? "Invite them to the call"
-                      : "Start the call";
-                  const sub = partnerInCall
-                    ? `${partnerName} is in the call`
-                    : partnerInRoom
-                      ? `${partnerName} is in the room`
-                      : `${partnerName} isn't in yet`;
-                  return (
-                    <button
-                      type="button"
-                      onClick={onCallIn}
-                      className="group hidden max-w-md items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] py-1.5 pl-1.5 pr-3 text-left text-cream transition hover:border-primary/30 hover:bg-white/[0.07] lg:flex"
-                    >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                        <Video className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-label font-semibold leading-tight">{title}</span>
-                        <span className="block truncate text-label leading-tight text-muted-foreground">{sub}</span>
-                      </span>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
-                    </button>
-                  );
-                })()
-              ) : null}
-              {staged && hasActivityHelp(staged) && !introOpen && (
-                <button
-                  type="button"
-                  onClick={() => setHelpOpen(true)}
-                  aria-label="How this works"
-                  className={[
-                    "flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/5 hover:text-cream",
-                    helpPulse ? "dr-help-pulse" : "",
-                  ].join(" ")}
-                >
-                  <HelpCircle className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </div>
-          <div key={staged} className="animate-stage-swell relative min-h-0 flex-1 overflow-hidden">
             {staged ? (
               <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
                 <div
@@ -1086,6 +1231,7 @@ export function RoomStage({
             ) : null}
           </div>
         </section>
+        </div>
 
         {splitCallLayout && <MusicPlayerBar onOpenList={() => commitStage("dj")} />}
         </div>
@@ -1136,7 +1282,8 @@ export function RoomStage({
         <div ref={launcherRef} className="relative">
           <div
             className={cn(
-              "absolute bottom-full left-1/2 mb-3 w-[min(29rem,94vw)] -translate-x-1/2 overflow-hidden rounded-3xl border border-white/10 bg-card/90 shadow-[0_24px_64px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-all duration-300 ease-out",
+              "absolute bottom-full left-1/2 mb-3 -translate-x-1/2 overflow-hidden rounded-3xl border border-white/10 bg-card/90 shadow-[0_24px_64px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-all duration-300 ease-out",
+              activeCat ? "w-[min(29rem,94vw)]" : "w-max max-w-[94vw]",
               menuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
             )}
             style={{ height: menuOpen ? panelH : 0 }}
@@ -1146,7 +1293,7 @@ export function RoomStage({
             <div
               ref={panelRef}
               className={cn(
-                "origin-bottom p-5 transition-transform duration-300 ease-out",
+                "origin-bottom px-4 py-5 transition-transform duration-300 ease-out",
                 menuOpen ? "scale-100" : "scale-90",
               )}
             >
@@ -1178,7 +1325,7 @@ export function RoomStage({
                 /* Level 1 — categories (Room / Games / Watch / DJ / Chat),
                    centered squircle tiles. Chaperon sits alongside them so it
                    stays reachable mid-activity. */
-                <div className="flex flex-wrap justify-center gap-4">
+                <div className="flex flex-wrap items-start justify-center gap-4">
                   {availCats.map((c) => (
                     <MenuTile
                       key={c.id}
@@ -1274,13 +1421,15 @@ export function RoomStage({
               activityId={inviteId}
               activityTitle={title}
               headline={inviteHeadline(partnerName, inviteId, title)}
-              tileSrc={ITEM_TILE_IMAGES[inviteId]}
+              tileSrc={ACTIVITY_TILES[inviteId]}
               Icon={ITEM_ICONS[inviteId]}
               onJoin={() => commitStage(inviteId)}
               onDecline={declineInvite}
             />
           );
         })()}
+
+      <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} />
 
       {chatToast && (
         <ChatToast
@@ -1292,7 +1441,7 @@ export function RoomStage({
           offset={Boolean(inviteId)}
           onOpen={() => {
             setChatToast(null);
-            commitStage("chat");
+            setChatOpen(true);
           }}
           onDismiss={dismissChatToast}
         />
@@ -1345,17 +1494,9 @@ export function RoomStage({
               pair={pairBubble}
               onLeave={onLeaveCall}
               // Pane → bubble (the shrink button RoomVideo has had all along).
-              onMinimize={!floatingCall ? () => chooseCallLayout("float") : undefined}
-              // Desktop fullscreen tile: only "back to the bubble". Desktop
-              // otherwise never shows a floating window. Below desktop: bubble ↔
-              // compact window ↔ large call, as before.
-              onExpand={
-                !floatingCall || wide
-                  ? undefined
-                  : expanded
-                    ? undefined
-                    : () => setExpanded(true)
-              }
+              // No expand control: the layout switcher in the top bar is where
+              // the call's size is chosen, and a second, differently-shaped
+              // control inside the video only competed with it.
               onCollapse={
                 !floatingCall
                   ? undefined
@@ -1492,7 +1633,7 @@ function MenuTile({
       title={label}
       // shrink-0: these wrap onto rows of differing counts, and a shrinkable
       // tile ends up a different size per row.
-      className="group flex w-[4rem] shrink-0 flex-col items-center gap-2.5"
+      className="group flex w-[3.5rem] shrink-0 flex-col items-center gap-2"
     >
       {/* Squircle app icon — the drilled-in row's icon chip at tile size:
           the same primary wash (bg-primary/15) and amber glyph. Tinting from
@@ -1503,11 +1644,14 @@ function MenuTile({
         className={cn(
           "relative flex aspect-square w-full items-center justify-center rounded-[26%] border transition duration-150 group-active:scale-90",
           active
-            ? "border-primary/50 bg-primary/20"
-            : "border-primary/20 bg-primary/10 group-hover:bg-primary/15",
+            ? "border-primary/30 bg-primary/[0.07]"
+            // Barely-there surfaces: the glyph and the outline carry the tile,
+            // and the room shows through the rest. Primary hue rather than
+            // white so a themed room retints them with everything else.
+            : "border-primary/[0.09] bg-primary/[0.02] group-hover:bg-primary/[0.05]",
         )}
       >
-        <Icon className="h-[42%] w-[42%] text-primary" strokeWidth={2.25} aria-hidden />
+        <Icon className="h-[42%] w-[42%] text-primary" strokeWidth={1.6} aria-hidden />
         {badge ? (
           <span
             data-testid={badgeTone === "alert" ? "unread-badge" : undefined}
@@ -1557,8 +1701,8 @@ function MenuListRow({
       className={cn(
         "flex items-center gap-3.5 rounded-2xl border p-3.5 text-left transition",
         active
-          ? "border-primary/40 bg-primary/[0.08]"
-          : "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05]",
+          ? "border-primary/30 bg-primary/[0.07]"
+          : "border-primary/[0.09] bg-primary/[0.02] hover:bg-primary/[0.05]",
       )}
     >
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">

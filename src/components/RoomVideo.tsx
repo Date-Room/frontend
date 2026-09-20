@@ -21,7 +21,7 @@ import {
 } from "livekit-client";
 import { toast } from "sonner";
 import "@livekit/components-styles";
-import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Maximize2, Minimize2, Minus, RotateCw } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Minus, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AmbientController } from "@/components/AmbientController";
 import { ChaperonAgentBridge } from "@/components/ChaperonAgentBridge";
@@ -582,10 +582,6 @@ type CallControls = {
   pair?: boolean;
   /** Full variant in a narrow pane: stack the two tiles instead of side by side. */
   stacked?: boolean;
-  /** pip → expand to fullscreen */
-  onExpand?: () => void;
-  /** full → shrink back to pip */
-  onMinimize?: () => void;
   /** pip → collapse to a small bubble */
   onCollapse?: () => void;
   /** pip → rotate portrait/landscape (rendered in the hover controls) */
@@ -600,8 +596,6 @@ function Stage({
   collapsed = false,
   pair = false,
   stacked = false,
-  onExpand,
-  onMinimize,
   onCollapse,
   onRotate,
 }: { onLeave: () => void } & CallControls) {
@@ -973,11 +967,6 @@ function Stage({
           >
             <Camera className="h-4 w-4" style={{ color: "var(--room-accent)" }} />
           </button>
-          {onExpand && (
-            <button onClick={onExpand} aria-label="Full screen call" className={ctrlBtn}>
-              <Maximize2 className="h-4 w-4" />
-            </button>
-          )}
           {onCollapse && (
             <button onClick={onCollapse} aria-label="Collapse call" className={ctrlBtn}>
               <Minus className="h-4 w-4" />
@@ -1061,15 +1050,6 @@ function Stage({
         )}
       >
         <div className={cn("flex items-center justify-end", isPip ? "gap-1.5" : "gap-3")}>
-        {variant === "full" && onMinimize && (
-          <button
-            onClick={onMinimize}
-            aria-label="Shrink the call to a bubble"
-            className="h-11 w-11 rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center justify-center transition"
-          >
-            <Minimize2 className="w-4 h-4 text-cream" />
-          </button>
-        )}
         <div className={fullPill}>
           <MicDropup triggerClassName={fullCaretBtn} iconClassName="w-4 h-4" />
           <button
@@ -1113,15 +1093,6 @@ function Stage({
           iconClassName="w-4 h-4 text-cream"
           canSplit={wideViewport}
         />
-        {isPip && onExpand && (
-          <button
-            onClick={onExpand}
-            aria-label="Full screen call"
-            className={cn(ctrlSurface, ctrlBox)}
-          >
-            <Maximize2 className="w-4 h-4 text-cream" />
-          </button>
-        )}
         {isPip && onCollapse && (
           <button
             onClick={onCollapse}
@@ -1156,8 +1127,6 @@ export function RoomVideo({
   collapsed,
   pair,
   stacked,
-  onExpand,
-  onMinimize,
   onCollapse,
   onRotate,
 }: { onLeave?: () => void } & CallControls = {}) {
@@ -1284,8 +1253,6 @@ export function RoomVideo({
         collapsed={collapsed}
         pair={pair}
         stacked={stacked}
-        onExpand={onExpand}
-        onMinimize={onMinimize}
         onCollapse={onCollapse}
         onRotate={onRotate}
       />

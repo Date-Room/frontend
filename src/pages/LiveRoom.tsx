@@ -33,7 +33,6 @@ import {
   useRoomCustomization,
 } from "@/context/RoomCustomizationContext";
 import { RoomStage, type StageItem } from "@/components/RoomStage";
-import { CallLayoutSwitcher } from "@/components/CallLayoutSwitcher";
 import { ChatWithBoundary } from "@/components/Chat";
 import { WatchTogether } from "@/components/WatchTogether";
 import { VisionBoard } from "@/components/VisionBoard";
@@ -141,7 +140,7 @@ type TabDef = {
 
 const WALL_TABS: TabDef[] = [
   { id: "vision_board", label: "Vision Board", icon: "✨", curatableId: "vision_board" },
-  { id: "fridge_notes", label: "Fridge Note", icon: "🧲", curatableId: null },
+  { id: "fridge_notes", label: "Sticky Notes", icon: "📝", curatableId: null },
   { id: "bookshelf", label: "Bookshelf", icon: "📚", curatableId: "fridge" },
 ];
 
@@ -157,7 +156,6 @@ const ACTIVITY_TABS: TabDef[] = [
   { id: "guacamole", label: "Guacamole Panic", icon: "🥑", curatableId: "guacamole" },
   { id: "watch", label: "Watch", icon: "📺", curatableId: "watch" },
   { id: "dj", label: "Music", icon: "🎵", curatableId: "dj" },
-  { id: "chat", label: "Chat", icon: "💭", curatableId: null },
 ];
 
 const ALL_TABS: TabDef[] = [...WALL_TABS, ...ACTIVITY_TABS];
@@ -547,6 +545,7 @@ function RoomShell({
       <PageShell
         orbs={false}
         vignette={false}
+        data-room-scope
         className="min-h-0 h-[100dvh] flex flex-col overflow-hidden"
         style={shellStyle}
       >
@@ -599,7 +598,6 @@ function RoomShell({
             )}
             {/* Desktop call layout — in the top bar so it is reachable in
                 every mode and every stage state. */}
-            {liveMode && <CallLayoutSwitcher className="hidden lg:flex" />}
             <button
               type="button"
               onClick={() => setTellUsOpen(true)}

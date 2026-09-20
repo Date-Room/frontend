@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, Loader2, Share2 } from "lucide-react";
+import { Check, ChevronRight, Copy, Loader2, Palette, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useRoomCustomization } from "@/context/RoomCustomizationContext";
@@ -97,6 +97,31 @@ export function RoomSettings() {
 
   return (
     <div className="flex h-full flex-col gap-5 overflow-y-auto p-4 sm:p-6">
+      {/* Theme — it used to sit permanently on top of the stage; it belongs
+          with the room's own settings, where you come to change the room. */}
+      <section className="flex flex-col gap-3">
+        <p className="px-1 text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Room
+        </p>
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent("dr:room:open-theme"))}
+          className="focus-ring group flex w-full items-center gap-3 rounded-2xl border border-primary/[0.12] bg-primary/[0.03] px-4 py-3.5 text-left transition hover:border-primary/30 hover:bg-primary/[0.07]"
+        >
+          <Palette className="h-[18px] w-[18px] shrink-0 text-primary" aria-hidden />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-body text-cream">Theme</span>
+            <span className="block truncate text-label text-muted-foreground">
+              Set the mood and colour of the room.
+            </span>
+          </span>
+          <ChevronRight
+            className="h-4 w-4 shrink-0 text-primary/70 transition group-hover:translate-x-0.5"
+            aria-hidden
+          />
+        </button>
+      </section>
+
       {/* Invite — mirrors the pre-room share block. */}
       <section className="flex flex-col gap-3">
         <p className="px-1 text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">

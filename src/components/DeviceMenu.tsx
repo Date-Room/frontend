@@ -9,7 +9,7 @@ import {
   LayoutTemplate,
   Mic,
   PictureInPicture2,
-  Settings,
+  LayoutPanelLeft,
   Video,
   Volume2,
   type LucideIcon,
@@ -266,13 +266,13 @@ export function CallSettingsMenu({
       <button
         ref={ref}
         type="button"
-        aria-label="Call settings"
+        aria-label="Call layout"
         aria-expanded={anchor !== null}
         onPointerDown={(e) => e.stopPropagation()}
         onClick={() => setAnchor(anchor ? null : (ref.current?.getBoundingClientRect() ?? null))}
         className={triggerClassName}
       >
-        <Settings className={iconClassName} />
+        <LayoutPanelLeft className={iconClassName} />
       </button>
       {anchor && (
         <Dropup anchor={anchor} onClose={() => setAnchor(null)}>

@@ -109,7 +109,7 @@ export function PinNotePanel() {
       </p>
       {notes.length > 0 && (
         <p className="text-label text-muted-foreground/80">
-          {notes.length} note{notes.length === 1 ? "" : "s"} on the fridge — new ones are added, not replaced.
+          {notes.length} note{notes.length === 1 ? "" : "s"} up — new ones are added, not replaced.
         </p>
       )}
       <Textarea

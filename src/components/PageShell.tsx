@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type PageShellProps = {
@@ -11,7 +11,11 @@ type PageShellProps = {
   /** Inline style — used by LiveRoom to paint the customized
    *  background gradient + drop the --room-accent CSS variable. */
   style?: CSSProperties;
-};
+  /** Anything else lands on the root element. `data-*` hooks in particular:
+   *  LiveRoom marks this as the room's accent scope so UI portalled out of
+   *  it (the chat drawer) can find the variables it left behind. Without the
+   *  spread those attributes were silently dropped. */
+} & Omit<HTMLAttributes<HTMLDivElement>, "children" | "className" | "style">;
 
 /**
  * Shared full-page backdrop: theme background, optional orbs, vignette.
@@ -27,9 +31,11 @@ export function PageShell({
   orbs = false,
   vignette = true,
   style,
+  ...rest
 }: PageShellProps) {
   return (
     <div
+      {...rest}
       className={cn("min-h-screen relative bg-background text-foreground overflow-x-hidden", className)}
       style={style}
     >

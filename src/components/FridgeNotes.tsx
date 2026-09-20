@@ -488,7 +488,7 @@ export function FridgeNotes({ active = true }: Props) {
   if (!room.canPersist) {
     return (
       <div className="wall-surface">
-        <EmptyState variant="fridge" title="Fridge Note" subtitle="Sign in to leave notes on your shared fridge." />
+        <EmptyState variant="notes" title="Sticky Notes" subtitle="Sign in to leave notes for each other." />
       </div>
     );
   }
@@ -572,7 +572,7 @@ export function FridgeNotes({ active = true }: Props) {
           {empty ? (
             <FridgeAppliance empty>
               <div className="fridge-empty-embedded">
-                <EmptyState variant="fridge" title="Fridge Note" onAdd={focusAdd} addLabel="Add a note" />
+                <EmptyState variant="notes" title="Sticky Notes" onAdd={focusAdd} addLabel="Add a note" />
               </div>
             </FridgeAppliance>
           ) : (

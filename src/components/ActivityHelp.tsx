@@ -179,11 +179,11 @@ const ACTIVITY_HELP: Record<string, HelpContent> = {
     ],
   },
   fridge_notes: {
-    title: "Fridge",
+    title: "Sticky Notes",
     tagline: "Little notes that stay up between calls.",
-    startLabel: "Open the fridge",
+    startLabel: "Open the notes",
     steps: [
-      { glyph: "🧲", name: "Leave a note", text: "Write it and tap Add — it stays for both of you." },
+      { glyph: "📝", name: "Leave a note", text: "Write it and tap Add — it stays for both of you." },
       { glyph: "👋", name: "Greet on entry", text: "Tick it to show a note first when they arrive." },
     ],
   },

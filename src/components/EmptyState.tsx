@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
  * the activity name in an exaggerated serif, with a single "+" to start.
  */
 
-type Variant = "vision" | "fridge" | "music" | "watch" | "bookshelf";
+type Variant = "vision" | "notes" | "music" | "watch" | "bookshelf";
 
 const svgProps = {
   className: "h-28 w-auto text-primary sm:h-32",
@@ -29,17 +29,14 @@ const ILLUSTRATIONS: Record<Variant, JSX.Element> = {
       <path d="M18 60h30M18 70h18" className="text-primary/45" />
     </svg>
   ),
-  fridge: (
-    <svg viewBox="0 0 88 108" {...svgProps}>
-      <rect x="20" y="6" width="48" height="96" rx="9" />
-      <path d="M20 40h48" />
-      <path d="M30 18v10" />
-      <path d="M30 52v18" />
-      {/* heart magnet */}
-      <path
-        d="M52 60c0-3 2.4-5 5-5 1.8 0 3.2 1 3.8 2.4.6-1.4 2-2.4 3.8-2.4 2.6 0 5 2 5 5 0 4-4.5 7-8.8 10-4.3-3-8.8-6-8.8-10z"
-        className="text-primary/55"
-      />
+  // A note, not an appliance: the fridge drawing described where the notes
+  // used to live rather than what they are.
+  notes: (
+    <svg viewBox="0 0 104 104" {...svgProps}>
+      {/* A square with the corner turned up — the shape of a sticky note. */}
+      <path d="M14 12h56l20 20v60H14z" />
+      <path d="M70 12v20h20" />
+      <path d="M30 46h40M30 60h40M30 74h24" className="text-primary/[0.45]" />
     </svg>
   ),
   music: (
