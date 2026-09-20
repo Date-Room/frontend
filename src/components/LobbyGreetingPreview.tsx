@@ -74,8 +74,8 @@ export function LobbyGreetingPreview({
             <div className={cn("w-full px-1 py-0.5 transition-all duration-200", highlightField === "headline" ? focusRing : "")}>
               <h2
                 className={cn(
-                  "font-serif text-xl italic leading-snug text-[#faf3e6] transition-colors duration-200 sm:text-[1.35rem]",
-                  !hasHeadline && "text-[#faf3e6]/44",
+                  "text-title italic leading-snug text-[#faf3e6] transition-colors duration-200",
+                  !hasHeadline && "text-[#faf3e6]/[0.44]",
                 )}
                 style={
                   hasHeadline
@@ -90,8 +90,8 @@ export function LobbyGreetingPreview({
             <div className={cn("w-full px-1 py-0.5 transition-all duration-200", highlightField === "subtext" ? focusRing : "")}>
               <p
                 className={cn(
-                  "font-serif text-[13px] leading-relaxed text-[#ebe0cf]/90 transition-colors duration-200 sm:text-[14px]",
-                  !hasSubtext && "italic text-[#ebe0cf]/48",
+                  "text-body leading-relaxed text-[#ebe0cf]/90 transition-colors duration-200",
+                  !hasSubtext && "italic text-[#ebe0cf]/[0.48]",
                 )}
                 style={hasSubtext ? { textShadow: "0 2px 14px rgba(0,0,0,0.82)" } : undefined}
               >
@@ -105,10 +105,10 @@ export function LobbyGreetingPreview({
           </div>
 
           <div className="border-t border-[hsl(35_28%_58%/0.22)] pt-5">
-            <p className="mb-3 flex flex-wrap items-center justify-center gap-x-2 font-serif italic text-[11px] leading-snug text-[#ecd9bc]/92 sm:text-[12px]">
+            <p className="mb-3 flex flex-wrap items-center justify-center gap-x-2 italic text-label leading-snug text-[#ecd9bc]/[0.92]">
               <span>Room opens in</span>
               <span
-                className="font-sans text-[9px] font-normal not-italic tracking-[0.42em] text-[hsl(28_48%_58%/0.68)] sm:text-[10px]"
+                className="font-sans text-label font-normal not-italic tracking-[0.42em] text-[hsl(28_48%_58%/0.68)]"
                 aria-hidden
               >
                 ······
@@ -121,31 +121,31 @@ export function LobbyGreetingPreview({
             >
               {DEMO_COUNTDOWN}
             </p>
-            <p className="mt-3 font-sans text-[9px] uppercase tracking-[0.22em] text-[#b9a794]/48">
+            <p className="mt-3 font-sans text-label uppercase tracking-[0.22em] text-[#b9a794]/[0.48]">
               Illustrative timer
             </p>
             {scheduledPreview ? (
-              <p className="mt-2 font-serif text-xs italic leading-snug text-[#dccfb8]/72 sm:text-sm">
+              <p className="mt-2 text-label italic leading-snug text-[#dccfb8]/[0.72]">
                 the date starts {scheduledPreview}
               </p>
             ) : startsNow ? (
-              <p className="mt-2 font-serif text-xs italic leading-snug text-[#dccfb8]/72 sm:text-sm">
+              <p className="mt-2 text-label italic leading-snug text-[#dccfb8]/[0.72]">
                 Their countdown appears here as soon as they open this lobby.
               </p>
             ) : (
-              <p className="mt-2 font-serif text-xs italic leading-snug text-[#a89482]/62 sm:text-sm">
+              <p className="mt-2 text-label italic leading-snug text-[#a89482]/[0.62]">
                 Schedule a start time on the previous step to preview the date line here.
               </p>
             )}
           </div>
 
-          <p className="mx-auto mt-6 max-w-[15.5rem] font-serif text-[11px] italic leading-relaxed text-[#a89482]/72 sm:mt-7 sm:text-xs">
+          <p className="mx-auto mt-6 max-w-[15.5rem] text-label italic leading-relaxed text-[#a89482]/[0.72] sm:mt-7">
             The room unlocks early if your host arrives ahead of time. You&apos;ll be let in automatically.
           </p>
         </div>
       </div>
 
-      <p className="border-t border-[hsl(35_22%_32%/0.28)] bg-[#0a0305]/92 px-4 py-3.5 text-center text-[10px] uppercase tracking-[0.26em] text-[#9e8e82]/95">
+      <p className="border-t border-[hsl(35_22%_32%/0.28)] bg-[#0a0305]/[0.92] px-4 py-3.5 text-center text-label uppercase tracking-[0.26em] text-[#9e8e82]/95">
         Live preview · {guestLabel}&apos;s lobby · {moodLabel}
       </p>
     </div>

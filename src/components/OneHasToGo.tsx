@@ -76,8 +76,8 @@ export function OneHasToGo() {
   if (ohtgIsFinished(state)) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center animate-fade-in">
-        <p className="font-serif text-2xl italic text-cream">That&apos;s all {OHTG_ROUNDS.length} rounds</p>
-        <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
+        <p className="font-serif text-display italic text-cream">That&apos;s all {OHTG_ROUNDS.length} rounds</p>
+        <p className="max-w-xs text-body leading-relaxed text-muted-foreground">
           {myReads === theirReads
             ? "You read each other equally well. Or equally badly."
             : myReads > theirReads
@@ -256,7 +256,7 @@ export function OneHasToGo() {
       </div>
 
       {guessing && !iGuessed && (
-        <p className="relative text-center text-[11px] text-muted-foreground">
+        <p className="relative text-center text-label text-muted-foreground">
           Guessing right is worth a read. Reading yourself only counts if {partnerName} cut it too.
         </p>
       )}
@@ -267,18 +267,18 @@ export function OneHasToGo() {
             <div className="dr-beam" aria-hidden />
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-2xl border border-white/[0.10] bg-white/[0.03] p-4 text-left">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">The cuts</p>
-                <p className="mt-2 flex items-center gap-2 font-serif text-cream">
+                <p className="text-label font-semibold uppercase tracking-[0.28em] text-muted-foreground">The cuts</p>
+                <p className="mt-2 flex items-center gap-2 text-cream">
                   <span aria-hidden>{round.options[myCut].emoji}</span> {round.options[myCut].label}
-                  <span className="ml-auto text-[10px] font-sans uppercase tracking-[0.2em] text-primary">you</span>
+                  <span className="ml-auto text-label font-sans uppercase tracking-[0.2em] text-primary">you</span>
                 </p>
                 {!sameCut && (
-                  <p className="mt-1 flex items-center gap-2 font-serif text-cream">
+                  <p className="mt-1 flex items-center gap-2 text-cream">
                     <span aria-hidden>{round.options[theirCut].emoji}</span> {round.options[theirCut].label}
-                    <span className="ml-auto text-[10px] font-sans uppercase tracking-[0.2em] text-rose">{partnerName}</span>
+                    <span className="ml-auto text-label font-sans uppercase tracking-[0.2em] text-rose">{partnerName}</span>
                   </p>
                 )}
-                <p className="mt-2 text-xs text-muted-foreground">
+                <p className="mt-2 text-label text-muted-foreground">
                   {sameCut
                     ? "Same cut · one thing gone, and you both killed it"
                     : "Two things gone · the table just got smaller"}
@@ -291,29 +291,29 @@ export function OneHasToGo() {
                   background: "color-mix(in srgb, var(--room-accent) 6%, transparent)",
                 }}
               >
-                <p className="text-[10px] font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>
+                <p className="text-label font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>
                   The read
                 </p>
-                <p className="mt-2 flex items-center gap-2 font-serif text-cream">
+                <p className="mt-2 flex items-center gap-2 text-cream">
                   <span aria-hidden>{round.options[myGuess].emoji}</span> {round.options[myGuess].label}
-                  <span className="ml-auto text-[10px] font-sans uppercase tracking-[0.2em] text-muted-foreground">your guess</span>
+                  <span className="ml-auto text-label font-sans uppercase tracking-[0.2em] text-muted-foreground">your guess</span>
                 </p>
-                <p className={["mt-2 text-xs", iReadThem ? "text-emerald-300" : "text-cream/80"].join(" ")}>
+                <p className={["mt-2 text-label", iReadThem ? "text-emerald-300" : "text-cream/80"].join(" ")}>
                   {iReadThem
                     ? `🎯 Right · you knew what ${partnerName} would let go`
                     : `Wrong · ${partnerName} actually cut ${round.options[theirCut].label}`}
                 </p>
-                <p className={["mt-1 text-xs", theyReadMe ? "text-rose" : "text-muted-foreground"].join(" ")}>
+                <p className={["mt-1 text-label", theyReadMe ? "text-rose" : "text-muted-foreground"].join(" ")}>
                   {theyReadMe ? `👀 ${partnerName} read you too` : `${partnerName} missed yours`}
                 </p>
               </div>
             </div>
 
             <div className="flex flex-col items-center gap-3 text-center">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>
+              <p className="text-label font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>
                 What survives · {survivorNames.join(" + ")}
               </p>
-              <p className="max-w-sm font-serif text-base italic leading-relaxed text-cream/90">
+              <p className="max-w-sm text-body italic leading-relaxed text-cream/90">
                 {survivorNames.length === 1
                   ? `Everything from here is ${survivorNames[0]}. Defend it.`
                   : `${listOf(survivorNames)} live on. Tell ${partnerName} why ${round.options[myCut].label} had to go.`}
@@ -330,10 +330,10 @@ export function OneHasToGo() {
           </div>
         ) : revealing ? null : guessing ? (
           iGuessed ? (
-            <p className="text-sm text-muted-foreground animate-pulse">waiting for {partnerName}&apos;s read…</p>
+            <p className="text-body text-muted-foreground animate-pulse">waiting for {partnerName}&apos;s read…</p>
           ) : null
         ) : iCut ? (
-          <p className="text-sm text-muted-foreground animate-pulse">waiting for {partnerName} to choose…</p>
+          <p className="text-body text-muted-foreground animate-pulse">waiting for {partnerName} to choose…</p>
         ) : (
           readsBar
         )}

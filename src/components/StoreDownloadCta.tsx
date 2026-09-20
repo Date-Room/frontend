@@ -24,7 +24,7 @@ export function StoreDownloadCta({
 }) {
   return (
     <div className={cn("space-y-3", className)}>
-      <p className="text-sm leading-relaxed text-muted-foreground">
+      <p className="text-body leading-relaxed text-muted-foreground">
         {note ?? STORE_ONLY_MESSAGE}
       </p>
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -38,10 +38,10 @@ export function StoreDownloadCta({
           >
             <Smartphone className="h-5 w-5 shrink-0 text-primary" aria-hidden />
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              <div className="text-label uppercase tracking-widest text-muted-foreground">
                 {b.top}
               </div>
-              <div className="text-sm font-medium text-cream">{b.bot}</div>
+              <div className="text-body font-medium text-cream">{b.bot}</div>
             </div>
           </a>
         ))}

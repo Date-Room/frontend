@@ -169,8 +169,8 @@ export function ChaperonSetupSheet({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="font-serif text-2xl leading-tight text-cream">Want me in the room?</h2>
-            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+            <h2 className="font-serif text-display leading-tight text-cream">Want me in the room?</h2>
+            <p className="mt-1 text-body leading-relaxed text-muted-foreground">
               I never speak aloud. Everything I notice comes to you alone.
             </p>
           </div>
@@ -200,10 +200,10 @@ export function ChaperonSetupSheet({
           />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-cream">Protect</span>
+              <span className="text-body font-semibold text-cream">Protect</span>
               <span
                 className={cn(
-                  "ml-auto rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                  "ml-auto rounded-full px-2 py-0.5 text-label font-semibold uppercase tracking-wide",
                   pill.tone === "empty"
                     ? "bg-white/10 text-cream/60"
                     : "bg-emerald-500/15 text-emerald-300",
@@ -212,7 +212,7 @@ export function ChaperonSetupSheet({
                 {pill.label}
               </span>
             </span>
-            <span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground">
+            <span className="mt-1 block text-label leading-relaxed text-muted-foreground">
               Scams, pressure and money asks, caught as they happen. Off until you turn it on.
             </span>
           </span>
@@ -237,8 +237,8 @@ export function ChaperonSetupSheet({
         {/* Disclosure */}
         <label className="flex items-start gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3">
           <span className="min-w-0 flex-1">
-            <span className="block text-sm text-cream">Tell {them} I'm here</span>
-            <span className="block text-[11px] leading-relaxed text-muted-foreground">
+            <span className="block text-body text-cream">Tell {them} I'm here</span>
+            <span className="block text-label leading-relaxed text-muted-foreground">
               {prefs.announcePresence
                 ? `${them === "them" ? "They" : them} will see a small badge. What I notice stays with you either way.`
                 : "Off. They see only the standard call notice. What I notice stays with you."}
@@ -252,7 +252,7 @@ export function ChaperonSetupSheet({
         </label>
 
         {variant === "live" && active && (
-          <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+          <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-label leading-relaxed text-muted-foreground">
             I listen to the whole call from our server, both sides.{" "}
             {onOpenStatus ? (
               <button
@@ -281,7 +281,7 @@ export function ChaperonSetupSheet({
           {primaryLabel}
         </button>
 
-        <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+        <p className="text-center text-label leading-relaxed text-muted-foreground">
           Calls may be processed by an AI safety layer.{" "}
           <Link to="/privacy" className="text-primary hover:underline">
             What that means
@@ -366,8 +366,8 @@ function CoachCard({
   const header = (
     <span className="flex items-center gap-2">
       <Compass className="h-4 w-4 text-amber-400" aria-hidden />
-      <span className="text-sm font-semibold text-cream">Coach</span>
-      <span className="ml-auto rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+      <span className="text-body font-semibold text-cream">Coach</span>
+      <span className="ml-auto rounded-full bg-amber-500/15 px-2 py-0.5 text-label font-semibold uppercase tracking-wide text-amber-300">
         {available
           ? `${status?.calls_remaining} beta call${status?.calls_remaining === 1 ? "" : "s"}`
           : "Premium · beta"}
@@ -387,7 +387,7 @@ function CoachCard({
       >
         <span className="min-w-0 flex-1">
           {header}
-          <span className="mt-1 block text-[11px] leading-relaxed text-muted-foreground">
+          <span className="mt-1 block text-label leading-relaxed text-muted-foreground">
             Private nudges on chemistry, pace and flow, on top of Protect. One call is used per
             date. Your reactions to cues help me tune it.
           </span>
@@ -402,7 +402,7 @@ function CoachCard({
     return (
       <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3">
         {header}
-        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="mt-1 text-label leading-relaxed text-muted-foreground">
           Got it. I'll let you in as beta spots open; you'll see it here.
         </p>
       </div>
@@ -414,14 +414,14 @@ function CoachCard({
   return (
     <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.05] px-4 py-3">
       {header}
-      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+      <p className="mt-1 text-label leading-relaxed text-muted-foreground">
         {usedUp
           ? "You've used your beta Coach calls. Ask for more below."
           : appStatus === "declined"
             ? "Not this time. You can ask again below."
             : "Private nudges on chemistry, pace and flow, on top of Protect."}
       </p>
-      <p className="mt-1 text-[11px] leading-relaxed text-amber-300/80">
+      <p className="mt-1 text-label leading-relaxed text-amber-300/80">
         {COACH_PRICE_BLURB} In exchange, your reactions to cues help me tune it.
       </p>
       <div className="mt-2 flex gap-2">
@@ -431,13 +431,13 @@ function CoachCard({
           maxLength={200}
           placeholder="One line: why you'd like Coach…"
           aria-label="Why you'd like Coach"
-          className="focus-ring min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[12px] placeholder:text-muted-foreground/60"
+          className="focus-ring min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-label placeholder:text-muted-foreground/60"
         />
         <button
           type="button"
           disabled={applying}
           onClick={() => void apply()}
-          className="btn-primary focus-ring inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-semibold disabled:opacity-50"
+          className="btn-primary focus-ring inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-label font-semibold disabled:opacity-50"
         >
           {applying && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           {usedUp || appStatus === "declined" ? "Ask again" : "Apply"}

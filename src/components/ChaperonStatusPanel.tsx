@@ -24,7 +24,7 @@ function Row({ label, state }: { label: string; state: RowState }) {
     <div className="flex items-center justify-between gap-3 py-0.5">
       <span
         className={cn(
-          "text-[11px]",
+          "text-label",
           state === "bad" ? "text-rose-200" : "text-white/70",
         )}
       >
@@ -124,13 +124,13 @@ export function ChaperonStatusPanel({
         type="button"
         onClick={onToggle}
         aria-label="Collapse chaperon status"
-        className="mb-0.5 flex w-full items-center justify-between text-[10px] font-semibold uppercase tracking-[0.16em] text-white/40 transition hover:text-white/70"
+        className="mb-0.5 flex w-full items-center justify-between text-label font-semibold uppercase tracking-[0.16em] text-white/40 transition hover:text-white/70"
       >
         How I'm doing
         <ChevronUp className="h-3 w-3" aria-hidden />
       </button>
       {summary.sentence && (
-        <p className="mb-1 font-serif text-[13px] italic leading-snug text-cream">
+        <p className="mb-1 text-body italic leading-snug text-cream">
           {summary.sentence}
         </p>
       )}
@@ -142,14 +142,14 @@ export function ChaperonStatusPanel({
       <button
         type="button"
         onClick={() => setDetailsOpen((v) => !v)}
-        className="mt-1 flex w-full items-center gap-1 border-t border-white/10 pt-1 text-[10px] text-white/40 transition hover:text-white/70"
+        className="mt-1 flex w-full items-center gap-1 border-t border-white/10 pt-1 text-label text-white/40 transition hover:text-white/70"
       >
         <ChevronRight className={cn("h-3 w-3 transition-transform", detailsOpen && "rotate-90")} />
         Details
       </button>
 
       {detailsOpen && (
-        <div className="mt-1 space-y-0.5 text-[10px] leading-relaxed text-white/45">
+        <div className="mt-1 space-y-0.5 text-label leading-relaxed text-white/45">
           <DetailLine label="you" track={agent.you} />
           <DetailLine label={remoteName} track={agent.them} />
           {status === "connecting" && !agent.connected && (

@@ -79,7 +79,7 @@ export function ActivityInvite({
               alt=""
               className="h-full w-full object-cover"
               fallback={
-                <span className="flex h-full w-full items-center justify-center text-[10px] font-bold text-primary">
+                <span className="flex h-full w-full items-center justify-center text-label font-bold text-primary">
                   {initial}
                 </span>
               }
@@ -88,15 +88,15 @@ export function ActivityInvite({
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-1 text-sm font-semibold leading-snug text-cream">{headline}</p>
-          <p className="text-xs text-cream/65">Want to join them?</p>
+          <p className="line-clamp-1 text-body font-semibold leading-snug text-cream">{headline}</p>
+          <p className="text-label text-cream/65">Want to join them?</p>
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"
             onClick={onDecline}
-            className="focus-ring rounded-full px-3 py-1.5 text-xs font-medium text-cream/70 transition hover:bg-white/[0.06] hover:text-cream"
+            className="focus-ring rounded-full px-3 py-1.5 text-label font-medium text-cream/70 transition hover:bg-white/[0.06] hover:text-cream"
           >
             Not now
           </button>
@@ -104,7 +104,7 @@ export function ActivityInvite({
             type="button"
             onClick={onJoin}
             autoFocus
-            className="focus-ring rounded-full bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground shadow-[0_0_18px_hsl(var(--primary)/0.4)] transition hover:brightness-110"
+            className="focus-ring rounded-full bg-primary px-3.5 py-1.5 text-label font-semibold text-primary-foreground shadow-[0_0_18px_hsl(var(--primary)/0.4)] transition hover:brightness-110"
           >
             Join {activityTitle.length <= 12 ? activityTitle : ""}
           </button>

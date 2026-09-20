@@ -142,7 +142,7 @@ function VisionGridCard({
         ) : media === "pdf" ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-amber-950/90 via-[#2a1810] to-indigo-950/80 px-3">
             <FileText className="h-8 w-8 text-amber/80" strokeWidth={1.25} />
-            <p className="max-w-full truncate text-center text-[11px] text-cream/70">
+            <p className="max-w-full truncate text-center text-label text-cream/70">
               {item.filename || "PDF document"}
             </p>
           </div>
@@ -153,11 +153,11 @@ function VisionGridCard({
 
       {/* Caption scrim */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent px-3 pb-2.5 pt-8">
-        <p className="truncate text-sm font-medium text-cream drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)]">
+        <p className="truncate text-body font-medium text-cream drop-shadow-[0_1px_4px_rgba(0,0,0,0.7)]">
           {label}
         </p>
         {item.added_by_name ? (
-          <p className="truncate text-[10px] uppercase tracking-[0.16em] text-cream/55">
+          <p className="truncate text-label uppercase tracking-[0.16em] text-cream/55">
             {item.added_by_name}
           </p>
         ) : null}
@@ -238,9 +238,9 @@ function MediaViewer({
       >
         <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-4 py-3">
           <div className="min-w-0">
-            <p className="truncate font-serif italic text-cream">{label}</p>
+            <p className="truncate italic text-cream">{label}</p>
             {item.filename && media === "pdf" && (
-              <p className="truncate text-[10px] uppercase tracking-wider text-muted-foreground/70">
+              <p className="truncate text-label uppercase tracking-wider text-muted-foreground/70">
                 {item.filename}
               </p>
             )}
@@ -251,7 +251,7 @@ function MediaViewer({
                 <button
                   type="button"
                   onClick={onEdit}
-                  className="inline-flex items-center gap-1 rounded-full border border-white/10 px-3 py-1.5 text-xs text-cream hover:bg-white/5"
+                  className="inline-flex items-center gap-1 rounded-full border border-white/10 px-3 py-1.5 text-label text-cream hover:bg-white/5"
                 >
                   <Pencil className="h-3.5 w-3.5" />
                   Edit
@@ -259,7 +259,7 @@ function MediaViewer({
                 <button
                   type="button"
                   onClick={onRemove}
-                  className="inline-flex items-center gap-1 rounded-full border border-red-400/30 px-3 py-1.5 text-xs text-red-300 hover:bg-red-500/10"
+                  className="inline-flex items-center gap-1 rounded-full border border-red-400/30 px-3 py-1.5 text-label text-red-300 hover:bg-red-500/10"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Remove
@@ -272,7 +272,7 @@ function MediaViewer({
                 target="_blank"
                 rel="noopener noreferrer"
                 download={item.filename || undefined}
-                className="inline-flex items-center gap-1 rounded-full border border-amber/30 bg-amber/10 px-3 py-1.5 text-xs text-amber hover:bg-amber/20"
+                className="inline-flex items-center gap-1 rounded-full border border-amber/30 bg-amber/10 px-3 py-1.5 text-label text-amber hover:bg-amber/20"
               >
                 <FileDown className="h-3.5 w-3.5" />
                 Open
@@ -305,7 +305,7 @@ function MediaViewer({
           ) : (
             <div
               className={cn(
-                "flex h-48 w-full max-w-sm items-center justify-center rounded-2xl bg-gradient-to-br px-6 text-center text-lg font-medium text-cream/90",
+                "flex h-48 w-full max-w-sm items-center justify-center rounded-2xl bg-gradient-to-br px-6 text-center text-title font-medium text-cream/90",
                 item.gradient ?? pickVisionGradient(item.caption || item.id),
               )}
             >
@@ -362,7 +362,7 @@ function VisionCard({
           aria-hidden
         />
         {media === "pdf" && (
-          <span className="absolute right-1 top-1 z-20 rounded-full bg-black/55 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wider text-amber">
+          <span className="absolute right-1 top-1 z-20 rounded-full bg-black/55 px-1.5 py-0.5 text-label font-semibold uppercase tracking-wider text-amber">
             PDF
           </span>
         )}
@@ -386,7 +386,7 @@ function VisionCard({
           ) : media === "pdf" ? (
             <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-amber-950/90 via-[#2a1810] to-indigo-950/80 px-2">
               <FileText className="h-8 w-8 text-amber/80" strokeWidth={1.25} />
-              <p className="max-w-full truncate text-center text-[10px] font-medium text-cream/80">
+              <p className="max-w-full truncate text-center text-label font-medium text-cream/80">
                 {item.filename || "PDF document"}
               </p>
             </div>
@@ -442,7 +442,7 @@ function VisionCard({
         </div>
       </div>
       {item.caption && (
-        <p className="mt-2 px-1 text-center text-sm leading-snug text-cream/90 pointer-events-none">
+        <p className="mt-2 px-1 text-center text-body leading-snug text-cream/90 pointer-events-none">
           {item.caption}
         </p>
       )}
@@ -488,7 +488,7 @@ function DreamForm({
         value={caption}
         onChange={(e) => setCaption(e.target.value)}
         placeholder="Name this dream…"
-        className="bg-secondary/50 border-white/10 text-base"
+        className="bg-secondary/50 border-white/10 text-body"
       />
 
       <input
@@ -502,7 +502,7 @@ function DreamForm({
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-3 text-sm text-muted-foreground transition hover:border-primary/40 hover:text-cream"
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-3 text-body text-muted-foreground transition hover:border-primary/40 hover:text-cream"
         >
           <ImagePlus className="h-4 w-4" />
           {hasPhoto ? (uploadMediaType === "pdf" ? "PDF added — replace" : "Photo added — replace") : "Add a photo or PDF"}
@@ -522,7 +522,7 @@ function DreamForm({
       <button
         type="submit"
         disabled={!canPin || saving}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-body font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
         style={{ backgroundColor: "var(--room-accent)" }}
       >
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -874,7 +874,7 @@ export function VisionBoard() {
       <div className="border-b border-white/[0.06] px-4 py-3 shrink-0">
         {mode === "board" ? (
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70">
+            <p className="text-label uppercase tracking-[0.2em] text-muted-foreground/70">
               {items.length} dream{items.length === 1 ? "" : "s"}
               {pinnedCount > 0 ? ` · ${pinnedCount}/${MAX_STAGE_PINS} pinned` : " · tap to view"}
             </p>
@@ -895,12 +895,12 @@ export function VisionBoard() {
             <button
               type="button"
               onClick={backToBoard}
-              className="absolute left-0 inline-flex items-center gap-1.5 text-sm text-primary transition hover:opacity-80"
+              className="absolute left-0 inline-flex items-center gap-1.5 text-body text-primary transition hover:opacity-80"
             >
               <ArrowLeft className="h-4 w-4" />
               Back
             </button>
-            <p className="text-sm font-semibold text-cream">
+            <p className="text-body font-semibold text-cream">
               {mode === "add" ? "Add Vision" : "Edit Vision"}
             </p>
           </div>
@@ -946,7 +946,7 @@ export function VisionBoard() {
           <button
             type="button"
             onClick={() => void removeItem(editingItem.id)}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-red-400/30 py-2 text-sm text-red-300/90 hover:bg-red-500/10"
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-red-400/30 py-2 text-body text-red-300/90 hover:bg-red-500/10"
           >
             <Trash2 className="h-4 w-4" />
             Remove from board

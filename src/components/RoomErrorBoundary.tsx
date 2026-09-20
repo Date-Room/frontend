@@ -32,15 +32,15 @@ export class ActivityBoundary extends Component<
     if (this.state.error) {
       return (
         <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
-          <p className="font-serif text-xl italic text-cream">Something hiccuped</p>
-          <p className="max-w-xs text-sm text-muted-foreground">
+          <p className="text-title italic text-cream">Something hiccuped</p>
+          <p className="max-w-xs text-body text-muted-foreground">
             {this.props.label ? `${this.props.label} ran into a problem.` : "This activity ran into a problem."}{" "}
             The call is still connected.
           </p>
           <button
             type="button"
             onClick={() => this.setState({ error: null })}
-            className="mt-1 rounded-full px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+            className="mt-1 rounded-full px-4 py-2 text-body font-semibold text-primary-foreground transition hover:opacity-90"
             style={{ backgroundColor: "var(--room-accent)" }}
           >
             Try again
@@ -70,9 +70,9 @@ export class RoomErrorBoundary extends Component<{ children: ReactNode }, { erro
     if (this.state.error) {
       return (
         <div className="fixed inset-0 z-[999] overflow-auto bg-background p-6 text-cream">
-          <p className="font-serif text-lg text-rose">Room crashed</p>
-          <p className="mt-2 text-sm font-semibold">{this.state.error.message}</p>
-          <pre className="mt-4 max-w-full whitespace-pre-wrap break-words text-[11px] leading-relaxed text-muted-foreground">
+          <p className="text-title text-rose">Room crashed</p>
+          <p className="mt-2 text-body font-semibold">{this.state.error.message}</p>
+          <pre className="mt-4 max-w-full whitespace-pre-wrap break-words text-label leading-relaxed text-muted-foreground">
             {this.state.error.stack}
           </pre>
         </div>

@@ -161,13 +161,13 @@ function CompactRow({
         <t.Icon className="h-4 w-4" strokeWidth={1.75} aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-serif text-[15px] italic text-cream">{view.headline}</span>
-        <span className="block truncate text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+        <span className="block truncate font-serif text-body italic text-cream">{view.headline}</span>
+        <span className="block truncate text-label uppercase tracking-[0.18em] text-muted-foreground">
           {view.eyebrow}
         </span>
       </span>
       {view.showKeep && (
-        <span className={cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold", t.button)}>
+        <span className={cn("shrink-0 rounded-full px-3 py-1.5 text-label font-semibold", t.button)}>
           Keep the room
         </span>
       )}
@@ -292,7 +292,7 @@ function Card({
           />
         </span>
       )}
-      <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+      <p className="text-label font-semibold uppercase tracking-[0.22em] text-muted-foreground">
         {view.eyebrow}
       </p>
       <span
@@ -306,7 +306,7 @@ function Card({
       <h2 className="mt-3 font-serif text-2xl italic leading-tight text-cream sm:text-[1.7rem]">
         {view.headline}
       </h2>
-      <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted-foreground">{view.body}</p>
+      <p className="mt-2 max-w-prose text-body leading-relaxed text-muted-foreground">{view.body}</p>
 
       {closeStep === "code" ? (
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -316,20 +316,20 @@ function Card({
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="6-digit code"
-            className="w-full rounded-full border border-white/10 bg-black/30 px-4 py-2.5 text-sm text-cream placeholder:text-muted-foreground/50 sm:max-w-[200px]"
+            className="w-full rounded-full border border-white/10 bg-black/30 px-4 py-2.5 text-body text-cream placeholder:text-muted-foreground/50 sm:max-w-[200px]"
           />
           <button
             type="button"
             onClick={() => void confirmClose()}
             disabled={busy !== null || code.trim().length < 4}
-            className="rounded-full bg-white/[0.12] px-4 py-2.5 text-sm font-semibold text-cream hover:bg-white/[0.18] disabled:opacity-50"
+            className="rounded-full bg-white/[0.12] px-4 py-2.5 text-body font-semibold text-cream hover:bg-white/[0.18] disabled:opacity-50"
           >
             {busy === "close" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : "Close the room"}
           </button>
           <button
             type="button"
             onClick={() => setCloseStep(null)}
-            className="rounded-full px-4 py-2.5 text-sm text-muted-foreground hover:text-cream"
+            className="rounded-full px-4 py-2.5 text-body text-muted-foreground hover:text-cream"
           >
             Never mind
           </button>
@@ -340,7 +340,7 @@ function Card({
             <button
               type="button"
               onClick={() => navigate("/create")}
-              className={cn("rounded-full px-5 py-2.5 text-sm font-semibold transition", t.button)}
+              className={cn("rounded-full px-5 py-2.5 text-body font-semibold transition", t.button)}
             >
               Open a new room
             </button>
@@ -350,7 +350,7 @@ function Card({
               type="button"
               onClick={() => void keep()}
               disabled={busy !== null}
-              className={cn("rounded-full px-5 py-2.5 text-sm font-semibold transition disabled:opacity-60", t.button)}
+              className={cn("rounded-full px-5 py-2.5 text-body font-semibold transition disabled:opacity-60", t.button)}
             >
               {busy === "keep" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : "Keep the room"}
             </button>
@@ -360,7 +360,7 @@ function Card({
               type="button"
               onClick={() => void cancelClose()}
               disabled={busy !== null}
-              className={cn("rounded-full px-5 py-2.5 text-sm font-semibold transition disabled:opacity-60", t.button)}
+              className={cn("rounded-full px-5 py-2.5 text-body font-semibold transition disabled:opacity-60", t.button)}
             >
               {busy === "cancel" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : "Keep the room"}
             </button>
@@ -370,7 +370,7 @@ function Card({
               type="button"
               onClick={() => void saveCopy()}
               disabled={busy !== null}
-              className="inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm text-cream/85 hover:bg-white/[0.05] disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-body text-cream/85 hover:bg-white/[0.05] disabled:opacity-60"
             >
               {busy === "copy" ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -384,7 +384,7 @@ function Card({
             <button
               type="button"
               onClick={onSnooze}
-              className="rounded-full px-4 py-2.5 text-sm text-muted-foreground hover:text-cream"
+              className="rounded-full px-4 py-2.5 text-body text-muted-foreground hover:text-cream"
             >
               Remind me later
             </button>
@@ -394,7 +394,7 @@ function Card({
               type="button"
               onClick={() => void sendCloseCode()}
               disabled={busy !== null}
-              className="ml-auto rounded-full px-4 py-2.5 text-sm text-muted-foreground hover:text-cream disabled:opacity-60"
+              className="ml-auto rounded-full px-4 py-2.5 text-body text-muted-foreground hover:text-cream disabled:opacity-60"
             >
               {busy === "close" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : "Close it now"}
             </button>

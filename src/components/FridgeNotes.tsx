@@ -277,7 +277,7 @@ function NoteDetail({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full px-4 py-2 text-sm text-muted-foreground hover:text-cream"
+          className="rounded-full px-4 py-2 text-body text-muted-foreground hover:text-cream"
         >
           Close
         </button>
@@ -286,7 +286,7 @@ function NoteDetail({
             <button
               type="button"
               onClick={onEdit}
-              className="inline-flex items-center gap-1.5 rounded-full border border-amber/35 bg-amber/10 px-4 py-2 text-sm text-amber hover:bg-amber/20"
+              className="inline-flex items-center gap-1.5 rounded-full border border-amber/35 bg-amber/10 px-4 py-2 text-body text-amber hover:bg-amber/20"
             >
               <Pencil className="h-3.5 w-3.5" />
               Edit
@@ -294,7 +294,7 @@ function NoteDetail({
             <button
               type="button"
               onClick={onRemove}
-              className="inline-flex items-center gap-1.5 rounded-full border border-red-400/30 px-4 py-2 text-sm text-red-300 hover:bg-red-500/10"
+              className="inline-flex items-center gap-1.5 rounded-full border border-red-400/30 px-4 py-2 text-body text-red-300 hover:bg-red-500/10"
             >
               <Trash2 className="h-3.5 w-3.5" />
               Remove
@@ -488,7 +488,7 @@ export function FridgeNotes({ active = true }: Props) {
   if (!room.canPersist) {
     return (
       <div className="wall-surface">
-        <EmptyState variant="fridge" title="Fridge Note" subtitle="Sign in to leave notes on your shared fridge." />
+        <EmptyState variant="notes" title="Sticky Notes" subtitle="Sign in to leave notes for each other." />
       </div>
     );
   }
@@ -508,16 +508,16 @@ export function FridgeNotes({ active = true }: Props) {
             <button
               type="button"
               onClick={cancelEdit}
-              className="absolute left-0 inline-flex items-center gap-1.5 text-sm text-primary transition hover:opacity-80"
+              className="absolute left-0 inline-flex items-center gap-1.5 text-body text-primary transition hover:opacity-80"
             >
               <ArrowLeft className="h-4 w-4" />
               Back
             </button>
-            <p className="text-sm font-semibold text-cream">{editingNote ? "Edit Note" : "Add Note"}</p>
+            <p className="text-body font-semibold text-cream">{editingNote ? "Edit Note" : "Add Note"}</p>
           </div>
         ) : (
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/70">
+            <p className="text-label uppercase tracking-[0.2em] text-muted-foreground/70">
               {notes.length} note{notes.length === 1 ? "" : "s"}
               {pinnedCount > 0 ? ` · ${pinnedCount}/${MAX_STAGE_PINS} pinned` : ""}
             </p>
@@ -545,9 +545,9 @@ export function FridgeNotes({ active = true }: Props) {
               onChange={(e) => setText(e.target.value.slice(0, NOTE_MAX))}
               placeholder="Thinking about you today…"
               rows={4}
-              className="resize-none border-white/10 bg-secondary/60 text-sm leading-relaxed"
+              className="resize-none border-white/10 bg-secondary/60 text-body leading-relaxed"
             />
-            <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <label className="flex cursor-pointer items-center gap-2 text-label text-muted-foreground">
               <input
                 type="checkbox"
                 checked={emergency}
@@ -559,7 +559,7 @@ export function FridgeNotes({ active = true }: Props) {
             <button
               type="submit"
               disabled={!canStick || saving}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-full py-2.5 text-body font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
               style={{ backgroundColor: "var(--room-accent)" }}
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -572,7 +572,7 @@ export function FridgeNotes({ active = true }: Props) {
           {empty ? (
             <FridgeAppliance empty>
               <div className="fridge-empty-embedded">
-                <EmptyState variant="fridge" title="Fridge Note" onAdd={focusAdd} addLabel="Add a note" />
+                <EmptyState variant="notes" title="Sticky Notes" onAdd={focusAdd} addLabel="Add a note" />
               </div>
             </FridgeAppliance>
           ) : (
@@ -633,16 +633,16 @@ function FridgeEmpty({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center text-muted-foreground">
-      <span className="text-3xl" aria-hidden>🧲</span>
-      <p className="text-sm">No notes yet.</p>
+      <span className="text-display" aria-hidden>🧲</span>
+      <p className="text-body">No notes yet.</p>
       {readonly ? (
-        <p className="text-sm">Sign in to leave notes on your shared fridge.</p>
+        <p className="text-body">Sign in to leave notes on your shared fridge.</p>
       ) : (
         onFocusAdd && (
           <button
             type="button"
             onClick={onFocusAdd}
-            className="rounded-full px-5 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+            className="rounded-full px-5 py-2 text-body font-semibold text-primary-foreground transition hover:opacity-90"
             style={{ backgroundColor: "var(--room-accent)" }}
           >
             {noteCount ? "Write a note" : "Leave the first note"}

@@ -56,14 +56,14 @@ export function LandingJoinMenu({ className }: { className?: string }) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="dialog"
-        className="flex items-center gap-1.5 text-sm text-lpmuted transition-colors hover:text-lpcream"
+        className="flex items-center gap-1.5 text-body text-lpmuted transition-colors hover:text-lpcream"
       >
         {t("landing.nav.join")}
         <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", open && "rotate-180")} />
       </button>
       {open && (
         <div className="absolute right-0 top-full z-50 mt-3 w-[19rem] rounded-2xl border border-lpborder/60 bg-lpcard p-5 shadow-2xl">
-          <p className="mb-4 text-center text-sm text-lpmuted">Type the Room ID and PIN your host shared.</p>
+          <p className="mb-4 text-center text-body text-lpmuted">Type the Room ID and PIN your host shared.</p>
           <form onSubmit={submit} className="space-y-5">
             <SlotInput
               label="ROOM ID"
@@ -84,11 +84,11 @@ export function LandingJoinMenu({ className }: { className?: string }) {
               obscure
               autoComplete="one-time-code"
             />
-            {error && <p className="text-center text-sm text-rose">{error}</p>}
+            {error && <p className="text-center text-body text-rose">{error}</p>}
             <button
               type="submit"
               disabled={!valid}
-              className="lp-btn w-full !py-3 text-sm disabled:opacity-40"
+              className="lp-btn w-full !py-3 text-body disabled:opacity-40"
             >
               {t("landing.nav.join")}
             </button>

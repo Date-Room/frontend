@@ -12,6 +12,9 @@ import { createPortal } from "react-dom";
 import {
   RotateCw,
   LayoutGrid,
+  X,
+  Columns2,
+  PictureInPicture2,
   Video,
   Sparkles,
   StickyNote,
@@ -37,26 +40,33 @@ import {
   Loader2,
   Check,
   ShieldCheck,
-  GripVertical,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
 import {
-  clampPaneWidth,
-  setCallMode,
-  setPaneWidth,
-  useCallMode,
-  usePaneWidth,
+  isSidePane,
+  useCallLayout,
 } from "@/lib/callLayout";
-import { ActivityHelp, GameIntro, hasActivityHelp, shouldShowGameIntro } from "@/components/ActivityHelp";
+import {
+  ActivityHelp,
+  GameIntro,
+  hasActivityHelp,
+  hasSeenGameIntro,
+  markGameIntroSeen,
+  shouldShowGameIntro,
+} from "@/components/ActivityHelp";
 import { RoomAmbianceSheet } from "@/components/RoomAmbianceSheet";
-import { RoomThemeChip } from "@/components/RoomThemeChip";
 import { useRoomThemePicker } from "@/hooks/useRoomThemePicker";
 import { useHelpNow } from "@/lib/activityHelpNow";
 import { MusicPlayerBar, MusicRoomProvider } from "@/components/MusicRoom";
 import { ActivityBoundary } from "@/components/RoomErrorBoundary";
 import { useRoomSession } from "@/context/RoomSessionContext";
+import { ACTIVITY_TILES } from "@/lib/activityTiles";
+import { useBottomBarHeight } from "@/lib/bottomBar";
+import { useVideoOrientation } from "@/lib/videoOrientation";
+import { useWideViewport } from "@/lib/viewport";
 import { useChaperonController } from "@/context/ChaperonContext";
 import { ChaperonSeam } from "@/components/ChaperonSeam";
+import { CHAT_OPEN_EVENT, ChatDrawer } from "@/components/ChatDrawer";
 import { ActivityInvite, inviteChime } from "@/components/ActivityInvite";
 import { ChatToast } from "@/components/ChatToast";
 import { useChatRoom } from "@/context/ChatContext";
@@ -98,7 +108,6 @@ const CATEGORIES: { id: string; label: string; icon: LucideIcon; itemIds: string
   },
   { id: "watch", label: "Watch", icon: PlayCircle, itemIds: ["watch"] },
   { id: "music", label: "Music", icon: Headphones, itemIds: ["dj"] },
-  { id: "chat", label: "Chat", icon: MessageCircle, itemIds: ["chat"] },
 ];
 
 /** Partner-action → notifier copy + which stage item to open. Maps the raw
@@ -145,25 +154,8 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   room_details: Settings,
 };
 
-/** Generated square backgrounds for dock drill-in tiles. */
-const ITEM_TILE_IMAGES: Record<string, string> = {
-  vision_board: "/dock-tiles/vision-board.png",
-  fridge_notes: "/dock-tiles/fridge-notes.png",
-  bookshelf: "/dock-tiles/bookshelf.png",
-  room_details: "/dock-tiles/room-details.png",
-  questions: "/dock-tiles/questions.png",
-  this_or_that: "/dock-tiles/this-or-that.png",
-  the_36: "/dock-tiles/the-36.png",
-  "2_truths": "/dock-tiles/2-truths.png",
-  truth_or_dare: "/dock-tiles/truth-or-dare.png",
-  one_has_to_go: "/dock-tiles/one-has-to-go.png",
-  pick_a_door: "/dock-tiles/pick-a-door.png",
-  rank_it: "/dock-tiles/rank-it.png",
-  guacamole: "/dock-tiles/guacamole.png",
-  watch: "/dock-tiles/watch.png",
-  dj: "/dock-tiles/dj.png",
-  chat: "/dock-tiles/chat.png",
-};
+
+
 
 /** One-line taglines for the drilled-in list rows — mirror the mobile menu. */
 const ITEM_TAGLINES: Record<string, string> = {
@@ -193,6 +185,12 @@ export type StageItem = {
   isWall?: boolean;
 };
 
+/** How much wider than tall the stage group sits, before the ceiling. */
+const STAGE_WIDTH_RATIO = 1.32;
+
+/** Gap between the detached bar and the card (Tailwind `gap-2`). */
+const STAGE_GAP = 8;
+
 const EDGE = 12;
 const TOP_PAD = 68;
 const BOTTOM_PAD = 96;
@@ -220,7 +218,6 @@ const FS_TILE = { w: 384, h: 216 };
 const FS_EDGE = 16;
 const FS_BOTTOM_PAD = 88;
 // Below this pane width the two faces stack instead of sitting side by side.
-const PANE_STACK_BELOW = 520;
 // Desktop call layout (side by side with a draggable divider, or the pair
 // bubble) lives in lib/callLayout so the top-bar switcher shares it.
 /** Default size is the biggest; drag-resize shrinks down to 2/3 of it. */
@@ -239,20 +236,6 @@ function useCompactViewport(): boolean {
     return () => mq.removeEventListener("change", on);
   }, []);
   return compact;
-}
-
-/** Desktop-wide viewport — drives the 50/50 call split layout. */
-function useWideViewport(): boolean {
-  const [wide, setWide] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches,
-  );
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const on = () => setWide(mq.matches);
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
-  return wide;
 }
 
 /**
@@ -314,7 +297,8 @@ export function RoomStage({
   const commitStage = useCallback((id: string) => setStaged(id), []);
 
   const [helpOpen, setHelpOpen] = useState(false);
-  /** Pre-game intro — shown each time you open an activity until you tap Start. */
+  /** Pre-game intro — shown the FIRST time you open an activity. After that
+   *  the ? in the stage header is the way back to it. */
   const [introOpen, setIntroOpen] = useState(false);
   // The ? button pulses briefly when the game's "right now" step changes —
   // a reminder of where help lives at exactly the moments its answer is new.
@@ -331,11 +315,20 @@ export function RoomStage({
     }
     prevStepRef.current = step;
   }, [helpSnap?.step]);
-  // Pre-game intro: every time you open an activity, learn the flow first,
-  // then tap Start. Mid-game reference lives on the ? button.
+  // Pre-game intro: learn the flow before your first go at a game. Once it
+  // has been read and dismissed, opening the game drops you straight in —
+  // the ? button in the stage header reopens the same card any time.
   useEffect(() => {
     setHelpOpen(false);
-    setIntroOpen(shouldShowGameIntro(staged));
+    setIntroOpen(shouldShowGameIntro(staged) && !hasSeenGameIntro(staged));
+  }, [staged]);
+
+  /** Close the intro and don't open it for this game again. Both exits count:
+   *  reading the card is what "seen" means, whether you then start or step
+   *  back out. */
+  const dismissIntro = useCallback(() => {
+    if (staged) markGameIntroSeen(staged);
+    setIntroOpen(false);
   }, [staged]);
   // Two-level launcher (mirrors mobile): null = category list, else drilled in.
   const [catId, setCatId] = useState<string | null>(null);
@@ -371,6 +364,14 @@ export function RoomStage({
   }, [channelStatus]);
   const { current: themeMood, open: themeOpen, setOpen: setThemeOpen, pick: pickTheme, busy: themeBusy } =
     useRoomThemePicker();
+  // Room theming used to sit permanently on top of the stage. It belongs
+  // with the room's settings, not over every activity, so Room info opens it.
+  useEffect(() => {
+    const open = () => setThemeOpen(true);
+    window.addEventListener("dr:room:open-theme", open);
+    return () => window.removeEventListener("dr:room:open-theme", open);
+  }, [setThemeOpen]);
+
   const [notif, setNotif] = useState<{ id: number; text: string; target: string } | null>(null);
 
   const stagedRef = useRef(staged);
@@ -441,7 +442,13 @@ export function RoomStage({
   }, [inviteId]);
   const declineInvite = useCallback(() => dispatchInvite({ type: "decline" }), []);
 
-  // ── Chat while the panel is closed: badge on the dock, toast up top ────
+  // ── Chat: a drawer over the room, not a stage activity ────────────────
+  const [chatOpen, setChatOpen] = useState(false);
+  useEffect(() => {
+    const onOpen = () => setChatOpen(true);
+    window.addEventListener(CHAT_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(CHAT_OPEN_EVENT, onOpen);
+  }, []);
   const chat = useChatRoom();
   const chatUnread = chat?.unread ?? 0;
   const [chatToast, setChatToast] = useState<{ id: string; text: string } | null>(null);
@@ -449,7 +456,7 @@ export function RoomStage({
   useEffect(() => {
     const m = chat?.lastIncoming;
     if (!m || !lastIncomingId) return;
-    if (stagedRef.current === "chat") return;
+    if (chatOpenRef.current) return;
     setChatToast({ id: m.id, text: m.text });
     // Chat is how you reach someone when the mic or speakers are gone, so
     // the arrival is audible whenever the panel isn't open (not only in a
@@ -457,9 +464,11 @@ export function RoomStage({
     inviteChime(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastIncomingId]);
+  const chatOpenRef = useRef(chatOpen);
+  chatOpenRef.current = chatOpen;
   useEffect(() => {
-    if (staged === "chat") setChatToast(null);
-  }, [staged]);
+    if (chatOpen) setChatToast(null);
+  }, [chatOpen]);
   const dismissChatToast = useCallback(() => setChatToast(null), []);
 
   const notifTimer = useRef<number | undefined>(undefined);
@@ -515,67 +524,28 @@ export function RoomStage({
   }, [room.channel, room.senderId, partnerName]);
   const compact = useCompactViewport();
   const wide = useWideViewport();
-  const callMode = useCallMode();
+  const [callLayout, chooseCallLayout] = useCallLayout();
   // Watch's native fullscreen only paints its own subtree, so while it is
   // up the call must float over it regardless of the chosen desktop mode.
   const [watchFullscreen, setWatchFullscreen] = useState(false);
   /** Desktop fullscreen override: pair bubble by default, one tap for a tile. */
   const fsOverlay = wide && watchFullscreen;
   const [fsExpanded, setFsExpanded] = useState(false);
-  /** The right-hand call pane is rendered. */
-  const splitCallLayout = callActive && wide && callMode === "split";
-  /** The call renders as the floating window (PiP/bubble) rather than in the pane. */
+  /** The right-hand call pane is rendered — `side` and `side-pip` both use it. */
+  const splitCallLayout = callActive && wide && isSidePane(callLayout);
+  /** The call renders as the floating window rather than in the pane. */
   const floatingCall = !splitCallLayout || watchFullscreen;
 
-  // ── Side-by-side pane width (desktop) ──
-  const rowRef = useRef<HTMLDivElement>(null);
-  const [rowW, setRowW] = useState(0);
-  useEffect(() => {
-    const el = rowRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => setRowW(entry.contentRect.width));
-    ro.observe(el);
-    setRowW(el.getBoundingClientRect().width);
-    return () => ro.disconnect();
-  }, []);
-  const savedPaneW = usePaneWidth();
-  const paneW = rowW > 0 ? clampPaneWidth(savedPaneW ?? rowW / 2, rowW) : savedPaneW ?? 0;
-  const paneStacked = paneW > 0 && paneW < PANE_STACK_BELOW;
-  const divider = useRef<{ right: number } | null>(null);
-  const onDividerMove = useCallback((e: PointerEvent) => {
-    const d = divider.current;
-    const row = rowRef.current;
-    if (!d || !row) return;
-    setPaneWidth(clampPaneWidth(d.right - e.clientX, row.getBoundingClientRect().width));
-  }, []);
-  const onDividerUp = useCallback(() => {
-    divider.current = null;
-    document.body.style.cursor = "";
-    window.removeEventListener("pointermove", onDividerMove);
-    window.removeEventListener("pointerup", onDividerUp);
-  }, [onDividerMove]);
-  function startDividerDrag(e: React.PointerEvent) {
-    const row = rowRef.current;
-    if (!row) return;
-    e.preventDefault();
-    divider.current = { right: row.getBoundingClientRect().right };
-    document.body.style.cursor = "col-resize";
-    window.addEventListener("pointermove", onDividerMove);
-    window.addEventListener("pointerup", onDividerUp);
-  }
-  function nudgeDivider(delta: number) {
-    const row = rowRef.current;
-    if (!row) return;
-    setPaneWidth(clampPaneWidth(paneW + delta, row.getBoundingClientRect().width));
-  }
-  useEffect(
-    () => () => {
-      window.removeEventListener("pointermove", onDividerMove);
-      window.removeEventListener("pointerup", onDividerUp);
-    },
-    [onDividerMove, onDividerUp],
+  // Orientation drives the capture shape, so the window's frame matches the
+  // stream inside it — and so the partner receives the framing you chose.
+  // Not part of the layout preference: that is upstream's, above.
+  const [orientation, chooseOrientation] = useVideoOrientation();
+  const portrait = orientation === "portrait";
+  const setPortrait = useCallback(
+    (fn: (v: boolean) => boolean) =>
+      chooseOrientation(fn(portrait) ? "portrait" : "landscape"),
+    [chooseOrientation, portrait],
   );
-  const [portrait, setPortrait] = useState(true);
   const [scale, setScale] = useState(1);
   // Phones start as a small bubble; expand toggles a large (near-fullscreen)
   // call. Desktop keeps the large window and freeform corner-resize. Lazy
@@ -599,10 +569,14 @@ export function RoomStage({
     setCallOpen(false);
     setManualBubble(false);
   }, [staged]);
+  // On desktop, `float` means the draggable picture-in-picture window — big
+  // feed with the other inset in it — not a pair of small round tiles. The
+  // bubble is a phone affordance (and the Watch-fullscreen overlay); it was
+  // never what "floating" meant on a large screen.
   const bubble = fsOverlay
     ? !fsExpanded
     : wide
-      ? floatingCall && callMode === "bubble"
+      ? false
       : compact && (activityStaged ? !callOpen : manualBubble);
   const pairBubble = bubble && wide;
   const base = fsOverlay
@@ -638,10 +612,22 @@ export function RoomStage({
     [items],
   );
   const activeCat = catId ? availCats.find((c) => c.id === catId) ?? null : null;
-  const dockExpanded = Boolean(activeCat);
+  /** The launcher is a floating dropup again, not a resident dock: the stage
+   *  keeps the full canvas and the menu is summoned over it. `menuOpen` is
+   *  the dropup; `activeCat` is which level it is showing. */
+  const [menuOpen, setMenuOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelH, setPanelH] = useState(0);
+  useLayoutEffect(() => {
+    if (menuOpen && panelRef.current) setPanelH(panelRef.current.scrollHeight);
+  }, [menuOpen, catId, availCats]);
   /** Dock category used to open the current activity — powers “back to Games” etc. */
   const [lastCatId, setLastCatId] = useState<string | null>(null);
 
+  function openMenu() {
+    setCatId(null);
+    setMenuOpen((v) => !v);
+  }
   function pickCategory(c: (typeof availCats)[number]) {
     // One thing inside (Watch, Music, Chat): open it. The drill-in list is
     // for choosing between things, and a list of one is just a second tap.
@@ -651,6 +637,7 @@ export function RoomStage({
       setLastCatId(null);
       commitStage(c.items[0].id);
       setCatId(null);
+      setMenuOpen(false);
       return;
     }
     setCatId(c.id);
@@ -658,30 +645,25 @@ export function RoomStage({
   function pickItem(id: string) {
     if (activeCat) setLastCatId(activeCat.id);
     commitStage(id);
+    setMenuOpen(false);
     setCatId(null);
   }
 
+  /** Back always means "out of this activity", since the menu is no longer
+   *  part of the layout — closing it is what the pill and the scrim do. */
   function goBack() {
-    if (staged !== "lobby") {
-      commitStage("lobby");
-      setCatId(lastCatId);
-      return;
-    }
-    if (dockExpanded) {
-      setCatId(null);
-      setLastCatId(null);
-    }
+    if (staged === "lobby") return;
+    commitStage("lobby");
+    setCatId(null);
   }
 
   const backLabel = useMemo(() => {
-    if (dockExpanded) return "Lobby";
     if (staged !== "lobby" && lastCatId) {
       return availCats.find((c) => c.id === lastCatId)?.label ?? "Lobby";
     }
     return "Lobby";
-  }, [dockExpanded, staged, lastCatId, availCats]);
+  }, [staged, lastCatId, availCats]);
 
-  const showBack = dockExpanded || staged !== "lobby";
 
   // ── Call PiP drag ──
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -882,30 +864,89 @@ export function RoomStage({
     () => parseFridgeNotes(fridgeState).notes.filter((n) => n.stage_pinned),
     [fridgeState],
   );
-  // Whether the bottom music bar is showing, so the launcher lifts above it.
-  const { state: djState } = useActivitySession("dj");
-  const musicActive =
-    djState?.closed !== true &&
-    (Boolean(djState?.now_playing) || (Array.isArray(djState?.queue) && djState.queue.length > 0));
-  // Watch shows its own bottom bar while it's staged with a video.
-  const { state: watchState } = useActivitySession("watch");
-  const bottomBarActive = musicActive || (staged === "watch" && Boolean(watchState?.video_id));
+
+
+  // The launcher sits in the gutter between the stage and whatever is pinned
+  // to the bottom of the screen, with the SAME gap above and below it. Both
+  // heights are measured rather than assumed: the player bar's height is
+  // content-driven (it grows with its controls), and the old hardcoded
+  // `bottom-[80px]` guess is what let the pill drift up over the stage.
+  const GUTTER = 14;
+  const launcherRef = useRef<HTMLDivElement>(null);
+  const barH = useBottomBarHeight();
+  const [pillH, setPillH] = useState(44);
+  useLayoutEffect(() => {
+    const el = launcherRef.current;
+    if (!el) return;
+    const read = () => setPillH(el.offsetHeight || 44);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // Roughly square where the screen allows, without locking a ratio: the
+  // width is capped to the height of the bar-and-stage group. Measuring the
+  // GROUP rather than the stage alone matters — once the bar was lifted out
+  // into its own card, measuring only the stage cut the width by the bar's
+  // height and left the card thin. Measured rather than derived from viewport
+  // maths, so it stays right when the chrome around it changes (the launcher
+  // gutter grows with the music bar). A little wider than tall reads better
+  // than a true square now the bar is its own card above it, so the height is
+  // scaled before it becomes the cap; the 54rem ceiling still keeps room
+  // around the card on a wide screen.
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [stageH, setStageH] = useState(0);
+  const [stageW, setStageW] = useState(0);
+  useLayoutEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const read = () => {
+      const r = el.getBoundingClientRect();
+      setStageH(r.height);
+      setStageW(r.width);
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // The card is a fixed height — everything under the detached bar. The lobby
+  // fills it by growing its own cards rather than by the card shrinking.
+  const stageBarRef = useRef<HTMLDivElement>(null);
+  const [stageBarH, setStageBarH] = useState(0);
+  useLayoutEffect(() => {
+    const el = stageBarRef.current;
+    if (!el) return;
+    const read = () => setStageBarH(el.getBoundingClientRect().height);
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  /** The card's height: everything under the bar. */
+  const stageCardH = Math.max(0, stageH - stageBarH - STAGE_GAP) || undefined;
+
+  /** Where the launcher floats, and how much room the stage gives up for it. */
+  const launcherBottom = barH + GUTTER;
+  const stagePadBottom = barH + GUTTER + pillH + GUTTER;
 
   return (
     <MusicRoomProvider watchActive={staged === "watch"}>
     <main
       className={cn(
-        "relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-2 pt-1 sm:px-6",
+        "relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-4 pt-1 transition-[padding-bottom] duration-300 ease-out sm:px-6",
         splitCallLayout ? "lg:px-5" : "lg:px-8",
       )}
+      style={{ paddingBottom: stagePadBottom }}
     >
       <div
-        ref={rowRef}
         className={cn(
           "flex h-full min-h-0 w-full gap-2 sm:gap-2.5",
           splitCallLayout
             ? "max-w-none flex-col lg:flex-row lg:items-stretch lg:gap-0"
-            : "mx-auto max-w-6xl flex-col",
+            : "mx-auto max-w-[57.6rem] flex-col",
         )}
       >
         {/* Left — stage + app dock. Takes whatever the call pane leaves. */}
@@ -924,7 +965,7 @@ export function RoomStage({
             <div className="perm-status-bar lg:hidden">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" />
-                <p className="truncate text-sm text-cream/80">{`Ringing ${partnerName}…`}</p>
+                <p className="truncate text-body text-cream/80">{`Ringing ${partnerName}…`}</p>
               </div>
             </div>
           ) : null
@@ -950,8 +991,8 @@ export function RoomStage({
                   <Video className="h-[18px] w-[18px]" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-semibold leading-tight">{title}</span>
-                  <span className="block truncate text-xs leading-tight text-muted-foreground">{sub}</span>
+                  <span className="block text-body font-semibold leading-tight">{title}</span>
+                  <span className="block truncate text-label leading-tight text-muted-foreground">{sub}</span>
                 </span>
                 <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
               </button>
@@ -959,249 +1000,238 @@ export function RoomStage({
           })()
         )}
 
-        {/* Stage — collapses to a strip when a dock category is open. */}
-        <section
+        {/* The bar hangs above the stage as its own surface — same width, same
+            centre, but a separate card with a gap between them. */}
+        <div
+          ref={stageRef}
           className={cn(
-            "perm-wall-frame flex flex-col overflow-hidden !p-0 transition-[flex] duration-300",
-            dockExpanded ? "shrink-0" : "min-h-0 flex-1",
+            "flex min-h-0 flex-1 flex-col gap-2",
+            // `self-center` is what lets the cap bite: a flex column stretches
+            // its children across the cross axis, which would override any
+            // max-width.
+            !splitCallLayout && "w-full self-center",
           )}
+          style={
+            !splitCallLayout && stageH > 0
+              ? { maxWidth: `min(60rem, ${Math.round(stageH * STAGE_WIDTH_RATIO)}px)` }
+              : undefined
+          }
         >
-          <div
-            className={cn(
-              "flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 sm:px-4",
-              dockExpanded ? "py-1.5" : "py-2",
-            )}
-          >
-            {showBack ? (
-              <button
-                type="button"
-                onClick={goBack}
-                className="focus-ring -ml-1 inline-flex items-center gap-1 rounded-full py-0.5 pl-0.5 pr-2.5 text-[11px] font-medium text-primary transition hover:bg-white/[0.06]"
-              >
-                <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="truncate">Back to {backLabel}</span>
-              </button>
-            ) : (
-              <>
-                {stagedItem &&
-                  (() => {
-                    const Icon = ITEM_ICONS[stagedItem.id] ?? LayoutGrid;
-                    return <Icon className="h-3.5 w-3.5 text-primary" aria-hidden />;
-                  })()}
-                <span className="text-xs font-medium uppercase tracking-[0.16em] text-cream/80">
-                  {stagedItem?.title ?? "Stage"}
-                </span>
-              </>
-            )}
-            {showBack && !dockExpanded && staged !== "lobby" && stagedItem && (
-              <span className="truncate text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                {stagedItem.title}
-              </span>
-            )}
-            {(() => {
-              // Starter's side: did my date follow me in?
-              const st = starterStatus(invite, staged, partnerPresent, nowTick, 45_000, openedAtRef.current);
-              if (!st) return null;
-              return (
-                <span
-                  data-testid="stage-partner-status"
-                  className={cn(
-                    "hidden min-w-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] sm:inline-flex",
-                    st === "together"
-                      ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
-                      : "border-white/[0.1] bg-white/[0.04] text-cream/60",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "h-1.5 w-1.5 shrink-0 rounded-full",
-                      st === "together" ? "bg-emerald-400" : "bg-primary animate-pulse",
-                    )}
-                  />
-                  <span className="truncate">{st === "together" ? `${partnerName} is here` : `Inviting ${partnerName}…`}</span>
-                </span>
-              );
-            })()}
-            <div className="ml-auto flex min-w-0 items-center gap-2">
-              {staged === "lobby" && (
-                <RoomThemeChip
-                  current={themeMood}
-                  onClick={() => setThemeOpen(true)}
-                  disabled={themeBusy}
-                  compact={dockExpanded}
-                />
-              )}
-              {callActive && !splitCallLayout ? (
-                <div className="hidden min-w-0 items-center gap-2 lg:flex">
-                  <span
-                    className={cn(
-                      "h-2 w-2 shrink-0 rounded-full",
-                      partnerInCall
-                        ? "bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.65)]"
-                        : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse",
-                    )}
-                  />
-                  <p className="truncate text-xs text-cream/80">
-                    {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
-                  </p>
-                </div>
-              ) : !callActive ? (
-                (() => {
-                  const title = partnerInCall
-                    ? "Join the call"
-                    : partnerInRoom
-                      ? "Invite them to the call"
-                      : "Start the call";
-                  const sub = partnerInCall
-                    ? `${partnerName} is in the call`
-                    : partnerInRoom
-                      ? `${partnerName} is in the room`
-                      : `${partnerName} isn't in yet`;
-                  return (
-                    <button
-                      type="button"
-                      onClick={onCallIn}
-                      className="group hidden max-w-md items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] py-1.5 pl-1.5 pr-3 text-left text-cream transition hover:border-primary/30 hover:bg-white/[0.07] lg:flex"
-                    >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                        <Video className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-xs font-semibold leading-tight">{title}</span>
-                        <span className="block truncate text-[10px] leading-tight text-muted-foreground">{sub}</span>
-                      </span>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
-                    </button>
-                  );
-                })()
-              ) : null}
-              {staged && hasActivityHelp(staged) && !introOpen && (
-                <button
-                  type="button"
-                  onClick={() => setHelpOpen(true)}
-                  aria-label="How this works"
-                  className={[
-                    "flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition hover:bg-white/5 hover:text-cream",
-                    helpPulse ? "dr-help-pulse" : "",
-                  ].join(" ")}
-                >
-                  <HelpCircle className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </div>
-          {!dockExpanded && (
-            <div key={staged} className="animate-stage-swell relative min-h-0 flex-1 overflow-hidden">
-              {staged ? (
-                <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
-                  <div
-                    className={[
-                      "h-full min-h-0 transition duration-300",
-                      introOpen ? "pointer-events-none scale-[0.98] opacity-40 blur-[2px]" : "",
-                    ].join(" ")}
-                    aria-hidden={introOpen}
-                  >
-                    {renderContent(staged, commitStage)}
-                  </div>
-                </ActivityBoundary>
-              ) : null}
-            </div>
-          )}
-        </section>
-
-        {/* App dock — expands when a category is open; lobby collapses above. */}
-        <nav
-          aria-label="Activities"
-          className={cn(
-            "dr-app-dock flex min-h-0 flex-col",
-            dockExpanded ? "min-h-0 flex-1" : "shrink-0",
-            bottomBarActive && !dockExpanded && "mb-14",
-          )}
-        >
-          {notif && (
-            <button
-              type="button"
-              onClick={() => {
-                commitStage(notif.target);
-                setNotif(null);
-              }}
-              className="focus-ring mb-2 flex w-full items-center gap-2 rounded-full border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs text-cream backdrop-blur-md transition hover:border-primary/55 hover:bg-primary/20"
+            <div
+              ref={stageBarRef}
+              className="perm-wall-frame flex shrink-0 items-center gap-2 !px-3 !py-2 sm:!px-4"
             >
               {(() => {
-                const NotifIcon = ITEM_ICONS[notif.target] ?? LayoutGrid;
-                return <NotifIcon className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />;
+                // Starter's side: did my date follow me in?
+                const st = starterStatus(invite, staged, partnerPresent, nowTick, 45_000, openedAtRef.current);
+                if (!st) return null;
+                return (
+                  <span
+                    data-testid="stage-partner-status"
+                    className={cn(
+                      "hidden min-w-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-label sm:inline-flex",
+                      st === "together"
+                        ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+                        : "border-white/[0.1] bg-white/[0.04] text-cream/60",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "h-1.5 w-1.5 shrink-0 rounded-full",
+                        st === "together" ? "bg-emerald-400" : "bg-primary animate-pulse",
+                      )}
+                    />
+                    <span className="truncate">{st === "together" ? `${partnerName} is here` : `Inviting ${partnerName}…`}</span>
+                  </span>
+                );
               })()}
-              <span className="truncate">{notif.text}</span>
-            </button>
-          )}
+              <div className="ml-auto flex min-w-0 items-center gap-2">
+                {/* Chat sits with the call, not with the games: it is how you
+                    reach someone while everything else carries on. Same pill
+                    as the call so the two read as a pair — inverted, so you
+                    can tell them apart without reading either. */}
+                {(() => {
+                  const unread = chatUnread > 0;
+                  const title = unread
+                    ? chatUnread === 1
+                      ? "1 new message"
+                      : `${chatUnread} new messages`
+                    : "Send a message";
+                  const sub = unread
+                    ? `From ${partnerName}`
+                    : partnerInRoom
+                      ? `${partnerName} is here`
+                      : "They'll see it when they arrive";
+                  return (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setChatOpen(true)}
+                        className={cn(
+                          "group hidden max-w-md items-center gap-2.5 rounded-full border py-1.5 pl-1.5 pr-3 text-left text-cream transition lg:flex",
+                          unread
+                            ? "border-primary/40 bg-primary/[0.10] hover:bg-primary/[0.16]"
+                            : "border-white/10 bg-white/[0.04] hover:border-primary/30 hover:bg-white/[0.07]",
+                        )}
+                      >
+                        {/* Tinted circle, accent glyph — the call carries the
+                            solid fill, so the pair stays distinguishable at a
+                            glance. */}
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                          <MessageCircle className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-label font-semibold leading-tight">{title}</span>
+                          <span className="block truncate text-label leading-tight text-muted-foreground">
+                            {sub}
+                          </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
+                      </button>
 
+                      {/* Below the pill's breakpoint the call CTA is a
+                          full-width row elsewhere, so chat keeps a compact
+                          control here rather than crowding the bar. */}
+                      <button
+                        type="button"
+                        onClick={() => setChatOpen(true)}
+                        aria-label={unread ? `Chat, ${chatUnread} unread` : "Chat"}
+                        title="Chat"
+                        className="focus-ring relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-primary/15 text-primary transition hover:bg-primary/25 lg:hidden"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        {unread && (
+                          <span
+                            data-testid="unread-badge"
+                            className="absolute -right-0.5 -top-0.5 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full border border-[#141019] bg-rose-500 px-1 text-[9px] font-bold text-white shadow-[0_0_12px_rgba(244,63,94,0.55)]"
+                          >
+                            {chatUnread > 99 ? "99+" : chatUnread}
+                          </span>
+                        )}
+                      </button>
+                    </>
+                  );
+                })()}
+                {callActive && !splitCallLayout ? (
+                  <div className="hidden min-w-0 items-center gap-2 lg:flex">
+                    <span
+                      className={cn(
+                        "h-2 w-2 shrink-0 rounded-full",
+                        partnerInCall
+                          ? "bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.65)]"
+                          : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse",
+                      )}
+                    />
+                    <p className="truncate text-label text-cream/80">
+                      {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
+                    </p>
+                  </div>
+                ) : !callActive ? (
+                  (() => {
+                    const title = partnerInCall
+                      ? "Join the call"
+                      : partnerInRoom
+                        ? "Invite them to the call"
+                        : "Start the call";
+                    const sub = partnerInCall
+                      ? `${partnerName} is in the call`
+                      : partnerInRoom
+                        ? `${partnerName} is in the room`
+                        : `${partnerName} isn't in yet`;
+                    return (
+                      <button
+                        type="button"
+                        onClick={onCallIn}
+                        className="group hidden max-w-md items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] py-1.5 pl-1.5 pr-3 text-left text-cream transition hover:border-primary/30 hover:bg-white/[0.07] lg:flex"
+                      >
+                        <span
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary-foreground"
+                          style={{ backgroundColor: "var(--room-accent, hsl(var(--primary)))" }}
+                        >
+                          <Video className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-label font-semibold leading-tight">{title}</span>
+                          <span className="block truncate text-label leading-tight text-muted-foreground">{sub}</span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5" />
+                      </button>
+                    );
+                  })()
+                ) : null}
+              </div>
+            </div>
+
+        {/* Stage — owns the canvas. The launcher floats over it. */}
+        <section
+          className={cn(
+            "perm-wall-frame flex min-h-0 shrink-0 flex-col overflow-hidden !p-0",
+            "transition-[height] duration-[420ms] ease-[cubic-bezier(0.2,0.8,0.2,1)]",
+            "motion-reduce:transition-none",
+          )}
+          style={stageCardH ? { height: stageCardH } : undefined}
+        >
           <div
+            key={staged}
             className={cn(
-              "flex flex-col rounded-2xl border border-white/[0.12] bg-[#141019]/75 p-2 shadow-[0_16px_48px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:p-2.5",
-              dockExpanded && "min-h-0 flex-1",
+              "animate-stage-swell relative min-h-0 flex-1 overflow-hidden",
+              // Clear the back/title and help controls in one place rather
+              // than teaching fifteen activities where the chrome sits.
+              staged !== "lobby" && "pt-12",
             )}
           >
-            {activeCat ? (
+            {/* An activity's own controls sit on it, not in a bar above
+                everything: back and the name on the left, help on the right. */}
+            {staged !== "lobby" && !introOpen && (
               <>
-                <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cream/70">
-                    {activeCat.label}
-                  </p>
-                  <span className="text-[9px] uppercase tracking-[0.16em] text-cream/40">
-                    {activeCat.items.length} items
-                  </span>
-                </div>
-                <div
-                  className={cn(
-                    "dr-dock-grid grid min-h-0 flex-1 gap-2 overflow-y-auto",
-                    activeCat.items.length <= 4
-                      ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
-                      : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5",
+                <div className="absolute left-3 top-3 z-30 flex animate-in items-center gap-2 fade-in slide-in-from-left-3 duration-300">
+                  <button
+                    type="button"
+                    onClick={() => commitStage("lobby")}
+                    aria-label="Back to the lobby"
+                    title="Back"
+                    className="focus-ring flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.14] bg-black/35 text-cream/80 backdrop-blur-md transition hover:bg-black/55 hover:text-cream"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  {stagedItem && (
+                    <span className="truncate text-label font-medium text-cream/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">
+                      {stagedItem.title}
+                    </span>
                   )}
-                >
-                  {activeCat.items.map((it) => (
-                    <MenuSquareTile
-                      key={it.id}
-                      Icon={ITEM_ICONS[it.id] ?? LayoutGrid}
-                      label={it.title}
-                      tagline={ITEM_TAGLINES[it.id]}
-                      image={ITEM_TILE_IMAGES[it.id]}
-                      active={staged === it.id}
-                      onClick={() => pickItem(it.id)}
-                    />
-                  ))}
                 </div>
-              </>
-            ) : (
-              <div
-                className="grid gap-1.5 sm:gap-2"
-                style={{ gridTemplateColumns: `repeat(${Math.max(availCats.length, 1)}, minmax(0, 1fr))` }}
-              >
-                {availCats.map((c) => (
-                  <MenuTile
-                    key={c.id}
-                    Icon={c.icon}
-                    label={c.label}
-                    active={c.items.some((i) => i.id === staged) || catId === c.id}
-                    badge={c.id === "chat" ? chatUnread || undefined : c.items.length > 1 ? c.items.length : undefined}
-                    badgeTone={c.id === "chat" ? "alert" : undefined}
-                    onClick={() => pickCategory(c)}
-                  />
-                ))}
-                {/* Chaperon lives in the dock too, so it is reachable mid-game
-                    (the lobby card is hidden once an activity is up). */}
-                {chaperon?.enabled && (
-                  <MenuTile
-                    Icon={ShieldCheck}
-                    label="Chaperon"
-                    active={chaperon.active}
-                    onClick={() => window.dispatchEvent(new CustomEvent("dr:chaperon:open-setup"))}
-                  />
+                {hasActivityHelp(staged) && (
+                  <button
+                    type="button"
+                    onClick={() => setHelpOpen(true)}
+                    aria-label="How this works"
+                    title="How this works"
+                    className={cn(
+                      "focus-ring absolute right-3 top-3 z-30 flex h-8 w-8 animate-in items-center justify-center rounded-full border border-white/[0.14] bg-black/35 text-cream/80 backdrop-blur-md transition fade-in slide-in-from-right-3 duration-300 hover:bg-black/55 hover:text-cream",
+                      helpPulse && "dr-help-pulse",
+                    )}
+                  >
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
                 )}
-              </div>
+              </>
             )}
+            {staged ? (
+              <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
+                <div
+                  className={[
+                    "h-full min-h-0 transition duration-300",
+                    introOpen ? "pointer-events-none scale-[0.98] opacity-40 blur-[2px]" : "",
+                  ].join(" ")}
+                  aria-hidden={introOpen}
+                >
+                  {renderContent(staged, commitStage)}
+                </div>
+              </ActivityBoundary>
+            ) : null}
           </div>
-        </nav>
+        </section>
+        </div>
 
         {splitCallLayout && <MusicPlayerBar onOpenList={() => commitStage("dj")} />}
         </div>
@@ -1209,38 +1239,11 @@ export function RoomStage({
         {/* Right — call video fills half the canvas on desktop. */}
         {splitCallLayout && (
           <>
-            {/* Divider — drag (or arrow keys) to trade stage for call. */}
-            <div
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="Resize the call pane"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={rowW > 0 ? Math.round((paneW / rowW) * 100) : 50}
-              tabIndex={0}
-              onPointerDown={startDividerDrag}
-              onKeyDown={(e) => {
-                if (e.key === "ArrowLeft") nudgeDivider(24);
-                else if (e.key === "ArrowRight") nudgeDivider(-24);
-                else if (e.key === "Home") setPaneWidth(null);
-                else return;
-                e.preventDefault();
-              }}
-              onDoubleClick={() => setPaneWidth(null)}
-              title="Drag to resize · double-click for half"
-              className="dr-call-divider focus-ring group hidden w-3 shrink-0 cursor-col-resize touch-none items-center justify-center lg:flex"
-            >
-              <GripVertical className="h-4 w-4 text-cream/30 transition group-hover:text-primary group-focus-visible:text-primary" aria-hidden />
-            </div>
-          <aside
-            className="dr-call-pane hidden min-h-0 w-full shrink-0 flex-col lg:flex"
-            // Before the row has been measured, hold the classic half.
-            style={{ width: paneW > 0 ? paneW : "50%" }}
-          >
+          <aside className="dr-call-pane hidden min-h-0 w-full shrink-0 flex-col lg:flex lg:w-1/2">
             <section className="perm-wall-frame flex min-h-0 flex-1 flex-col overflow-hidden !p-0">
               <div className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-3 py-2 sm:px-4">
                 <Video className="h-3.5 w-3.5 text-primary" aria-hidden />
-                <span className="text-xs font-medium uppercase tracking-[0.16em] text-cream/80">
+                <span className="text-label font-medium uppercase tracking-[0.16em] text-cream/80">
                   Call
                 </span>
                 <div className="ml-auto flex min-w-0 items-center gap-2">
@@ -1252,7 +1255,7 @@ export function RoomStage({
                         : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse",
                     )}
                   />
-                  <p className="truncate text-xs text-cream/80">
+                  <p className="truncate text-label text-cream/80">
                     {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
                   </p>
                 </div>
@@ -1263,6 +1266,132 @@ export function RoomStage({
           </aside>
           </>
         )}
+      </div>
+
+      {/* Launcher — one pill at the bottom of the screen with an animated
+          dropup. It floats over the stage instead of occupying a row of it,
+          which is the whole point: the activity gets the canvas, the menu is
+          summoned and dismissed. */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} aria-hidden />
+      )}
+      <div
+        className="pointer-events-none fixed inset-x-0 z-40 flex justify-center px-3 transition-[bottom] duration-300 ease-out"
+        style={{ bottom: launcherBottom }}
+      >
+        <div ref={launcherRef} className="relative">
+          <div
+            className={cn(
+              "absolute bottom-full left-1/2 mb-3 -translate-x-1/2 overflow-hidden rounded-3xl border border-white/10 bg-card/90 shadow-[0_24px_64px_rgba(0,0,0,0.55)] backdrop-blur-xl transition-all duration-300 ease-out",
+              activeCat ? "w-[min(29rem,94vw)]" : "w-max max-w-[94vw]",
+              menuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
+            )}
+            style={{ height: menuOpen ? panelH : 0 }}
+          >
+            {/* Content scales up from the bottom as the tray grows, so the
+                whole menu (icons included) opens as one motion. */}
+            <div
+              ref={panelRef}
+              className={cn(
+                "origin-bottom px-4 py-5 transition-transform duration-300 ease-out",
+                menuOpen ? "scale-100" : "scale-90",
+              )}
+            >
+              {activeCat ? (
+                /* Level 2 — the category's activities as a list. */
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setCatId(null)}
+                    className="mb-2.5 -ml-1 inline-flex items-center gap-1 rounded-full px-2 py-1 text-label font-semibold uppercase tracking-[0.16em] text-muted-foreground transition hover:text-cream"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                    {activeCat.label}
+                  </button>
+                  <div className="flex max-h-[min(28rem,56vh)] flex-col gap-2.5 overflow-y-auto">
+                    {activeCat.items.map((it) => (
+                      <MenuListRow
+                        key={it.id}
+                        Icon={ITEM_ICONS[it.id] ?? LayoutGrid}
+                        label={it.title}
+                        tagline={ITEM_TAGLINES[it.id]}
+                        active={staged === it.id}
+                        onClick={() => pickItem(it.id)}
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : (
+                /* Level 1 — categories (Room / Games / Watch / DJ / Chat),
+                   centered squircle tiles. Chaperon sits alongside them so it
+                   stays reachable mid-activity. */
+                <div className="flex flex-wrap items-start justify-center gap-4">
+                  {availCats.map((c) => (
+                    <MenuTile
+                      key={c.id}
+                      Icon={c.icon}
+                      label={c.label}
+                      active={c.items.some((i) => i.id === staged)}
+                      badge={c.items.length > 1 ? c.items.length : undefined}
+                      onClick={() => pickCategory(c)}
+                    />
+                  ))}
+                  {chaperon?.enabled && (
+                    <MenuTile
+                      Icon={ShieldCheck}
+                      label="Chaperon"
+                      active={chaperon.active}
+                      onClick={() => {
+                        setMenuOpen(false);
+                        window.dispatchEvent(new CustomEvent("dr:chaperon:open-setup"));
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          {(() => {
+            // The pill doubles as the nudge surface: when an activity wants
+            // attention it becomes that invitation, and tapping takes you
+            // there instead of opening the menu.
+            const showNotif = notif && !menuOpen;
+            const NotifIcon = showNotif ? ITEM_ICONS[notif.target] ?? LayoutGrid : LayoutGrid;
+            return (
+              <button
+                type="button"
+                onClick={
+                  showNotif
+                    ? () => {
+                        commitStage(notif.target);
+                        setNotif(null);
+                      }
+                    : openMenu
+                }
+                className={cn(
+                  "focus-ring pointer-events-auto flex max-w-[80vw] items-center gap-2 rounded-full border px-5 py-2.5 text-body font-medium text-cream shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all duration-300",
+                  showNotif
+                    ? "border-primary/40 bg-primary/20"
+                    : "border-white/10 bg-card/85 hover:border-primary/30",
+                )}
+              >
+                {showNotif ? (
+                  <NotifIcon className="h-4 w-4 shrink-0 text-primary" />
+                ) : menuOpen ? (
+                  <X className="h-4 w-4" />
+                ) : (
+                  <LayoutGrid className="h-4 w-4 text-primary" />
+                )}
+                <span
+                  key={showNotif ? notif.id : menuOpen ? "close" : "activities"}
+                  className="animate-fade-in truncate"
+                >
+                  {showNotif ? notif.text : menuOpen ? "Close" : "Activities"}
+                </span>
+              </button>
+            );
+          })()}
+        </div>
       </div>
 
       {!splitCallLayout && <MusicPlayerBar onOpenList={() => commitStage("dj")} />}
@@ -1292,13 +1421,15 @@ export function RoomStage({
               activityId={inviteId}
               activityTitle={title}
               headline={inviteHeadline(partnerName, inviteId, title)}
-              tileSrc={ITEM_TILE_IMAGES[inviteId]}
+              tileSrc={ACTIVITY_TILES[inviteId]}
               Icon={ITEM_ICONS[inviteId]}
               onJoin={() => commitStage(inviteId)}
               onDecline={declineInvite}
             />
           );
         })()}
+
+      <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} />
 
       {chatToast && (
         <ChatToast
@@ -1310,7 +1441,7 @@ export function RoomStage({
           offset={Boolean(inviteId)}
           onOpen={() => {
             setChatToast(null);
-            commitStage("chat");
+            setChatOpen(true);
           }}
           onDismiss={dismissChatToast}
         />
@@ -1345,7 +1476,7 @@ export function RoomStage({
                 return;
               }
               if (wide) {
-                setCallMode("split");
+                chooseCallLayout("side");
                 return;
               }
               setCallOpen(true);
@@ -1354,23 +1485,18 @@ export function RoomStage({
           >
             {!bubble && <ChaperonSeam className={floatingCall ? undefined : "rounded-none"} />}
             <RoomVideo
-              variant={floatingCall ? "pip" : "full"}
+              // In the pane, `side-pip` gives the phone-call shape — one feed
+              // full-bleed with the other floating over it — while `side`
+              // shows both tiles.
+              variant={floatingCall || callLayout === "side-pip" ? "pip" : "full"}
+              framed={!floatingCall}
               collapsed={bubble}
               pair={pairBubble}
-              stacked={!floatingCall && paneStacked}
               onLeave={onLeaveCall}
               // Pane → bubble (the shrink button RoomVideo has had all along).
-              onMinimize={!floatingCall ? () => setCallMode("bubble") : undefined}
-              // Desktop fullscreen tile: only "back to the bubble". Desktop
-              // otherwise never shows a floating window. Below desktop: bubble ↔
-              // compact window ↔ large call, as before.
-              onExpand={
-                !floatingCall || wide
-                  ? undefined
-                  : expanded
-                    ? undefined
-                    : () => setExpanded(true)
-              }
+              // No expand control: the layout switcher in the top bar is where
+              // the call's size is chosen, and a second, differently-shaped
+              // control inside the video only competed with it.
               onCollapse={
                 !floatingCall
                   ? undefined
@@ -1393,7 +1519,7 @@ export function RoomStage({
           </div>
           {floatingCall && bubble && !pairBubble && (
             <span
-              className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-[9px] font-semibold uppercase tracking-[0.14em] text-cream/80 drop-shadow"
+              className="pointer-events-none absolute inset-x-0 bottom-1 text-center text-label font-semibold uppercase tracking-[0.14em] text-cream/80 drop-shadow"
               aria-hidden
             >
               tap
@@ -1404,7 +1530,8 @@ export function RoomStage({
             type="button"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => setPortrait((v) => !v)}
-            aria-label="Rotate call"
+            aria-label={portrait ? "Switch to landscape" : "Switch to portrait"}
+            title={portrait ? "Switch to landscape" : "Switch to portrait"}
             className="absolute right-2 top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-cream opacity-0 backdrop-blur transition duration-200 hover:bg-black/70 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
           >
             <RotateCw className="h-3.5 w-3.5" />
@@ -1435,8 +1562,11 @@ export function RoomStage({
       {introOpen && staged && shouldShowGameIntro(staged) && (
         <GameIntro
           id={staged}
-          onStart={() => setIntroOpen(false)}
-          onBack={goBack}
+          onStart={dismissIntro}
+          onBack={() => {
+            dismissIntro();
+            goBack();
+          }}
           backLabel={backLabel === "Lobby" ? "Back to lobby" : `Back to ${backLabel}`}
         />
       )}
@@ -1449,7 +1579,7 @@ export function RoomStage({
           role="status"
           aria-live="polite"
           className={cn(
-            "pointer-events-none fixed left-1/2 top-3 z-[90] flex -translate-x-1/2 items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium shadow-lg backdrop-blur-md animate-fade-in",
+            "pointer-events-none fixed left-1/2 top-3 z-[90] flex -translate-x-1/2 items-center gap-2 rounded-full border px-3.5 py-1.5 text-label font-medium shadow-lg backdrop-blur-md animate-fade-in",
             linkDown
               ? "border-amber-300/50 bg-black/70 text-amber-200"
               : "border-emerald-400/50 bg-black/70 text-emerald-200",
@@ -1501,28 +1631,32 @@ function MenuTile({
       type="button"
       onClick={onClick}
       title={label}
-      className="group flex min-w-0 flex-col items-center gap-1.5 px-0.5"
+      // shrink-0: these wrap onto rows of differing counts, and a shrinkable
+      // tile ends up a different size per row.
+      className="group flex w-[3.5rem] shrink-0 flex-col items-center gap-2"
     >
+      {/* Squircle app icon — the drilled-in row's icon chip at tile size:
+          the same primary wash (bg-primary/15) and amber glyph. Tinting from
+          `primary` rather than white means a themed room retints these with
+          everything else; a white wash would stay grey while the room warmed
+          around it. */}
       <span
         className={cn(
-          "dr-app-icon relative mx-auto flex aspect-square w-full max-w-[3.75rem] items-center justify-center rounded-[24%] border border-white/[0.14] sm:max-w-[4.25rem]",
-          active ? "dr-app-icon-active" : "dr-app-icon-idle",
+          "relative flex aspect-square w-full items-center justify-center rounded-[26%] border transition duration-150 group-active:scale-90",
+          active
+            ? "border-primary/30 bg-primary/[0.07]"
+            // Barely-there surfaces: the glyph and the outline carry the tile,
+            // and the room shows through the rest. Primary hue rather than
+            // white so a themed room retints them with everything else.
+            : "border-primary/[0.09] bg-primary/[0.02] group-hover:bg-primary/[0.05]",
         )}
       >
-        <span className="dr-app-icon-shine pointer-events-none absolute inset-0 rounded-[inherit]" aria-hidden />
-        <Icon
-          className={cn(
-            "relative z-[1] h-[44%] w-[44%] transition duration-200",
-            active ? "text-[#1a1207]" : "text-[#1a1207]/90",
-          )}
-          strokeWidth={2.15}
-          aria-hidden
-        />
+        <Icon className="h-[42%] w-[42%] text-primary" strokeWidth={1.6} aria-hidden />
         {badge ? (
           <span
             data-testid={badgeTone === "alert" ? "unread-badge" : undefined}
             className={cn(
-              "absolute -right-1 -top-1 z-[2] flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full border px-1 text-[9px] font-bold shadow-md",
+              "absolute -right-1 -top-1 z-[2] flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full border px-1 text-label font-bold shadow-md",
               badgeTone === "alert"
                 ? "border-[#141019] bg-rose-500 text-white shadow-[0_0_12px_rgba(244,63,94,0.55)] animate-in zoom-in-50 duration-200"
                 : "border-white/20 bg-[#141019] text-primary",
@@ -1534,8 +1668,8 @@ function MenuTile({
       </span>
       <span
         className={cn(
-          "max-w-full truncate text-center text-[10px] font-medium leading-tight tracking-[0.06em] sm:text-[11px]",
-          active ? "text-primary" : "text-cream/75 group-hover:text-cream",
+          "max-w-full truncate text-label font-medium",
+          active ? "text-cream" : "text-cream/70",
         )}
       >
         {label}
@@ -1544,19 +1678,19 @@ function MenuTile({
   );
 }
 
-/** Drilled-in activity — image-backed square with classic icon + label. */
-function MenuSquareTile({
+/** A drilled-in activity as a list row — icon chip + title + tagline +
+ *  chevron. The compact form the dropup wants; the dock's big square tiles
+ *  needed a grid the stage can no longer spare. */
+function MenuListRow({
   Icon,
   label,
   tagline,
-  image,
   active,
   onClick,
 }: {
   Icon: LucideIcon;
   label: string;
   tagline?: string;
-  image?: string;
   active: boolean;
   onClick: () => void;
 }) {
@@ -1564,59 +1698,23 @@ function MenuSquareTile({
     <button
       type="button"
       onClick={onClick}
-      title={tagline ? `${label} — ${tagline}` : label}
       className={cn(
-        "dr-dock-tile group relative flex aspect-square min-w-0 flex-col overflow-hidden rounded-xl border text-left transition duration-200",
+        "flex items-center gap-3.5 rounded-2xl border p-3.5 text-left transition",
         active
-          ? "border-primary/50 shadow-[0_0_0_1px_hsl(var(--primary)/0.4),0_12px_32px_rgb(0_0_0_/_0.45)]"
-          : "border-white/[0.10] hover:border-primary/30 hover:shadow-[0_10px_28px_rgb(0_0_0_/_0.4)]",
+          ? "border-primary/30 bg-primary/[0.07]"
+          : "border-primary/[0.09] bg-primary/[0.02] hover:bg-primary/[0.05]",
       )}
     >
-      {image ? (
-        <img
-          src={image}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
-        />
-      ) : (
-        <span className="absolute inset-0 bg-gradient-to-br from-white/[0.08] to-black/50" aria-hidden />
-      )}
-      <span
-        className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#080604]/95 via-[#080604]/45 to-[#080604]/15 transition duration-300 group-hover:via-[#080604]/35"
-        aria-hidden
-      />
-      <span className="relative z-[1] flex flex-1 items-start justify-start p-2">
-        <span
-          className={cn(
-            "flex h-8 w-8 items-center justify-center rounded-lg border border-white/20 bg-black/35 backdrop-blur-md transition duration-200 group-hover:border-primary/40 group-hover:bg-black/50 sm:h-9 sm:w-9",
-            active && "border-primary/50 bg-primary/20",
-          )}
-        >
-          <Icon
-            className={cn("h-4 w-4 sm:h-[18px] sm:w-[18px]", active ? "text-primary" : "text-cream")}
-            strokeWidth={2}
-            aria-hidden
-          />
-        </span>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+        <Icon className="h-[18px] w-[18px] text-primary" aria-hidden />
       </span>
-      <span className="relative z-[1] shrink-0 px-2 pb-2 pt-1 sm:px-2.5 sm:pb-2.5">
-        <span
-          className={cn(
-            "block truncate font-serif text-[11px] leading-tight sm:text-xs",
-            active ? "text-primary" : "text-cream",
-          )}
-        >
-          {label}
-        </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-body font-semibold text-cream">{label}</span>
         {tagline ? (
-          <span
-            className="mt-0.5 block line-clamp-2 text-[8px] leading-snug text-cream/55 sm:text-[9px]"
-          >
-            {tagline}
-          </span>
+          <span className="block truncate text-label text-muted-foreground">{tagline}</span>
         ) : null}
       </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
     </button>
   );
 }
@@ -1702,7 +1800,7 @@ function PinnedVisionCard({
         ) : (
           <div className={cn("flex h-full w-full items-center justify-center bg-gradient-to-br", gradient)}>
             {media === "pdf" && (
-              <span className="rounded-full bg-black/45 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber">
+              <span className="rounded-full bg-black/45 px-2 py-0.5 text-label font-semibold uppercase tracking-wider text-amber">
                 PDF
               </span>
             )}
@@ -1712,7 +1810,7 @@ function PinnedVisionCard({
           <Pin className="h-3 w-3 fill-current" />
         </span>
       </div>
-      <p className="truncate px-0.5 pt-1.5 text-center text-xs font-medium text-cream/90">{label}</p>
+      <p className="truncate px-0.5 pt-1.5 text-center text-label font-medium text-cream/90">{label}</p>
     </div>
   );
 }

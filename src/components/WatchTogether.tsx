@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { useReportBottomBarHeight } from "@/lib/bottomBar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -310,6 +311,14 @@ export function WatchTogether() {
   const directUrlRef = useRef(directUrl);
   directUrlRef.current = directUrl;
 
+  // Watch puts its own bar at the bottom of the room — a different component
+  // from the music bar, and the one that was silently never reporting, which
+  // is why the launcher sat behind it.
+  const watchBarRef = useReportBottomBarHeight(
+    "watch",
+    Boolean(videoId || directUrl) && !fullscreen,
+  );
+
   /* Engine facade — control paths dispatch to whichever engine owns the
      current video. Plain functions over refs, safe inside stale closures. */
   const wPlay = () => {
@@ -530,8 +539,24 @@ export function WatchTogether() {
           },
           onStateChange: (e: YoutubePlayerStateChangeEvent) => {
             const PS = yt.PlayerState;
-            if (e.data === PS.PLAYING) setLivePlaying(true);
-            else if (e.data === PS.PAUSED || e.data === PS.ENDED) setLivePlaying(false);
+            if (e.data === PS.PLAYING) {
+              setLivePlaying(true);
+              // Sound the moment it is actually playing. The player is built
+              // with `mute: 1` purely so autoplay is never blocked — that is
+              // a startup trick, not a preference, and it must not survive
+              // into playback. This has to sit ABOVE the suppression check:
+              // onReady suppresses for 3s and then plays, so the first
+              // PLAYING event is always suppressed, which is why the video
+              // stayed silent until you nudged the volume slider.
+              if (volumeRef.current > 0) {
+                try {
+                  playerRef.current?.unMute?.();
+                  playerRef.current?.setVolume?.(volumeRef.current);
+                } catch {
+                  void 0;
+                }
+              }
+            } else if (e.data === PS.PAUSED || e.data === PS.ENDED) setLivePlaying(false);
             // Programmatic changes we make are suppressed, so anything reaching
             // here is a real user interaction (bottom bar OR a direct click on
             // the video). Whoever acts takes control and the change syncs.
@@ -540,15 +565,6 @@ export function WatchTogether() {
             const time = p?.getCurrentTime?.() ?? 0;
             if (e.data === PS.PLAYING) {
               isControllerRef.current = true;
-              // A direct click on a muted video is still a gesture — give it sound.
-              if (volume > 0) {
-                try {
-                  p?.unMute?.();
-                  p?.setVolume?.(volume);
-                } catch {
-                  void 0;
-                }
-              }
               setPlaying(true);
               void session?.sendEvent("play", { timestamp_seconds: time });
               persistWatch({ video_id: videoId, playing: true, timestamp_seconds: time });
@@ -955,7 +971,7 @@ export function WatchTogether() {
         />
       </button>
       <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-1.5 pr-12">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black text-base">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-black text-body">
           {videoId ? (
             /* eslint-disable-next-line jsx-a11y/alt-text */
             <img
@@ -968,7 +984,7 @@ export function WatchTogether() {
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-cream">{videoTitle ?? "Watching"}</p>
+          <p className="truncate text-body font-semibold text-cream">{videoTitle ?? "Watching"}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -1061,13 +1077,13 @@ export function WatchTogether() {
                 aria-label={t("room.watchHistory")}
               >
                 <Clock className="h-4 w-4" />
-                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-label font-semibold text-primary-foreground">
                   {history.length}
                 </span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-72 max-h-64 overflow-y-auto">
-              <DropdownMenuLabel className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <DropdownMenuLabel className="flex items-center gap-1.5 text-label font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                 <Clock className="h-3 w-3" />
                 {t("room.watchHistory")}
               </DropdownMenuLabel>
@@ -1089,10 +1105,10 @@ export function WatchTogether() {
                     <Play className="pointer-events-none absolute h-3.5 w-3.5 text-white/90 drop-shadow" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm">
+                    <span className="block truncate text-body">
                       {entry.title ?? "YouTube video"}
                     </span>
-                    <span className="block text-[11px] text-muted-foreground">
+                    <span className="block text-label text-muted-foreground">
                       {new Date(entry.addedAt).toLocaleDateString(undefined, {
                         month: "short",
                         day: "numeric",
@@ -1193,6 +1209,7 @@ export function WatchTogether() {
         !fullscreen &&
         createPortal(
           <div
+            ref={watchBarRef}
             style={barVars}
             className="pointer-events-auto fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-card/60 backdrop-blur-sm"
           >

@@ -117,8 +117,8 @@ export function PickADoor() {
   if (pickADoorIsFinished(state)) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center animate-fade-in">
-        <p className="font-serif text-2xl italic text-cream">All {DOOR_ROUNDS.length} rounds, done</p>
-        <p className="max-w-xs text-sm leading-relaxed text-muted-foreground">
+        <p className="font-serif text-display italic text-cream">All {DOOR_ROUNDS.length} rounds, done</p>
+        <p className="max-w-xs text-body leading-relaxed text-muted-foreground">
           A lot of doors opened between you. The ones still closed keep their secrets for next time.
         </p>
         <Button onClick={() => emit("restart")} className={accentBtn} style={accentStyle}>
@@ -187,11 +187,11 @@ export function PickADoor() {
   return (
     <GameStage gameId="pick_a_door" dimmed={dimmed}>
       <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Round {state.round + 1} of {DOOR_ROUNDS.length} · {round.title}
         </p>
-        <p key={title} className="font-serif text-xl italic text-cream animate-fade-in">{title}</p>
-        <p key={status} aria-live="polite" className="min-h-[1rem] text-xs text-muted-foreground animate-fade-in">{status}</p>
+        <p key={title} className="text-title italic text-cream animate-fade-in">{title}</p>
+        <p key={status} aria-live="polite" className="min-h-[1rem] text-label text-muted-foreground animate-fade-in">{status}</p>
       </div>
 
       {showDoors && (
@@ -230,13 +230,13 @@ export function PickADoor() {
                     <span className="dr-door-spill" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium uppercase tracking-[0.18em] text-cream flex items-center gap-2 flex-wrap">
+                    <p className="text-body font-medium uppercase tracking-[0.18em] text-cream flex items-center gap-2 flex-wrap">
                       {door.name}
                       {isMine && !revealing && (
-                        <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/40 text-[10px] tracking-[0.2em]">your door</span>
+                        <span className="px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/40 text-label tracking-[0.2em]">your door</span>
                       )}
                     </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
+                    <p className="mt-0.5 text-label text-muted-foreground">
                       {shut ? "Still closed. Its secret keeps." : "Something's behind it."}
                     </p>
                   </div>
@@ -261,12 +261,12 @@ export function PickADoor() {
             <BigDoor label={ownerWord} name={stageDoor.name} />
           ) : (
             <>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--room-accent)" }}>
+              <p className="text-label font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--room-accent)" }}>
                 {ownerWord} · {stageDoor.name}
               </p>
               <blockquote key={`${state.round}-${state.stage <= 1 ? "a" : "b"}`} className={["dr-plaque w-full max-w-md text-left", typed.complete ? "dr-plaque--settled" : ""].join(" ")}>
                 <span className="dr-plaque-glyph" aria-hidden>{stageDoor.emoji}</span>
-                <p className="font-serif italic text-xl sm:text-2xl leading-snug text-cream">
+                <p className="font-serif italic text-title leading-snug text-cream">
                   {typed.shown}
                   {!typed.complete && <span className="dr-caret" aria-hidden />}
                 </p>
@@ -282,7 +282,7 @@ export function PickADoor() {
                     {sameDoor ? "We're ready" : "I'm ready to answer"}
                   </Button>
                 ) : (
-                  <p className="text-sm text-muted-foreground animate-pulse">
+                  <p className="text-body text-muted-foreground animate-pulse">
                     waiting for {partnerName} to be ready…
                   </p>
                 )
@@ -291,7 +291,7 @@ export function PickADoor() {
               {answering && (
                 <div className="flex flex-col items-center gap-3 animate-fade-in">
                   <div className="dr-ring" style={{ ["--p" as string]: seconds / ANSWER_SECONDS }}>
-                    <span className="font-serif">{seconds}</span>
+                    <span className="">{seconds}</span>
                   </div>
                   {state.stage === lastStage ? (
                     padCapped ? (
@@ -310,7 +310,7 @@ export function PickADoor() {
                       Pass it over
                     </Button>
                   ) : (
-                    <p className="text-xs text-muted-foreground">your door comes next</p>
+                    <p className="text-label text-muted-foreground">your door comes next</p>
                   )}
                 </div>
               )}
@@ -326,7 +326,7 @@ export function PickADoor() {
 function BigDoor({ label, name }: { label: string; name: string }) {
   return (
     <div className="flex flex-col items-center gap-4 animate-fade-in">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--room-accent)" }}>
+      <p className="text-label font-semibold uppercase tracking-[0.3em]" style={{ color: "var(--room-accent)" }}>
         {label} · {name}
       </p>
       <div className="dr-bigdoor" aria-hidden>
@@ -334,7 +334,7 @@ function BigDoor({ label, name }: { label: string; name: string }) {
         <span className="dr-bigdoor-leaf dr-bigdoor-leaf--l" />
         <span className="dr-bigdoor-leaf dr-bigdoor-leaf--r" />
       </div>
-      <p className="text-xs text-muted-foreground animate-pulse">opening…</p>
+      <p className="text-label text-muted-foreground animate-pulse">opening…</p>
     </div>
   );
 }

@@ -71,7 +71,7 @@ export function RevenueChart({ points, unit = "", height = 200 }: { points: Poin
         )}
       </svg>
       {hover != null && points[hover] && (
-        <div className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded-md border border-white/[0.14] bg-card px-2 py-1 text-xs text-cream shadow">
+        <div className="pointer-events-none absolute left-1/2 top-2 -translate-x-1/2 rounded-md border border-white/[0.14] bg-card px-2 py-1 text-label text-cream shadow">
           {points[hover].day} · {points[hover].value.toLocaleString()}{unit}
         </div>
       )}

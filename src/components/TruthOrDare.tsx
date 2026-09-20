@@ -89,7 +89,7 @@ export function TruthOrDare() {
         ]}
       />
       {state.vault.length > 0 && (
-        <span className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+        <span className="text-label uppercase tracking-[0.22em] text-muted-foreground">
           Vault · {state.vault.length}
         </span>
       )}
@@ -207,30 +207,30 @@ export function TruthOrDare() {
     return (
       <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto p-5 sm:p-6 animate-fade-in">
         <div className="flex shrink-0 flex-col items-center gap-1 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Truth or Dare</p>
-          <p className="font-serif text-2xl italic text-cream">How the night went</p>
+          <p className="text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">Truth or Dare</p>
+          <p className="font-serif text-display italic text-cream">How the night went</p>
         </div>
         <div className="flex flex-col items-center gap-3">
-          <p className="max-w-sm text-center font-serif text-base italic leading-relaxed text-cream/90">{verdict}</p>
+          <p className="max-w-sm text-center font-serif text-body italic leading-relaxed text-cream/90">{verdict}</p>
           {tokensBar}
         </div>
         <div className="flex flex-1 flex-col gap-2">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>
+          <p className="text-label font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>
             The vault · {state.vault.length === 0 ? "empty" : "pick one and answer it now"}
           </p>
           {state.vault.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nothing got away from either of you.</p>
+            <p className="text-body text-muted-foreground">Nothing got away from either of you.</p>
           ) : (
             state.vault.map((id) => {
               const c = lookupTodCard(id);
               if (!c) return null;
               return (
                 <div key={id} className="flex items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-3">
-                  <span className="w-5 text-center font-serif text-lg" style={{ color: "var(--room-accent)" }}>
+                  <span className="w-5 text-center text-title" style={{ color: "var(--room-accent)" }}>
                     {c.kind === "truth" ? "T" : "D"}
                   </span>
-                  <span className="flex-1 text-sm text-cream/90">{c.text}</span>
-                  <span className="shrink-0 rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                  <span className="flex-1 text-body text-cream/90">{c.text}</span>
+                  <span className="shrink-0 rounded-full border border-white/15 px-2 py-0.5 text-label uppercase tracking-[0.18em] text-muted-foreground">
                     {TOD_HEATS[heatOfCard(id)].name}
                   </span>
                 </div>
@@ -250,11 +250,11 @@ export function TruthOrDare() {
   return (
     <GameStage gameId="truth_or_dare" dimmed={dimmed}>
       <div className="relative flex shrink-0 flex-col items-center gap-1 text-center">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <p className="text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           Card {Math.min(state.turn + 1, TOD_NIGHT_TURNS)} of {TOD_NIGHT_TURNS} · {TOD_HEATS[heat].name}
         </p>
-        <p key={title} className="font-serif text-xl italic text-cream animate-fade-in">{title}</p>
-        <p key={status} aria-live="polite" className="min-h-[1rem] text-xs text-muted-foreground animate-fade-in">{status}</p>
+        <p key={title} className="text-title italic text-cream animate-fade-in">{title}</p>
+        <p key={status} aria-live="polite" className="min-h-[1rem] text-label text-muted-foreground animate-fade-in">{status}</p>
       </div>
 
       {/* Heat dial */}
@@ -263,7 +263,7 @@ export function TruthOrDare() {
           <span
             key={h}
             className={[
-              "rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.22em]",
+              "rounded-full border px-3 py-1 text-label uppercase tracking-[0.22em]",
               h === heat
                 ? "border-transparent text-primary-foreground"
                 : h < heat
@@ -298,21 +298,21 @@ export function TruthOrDare() {
               <span className="dr-coin-face">Truth</span>
               <span className="dr-coin-face dr-coin-face--dare">Dare</span>
             </div>
-            <p className="text-sm text-muted-foreground animate-pulse">the coin is in {partnerName}&apos;s hand…</p>
+            <p className="text-body text-muted-foreground animate-pulse">the coin is in {partnerName}&apos;s hand…</p>
           </>
         )}
 
         {state.phase === "decide" && !iPerform && (
           <div className="flex flex-col items-center gap-3">
             <div className="flex gap-3">
-              <Button onClick={() => chooseKind("truth")} variant="outline" className={quietBtn + " px-8 py-6 font-serif text-lg italic"}>
+              <Button onClick={() => chooseKind("truth")} variant="outline" className={quietBtn + " px-8 py-6 text-title italic"}>
                 Truth
               </Button>
-              <Button onClick={() => chooseKind("dare")} className={accentBtn + " px-8 py-6 font-serif text-lg italic"} style={accentStyle}>
+              <Button onClick={() => chooseKind("dare")} className={accentBtn + " px-8 py-6 text-title italic"} style={accentStyle}>
                 Dare
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">{partnerName} doesn&apos;t get a vote.</p>
+            <p className="text-label text-muted-foreground">{partnerName} doesn&apos;t get a vote.</p>
           </div>
         )}
 
@@ -334,13 +334,13 @@ export function TruthOrDare() {
               ].join(" ")}
             >
               <span className="dr-plaque-glyph" aria-hidden>{card.kind === "truth" ? "T" : "D"}</span>
-              <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>
+              <p className="flex items-center gap-2 text-label font-semibold uppercase tracking-[0.28em]" style={{ color: "var(--room-accent)" }}>
                 {card.kind} · {TOD_HEATS[heatOfCard(card.id)].name}
                 {state.doubled && (
                   <span className="rounded-full border px-2 py-0.5" style={{ borderColor: "var(--room-accent)" }}>double</span>
                 )}
               </p>
-              <p className="mt-2 font-serif text-lg sm:text-xl italic leading-snug text-cream">
+              <p className="mt-2 text-title italic leading-snug text-cream">
                 {typed.shown}
                 {!typed.complete && <span className="dr-caret" aria-hidden />}
               </p>
@@ -357,7 +357,7 @@ export function TruthOrDare() {
                 <Button onClick={burn} disabled={myBurnsLeft <= 0} variant="outline" className={quietBtn}>
                   Burn it ({myBurnsLeft})
                 </Button>
-                <p className="w-full text-center text-[11px] text-muted-foreground">
+                <p className="w-full text-center text-label text-muted-foreground">
                   Doubling pays two tokens. Burning locks it in the vault for the end of the night.
                 </p>
               </div>
@@ -366,7 +366,7 @@ export function TruthOrDare() {
             {state.phase === "perform" && (
               <div className="flex flex-col items-center gap-3 animate-fade-in">
                 <div className="dr-ring" style={{ ["--p" as string]: left / PERFORM_SECONDS }}>
-                  <span className="font-serif">{left}</span>
+                  <span className="">{left}</span>
                 </div>
                 {!iPerform && (
                   <div className="flex gap-2">

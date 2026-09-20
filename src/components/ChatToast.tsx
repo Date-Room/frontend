@@ -60,19 +60,19 @@ export function ChatToast({
             alt=""
             className="h-full w-full object-cover"
             fallback={
-              <span className="flex h-full w-full items-center justify-center text-sm font-bold text-primary">
+              <span className="flex h-full w-full items-center justify-center text-body font-bold text-primary">
                 {initial}
               </span>
             }
           />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.14em] text-cream/60">
+          <p className="flex items-center gap-1.5 text-label uppercase tracking-[0.14em] text-cream/60">
             <MessageCircle className="h-3 w-3 text-primary" aria-hidden />
             <span className="truncate">{partnerName}</span>
-            {count > 1 && <span className="ml-auto rounded-full bg-primary px-1.5 text-[10px] font-bold normal-case tracking-normal text-primary-foreground">{count}</span>}
+            {count > 1 && <span className="ml-auto rounded-full bg-primary px-1.5 text-label font-bold normal-case tracking-normal text-primary-foreground">{count}</span>}
           </p>
-          <p className="truncate text-sm text-cream">{text}</p>
+          <p className="truncate text-body text-cream">{text}</p>
         </div>
       </button>
     </div>,

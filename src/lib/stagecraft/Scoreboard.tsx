@@ -30,10 +30,10 @@ function Plate({ entry }: { entry: Entry }) {
         bump ? "dr-score-plate--bump" : "",
       ].join(" ")}
     >
-      <span className="max-w-[7rem] truncate text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+      <span className="max-w-[7rem] truncate text-label uppercase tracking-[0.22em] text-muted-foreground">
         {entry.name}
       </span>
-      <span className="font-serif text-2xl leading-none text-cream tabular-nums">{entry.value}</span>
+      <span className="font-serif text-display leading-none text-cream tabular-nums">{entry.value}</span>
     </div>
   );
 }
@@ -41,7 +41,7 @@ function Plate({ entry }: { entry: Entry }) {
 export function Scoreboard({ label, entries }: { label: string; entries: Entry[] }) {
   return (
     <div className="flex items-center justify-center gap-3">
-      <span className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">{label}</span>
+      <span className="text-label uppercase tracking-[0.28em] text-muted-foreground">{label}</span>
       {entries.map((e) => (
         <Plate key={e.name + (e.accent ? "-you" : "")} entry={e} />
       ))}

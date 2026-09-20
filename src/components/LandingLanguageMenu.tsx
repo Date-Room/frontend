@@ -55,7 +55,7 @@ export function LandingLanguageMenu({
         aria-label={iconOnly ? `Language: ${active.nativeLabel}` : undefined}
         className={cn(
           "flex items-center rounded-full border border-lpborder/60 text-lpmuted transition hover:border-lpborder hover:text-lpcream",
-          iconOnly ? "gap-0 p-2" : "gap-1.5 px-3 py-1.5 text-sm",
+          iconOnly ? "gap-0 p-2" : "gap-1.5 px-3 py-1.5 text-body",
         )}
       >
         <Globe className="h-4 w-4" />
@@ -85,12 +85,12 @@ export function LandingLanguageMenu({
                 aria-selected={current === loc.code}
                 onClick={() => pick(loc.code)}
                 className={cn(
-                  "flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-lpcream/85 transition hover:bg-lpcream/[0.06] hover:text-lpcream",
+                  "flex w-full items-center gap-3 px-4 py-2.5 text-left text-body text-lpcream/85 transition hover:bg-lpcream/[0.06] hover:text-lpcream",
                   i > 0 && "border-t border-lpborder/40",
                 )}
               >
                 <span className="flex-1">{loc.nativeLabel}</span>
-                <span className="text-xs text-lpmuted">{loc.label}</span>
+                <span className="text-label text-lpmuted">{loc.label}</span>
                 {current === loc.code && <Check className="h-4 w-4 text-lppeach" />}
               </button>
             </li>

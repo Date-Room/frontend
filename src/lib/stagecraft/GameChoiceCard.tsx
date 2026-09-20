@@ -82,14 +82,14 @@ export function GameChoiceCard({
         {emoji}
       </span>
       <span className="dr-choice-card__body">
-        <span className="font-serif text-lg italic leading-tight text-cream sm:text-xl">{label}</span>
+        <span className="text-title italic leading-tight text-cream">{label}</span>
         {badges.length > 0 && (
           <span className="mt-2 flex min-h-[1.3rem] flex-wrap justify-center gap-1.5">
             {badges.map((b) => (
               <span
                 key={b.text}
                 className={cn(
-                  "rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.18em]",
+                  "rounded-full border px-2 py-0.5 text-label uppercase tracking-[0.18em]",
                   BADGE_CLASS[b.tone],
                 )}
               >

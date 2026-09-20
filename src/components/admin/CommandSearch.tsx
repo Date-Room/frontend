@@ -53,11 +53,11 @@ export function CommandSearch() {
       <button
         type="button"
         onClick={() => { setOpen(true); setTimeout(() => input.current?.focus(), 0); }}
-        className="flex h-9 w-full items-center gap-2 rounded-lg border border-white/[0.14] bg-card px-3 text-left text-xs text-muted-foreground/70 hover:bg-white/[0.05]"
+        className="flex h-9 w-full items-center gap-2 rounded-lg border border-white/[0.14] bg-card px-3 text-left text-label text-muted-foreground/70 hover:bg-white/[0.05]"
       >
         <Search className="h-3.5 w-3.5" />
         Search users, rooms, codes
-        <kbd className="ml-auto rounded border border-white/[0.14] px-1.5 text-[10px]">⌘K</kbd>
+        <kbd className="ml-auto rounded border border-white/[0.14] px-1.5 text-label">⌘K</kbd>
       </button>
       {open && (
         <div className="fixed inset-0 z-[90] flex items-start justify-center bg-black/50 pt-[12vh]" onClick={() => setOpen(false)}>
@@ -75,17 +75,17 @@ export function CommandSearch() {
                 }}
                 placeholder="Email, name, room code, promo code…"
                 aria-label="Search"
-                className="h-11 flex-1 bg-transparent text-sm text-cream outline-none placeholder:text-muted-foreground/50"
+                className="h-11 flex-1 bg-transparent text-body text-cream outline-none placeholder:text-muted-foreground/50"
               />
             </div>
             <ul className="max-h-[50vh] overflow-y-auto py-1">
-              {q.trim() && hits.length === 0 && !res.isFetching && <li className="px-4 py-3 text-sm text-muted-foreground/70">Nothing matches.</li>}
+              {q.trim() && hits.length === 0 && !res.isFetching && <li className="px-4 py-3 text-body text-muted-foreground/70">Nothing matches.</li>}
               {hits.map((h, i) => (
                 <li key={`${h.kind}:${h.id}`}>
-                  <button type="button" onMouseEnter={() => setCursor(i)} onClick={() => go(h)} className={cn("flex w-full items-center gap-3 px-4 py-2 text-left text-sm", i === cursor ? "bg-white/[0.08]" : "hover:bg-white/[0.05]")}>
-                    <span className="w-12 text-[10px] uppercase tracking-wider text-muted-foreground/70">{h.kind}</span>
+                  <button type="button" onMouseEnter={() => setCursor(i)} onClick={() => go(h)} className={cn("flex w-full items-center gap-3 px-4 py-2 text-left text-body", i === cursor ? "bg-white/[0.08]" : "hover:bg-white/[0.05]")}>
+                    <span className="w-12 text-label uppercase tracking-wider text-muted-foreground/70">{h.kind}</span>
                     <span className="text-cream">{h.title}</span>
-                    <span className="ml-auto text-xs text-muted-foreground/70">{h.sub}</span>
+                    <span className="ml-auto text-label text-muted-foreground/70">{h.sub}</span>
                   </button>
                 </li>
               ))}

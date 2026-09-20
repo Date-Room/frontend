@@ -32,7 +32,7 @@ function ZoomCopyButton({
       aria-label={label}
       className={cn(
         "shrink-0 inline-flex items-center justify-center gap-1.5 rounded-md border border-border bg-secondary/60 px-3 py-2",
-        "text-xs font-semibold text-foreground shadow-sm transition-colors",
+        "text-label font-semibold text-foreground shadow-sm transition-colors",
         "hover:bg-secondary hover:border-muted-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
       )}
     >
@@ -89,8 +89,8 @@ export function InviteSharePanel({ recipientName, shareLink, guestInviteId, clas
     >
       {/* Zoom-like modal header */}
       <div className="border-b border-border bg-muted/40 px-4 py-3 sm:px-5">
-        <h3 className="text-[15px] font-semibold tracking-tight text-foreground">Share meeting info</h3>
-        <p className="text-[13px] text-muted-foreground mt-1 leading-snug">
+        <h3 className="text-body font-semibold tracking-tight text-foreground">Share meeting info</h3>
+        <p className="text-body text-muted-foreground mt-1 leading-snug">
           Send the invitation link or meeting ID — same layout as Zoom. Your guest opens it to reach the lobby.
         </p>
       </div>
@@ -103,8 +103,8 @@ export function InviteSharePanel({ recipientName, shareLink, guestInviteId, clas
               <Link2 className="w-4 h-4 text-muted-foreground" aria-hidden />
             </div>
             <div className="min-w-0 space-y-1.5">
-              <p className="text-[13px] font-semibold text-foreground">Invitation link</p>
-              <p className="text-[13px] font-mono text-muted-foreground break-all leading-relaxed">{shareLink}</p>
+              <p className="text-body font-semibold text-foreground">Invitation link</p>
+              <p className="text-body font-mono text-muted-foreground break-all leading-relaxed">{shareLink}</p>
             </div>
           </div>
           <ZoomCopyButton
@@ -118,14 +118,14 @@ export function InviteSharePanel({ recipientName, shareLink, guestInviteId, clas
         {/* Meeting ID row */}
         <div className="px-4 py-4 sm:px-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 flex-1 space-y-1">
-            <p className="text-[13px] font-semibold text-foreground">Meeting ID</p>
+            <p className="text-body font-semibold text-foreground">Meeting ID</p>
             <p
-              className="text-xl sm:text-2xl font-semibold tracking-[0.2em] font-mono tabular-nums text-foreground select-all"
+              className="text-title font-semibold tracking-[0.2em] font-mono tabular-nums text-foreground select-all"
               translate="no"
             >
               {meetingIdFormatted}
             </p>
-            <p className="text-[11px] text-muted-foreground font-mono">
+            <p className="text-label text-muted-foreground font-mono">
               Path: /i/{guestInviteId}
             </p>
           </div>
@@ -144,7 +144,7 @@ export function InviteSharePanel({ recipientName, shareLink, guestInviteId, clas
           type="button"
           onClick={() => void copyText(invitationBody, "invite")}
           className={cn(
-            "w-full rounded-lg py-3 px-4 text-sm font-semibold transition-all flex items-center justify-center gap-2",
+            "w-full rounded-lg py-3 px-4 text-body font-semibold transition-all flex items-center justify-center gap-2",
             "bg-primary text-primary-foreground hover:opacity-[0.96] shadow-[0_4px_24px_rgba(232,166,83,0.28)]",
           )}
         >
@@ -158,7 +158,7 @@ export function InviteSharePanel({ recipientName, shareLink, guestInviteId, clas
             </>
           )}
         </button>
-        <p className="text-[11px] text-center text-muted-foreground leading-relaxed px-1">
+        <p className="text-label text-center text-muted-foreground leading-relaxed px-1">
           Includes join link and meeting ID — ready to paste into Messages, email, or Calendar.
         </p>
       </div>

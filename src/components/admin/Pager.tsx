@@ -34,14 +34,14 @@ export function Pager({
 }) {
   const btn = "focus-ring inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.14] bg-card text-cream/80 transition hover:bg-white/[0.08] disabled:opacity-35";
   return (
-    <div className="flex flex-wrap items-center gap-3 border-t border-white/[0.08] px-4 py-2.5 text-xs text-muted-foreground">
+    <div className="flex flex-wrap items-center gap-3 border-t border-white/[0.08] px-4 py-2.5 text-label text-muted-foreground">
       <span className="tabular-nums">{pagerLabel(from, to, total, noun)}</span>
       <label className="ml-auto flex items-center gap-1.5">
         Per page
         <select
           value={perPage}
           onChange={(e) => onPerPage(Number(e.target.value))}
-          className="focus-ring h-8 rounded-lg border border-white/[0.14] bg-card px-2 text-xs text-cream"
+          className="focus-ring h-8 rounded-lg border border-white/[0.14] bg-card px-2 text-label text-cream"
         >
           {[10, 25, 50, 100].map((n) => (
             <option key={n} value={n}>{n}</option>

@@ -66,7 +66,7 @@ export function ChaperonReactions({
   const no = protect ? "Wrong call" : "Not that";
   const chip = cn(
     "focus-ring rounded-full border transition disabled:opacity-60",
-    size === "sm" ? "px-2.5 py-0.5 text-[11px]" : "px-3 py-1 text-[12px]",
+    size === "sm" ? "px-2.5 py-0.5 text-label" : "px-3 py-1 text-label",
   );
 
   // A probe is the viewer's own test: nothing to rate.
@@ -74,7 +74,7 @@ export function ChaperonReactions({
 
   if (rated) {
     return (
-      <span className="text-[11px] text-cream/60">
+      <span className="text-label text-cream/60">
         {rated === "up" ? `${yes}d` : "Noted. I will adjust."}
       </span>
     );
@@ -83,7 +83,7 @@ export function ChaperonReactions({
   if (asking) {
     return (
       <div className="w-full space-y-2" role="group" aria-label="What did I get wrong?">
-        <p className="text-[11px] font-medium text-cream/80">What did I get wrong?</p>
+        <p className="text-label font-medium text-cream/80">What did I get wrong?</p>
         <div className="flex flex-wrap gap-1.5">
           {REASONS.map((r) => (
             <button
@@ -102,7 +102,7 @@ export function ChaperonReactions({
             </button>
           ))}
         </div>
-        <label className="flex items-start gap-2 text-[11px] leading-snug text-cream/70">
+        <label className="flex items-start gap-2 text-label leading-snug text-cream/70">
           <input
             type="checkbox"
             checked={share}

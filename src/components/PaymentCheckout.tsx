@@ -105,7 +105,7 @@ export function PaymentCheckout({
     return (
       <div className={cn("space-y-3", className)}>
         {priceHint && (
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
+          <p className="text-label leading-relaxed text-muted-foreground">
             {label} · {priceHint}
           </p>
         )}
@@ -117,7 +117,7 @@ export function PaymentCheckout({
   return (
     <div className={cn("space-y-3", className)}>
       {blocked && (
-        <p className="rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 text-xs leading-relaxed text-amber/90">
+        <p className="rounded-xl border border-amber/25 bg-amber/10 px-3 py-2.5 text-label leading-relaxed text-amber/90">
           {blocked}
         </p>
       )}
@@ -126,7 +126,7 @@ export function PaymentCheckout({
         <div className="space-y-2 rounded-xl border border-white/[0.08] bg-black/20 p-3">
           <label
             htmlFor="checkout-country"
-            className="flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-muted-foreground"
+            className="flex items-center gap-2 text-label uppercase tracking-[0.22em] text-muted-foreground"
           >
             <MapPin className="h-3.5 w-3.5" aria-hidden />
             Your location
@@ -137,7 +137,7 @@ export function PaymentCheckout({
             value={countryQuery}
             onChange={(e) => setCountryQuery(e.target.value)}
             placeholder="Search country…"
-            className="w-full rounded-xl border border-white/[0.08] bg-black/25 py-3 px-4 text-sm text-cream placeholder:text-muted-foreground/45 focus:border-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/35"
+            className="w-full rounded-xl border border-white/[0.08] bg-black/25 py-3 px-4 text-body text-cream placeholder:text-muted-foreground/45 focus:border-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/35"
           />
           <ul className="max-h-40 space-y-1 overflow-y-auto">
             {filteredCountries.map((c) => (
@@ -146,18 +146,18 @@ export function PaymentCheckout({
                   type="button"
                   disabled={savingCountry}
                   onClick={() => void handleCountryPick(c.code)}
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-cream transition hover:bg-white/[0.06] disabled:opacity-50"
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-body text-cream transition hover:bg-white/[0.06] disabled:opacity-50"
                 >
                   <span aria-hidden>{flagFor(c.code)}</span>
                   <span className="flex-1">{c.name}</span>
-                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <span className="text-label uppercase tracking-wider text-muted-foreground">
                     {c.code}
                   </span>
                 </button>
               </li>
             ))}
           </ul>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
+          <p className="text-label leading-relaxed text-muted-foreground">
             Saved to your profile. Your payment region is set separately, so this
             doesn&apos;t change how you pay.
           </p>
@@ -168,7 +168,7 @@ export function PaymentCheckout({
         <div className="space-y-2">
           <label
             htmlFor="mpesa-phone"
-            className="block text-[11px] uppercase tracking-[0.22em] text-muted-foreground"
+            className="block text-label uppercase tracking-[0.22em] text-muted-foreground"
           >
             M-Pesa number
           </label>
@@ -185,10 +185,10 @@ export function PaymentCheckout({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="07XX XXX XXX"
-              className="w-full rounded-xl border border-white/[0.08] bg-black/25 py-3.5 pl-10 pr-4 text-sm text-cream placeholder:text-muted-foreground/45 focus:border-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/35"
+              className="w-full rounded-xl border border-white/[0.08] bg-black/25 py-3.5 pl-10 pr-4 text-body text-cream placeholder:text-muted-foreground/45 focus:border-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/35"
             />
           </div>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">
+          <p className="text-label leading-relaxed text-muted-foreground">
             You&apos;ll get an STK prompt on this phone. Pay with{" "}
             {paymentRailLabel(config.payment_provider)}
             {priceHint ? ` · ${priceHint}` : ""}.
@@ -197,7 +197,7 @@ export function PaymentCheckout({
       )}
 
       {!needsCountry && !isMpesa && !blocked && (
-        <p className="text-[11px] leading-relaxed text-muted-foreground">
+        <p className="text-label leading-relaxed text-muted-foreground">
           You&apos;ll complete checkout on Stripe
           {priceHint ? ` · ${priceHint}` : ""}.
         </p>

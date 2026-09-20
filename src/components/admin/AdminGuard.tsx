@@ -38,7 +38,7 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
   if (state === "loading") {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <p className="text-slate-400 text-sm tracking-widest uppercase">Loading admin…</p>
+        <p className="text-slate-400 text-body tracking-widest uppercase">Loading admin…</p>
       </div>
     );
   }
@@ -56,12 +56,12 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center px-6">
         <div className="text-center max-w-md">
-          <p className="text-slate-200 font-medium text-lg">Admin access required</p>
-          <p className="text-slate-500 text-sm mt-2">
+          <p className="text-slate-200 font-medium text-title">Admin access required</p>
+          <p className="text-slate-500 text-body mt-2">
             Your account is not authorized for the DateRoom admin portal. Contact the platform team
             if you believe this is an error.
           </p>
-          <a href="/home" className="inline-block mt-6 text-fuchsia-400 text-sm hover:underline">
+          <a href="/home" className="inline-block mt-6 text-fuchsia-400 text-body hover:underline">
             Back to app
           </a>
         </div>

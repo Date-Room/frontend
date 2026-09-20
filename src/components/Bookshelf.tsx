@@ -68,11 +68,11 @@ function ItemRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
-          <span className="truncate text-sm text-cream">{item.title}</span>
+          <span className="truncate text-body text-cream">{item.title}</span>
           {fromPartner && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-label="From your partner" />}
         </span>
         {(item.author || item.note) && (
-          <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+          <span className="mt-0.5 block truncate text-label text-muted-foreground">
             {item.author || item.note}
           </span>
         )}
@@ -105,19 +105,19 @@ function ItemDetail({
           </span>
           <div className="min-w-0">
             <p className="font-semibold leading-snug text-cream">{item.title}</p>
-            {item.author && <p className="mt-0.5 text-sm text-muted-foreground">{item.author}</p>}
-            {item.note && <p className="mt-2 text-sm text-cream/80">&ldquo;{item.note}&rdquo;</p>}
+            {item.author && <p className="mt-0.5 text-body text-muted-foreground">{item.author}</p>}
+            {item.note && <p className="mt-2 text-body text-cream/80">&ldquo;{item.note}&rdquo;</p>}
             {item.url && (
               <a
                 href={item.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-2 inline-block max-w-full truncate text-xs text-primary hover:underline"
+                className="mt-2 inline-block max-w-full truncate text-label text-primary hover:underline"
               >
                 Open link
               </a>
             )}
-            <p className="mt-3 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
+            <p className="mt-3 text-label uppercase tracking-[0.16em] text-muted-foreground/70">
               {fromPartner ? "From them" : "From you"}
               {item.status === "done" ? " · finished" : ""}
             </p>
@@ -136,7 +136,7 @@ function ItemDetail({
         <button
           type="button"
           onClick={onMarkRead}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-primary/40 bg-primary/10 py-2 text-sm text-primary transition hover:bg-primary/20"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-primary/40 bg-primary/10 py-2 text-body text-primary transition hover:bg-primary/20"
         >
           <Check className="h-4 w-4" />
           Mark read &amp; move to finished
@@ -293,12 +293,12 @@ export function Bookshelf() {
           <button
             type="button"
             onClick={() => setAdding(false)}
-            className="absolute left-0 inline-flex items-center gap-1.5 text-sm text-primary transition hover:opacity-80"
+            className="absolute left-0 inline-flex items-center gap-1.5 text-body text-primary transition hover:opacity-80"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
           </button>
-          <p className="text-sm font-semibold text-cream">Add to Shelf</p>
+          <p className="text-body font-semibold text-cream">Add to Shelf</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -308,7 +308,7 @@ export function Bookshelf() {
               type="button"
               onClick={() => setKind(t.id)}
               className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition",
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-label transition",
                 kind === t.id
                   ? "border-primary/50 bg-primary/10 text-cream"
                   : "border-white/10 text-muted-foreground hover:text-cream",
@@ -326,26 +326,26 @@ export function Bookshelf() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={kind === "book" ? "Book title…" : "Paste a link or title…"}
-            className="focus-ring w-full rounded-xl border border-white/10 bg-secondary/60 px-4 py-2.5 text-sm text-cream placeholder:text-muted-foreground/60"
+            className="focus-ring w-full rounded-xl border border-white/10 bg-secondary/60 px-4 py-2.5 text-body text-cream placeholder:text-muted-foreground/60"
           />
           {kind === "book" && (
             <input
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
               placeholder="Author"
-              className="focus-ring w-full rounded-xl border border-white/10 bg-secondary/60 px-4 py-2.5 text-sm text-cream placeholder:text-muted-foreground/60"
+              className="focus-ring w-full rounded-xl border border-white/10 bg-secondary/60 px-4 py-2.5 text-body text-cream placeholder:text-muted-foreground/60"
             />
           )}
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="A note for them (optional)…"
-            className="focus-ring w-full rounded-xl border border-white/10 bg-secondary/60 px-4 py-2.5 text-sm text-cream placeholder:text-muted-foreground/60"
+            className="focus-ring w-full rounded-xl border border-white/10 bg-secondary/60 px-4 py-2.5 text-body text-cream placeholder:text-muted-foreground/60"
           />
           <button
             type="submit"
             disabled={!input.trim() || saving || resolving}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-full py-2.5 text-body font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
             style={{ backgroundColor: "var(--room-accent)" }}
           >
             {saving || resolving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -368,7 +368,7 @@ export function Bookshelf() {
               setSelectedId(null);
             }}
             className={cn(
-              "border-b-2 pb-2 text-sm transition",
+              "border-b-2 pb-2 text-body transition",
               view === "todo" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-cream",
             )}
           >
@@ -381,7 +381,7 @@ export function Bookshelf() {
               setSelectedId(null);
             }}
             className={cn(
-              "border-b-2 pb-2 text-sm transition",
+              "border-b-2 pb-2 text-body transition",
               view === "done" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-cream",
             )}
           >

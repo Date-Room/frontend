@@ -179,11 +179,11 @@ const ACTIVITY_HELP: Record<string, HelpContent> = {
     ],
   },
   fridge_notes: {
-    title: "Fridge",
+    title: "Sticky Notes",
     tagline: "Little notes that stay up between calls.",
-    startLabel: "Open the fridge",
+    startLabel: "Open the notes",
     steps: [
-      { glyph: "🧲", name: "Leave a note", text: "Write it and tap Add — it stays for both of you." },
+      { glyph: "📝", name: "Leave a note", text: "Write it and tap Add — it stays for both of you." },
       { glyph: "👋", name: "Greet on entry", text: "Tick it to show a note first when they arrive." },
     ],
   },
@@ -221,6 +221,42 @@ export function shouldShowGameIntro(id: string): boolean {
   return hasActivityHelp(id) && !INTRO_SKIP.has(id);
 }
 
+/** Activities whose intro this browser has already shown and dismissed.
+ *
+ *  Kept per browser rather than per room on purpose: session rooms are new
+ *  for every date, so a per-room memory would show the card again on every
+ *  date — which is the thing it is meant to stop. Once you have read how a
+ *  game works, the ? in the stage header is where it lives. */
+const INTRO_SEEN_KEY = "dr:intro-seen:v1";
+
+function readIntroSeen(): Set<string> {
+  try {
+    const raw = localStorage.getItem(INTRO_SEEN_KEY);
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? new Set(parsed.filter((v): v is string => typeof v === "string")) : new Set();
+  } catch {
+    // Private mode / disabled storage — nothing remembered, so the intro
+    // shows. Better a repeated card than a swallowed explanation.
+    return new Set();
+  }
+}
+
+export function hasSeenGameIntro(id: string): boolean {
+  return readIntroSeen().has(id);
+}
+
+export function markGameIntroSeen(id: string): void {
+  try {
+    const seen = readIntroSeen();
+    if (seen.has(id)) return;
+    seen.add(id);
+    localStorage.setItem(INTRO_SEEN_KEY, JSON.stringify([...seen]));
+  } catch {
+    /* storage unavailable — the card just shows again next time */
+  }
+}
+
 function HelpShell({
   id,
   onDismiss,
@@ -245,7 +281,7 @@ function HelpShell({
       onClick={mode === "intro" ? undefined : onDismiss}
     >
       <div
-        className="dr-help-modal dr-game-intro flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/10 bg-card shadow-2xl animate-scale-in"
+        className="dr-help-modal dr-game-intro flex max-h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-card shadow-2xl animate-scale-in"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-labelledby={`game-intro-title-${id}`}
@@ -257,15 +293,15 @@ function HelpShell({
             <div className="absolute inset-0 bg-gradient-to-t from-card via-card/75 to-card/20" aria-hidden />
           </div>
         )}
-        <div className="flex items-start justify-between gap-3 px-6 pb-0 pt-5">
+        <div className="flex items-start justify-between gap-4 px-7 pb-1 pt-6">
           <div className="min-w-0">
-            <h2 id={`game-intro-title-${id}`} className="font-serif text-xl text-cream sm:text-2xl">
+            <h2 id={`game-intro-title-${id}`} className="font-serif text-display text-cream">
               {help.title}
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">{help.tagline}</p>
+            <p className="mt-1.5 text-body text-muted-foreground">{help.tagline}</p>
             {mode === "intro" && help.minutes && (
               <p
-                className="mt-2 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em]"
+                className="dr-eyebrow mt-2 flex items-center gap-1.5"
                 style={{ color: "var(--room-accent)" }}
               >
                 <Clock className="h-3.5 w-3.5" aria-hidden />
@@ -285,14 +321,14 @@ function HelpShell({
           )}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-7 py-5">
           {mode === "intro" ? (
-            <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            <p className="dr-eyebrow mb-3 text-muted-foreground">
               How it works
             </p>
           ) : now ? (
             <p
-              className="dr-help-now mb-4 rounded-xl px-3 py-2 text-[12px] font-semibold uppercase tracking-[0.14em]"
+              className="dr-help-now dr-eyebrow mb-4 rounded-xl px-3 py-2"
               style={{
                 color: "var(--room-accent)",
                 backgroundColor: "color-mix(in srgb, var(--room-accent) 14%, transparent)",
@@ -304,7 +340,7 @@ function HelpShell({
             </p>
           ) : null}
 
-          <ol className="space-y-2">
+          <ol className="space-y-3">
             {help.steps.map((s, i) => {
               const current = mode === "help" && now != null && now.step === i;
               const firstUp = mode === "intro" && i === 0;
@@ -312,7 +348,7 @@ function HelpShell({
                 <li
                   key={s.name}
                   className={[
-                    "dr-help-step rounded-xl border p-3 transition",
+                    "dr-help-step rounded-xl border p-4 transition",
                     current
                       ? "dr-help-step--current border-[color-mix(in_srgb,var(--room-accent)_70%,transparent)] bg-[color-mix(in_srgb,var(--room-accent)_8%,transparent)]"
                       : firstUp
@@ -321,48 +357,58 @@ function HelpShell({
                   ].join(" ")}
                   style={{ animationDelay: `${80 + i * 60}ms` }}
                 >
-                  <p className="flex items-center gap-2 font-serif text-base text-cream">
+                  {/* Glyph in its own column so the body aligns under the
+                      name by construction — the old fixed `pl-` indent had to
+                      be re-guessed every time the glyph changed size. */}
+                  <div className="flex gap-3.5">
                     <span
-                      className="dr-help-step__glyph flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-lg"
+                      className="dr-help-step__glyph flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-body"
                       aria-hidden
                     >
                       {mode === "intro" ? i + 1 : s.glyph}
                     </span>
-                    {s.name}
-                    {current && (
-                      <span
-                        className="ml-auto rounded-full px-2 py-0.5 text-[9px] font-sans font-semibold uppercase tracking-[0.16em]"
-                        style={{
-                          color: "var(--room-accent)",
-                          border: "1px solid color-mix(in srgb, var(--room-accent) 50%, transparent)",
-                        }}
-                      >
-                        you are here
-                      </span>
-                    )}
-                    {firstUp && (
-                      <span className="ml-auto rounded-full border border-white/15 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        first up
-                      </span>
-                    )}
-                  </p>
-                  <p className="mt-1 pl-10 text-sm leading-relaxed text-cream/80">{s.text}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        {/* The step name is a lead-in, not a section heading —
+                            at `title` it shouted over the sentence beneath it.
+                            Same size as the body, carried by weight instead. */}
+                        <p className="min-w-0 flex-1 text-body font-semibold text-cream">{s.name}</p>
+                        {current && (
+                          <span
+                            className="dr-eyebrow shrink-0 rounded-full px-2 py-0.5"
+                            style={{
+                              color: "var(--room-accent)",
+                              border: "1px solid color-mix(in srgb, var(--room-accent) 50%, transparent)",
+                            }}
+                          >
+                            you are here
+                          </span>
+                        )}
+                        {firstUp && (
+                          <span className="dr-eyebrow shrink-0 rounded-full border border-white/15 px-2 py-0.5 text-muted-foreground">
+                            first up
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1.5 text-body text-cream/75">{s.text}</p>
+                    </div>
+                  </div>
                 </li>
               );
             })}
           </ol>
           {help.note && (
-            <p className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+            <p className="mt-5 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-body leading-relaxed text-muted-foreground">
               {help.note}
             </p>
           )}
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-white/[0.06] p-6 pt-4">
+        <div className="flex flex-col gap-2.5 border-t border-white/[0.06] px-7 pb-6 pt-5">
           <button
             type="button"
             onClick={onDismiss}
-            className="focus-ring w-full rounded-full py-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+            className="focus-ring w-full rounded-full py-3 text-body font-semibold text-primary-foreground transition hover:opacity-90"
             style={{ backgroundColor: "var(--room-accent)" }}
           >
             {dismissLabel}
@@ -371,7 +417,7 @@ function HelpShell({
             <button
               type="button"
               onClick={secondaryAction.onClick}
-              className="focus-ring w-full rounded-full border border-white/20 py-2.5 text-sm text-muted-foreground transition hover:bg-white/5 hover:text-cream"
+              className="focus-ring w-full rounded-full border border-white/20 py-2.5 text-body text-muted-foreground transition hover:bg-white/5 hover:text-cream"
             >
               {secondaryAction.label}
             </button>
@@ -410,5 +456,5 @@ export function GameIntro({
 /** In-game help — live “right now” line + step pin; opened from ? in the stage header. */
 export function ActivityHelp({ id, onClose }: { id: string; onClose: () => void }) {
   if (!ACTIVITY_HELP[id]) return null;
-  return <HelpShell id={id} mode="help" onDismiss={onClose} dismissLabel="Back to the game" />;
+  return <HelpShell id={id} mode="help" onDismiss={onClose} dismissLabel="Okay" />;
 }

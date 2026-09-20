@@ -57,12 +57,12 @@ export function AdminLayout() {
     <div className="theme-admin flex min-h-screen bg-background text-cream">
       <aside className="flex w-[232px] shrink-0 flex-col border-r border-white/[0.06] bg-black/20">
         <div className="flex items-center gap-2.5 px-5 pb-4 pt-6">
-          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-primary text-[13px] font-bold text-primary-foreground neon-glow">
+          <span className="flex h-[30px] w-[30px] items-center justify-center rounded-[9px] bg-primary text-body font-bold text-primary-foreground neon-glow">
             DR
           </span>
           <div>
-            <p className="text-[15px] font-semibold leading-none tracking-tight">DateRoom</p>
-            <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">Admin</p>
+            <p className="text-body font-semibold leading-none tracking-tight">DateRoom</p>
+            <p className="mt-1 text-label uppercase tracking-[0.16em] text-muted-foreground/70">Admin</p>
           </div>
         </div>
         <div className="px-3 pb-1">
@@ -71,7 +71,7 @@ export function AdminLayout() {
         <nav className="flex-1 space-y-1 px-2">
           {groups.map((g) => (
             <div key={g.label}>
-              <p className="px-3 pb-1 pt-4 text-[10px] uppercase tracking-[0.14em] text-muted-foreground/60">{g.label}</p>
+              <p className="px-3 pb-1 pt-4 text-label uppercase tracking-[0.14em] text-muted-foreground/60">{g.label}</p>
               {g.items.map((item) => (
                 <NavLink
                   key={item.to}
@@ -79,7 +79,7 @@ export function AdminLayout() {
                   end={item.end}
                   className={({ isActive }) =>
                     cn(
-                      "flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] transition",
+                      "flex items-center gap-2.5 rounded-lg px-3 py-2 text-body transition",
                       isActive ? "bg-primary/[0.14] text-cream neon-nav" : "text-muted-foreground hover:bg-white/[0.05] hover:text-cream",
                     )
                   }
@@ -89,7 +89,7 @@ export function AdminLayout() {
                       <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.label}</span>
                       {item.count !== undefined && (
-                        <span className={cn("ml-auto text-[11px] tabular-nums", isActive ? "text-primary" : "text-muted-foreground/70")}>{item.count}</span>
+                        <span className={cn("ml-auto text-label tabular-nums", isActive ? "text-primary" : "text-muted-foreground/70")}>{item.count}</span>
                       )}
                     </>
                   )}
@@ -99,8 +99,8 @@ export function AdminLayout() {
           ))}
         </nav>
         <div className="space-y-1.5 border-t border-white/[0.06] px-5 py-4">
-          <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
-          <Link to="/home" className="flex items-center gap-1.5 text-xs text-muted-foreground/70 hover:text-primary">
+          <p className="truncate text-label text-muted-foreground">{user?.email}</p>
+          <Link to="/home" className="flex items-center gap-1.5 text-label text-muted-foreground/70 hover:text-primary">
             <ArrowLeft className="h-3.5 w-3.5" />
             Exit to app
           </Link>

@@ -63,7 +63,7 @@ export function TellUsSheet({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="font-serif text-2xl leading-tight text-cream">Feedback</h2>
-            <p className="mt-1 text-[13px] text-muted-foreground">
+            <p className="mt-1 text-body text-muted-foreground">
               One tap and a line. It goes to the people building this, with nothing about your call.
             </p>
           </div>
@@ -73,11 +73,11 @@ export function TellUsSheet({
         </div>
 
         {!signedIn ? (
-          <p className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-[13px] text-muted-foreground">
+          <p className="rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-body text-muted-foreground">
             Sign in to send feedback, so we can reply.
           </p>
         ) : sent ? (
-          <p className="rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.06] px-4 py-3 text-[13px] text-cream">Got it. Thank you.</p>
+          <p className="rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.06] px-4 py-3 text-body text-cream">Got it. Thank you.</p>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2" role="group" aria-label="What kind">
@@ -92,8 +92,8 @@ export function TellUsSheet({
                     kind === k.id ? "border-primary/60 bg-primary/[0.12]" : "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05]",
                   )}
                 >
-                  <span className="block text-sm font-semibold text-cream">{k.label}</span>
-                  <span className="block text-[11px] text-muted-foreground">{k.hint}</span>
+                  <span className="block text-body font-semibold text-cream">{k.label}</span>
+                  <span className="block text-label text-muted-foreground">{k.hint}</span>
                 </button>
               ))}
             </div>
@@ -103,7 +103,7 @@ export function TellUsSheet({
               maxLength={2000}
               rows={3}
               placeholder="What happened, in your words (optional)"
-              className="focus-ring w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-[13px] text-cream placeholder:text-muted-foreground/60"
+              className="focus-ring w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-body text-cream placeholder:text-muted-foreground/60"
             />
             <button
               type="button"

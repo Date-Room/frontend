@@ -57,7 +57,7 @@ export function ChaperonTryCard({ partnerName }: { partnerName: string | null })
     <div
       role="status"
       className={cn(
-        "pointer-events-auto w-full rounded-2xl border px-3.5 py-3 text-[12px] leading-relaxed text-cream/90 shadow-lg backdrop-blur-xl",
+        "pointer-events-auto w-full rounded-2xl border px-3.5 py-3 text-label leading-relaxed text-cream/90 shadow-lg backdrop-blur-xl",
         probe === "caught"
           ? "border-emerald-400/40 bg-emerald-500/[0.12]"
           : "border-white/10 bg-black/60",
@@ -77,7 +77,7 @@ export function ChaperonTryCard({ partnerName }: { partnerName: string | null })
           <button
             type="button"
             onClick={skip}
-            className="focus-ring mt-2 rounded-full border border-white/15 px-3 py-1 text-[11px] text-cream/80 hover:bg-white/10"
+            className="focus-ring mt-2 rounded-full border border-white/15 px-3 py-1 text-label text-cream/80 hover:bg-white/10"
           >
             Never mind
           </button>
@@ -88,21 +88,21 @@ export function ChaperonTryCard({ partnerName }: { partnerName: string | null })
           <p className="mt-1 text-cream/70">
             Say this to {them}, as a joke if you like. Only you will see what I make of it.
           </p>
-          <p className="mt-2 rounded-xl border border-white/10 bg-black/40 px-3 py-2 font-serif text-[13px] italic text-cream">
+          <p className="mt-2 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-body italic text-cream">
             &ldquo;{PROBE_LINE}&rdquo;
           </p>
           <div className="mt-2 flex gap-2">
             <button
               type="button"
               onClick={() => void ctrl.startProbe()}
-              className="btn-primary focus-ring rounded-full px-3 py-1.5 text-[11px] font-semibold"
+              className="btn-primary focus-ring rounded-full px-3 py-1.5 text-label font-semibold"
             >
               I said it
             </button>
             <button
               type="button"
               onClick={skip}
-              className="focus-ring rounded-full border border-white/15 px-3 py-1.5 text-[11px] text-cream/80 hover:bg-white/10"
+              className="focus-ring rounded-full border border-white/15 px-3 py-1.5 text-label text-cream/80 hover:bg-white/10"
             >
               Skip
             </button>

@@ -40,7 +40,7 @@ export function PinnedNoteGate({ enabled }: Props) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/85 backdrop-blur-md px-4 animate-fade-in">
       <div className="w-full max-w-md text-center">
-        <p className="font-serif italic text-cream/90 text-lg sm:text-xl mb-4">
+        <p className="italic text-cream/90 text-title mb-4">
           {note.emergency ? "A note was waiting for you" : "Something was left for you"}
         </p>
         <div className="relative mx-auto max-w-sm">
@@ -49,10 +49,10 @@ export function PinnedNoteGate({ enabled }: Props) {
             aria-hidden
           />
           <div className="rounded-2xl bg-[#F5E6D3] px-6 py-8 text-left shadow-[0_24px_60px_rgba(0,0,0,0.45)]">
-            <p className="font-serif text-[#2A2018] text-lg leading-relaxed whitespace-pre-wrap">
+            <p className="text-[#2A2018] text-title leading-relaxed whitespace-pre-wrap">
               {note.text}
             </p>
-            <p className="mt-4 text-xs uppercase tracking-[0.18em] text-[#2A2018]/45">
+            <p className="mt-4 text-label uppercase tracking-[0.18em] text-[#2A2018]/45">
               from {note.pinned_by_name}
             </p>
             <div className="mt-6 flex justify-center">
@@ -104,12 +104,12 @@ export function PinNotePanel() {
 
   return (
     <form onSubmit={(e) => void pin(e)} className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
-      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+      <p className="text-label uppercase tracking-[0.18em] text-muted-foreground">
         Pin a note for them
       </p>
       {notes.length > 0 && (
-        <p className="text-xs text-muted-foreground/80">
-          {notes.length} note{notes.length === 1 ? "" : "s"} on the fridge — new ones are added, not replaced.
+        <p className="text-label text-muted-foreground/80">
+          {notes.length} note{notes.length === 1 ? "" : "s"} up — new ones are added, not replaced.
         </p>
       )}
       <Textarea
@@ -117,9 +117,9 @@ export function PinNotePanel() {
         onChange={(e) => setText(e.target.value)}
         placeholder="Thinking about you today…"
         rows={3}
-        className="bg-secondary/50 border-white/10 resize-none font-serif"
+        className="bg-secondary/50 border-white/10 resize-none "
       />
-      <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+      <label className="flex items-center gap-2 text-label text-muted-foreground cursor-pointer">
         <input
           type="checkbox"
           checked={emergency}

@@ -6,25 +6,41 @@ import {
   VideoTrack,
   useTracks,
   useLocalParticipant,
-  useIsSpeaking,
   useRoomContext,
   isTrackReference,
 } from "@livekit/components-react";
-import { Track, DisconnectReason, RoomEvent, VideoPresets, setLogLevel, type RoomOptions } from "livekit-client";
+import {
+  Track,
+  DisconnectReason,
+  RoomEvent,
+  VideoPresets,
+  setLogLevel,
+  type LocalVideoTrack,
+  type Participant,
+  type RoomOptions,
+} from "livekit-client";
 import { toast } from "sonner";
 import "@livekit/components-styles";
-import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Maximize2, Minimize2, Minus, RotateCw } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Minus, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AmbientController } from "@/components/AmbientController";
 import { ChaperonAgentBridge } from "@/components/ChaperonAgentBridge";
 import { CallPeersBridge } from "@/context/CallPeersContext";
-import { DeviceMenu, DeviceChangeToaster } from "@/components/DeviceMenu";
+import {
+  CallSettingsMenu,
+  CameraDropup,
+  DeviceChangeToaster,
+  MicDropup,
+} from "@/components/DeviceMenu";
 import { loadDevicePreference } from "@/lib/devices";
 import { getInvitedGuestName } from "@/lib/invitedGuest";
 import { livekitToken } from "@/lib/rooms";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
 import { partnerFromPresence } from "@/lib/stagecraft/usePartnerName";
 import { useRoomSession } from "@/context/RoomSessionContext";
+import { authClient } from "@/lib/authClient";
+import { useVideoOrientation } from "@/lib/videoOrientation";
+import { useWideViewport } from "@/lib/viewport";
 import type { PresenceState } from "@/lib/realtime/roomChannel";
 
 // Adaptive stream + dynacast let LiveKit stop sending layers nobody is
@@ -39,11 +55,20 @@ setLogLevel("warn");
 const LIVEKIT_ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
   dynacast: true,
+  // Ask for 540p rather than letting the browser negotiate its default
+  // (often 720p or higher). Acquisition is the slow half of turning a camera
+  // back on, and it scales with the resolution being negotiated; this also
+  // matches what mobile pins for thermal reasons, so both clients capture the
+  // same thing.
+  videoCaptureDefaults: {
+    resolution: VideoPresets.h540.resolution,
+  },
   publishDefaults: {
     simulcast: true,
     videoSimulcastLayers: [VideoPresets.h180, VideoPresets.h360],
   },
 };
+
 
 const REACTIONS = ["❤️", "🔥", "😂", "🤔", "🥹"];
 
@@ -238,41 +263,204 @@ const BEAUTY_CSS = [
 ].join(" ");
 const LITE_CSS = ["brightness(1.05)", "saturate(1.06)"].join(" ");
 
-/** Camera-off placeholder — the person's initial in a disc with a ring that
- *  pulses while they're speaking, so the call still feels alive. */
+/** One AudioContext for the page. Browsers cap how many you may open, and a
+ *  call has two of these avatars. */
+let rippleCtx: AudioContext | null = null;
+function sharedAudioContext(): AudioContext | null {
+  try {
+    rippleCtx ??= new AudioContext();
+    if (rippleCtx.state === "suspended") void rippleCtx.resume();
+    return rippleCtx;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Drives the camera-off halo from the participant's live microphone.
+ *
+ * Deliberately writes to the DOM from a rAF loop instead of going through
+ * React state. Two earlier attempts felt wrong for reasons worth recording:
+ * LiveKit's `isSpeaking` is a debounced boolean, so it arrived late and could
+ * only say yes/no; and driving a per-frame value through state plus a CSS
+ * `transition` double-smooths it — every new sample restarts a fresh
+ * interpolation, which reads as lag and mush, on top of re-rendering the
+ * subtree 60 times a second.
+ *
+ * So: sample the analyser each frame, smooth the VALUE (fast attack, slow
+ * release — how a level meter behaves), and write transform/opacity straight
+ * to the nodes. No transitions, no re-renders.
+ */
+function useVoiceRipple(
+  participant: Participant,
+  ringRef: React.RefObject<HTMLSpanElement | null>,
+  discRef: React.RefObject<HTMLSpanElement | null>,
+) {
+  useEffect(() => {
+    const ctx = sharedAudioContext();
+    if (!ctx) return;
+
+    let raf = 0;
+    let source: MediaStreamAudioSourceNode | null = null;
+    let analyser: AnalyserNode | null = null;
+    let sink: GainNode | null = null;
+    let data: Uint8Array | null = null;
+    let attachedId: string | null = null;
+    let smoothed = 0;
+
+    const detach = () => {
+      source?.disconnect();
+      analyser?.disconnect();
+      sink?.disconnect();
+      source = null;
+      analyser = null;
+      sink = null;
+      data = null;
+      attachedId = null;
+    };
+
+    const attach = (mst: MediaStreamTrack) => {
+      detach();
+      try {
+        source = ctx.createMediaStreamSource(new MediaStream([mst]));
+        analyser = ctx.createAnalyser();
+        analyser.fftSize = 1024;
+        // Our own smoothing below is what shapes the feel; keep the
+        // analyser's own averaging light so it stays responsive.
+        analyser.smoothingTimeConstant = 0.2;
+        // A muted sink: some browsers only run a graph that reaches a
+        // destination, and this keeps a remote track pulling without
+        // making any sound of its own.
+        sink = ctx.createGain();
+        sink.gain.value = 0;
+        source.connect(analyser);
+        analyser.connect(sink);
+        sink.connect(ctx.destination);
+        data = new Uint8Array(analyser.fftSize);
+        attachedId = mst.id;
+      } catch {
+        detach();
+      }
+    };
+
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+
+      // Re-read every frame so a mic that is muted, swapped or subscribed
+      // late is picked up without re-running the effect.
+      const mst = participant.getTrackPublication(Track.Source.Microphone)?.track
+        ?.mediaStreamTrack;
+      if (mst && mst.id !== attachedId) attach(mst);
+      else if (!mst && attachedId) detach();
+
+      let energy = 0;
+      if (analyser && data) {
+        analyser.getByteTimeDomainData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i += 1) {
+          const v = (data[i] - 128) / 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / data.length);
+        // A mic never reads a true zero; drop the floor, then open up what
+        // is left so ordinary speech uses the whole ring.
+        energy = Math.max(0, Math.min(1, (rms - 0.012) * 9));
+      }
+
+      // Fast attack so a consonant lands immediately, slower release so it
+      // falls away rather than flickering between syllables.
+      const k = energy > smoothed ? 0.45 : 0.12;
+      smoothed += (energy - smoothed) * k;
+      if (smoothed < 0.001) smoothed = 0;
+
+      const ring = ringRef.current;
+      if (ring) {
+        ring.style.transform = `scale(${(1 + smoothed * 0.3).toFixed(4)})`;
+        ring.style.opacity = (smoothed * 0.9).toFixed(3);
+      }
+      const disc = discRef.current;
+      if (disc) {
+        disc.style.boxShadow = `0 0 0 ${(smoothed * 9).toFixed(2)}px color-mix(in srgb, var(--room-accent) 30%, transparent)`;
+      }
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      detach();
+    };
+  }, [participant, ringRef, discRef]);
+}
+
+/** Camera-off placeholder — the person's photo, or their initial, in a disc
+ *  with a ring that pulses while they're speaking so the call still feels
+ *  alive.
+ *
+ *  Surface treatment matches the activity tray's tiles: a faded wash of the
+ *  accent with an outline, rather than a solid fill. Tinting from
+ *  `--room-accent` (not a fixed amber) is what keeps it on-theme when the
+ *  room is retinted. */
 function SpeakingAvatar({
   trackRef,
   label,
+  photoUrl,
 }: {
   trackRef: ReturnType<typeof useTracks>[number];
   label: string;
+  photoUrl?: string | null;
 }) {
-  const speaking = useIsSpeaking(trackRef.participant);
+  const ringRef = useRef<HTMLSpanElement>(null);
+  const discRef = useRef<HTMLSpanElement>(null);
+  useVoiceRipple(trackRef.participant, ringRef, discRef);
   const initial = (label || "?").trim().charAt(0).toUpperCase() || "?";
+  // A photo that fails to load shouldn't leave an empty disc — fall back to
+  // the initial, which is what we had before photos.
+  const [photoBroken, setPhotoBroken] = useState(false);
+  const showPhoto = Boolean(photoUrl) && !photoBroken;
   return (
-    <div className="absolute inset-0 flex items-center justify-center">
+    // A size container so the disc can be measured against the SMALLER side of
+    // the tile (`cqmin`). Sizing it with a plain percentage made it an ellipse
+    // — `height: 26%` resolves against the tile's height while `width: 26%`
+    // resolves against its width, so any non-square tile stretched it, and the
+    // two people ended up different sizes because their tiles differ.
+    <div className="absolute inset-0 flex items-center justify-center [container-type:size]">
       <div className="relative flex items-center justify-center">
-        {/* Reverberating rings — appear only while speaking. */}
+        {/* The ripple — a halo that breathes with the voice. Transform and
+            opacity only (both GPU-composited), interpolated by a short
+            transition so the per-frame level reads as motion rather than
+            stepping. The old `animate-ping` was a fixed 1s keyframe loop with
+            no relationship to what was being said. */}
         <span
-          className={cn(
-            "absolute rounded-full transition-opacity duration-300",
-            speaking ? "opacity-100 animate-ping" : "opacity-0",
-          )}
+          ref={ringRef}
+          className="pointer-events-none absolute inset-[-9%] rounded-full"
           style={{
-            width: "6rem",
-            height: "6rem",
             background: "color-mix(in srgb, var(--room-accent) 22%, transparent)",
+            transform: "scale(1)",
+            opacity: 0,
+            willChange: "transform, opacity",
           }}
           aria-hidden
         />
         <span
-          className="relative flex h-[clamp(2.75rem,26%,4.5rem)] w-[clamp(2.75rem,26%,4.5rem)] items-center justify-center rounded-full font-serif text-[clamp(1.1rem,1.4vw,1.9rem)] text-primary-foreground transition-shadow duration-200"
+          ref={discRef}
+          className="relative flex aspect-square w-[clamp(3rem,45cqmin,10.5rem)] items-center justify-center overflow-hidden rounded-full border text-[clamp(1.3rem,19.5cqmin,3.75rem)] leading-none"
           style={{
-            backgroundColor: "var(--room-accent)",
-            boxShadow: speaking ? "0 0 0 6px color-mix(in srgb, var(--room-accent) 30%, transparent)" : "none",
+            backgroundColor: "color-mix(in srgb, var(--room-accent) 10%, transparent)",
+            borderColor: "color-mix(in srgb, var(--room-accent) 20%, transparent)",
+            color: "var(--room-accent)",
+            boxShadow: "0 0 0 0 color-mix(in srgb, var(--room-accent) 30%, transparent)",
           }}
         >
-          {initial}
+          {showPhoto ? (
+            <img
+              src={photoUrl ?? undefined}
+              alt=""
+              className="h-full w-full object-cover"
+              onError={() => setPhotoBroken(true)}
+            />
+          ) : (
+            initial
+          )}
         </span>
       </div>
     </div>
@@ -283,38 +471,53 @@ function Tile({
   participant,
   isLocal,
   label,
+  photoUrl,
   contain,
+  square,
+  forceOff,
   bare,
 }: {
   participant?: ReturnType<typeof useTracks>[number];
   isLocal?: boolean;
   label: string;
+  /** Shown instead of the initial while their camera is off. */
+  photoUrl?: string | null;
   /** Show the whole camera frame (no crop) so both sides see the same thing. */
   contain?: boolean;
+  /** Square corners. A pane that sits flush against the stage makes a
+   *  rounded video read as a card inside a card. */
+  square?: boolean;
+  /** Show the placeholder now, without waiting for the track to report muted.
+   *  Your own tile uses this so turning the camera off looks immediate even
+   *  though releasing the device doesn't finish for another moment. */
+  forceOff?: boolean;
   /** No caption, no card chrome — for round bubbles that bring their own ring. */
   bare?: boolean;
 }) {
   // A placeholder ref (no publication yet) can't feed <VideoTrack> — treat it
   // like a muted camera and show the avatar instead.
   const videoTrackRef =
-    participant && isTrackReference(participant) && !participant.publication.isMuted
+    participant && !forceOff && isTrackReference(participant) && !participant.publication.isMuted
       ? participant
       : undefined;
   const lowPower = useLowPowerMode();
   return (
     <div
-      className={
-        bare
-          ? "relative h-full w-full overflow-hidden bg-black"
-          : "relative w-full h-full overflow-hidden rounded-2xl bg-black border border-white/[0.08]"
-      }
+      className={cn(
+        "relative h-full w-full overflow-hidden bg-black",
+        // `bare` drops the chrome entirely (round bubbles bring their own
+        // ring); otherwise the only question is whether the corners are
+        // rounded, which depends on whether the tile sits flush in a pane.
+        !bare && "border border-white/[0.08]",
+        !bare && (square ? "rounded-none" : "rounded-2xl"),
+      )}
       style={bare ? undefined : { boxShadow: "0 12px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04)" }}
     >
       {!videoTrackRef ? (
         participant ? (
-          <SpeakingAvatar trackRef={participant} label={label} />
+          <SpeakingAvatar trackRef={participant} label={label} photoUrl={photoUrl} />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground font-serif italic text-xl sm:text-2xl">
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground font-serif italic text-title">
             waiting for them…
           </div>
         )
@@ -322,8 +525,16 @@ function Tile({
         <>
           <VideoTrack
             trackRef={videoTrackRef}
-            className={`w-full h-full ${contain ? "object-contain" : "object-cover"} ${isLocal ? "scale-x-[-1]" : ""}`}
-            style={{ filter: lowPower ? LITE_CSS : BEAUTY_CSS }}
+            className={`w-full h-full ${isLocal ? "scale-x-[-1]" : ""}`}
+            // object-fit is set inline, not as a class. LiveKit's own
+            // stylesheet ships `.lk-participant-media-video { object-fit:
+            // cover }` at the same specificity as Tailwind's utility and is
+            // imported after it, so `object-contain` lost every time and the
+            // `contain` prop silently did nothing — every feed was cropped.
+            style={{
+              objectFit: contain ? "contain" : "cover",
+              filter: lowPower ? LITE_CSS : BEAUTY_CSS,
+            }}
           />
           {/* Soft-glow overlay — Snapchat-style beauty sheen. Skipped on
               low-power/thermal devices (soft-light blend is costly per frame). */}
@@ -340,7 +551,7 @@ function Tile({
         </>
       )}
       {!bare && (
-        <span className="absolute bottom-2.5 left-3 text-[10px] sm:text-xs uppercase tracking-[0.2em] text-cream/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">
+        <span className="absolute bottom-2.5 left-3 text-label uppercase tracking-[0.2em] text-cream/85 drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">
           {label}
         </span>
       )}
@@ -361,6 +572,8 @@ function gridClass(count: number): string {
 type CallControls = {
   /** "full" = fullscreen call (all controls); "pip" = compact floating window. */
   variant?: "full" | "pip";
+  /** Rendered inside the side pane rather than as a floating window. */
+  framed?: boolean;
   /** Alias for pip sizing — used by the session watch-together mini-view. */
   compact?: boolean;
   /** Bubble mode — just the video, no controls (call stays live). */
@@ -369,10 +582,6 @@ type CallControls = {
   pair?: boolean;
   /** Full variant in a narrow pane: stack the two tiles instead of side by side. */
   stacked?: boolean;
-  /** pip → expand to fullscreen */
-  onExpand?: () => void;
-  /** full → shrink back to pip */
-  onMinimize?: () => void;
   /** pip → collapse to a small bubble */
   onCollapse?: () => void;
   /** pip → rotate portrait/landscape (rendered in the hover controls) */
@@ -382,12 +591,11 @@ type CallControls = {
 function Stage({
   onLeave,
   variant = "full",
+  framed,
   compact = false,
   collapsed = false,
   pair = false,
   stacked = false,
-  onExpand,
-  onMinimize,
   onCollapse,
   onRotate,
 }: { onLeave: () => void } & CallControls) {
@@ -399,7 +607,83 @@ function Stage({
   const local = cameraTracks.find((t) => t.participant.isLocal);
   const remotes = cameraTracks.filter((t) => !t.participant.isLocal);
 
-  const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+  const {
+    localParticipant,
+    isMicrophoneEnabled: micActual,
+    isCameraEnabled: camActual,
+  } = useLocalParticipant();
+  // The button answers the tap, not the hardware. Turning a camera on takes
+  // a moment to negotiate, and a control that sits on its old state until
+  // the track is live reads as a missed tap. Show the intent immediately and
+  // fall back to the truth if the device refuses.
+  const [micWanted, setMicWanted] = useState<boolean | null>(null);
+  const [camWanted, setCamWanted] = useState<boolean | null>(null);
+  const isMicrophoneEnabled = micWanted ?? micActual;
+  const isCameraEnabled = camWanted ?? camActual;
+  useEffect(() => {
+    if (micWanted !== null && micActual === micWanted) setMicWanted(null);
+  }, [micActual, micWanted]);
+  useEffect(() => {
+    if (camWanted !== null && camActual === camWanted) setCamWanted(null);
+  }, [camActual, camWanted]);
+  const toggleMic = useCallback(async () => {
+    const next = !(micWanted ?? micActual);
+    setMicWanted(next);
+    try {
+      await localParticipant.setMicrophoneEnabled(next);
+    } catch {
+      setMicWanted(null);
+      toast.error(next ? "Couldn't turn the mic on" : "Couldn't mute");
+    }
+  }, [localParticipant, micWanted, micActual]);
+  // The device is released the moment you turn the camera off — no holding it
+  // open to make the next switch-on quick, because that keeps the camera light
+  // lit while the UI says "off", and that is not a trade worth making here.
+  // What is instant is the *appearance*: the button and your own tile flip
+  // immediately, and the hardware takes the time it takes underneath.
+  // Orientation is enforced at CAPTURE, not on the way out of a <video>.
+  // Cropping locally would only change what you see; publishing a stream that
+  // is genuinely this shape is what makes the other person see the same
+  // framing you do.
+  // Not pinned to the layout any more: upstream's side pane is resizable, so
+  // "the pane can only be portrait" stopped being true. Orientation is now a
+  // free preference again.
+  const [orientation] = useVideoOrientation();
+  const appliedOrientation = useRef<string | null>(null);
+  useEffect(() => {
+    if (!camActual) {
+      // Nothing capturing — the next start picks the shape up from options.
+      appliedOrientation.current = null;
+      return;
+    }
+    if (appliedOrientation.current === orientation) return;
+    const track = localParticipant.getTrackPublication(Track.Source.Camera)?.track as
+      | LocalVideoTrack
+      | undefined;
+    if (!track) return;
+    appliedOrientation.current = orientation;
+    const { width, height } = VideoPresets.h540.resolution;
+    const resolution =
+      orientation === "portrait"
+        ? { width: height, height: width }
+        : { width, height };
+    void track.restartTrack({ resolution }).catch(() => {
+      // A camera that won't give us that shape keeps the one it has; better a
+      // sideways picture than no picture.
+      appliedOrientation.current = null;
+    });
+  }, [orientation, camActual, localParticipant]);
+
+  const toggleCam = useCallback(async () => {
+    const next = !(camWanted ?? camActual);
+    setCamWanted(next);
+    try {
+      await localParticipant.setCameraEnabled(next);
+    } catch {
+      setCamWanted(null);
+      toast.error(next ? "Couldn't turn the camera on" : "Couldn't turn the camera off");
+    }
+  }, [localParticipant, camWanted, camActual]);
 
   const partnerWrapRef = useRef<HTMLDivElement>(null);
   const selfWrapRef = useRef<HTMLDivElement>(null);
@@ -438,6 +722,37 @@ function Stage({
   const partnerDisplay = useMemo(
     () => partnerNameFromPresence(room.presence, room.senderId, room.roomId),
     [room.presence, room.senderId, room.roomId],
+  );
+  // Your own photo for the camera-off disc. Presence carries the partner's;
+  // your own row is the one you can't read a name off reliably, so take it
+  // from the session.
+  const myPhotoUrl = authClient.getSession()?.user.photo_url ?? null;
+  // Whether the side-by-side layout is even on the table — the settings menu
+  // offers the choice, so it needs the same answer the room uses.
+  const wideViewport = useWideViewport();
+  // A control and its device list read as one object: a pill holding a bare
+  // caret on the left and the toggle in its circle on the right. The caret is
+  // deliberately un-circled so it doesn't compete with the button it belongs
+  // to — same icon size, different weight.
+  // Every control in the row is this tall — circles, pills and all. Heights
+  // are set on the OUTER element (border-box) so a pill with inner padding
+  // still measures the same as a plain circle beside it.
+  const ctrlH = isPip ? "h-8" : "h-11";
+  const ctrlBox = cn(ctrlH, isPip ? "w-8" : "w-11");
+  const ctrlSurface =
+    "flex items-center justify-center rounded-full border border-border bg-secondary/80 transition hover:bg-muted";
+  const fullPill = cn(
+    "flex items-center rounded-full border border-border bg-secondary/40",
+    ctrlH,
+    isPip ? "gap-0.5 py-0.5 pl-1.5 pr-0.5" : "gap-1 py-1 pl-2 pr-1",
+  );
+  const fullCaretBtn = cn(
+    "flex items-center justify-center text-cream/70 transition hover:text-cream",
+    isPip ? "h-5 w-4" : "h-6 w-5",
+  );
+  const fullToggleBtn = cn(
+    "flex items-center justify-center rounded-full bg-secondary/90 transition hover:bg-muted",
+    isPip ? "h-7 w-7" : "h-9 w-9",
   );
 
   // The capture listener below subscribes once per channel, so anything the
@@ -525,6 +840,7 @@ function Stage({
             participant={primary}
             isLocal={primary === local}
             label={remotes[0]?.participant.name || partnerDisplay.name || "you"}
+            photoUrl={primary === local ? myPhotoUrl : partnerDisplay.photoUrl}
           />
         ) : (
           <Tile label="…" />
@@ -537,18 +853,48 @@ function Stage({
   if (isPip) {
     const ctrlBtn =
       "flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-cream backdrop-blur-md transition hover:bg-black/65";
+    // The caret rides inside its control's pill rather than being a control
+    // itself, so it reads as "more of this button", not another button.
+    const caretBtn =
+      "flex h-5 w-4 items-center justify-center text-cream/70 transition hover:text-cream";
+    const pipPill =
+      "flex h-8 items-center gap-0.5 rounded-full bg-black/35 py-0.5 pl-1.5 pr-0.5 backdrop-blur-md";
+    const pipToggleBtn =
+      "flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-cream transition hover:bg-black/75";
     const partner = remotes[0];
     const partnerLabel = partner?.participant.name || partnerDisplay.name;
     // Big vs inset: default big = partner, inset = you; tapping the inset swaps.
     const bigIsLocal = partner ? pipSwapped : true;
     return (
-      <div ref={pipFrameRef} className="group relative h-full w-full overflow-hidden rounded-xl bg-black">
+      <div
+        ref={pipFrameRef}
+        className={cn(
+          "group relative h-full w-full overflow-hidden bg-black",
+          // In a pane it runs to the edges; as a floating window it keeps the
+          // radius that matches the frame around it.
+          framed ? "rounded-none" : "rounded-xl",
+        )}
+      >
         <ReactionsLayer />
         <div ref={partnerWrapRef} className="absolute inset-0">
           {bigIsLocal ? (
-            <Tile participant={local} isLocal label="you" contain />
+            <Tile
+              participant={local}
+              isLocal
+              label="you"
+              photoUrl={myPhotoUrl}
+              forceOff={!isCameraEnabled}
+              square={framed}
+              contain
+            />
           ) : (
-            <Tile participant={partner} label={partnerLabel} contain />
+            <Tile
+              participant={partner}
+              label={partnerLabel}
+              photoUrl={partnerDisplay.photoUrl}
+              square={framed}
+              contain
+            />
           )}
         </div>
         {/* Inset PiP-in-PiP — the other person; drag within the frame, tap to swap.
@@ -561,12 +907,17 @@ function Stage({
               if (!pipMovedRef.current) setPipSwapped((v) => !v);
             }}
             style={pipPos ? { left: pipPos.x, top: pipPos.y } : { right: 8, bottom: 8 }}
-            className="absolute z-20 h-[32%] w-[34%] cursor-pointer overflow-hidden rounded-lg border border-white/25 shadow-lg active:cursor-grabbing"
+            className={cn(
+              "absolute z-20 cursor-pointer overflow-hidden rounded-lg border border-white/25 shadow-lg active:cursor-grabbing",
+              orientation === "portrait"
+                ? "h-[34%] w-auto aspect-[9/16]"
+                : "w-[36%] h-auto aspect-[16/9]",
+            )}
           >
             {bigIsLocal ? (
-              <Tile participant={partner} label={partnerLabel} contain />
+              <Tile participant={partner} label={partnerLabel} photoUrl={partnerDisplay.photoUrl} contain />
             ) : (
-              <Tile participant={local} isLocal label="you" contain />
+              <Tile participant={local} isLocal label="you" photoUrl={myPhotoUrl} forceOff={!isCameraEnabled} contain />
             )}
           </div>
         )}
@@ -586,21 +937,27 @@ function Stage({
           onPointerDown={(e) => e.stopPropagation()}
           className="absolute inset-x-0 bottom-0 z-20 flex flex-wrap items-center justify-center gap-1.5 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-2 pb-2 pt-8 transition-all duration-200 pointer-events-auto translate-y-0 opacity-100 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:translate-y-1 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:pointer-events-auto [@media(hover:hover)]:group-hover:translate-y-0 [@media(hover:hover)]:group-hover:opacity-100"
         >
-          <button
-            onClick={() => void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
-            aria-label={isMicrophoneEnabled ? "Mute" : "Unmute"}
-            className={ctrlBtn}
-          >
-            {isMicrophoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4 text-rose" />}
-          </button>
-          <button
-            onClick={() => void localParticipant.setCameraEnabled(!isCameraEnabled)}
-            aria-label={isCameraEnabled ? "Camera off" : "Camera on"}
-            className={ctrlBtn}
-          >
-            {isCameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4 text-rose" />}
-          </button>
-          <DeviceMenu triggerClassName={ctrlBtn} iconClassName="h-4 w-4" />
+          <div className={pipPill}>
+            <MicDropup triggerClassName={caretBtn} iconClassName="h-4 w-4" />
+            <button
+              onClick={() => void toggleMic()}
+              aria-label={isMicrophoneEnabled ? "Mute" : "Unmute"}
+              className={pipToggleBtn}
+            >
+              {isMicrophoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4 text-rose" />}
+            </button>
+          </div>
+          <div className={pipPill}>
+            <CameraDropup triggerClassName={caretBtn} iconClassName="h-4 w-4" />
+            <button
+              onClick={() => void toggleCam()}
+              aria-label={isCameraEnabled ? "Camera off" : "Camera on"}
+              className={pipToggleBtn}
+            >
+              {isCameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4 text-rose" />}
+            </button>
+          </div>
+          <CallSettingsMenu triggerClassName={ctrlBtn} iconClassName="h-4 w-4" canSplit={wideViewport} />
           {/* FaceTime-style capture — grabs both faces to a photo. */}
           <button
             onClick={startCapture}
@@ -610,11 +967,6 @@ function Stage({
           >
             <Camera className="h-4 w-4" style={{ color: "var(--room-accent)" }} />
           </button>
-          {onExpand && (
-            <button onClick={onExpand} aria-label="Full screen call" className={ctrlBtn}>
-              <Maximize2 className="h-4 w-4" />
-            </button>
-          )}
           {onCollapse && (
             <button onClick={onCollapse} aria-label="Collapse call" className={ctrlBtn}>
               <Minus className="h-4 w-4" />
@@ -633,7 +985,7 @@ function Stage({
   }
 
   return (
-    <div className="flex flex-col gap-2 h-full relative">
+    <div className="flex flex-col h-full relative">
       <ReactionsLayer />
 
       {countdown != null && (
@@ -651,97 +1003,101 @@ function Stage({
       {isPip ? (
         <div ref={partnerWrapRef} className="flex-1 min-h-0">
           {remotes.length > 0 ? (
-            <Tile participant={remotes[0]} label={remotes[0].participant.name || partnerDisplay.name} />
+            <Tile
+              participant={remotes[0]}
+              label={remotes[0].participant.name || partnerDisplay.name}
+              photoUrl={partnerDisplay.photoUrl}
+            />
           ) : (
-            <Tile participant={local} isLocal label="you" />
+            <Tile participant={local} isLocal label="you" photoUrl={myPhotoUrl} forceOff={!isCameraEnabled} />
           )}
         </div>
       ) : (
-        <div className={`flex-1 min-h-0 grid gap-2 sm:gap-3 ${stacked ? "grid-cols-1" : gridClass(tileCount)} auto-rows-fr`}>
+        <div className={`flex-1 min-h-0 grid ${stacked ? "grid-cols-1" : gridClass(tileCount)} auto-rows-fr`}>
           <div ref={selfWrapRef} className="min-h-0">
-            <Tile participant={local} isLocal label="you" />
+            <Tile participant={local} isLocal label="you" photoUrl={myPhotoUrl} forceOff={!isCameraEnabled} square />
           </div>
           {remotes.length === 0 ? (
             <div ref={partnerWrapRef} className="min-h-0">
-              <Tile label="waiting for them…" />
+              <Tile label="waiting for them…" square />
             </div>
           ) : (
             remotes.map((p, i) => (
               <div key={p.participant.identity} ref={i === 0 ? partnerWrapRef : undefined} className="min-h-0">
-                <Tile participant={p} label={p.participant.name || partnerDisplay.name} />
+                <Tile
+                  participant={p}
+                  label={p.participant.name || partnerDisplay.name}
+                  photoUrl={partnerDisplay.photoUrl}
+                  square
+                />
               </div>
             ))
           )}
         </div>
       )}
 
-      {/* Controls row — compact in pip, full otherwise */}
+      {/* Controls row. Three tracks rather than one flex run, so the capture
+          button sits on the true centre of the row: the side groups can differ
+          in width (the mic and camera pills are wider than a plain circle,
+          and minimize only sometimes exists) and the middle still lands
+          dead centre. */}
       <div
         className={cn(
-          "flex items-center justify-center shrink-0",
-          isPip ? "gap-1.5 py-1.5" : "gap-3 py-2",
+          "grid grid-cols-[1fr_auto_1fr] items-center shrink-0",
+          // Equal space above and below: the parent's gap used to stack on
+          // top of this padding, so the row sat low in the pane.
+          isPip ? "py-1.5" : "py-3",
         )}
       >
-        {variant === "full" && onMinimize && (
+        <div className={cn("flex items-center justify-end", isPip ? "gap-1.5" : "gap-3")}>
+        <div className={fullPill}>
+          <MicDropup triggerClassName={fullCaretBtn} iconClassName="w-4 h-4" />
           <button
-            onClick={onMinimize}
-            aria-label="Shrink the call to a bubble"
-            className="h-11 w-11 rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center justify-center transition"
+            onClick={() => void toggleMic()}
+            aria-label={isMicrophoneEnabled ? "Mute" : "Unmute"}
+            className={fullToggleBtn}
           >
-            <Minimize2 className="w-4 h-4 text-cream" />
+            {isMicrophoneEnabled ? <Mic className="w-4 h-4 text-cream" /> : <MicOff className="w-4 h-4 text-rose" />}
           </button>
-        )}
-        <button
-          onClick={() => void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
-          aria-label={isMicrophoneEnabled ? "Mute" : "Unmute"}
-          className={cn(
-            "rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center justify-center transition",
-            isPip ? "h-8 w-8" : "h-11 w-11",
+        </div>
+        <div className={fullPill}>
+          <CameraDropup triggerClassName={fullCaretBtn} iconClassName="w-4 h-4" />
+          <button
+            onClick={() => void toggleCam()}
+            aria-label={isCameraEnabled ? "Camera off" : "Camera on"}
+            className={fullToggleBtn}
+          >
+            {isCameraEnabled ? <Video className="w-4 h-4 text-cream" /> : <VideoOff className="w-4 h-4 text-rose" />}
+          </button>
+        </div>
+        </div>
+
+        {/* Centre — the shutter. */}
+        <div className={cn("flex items-center justify-center", isPip ? "px-1.5" : "px-3")}>
+          {!isPip && (
+            <button
+              onClick={startCapture}
+              disabled={countdown != null}
+              aria-label="Take a photo"
+              title="Take a photo"
+              className={cn(ctrlSurface, ctrlBox, "disabled:opacity-50")}
+            >
+              <Camera className="w-4 h-4 text-amber" />
+            </button>
           )}
-        >
-          {isMicrophoneEnabled ? <Mic className="w-4 h-4 text-cream" /> : <MicOff className="w-4 h-4 text-rose" />}
-        </button>
-        <button
-          onClick={() => void localParticipant.setCameraEnabled(!isCameraEnabled)}
-          aria-label={isCameraEnabled ? "Camera off" : "Camera on"}
-          className={cn(
-            "rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center justify-center transition",
-            isPip ? "h-8 w-8" : "h-11 w-11",
-          )}
-        >
-          {isCameraEnabled ? <Video className="w-4 h-4 text-cream" /> : <VideoOff className="w-4 h-4 text-rose" />}
-        </button>
-        <DeviceMenu
-          triggerClassName={cn(
-            "rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center justify-center transition",
-            isPip ? "h-8 w-8" : "h-11 w-11",
-          )}
+        </div>
+
+        <div className={cn("flex items-center justify-start", isPip ? "gap-1.5" : "gap-3")}>
+        <CallSettingsMenu
+          triggerClassName={cn(ctrlSurface, ctrlBox)}
           iconClassName="w-4 h-4 text-cream"
+          canSplit={wideViewport}
         />
-        {!isPip && (
-          <button
-            onClick={startCapture}
-            disabled={countdown != null}
-            className="h-11 px-5 rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center gap-2 transition disabled:opacity-50"
-          >
-            <Camera className="w-4 h-4 text-amber" />
-            <span className="text-sm text-cream">Capture moment</span>
-          </button>
-        )}
-        {isPip && onExpand && (
-          <button
-            onClick={onExpand}
-            aria-label="Full screen call"
-            className="h-8 w-8 rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center justify-center transition"
-          >
-            <Maximize2 className="w-4 h-4 text-cream" />
-          </button>
-        )}
         {isPip && onCollapse && (
           <button
             onClick={onCollapse}
             aria-label="Collapse call"
-            className="h-8 w-8 rounded-full bg-secondary/80 hover:bg-muted border border-border flex items-center justify-center transition"
+            className={cn(ctrlSurface, ctrlBox)}
           >
             <Minus className="w-4 h-4 text-cream" />
           </button>
@@ -749,14 +1105,15 @@ function Stage({
         <button
           onClick={onLeave}
           aria-label="Leave call"
+          title="Leave call"
           className={cn(
-            "rounded-full bg-destructive/80 hover:bg-destructive flex items-center justify-center gap-2 transition text-cream",
-            isPip ? "h-8 w-8" : "h-11 px-5",
+            "flex items-center justify-center rounded-full border border-transparent bg-destructive/80 text-cream transition hover:bg-destructive",
+            ctrlBox,
           )}
         >
           <PhoneOff className="w-4 h-4" />
-          {!isPip && <span className="text-sm">Leave</span>}
         </button>
+        </div>
       </div>
     </div>
   );
@@ -765,12 +1122,11 @@ function Stage({
 export function RoomVideo({
   onLeave,
   variant,
+  framed,
   compact,
   collapsed,
   pair,
   stacked,
-  onExpand,
-  onMinimize,
   onCollapse,
   onRotate,
 }: { onLeave?: () => void } & CallControls = {}) {
@@ -823,11 +1179,29 @@ export function RoomVideo({
   // internal connect effect on every parent re-render (the once-a-second
   // "already connected" churn).
   const onLkError = useCallback((e: Error) => {
-    toast.error(e instanceof Error ? e.message : "Call error.");
+    // LiveKit's error strings are diagnostics, not copy — "publishing
+    // rejected as engine not connected within timeout" means nothing to
+    // someone on a date, and most of these heal on the next reconnect
+    // without any action. Keep the detail where we can read it; the room's
+    // own connection banner is what tells the user when the link is
+    // genuinely down.
+    console.warn("[livekit] room error", e);
   }, []);
+
   const onLkDeviceFailure = useCallback((failure?: unknown) => {
+    // Device failures DO need the user — only they can unblock a camera —
+    // so these still surface, but as something a person can act on rather
+    // than the SDK's enum name.
+    console.warn("[livekit] device failure", failure);
+    const kind = String(failure ?? "");
     toast.error(
-      failure ? `Microphone/camera blocked (${String(failure)}).` : "Microphone/camera unavailable.",
+      kind === "PermissionDenied"
+        ? "Camera and mic are blocked. Allow them in your browser's address bar, then try again."
+        : kind === "NotFound"
+          ? "No camera or microphone found on this device."
+          : kind === "DeviceInUse"
+            ? "Your camera or mic is in use by another app. Close it and try again."
+            : "Couldn't reach your camera or microphone.",
     );
   }, []);
   const onLkDisconnected = useCallback(
@@ -842,12 +1216,12 @@ export function RoomVideo({
   );
 
   if (error) {
-    return <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">{error}</div>;
+    return <div className="flex h-full items-center justify-center p-6 text-center text-body text-muted-foreground">{error}</div>;
   }
   if (!conn) {
     return (
       <div className="flex h-full items-center justify-center text-center">
-        <p className="font-serif italic text-cream text-xl">Lighting the candles…</p>
+        <p className="italic text-cream text-title">Lighting the candles…</p>
       </div>
     );
   }
@@ -874,12 +1248,11 @@ export function RoomVideo({
       <Stage
         onLeave={onLeave ?? (() => {})}
         variant={variant}
+        framed={framed}
         compact={compact}
         collapsed={collapsed}
         pair={pair}
         stacked={stacked}
-        onExpand={onExpand}
-        onMinimize={onMinimize}
         onCollapse={onCollapse}
         onRotate={onRotate}
       />

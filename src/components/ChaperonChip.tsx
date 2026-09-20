@@ -30,7 +30,7 @@ function Badge({ n, tone }: { n: number; tone: "protect" | "coach" | "alert" }) 
   return (
     <span
       className={cn(
-        "absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums",
+        "absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-label font-bold tabular-nums",
         tone === "alert"
           ? "bg-rose-500 text-white"
           : tone === "protect"
@@ -81,7 +81,7 @@ export function ChaperonChip({
             <Indicator key={i} state={st} />
           ))}
         </span>
-        <span className="text-[11px] text-cream/80">{summary.sentence}</span>
+        <span className="text-label text-cream/80">{summary.sentence}</span>
       </button>
     );
   }
