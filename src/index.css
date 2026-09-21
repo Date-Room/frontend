@@ -605,6 +605,15 @@
     50% { filter: brightness(1.06) saturate(1.08); }
   }
 
+  /* Low-power devices (phones, see useLowPowerMode) keep the wash but not the
+     breathe: animating `filter` on a full-viewport blend layer re-blends the
+     whole screen every frame for the length of the date, and the photo
+     underneath gets the same treatment (no Ken Burns). At rest the room
+     looks identical; only the slow motion stops. */
+  .live-room-ambient[data-low-power="true"] {
+    animation: none;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .live-room-ambient {
       animation: none;
