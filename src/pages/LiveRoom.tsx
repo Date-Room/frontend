@@ -14,6 +14,7 @@ import { isWatchPartyRoom } from "@/lib/watchParty";
 import { getRoomExperienceApi, listMyRooms, type Room, type RoomPackage } from "@/lib/rooms";
 import { LogOut, Clock, Maximize2, Minimize2, Sparkles, ChevronLeft, Home, MessageSquareText } from "lucide-react";
 import { AmbientSceneStack } from "@/components/AmbientSceneStack";
+import { useLowPowerMode } from "@/hooks/useLowPowerMode";
 import type { LobbyMood } from "@/lib/ambiance";
 import { ambianceMeta, PLAIN_MOOD } from "@/lib/ambiance";
 import { ambianceAccentStyle } from "@/lib/roomAmbiance";
@@ -96,19 +97,71 @@ function KickedListener({ onKicked }: { onKicked: () => void }) {
 }
 
 function LiveRoomAmbianceBackdrop({ preset }: { preset: LobbyMood }) {
+  // Phones keep the mood but not its motion: the Ken Burns drift and the
+  // breathing blend layer are full-screen per-frame work on top of a live
+  // call, and the tile's own beauty gate never covered them.
+  const lowPower = useLowPowerMode();
   return (
     <>
-      <AmbientSceneStack ambiance={preset} positionClassName="fixed inset-0 z-[1]" />
+      <AmbientSceneStack
+        ambiance={preset}
+        positionClassName="fixed inset-0 z-[1]"
+        kenBurns={!lowPower}
+      />
       {preset !== PLAIN_MOOD && (
         <div
           className="live-room-ambient"
           data-live-ambiance={preset}
           data-photo-backdrop="true"
+          data-low-power={lowPower ? "true" : undefined}
           aria-hidden
         />
       )}
       <div className="live-room-soft-vignette" aria-hidden />
     </>
+  );
+}
+
+/** Session-room countdown in the top bar. Owns its own 1 Hz tick so the
+ *  seconds can change without the room page re-rendering around them;
+ *  critical (≤5 min) styling and the add-time button live here too. */
+function SessionCountdown({ expiryMs, onAddTime }: { expiryMs: number; onAddTime: () => void }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  const remaining = Math.max(0, Math.floor((expiryMs - now) / 1000));
+  const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
+  const ss = String(remaining % 60).padStart(2, "0");
+  const criticalTime = remaining > 0 && remaining <= 300;
+  const expired = remaining <= 0;
+  return (
+    <div className="flex items-center gap-2">
+      <div className={cn("flex items-center gap-1.5 text-[10px] sm:text-xs", expired && "text-destructive")}>
+        <Clock className={cn("h-3 w-3 shrink-0", criticalTime ? "text-rose-400" : "text-muted-foreground")} />
+        <span
+          className={cn(
+            "tabular-nums",
+            criticalTime
+              ? "font-bold text-rose-400 animate-timer-critical-blink"
+              : "font-medium text-cream/90",
+            expired && "font-bold text-destructive",
+          )}
+        >
+          {mm}:{ss}
+        </span>
+      </div>
+      {criticalTime && (
+        <button
+          type="button"
+          onClick={onAddTime}
+          className="shrink-0 rounded-full border border-rose-400/45 bg-rose-500/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-rose-300 transition hover:border-rose-400/60 hover:bg-rose-500/25"
+        >
+          Add time
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -380,15 +433,33 @@ function RoomShell({
   const [ambianceOverride, setAmbianceOverride] = useState<LobbyMood | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
-  const [now, setNow] = useState(Date.now());
+  // Expiry is a moment, not a clock: one timeout armed at that moment rather
+  // than a once-a-second tick. The tick used to re-render this whole page
+  // (and RoomStage under it) every second in every room, Together rooms
+  // included, where there is no countdown at all. The visible mm:ss lives
+  // in <SessionCountdown>, which ticks on its own.
+  const expiryMs = useMemo(() => {
+    if (isPersistent || !expiresAt) return null;
+    const ms = new Date(expiresAt).getTime();
+    // An unparseable stamp never expired under the old tick; keep that.
+    return Number.isNaN(ms) ? null : ms;
+  }, [isPersistent, expiresAt]);
+  const [expired, setExpired] = useState(() => expiryMs != null && Date.now() >= expiryMs);
   useEffect(() => {
-    const t = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(t);
-  }, []);
-
-  const expired = !isPersistent && expiresAt
-    ? now >= new Date(expiresAt).getTime()
-    : false;
+    if (expiryMs == null) {
+      setExpired(false);
+      return;
+    }
+    const wait = expiryMs - Date.now();
+    if (wait <= 0) {
+      setExpired(true);
+      return;
+    }
+    setExpired(false);
+    // setTimeout overflows past ~24.8 days; nothing time-limited runs that long.
+    const t = window.setTimeout(() => setExpired(true), Math.min(wait, 2_147_000_000));
+    return () => window.clearTimeout(t);
+  }, [expiryMs]);
 
   // Session (time-limited) rooms auto-start the call on entry — the date is the
   // point and the window is short. Permanent rooms never force a call. Runs once
@@ -412,32 +483,6 @@ function RoomShell({
     if (roomPackage === "long_pack") return "Long Pack";
     return "Try";
   }, [isPersistent, roomPackage]);
-
-  // Timer — critical warning at 5 minutes for session rooms.
-  const timerModel = useMemo(() => {
-    if (isPersistent || !expiresAt) {
-      return {
-        display: "∞",
-        caption: "Open evening",
-        criticalTime: false,
-        expired: false,
-      };
-    }
-    const remaining = Math.max(0, Math.floor((new Date(expiresAt).getTime() - now) / 1000));
-    const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
-    const ss = String(remaining % 60).padStart(2, "0");
-    const criticalTime = remaining > 0 && remaining <= 300;
-    return {
-      display: `${mm}:${ss}`,
-      caption: remaining <= 0
-        ? "Window ended"
-        : criticalTime
-          ? "5 minutes left — add more time"
-          : "Time left together",
-      criticalTime,
-      expired: remaining <= 0,
-    };
-  }, [isPersistent, expiresAt, now]);
 
   // Filter tabs by curation
   const curated = useMemo(
@@ -569,32 +614,8 @@ function RoomShell({
           </div>
           <div className="flex items-center gap-3 sm:gap-4">
             {/* Session (time-limited) rooms keep their countdown + add-time. */}
-            {!isPersistent && expiresAt && (
-              <div className="flex items-center gap-2">
-                <div className={cn("flex items-center gap-1.5 text-[10px] sm:text-xs", timerModel.expired && "text-destructive")}>
-                  <Clock className={cn("h-3 w-3 shrink-0", timerModel.criticalTime ? "text-rose-400" : "text-muted-foreground")} />
-                  <span
-                    className={cn(
-                      "tabular-nums",
-                      timerModel.criticalTime
-                        ? "font-bold text-rose-400 animate-timer-critical-blink"
-                        : "font-medium text-cream/90",
-                      timerModel.expired && "font-bold text-destructive",
-                    )}
-                  >
-                    {timerModel.display}
-                  </span>
-                </div>
-                {timerModel.criticalTime && (
-                  <button
-                    type="button"
-                    onClick={() => setUpgradeOpen(true)}
-                    className="shrink-0 rounded-full border border-rose-400/45 bg-rose-500/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-rose-300 transition hover:border-rose-400/60 hover:bg-rose-500/25"
-                  >
-                    Add time
-                  </button>
-                )}
-              </div>
+            {expiryMs != null && (
+              <SessionCountdown expiryMs={expiryMs} onAddTime={() => setUpgradeOpen(true)} />
             )}
             {/* Desktop call layout — in the top bar so it is reachable in
                 every mode and every stage state. */}

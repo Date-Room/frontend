@@ -3,12 +3,20 @@ import { useEffect, useState } from "react";
 /**
  * Heuristic "should we cut expensive GPU effects?" signal, to keep phones from
  * overheating during a call with media playing. Combines:
- *   - static device hints (low memory / few cores / coarse pointer = phone)
+ *   - static device hints (touch-only device = phone/tablet; low memory; few cores)
  *   - prefers-reduced-motion
  *   - the Compute Pressure API (Chrome) — escalates live when the CPU/thermal
  *     state hits "serious"/"critical"
  * Returns true when we should render the cheaper path (no live-video blur /
- * blend overlays / heavy backdrop filters).
+ * blend overlays / heavy backdrop filters / ambient backdrop animation).
+ *
+ * Any touch-only device counts as low-power. The earlier memory/core checks
+ * alone missed the phones that actually overheat: iPhones report no
+ * deviceMemory and 6 cores, mid-range Androids report 8 cores and 6 GB, so
+ * neither ever took the cheap path. A phone has no fan and shares one thermal
+ * budget between the video encode and the GPU, and that is true regardless of
+ * how many cores it advertises. "hover: none" keeps touchscreen laptops (whose
+ * primary pointer still hovers) on the full path.
  *
  * The Compute Pressure observer is a module singleton so many tiles calling
  * this hook share one observer.
@@ -23,8 +31,10 @@ function computeStaticLowPower(): boolean {
     const cores = navigator.hardwareConcurrency;
     const mm = typeof window !== "undefined" && typeof window.matchMedia === "function";
     const coarse = mm && window.matchMedia("(pointer: coarse)").matches;
+    const touchOnly = coarse && mm && window.matchMedia("(hover: none)").matches;
     const reducedMotion = mm && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reducedMotion) result = true;
+    else if (touchOnly) result = true;
     else if (typeof mem === "number" && mem <= 4) result = true;
     else if (typeof cores === "number" && cores <= 4 && coarse) result = true;
   }
