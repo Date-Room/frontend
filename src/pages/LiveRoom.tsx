@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useReportTabOpened } from "@/lib/featureOpened";
 import { isTryPackage, getRoomExperience, isActivityEnabled, getRoomPlan, saveRoomPlanFromServer, isSubscriptionPackage, type CuratableActivityId } from "@/lib/roomExperience";
 import { isWatchPartyRoom } from "@/lib/watchParty";
 import { getRoomExperienceApi, listMyRooms, type Room, type RoomPackage } from "@/lib/rooms";
@@ -252,6 +253,7 @@ function RoomShell({
   const caps = roomCapabilities(room);
 
   const [tab, setTab] = useState<ActivityTabId>("questions");
+  useReportTabOpened(roomId, tab, session.participantId);
   const wallRoom = isSubscriptionPackage(roomPackage);
   const isPermanentRoom = isPersistent || wallRoom;
 

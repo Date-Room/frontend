@@ -15,7 +15,7 @@
 import { BRAND_NAME } from "@/lib/constants";
 import { LegalShell, type LegalSection } from "@/components/LegalShell";
 
-const LAST_UPDATED = "17 August 2026";
+const LAST_UPDATED = "28 September 2026";
 const PRIVACY_EMAIL = "privacy@dateroom.io";
 
 export default function Privacy() {
@@ -80,6 +80,15 @@ export default function Privacy() {
             <span className="text-cream/90">Device and technical data.</span> IP
             address, user agent, and basic request logs that help us keep the
             service running and prevent abuse.
+          </li>
+          <li>
+            <span className="text-cream/90">How you use the product.</span>{" "}
+            Which features you open and use in a room (a game, watch together,
+            the vision board and so on), when, and how often, so we can see
+            what's working. We record that a feature was used, never what you
+            said, typed, watched or shared in it. We also note the country your
+            connection comes from, worked out from your IP address on our own
+            servers.
           </li>
         </ul>
       ),

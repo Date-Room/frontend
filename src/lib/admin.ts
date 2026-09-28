@@ -647,3 +647,26 @@ export async function getAdminAnalytics(days: number, includeTeam = false, filte
 export async function postAdminAnalyticsBackfill(apply: boolean) {
   return api.post<AnalyticsBackfillResult>(`/v1/admin/analytics/backfill?apply=${apply}`, {});
 }
+
+/* ── Feature usage (/v1/admin/features) ─────────────────────────────────── */
+
+export type FeatureRow = {
+  feature: string;
+  rooms_used: number;
+  rooms_opened_only: number;
+  abandon_rate: number | null;
+  share_of_dates: number | null;
+  median_minutes: number | null;
+  users: number;
+  repeat_users: number;
+  in_paid_rooms: number | null;
+  by_package: Record<string, number>;
+};
+
+export type FeaturesReport = { days: number; rooms: number; dated_rooms: number; features: FeatureRow[] };
+
+export async function getAdminFeatures(days: number, includeTeam = false, filters: AnalyticsFilters = {}) {
+  const q = new URLSearchParams({ days: String(days), include_team: String(includeTeam) });
+  for (const [k, v] of Object.entries(filters)) if (v) q.set(k, v);
+  return api.get<FeaturesReport>(`/v1/admin/features?${q.toString()}`);
+}
