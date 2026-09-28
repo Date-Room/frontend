@@ -535,3 +535,82 @@ export function listAdminAudit(params: { action?: string; cursor?: string; limit
 export function listAdminPromoCodes(params: { label?: string; cursor?: string; limit?: number }) {
   return api.get<Page<PromoCode> & { total?: number | null }>(`/v1/admin/promo-codes${qs(params)}`);
 }
+
+/* ── Growth analytics (/v1/admin/analytics) ─────────────────────────────── */
+
+export type AnalyticsFunnelStep = {
+  step: "signed_up" | "opened_or_joined_room" | "had_a_date" | "came_back_later" | "paid";
+  users: number;
+};
+
+export type AnalyticsDay = {
+  day: string;
+  opened: number;
+  opened_paid: number;
+  opened_free: number;
+  dates: number;
+  ended: number;
+  closed: number;
+  promoted: number;
+  active_users: number;
+  signups: number;
+};
+
+export type AnalyticsCountryRow = {
+  /** ISO alpha-2, or "unknown". */
+  country: string;
+  signed_up: number;
+  new_in_period: number;
+  had_a_date: number;
+  came_back_later: number;
+  paid: number;
+};
+
+export type AnalyticsReport = {
+  days: number;
+  include_team: boolean;
+  country: string | null;
+  countries: AnalyticsCountryRow[];
+  tracking_since: string | null;
+  funnel: AnalyticsFunnelStep[];
+  cohorts: { week_of: string; signed_up: number; active_pct: (number | null)[] }[];
+  daily: AnalyticsDay[];
+  rooms_by_package: { package: string; paid_via: string; rooms: number }[];
+  promotions: Record<string, number>;
+  renewals: Record<string, number>;
+  closed_reasons: Record<string, number>;
+  median_call_seconds: number | null;
+  open_ended_unpaid_rooms: {
+    room_id: string;
+    code: string;
+    created_at: string;
+    state: string;
+    host_email: string | null;
+    team: boolean;
+  }[];
+  recent: {
+    kind: string;
+    at: string;
+    user_email: string | null;
+    room_id: string | null;
+    props: Record<string, unknown>;
+    backfilled: boolean;
+  }[];
+};
+
+export type AnalyticsBackfillResult = {
+  applied: boolean;
+  events: number;
+  events_by_kind: Record<string, number>;
+  active_user_days: number;
+  users_with_activity: number;
+};
+
+export async function getAdminAnalytics(days: number, includeTeam = false, country: string | null = null) {
+  const c = country ? `&country=${encodeURIComponent(country)}` : "";
+  return api.get<AnalyticsReport>(`/v1/admin/analytics?days=${days}&include_team=${includeTeam}${c}`);
+}
+
+export async function postAdminAnalyticsBackfill(apply: boolean) {
+  return api.post<AnalyticsBackfillResult>(`/v1/admin/analytics/backfill?apply=${apply}`, {});
+}
