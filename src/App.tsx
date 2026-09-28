@@ -39,6 +39,7 @@ const ProfileComplete = lazy(() => import("./pages/ProfileComplete"));
 const ReferralLanding = lazy(() => import("./pages/ReferralLanding"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminGrowth = lazy(() => import("./pages/admin/AdminGrowth"));
+const AdminFeatures = lazy(() => import("./pages/admin/AdminFeatures"));
 const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
 const AdminPromoCodes = lazy(() => import("./pages/admin/AdminPromoCodes"));
 const AdminRooms = lazy(() => import("./pages/admin/AdminRooms"));
@@ -137,6 +138,7 @@ const App = () => {
             >
               <Route index element={<AdminDashboard />} />
               <Route path="growth" element={<AdminGrowth />} />
+              <Route path="features" element={<AdminFeatures />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="promo" element={<AdminPromoCodes />} />
               <Route path="rooms" element={<AdminRooms />} />

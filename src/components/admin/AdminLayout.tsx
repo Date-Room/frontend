@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   Radio,
   TrendingUp,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,7 @@ export function AdminLayout() {
       items: [
         { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
         { to: "/admin/growth", label: "Growth", icon: TrendingUp },
+        { to: "/admin/features", label: "Features", icon: Sparkles },
         { to: "/admin/users", label: "Users", icon: Users, count: stats.data?.total_users },
         { to: "/admin/promo", label: "Promo codes", icon: Ticket },
       ],
