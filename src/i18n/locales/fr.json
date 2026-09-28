@@ -236,7 +236,7 @@
       "eyebrow": "Ou réunissez le groupe",
       "title": "Plus proches que la boucle de groupe.",
       "body": "Des meilleurs amis dans trois villes différentes. Des sœurs dans des pays différents. Le club de lecture éparpillé sur plusieurs fuseaux horaires. Jusqu'à cinq dans une même salle. Regardez un film en même temps. Jouez au jeu de cartes. Chamaillez-vous pour savoir à qui le tour au DJ. La boucle de groupe, mais où vous pouvez enfin vous voir.",
-      "cta": "Ouvrir une salle entre amis"
+      "cta": "Demander l'accès à Squad"
     },
     "pricing": {
       "eyebrow": "Tarifs",
@@ -257,6 +257,11 @@
       "crewName": "Bande",
       "crewDesc": "Soirées cinéma, soirées jeux, clubs de lecture. Soirée cinéma de groupe jusqu'à 5 personnes.",
       "crewCta": "Ouvrir Bande",
+      "squadName": "Squad",
+      "squadPrice": "Bêta",
+      "squadUnit": "sur invitation · 2 à 5 amis",
+      "squadDesc": "Soirées film, soirées jeux et longues retrouvailles pour 2 à 5 amis, où que vous soyez. On ouvre d'abord à quelques groupes.",
+      "squadCta": "Demander l'accès",
       "sessionsLabel": "Packs de sessions — payez quand vous vous voyez",
       "subscriptionsLabel": "Des salles qui restent ouvertes"
     },

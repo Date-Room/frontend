@@ -1,6 +1,6 @@
 import type { FocusEvent, RefObject } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -676,6 +676,21 @@ export default function CreateRoom() {
                 ))}
               </div>
             )}
+            <Link
+              to="/squad"
+              className="focus-ring editorial-card group mt-3 flex w-full items-center gap-3.5 px-4 py-4 text-left transition-colors hover:bg-white/[0.025]"
+            >
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-xl ring-1 ring-primary/20">
+                🛋️
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-medium text-cream">
+                  Squad <span className="ml-1 rounded-full border border-primary/30 px-1.5 py-px text-[10px] uppercase tracking-[0.14em] text-primary">Beta</span>
+                </p>
+                <p className="text-xs text-muted-foreground">A room for 2 to 5 friends · request access</p>
+              </div>
+              <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-cream" />
+            </Link>
             <button
               type="button"
               onClick={goManagePlans}

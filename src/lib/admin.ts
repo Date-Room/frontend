@@ -454,6 +454,50 @@ export function declineCoachBeta(body: { user_id: string; reason: CoachBetaDecli
   return api.post<{ status: string; reason: string }>("/v1/admin/chaperon/coach-beta/decline", body);
 }
 
+// --- Squad beta (friend nights) - request queue + grant/decline -----------
+
+export type SquadBetaApplication = {
+  id: string;
+  user_id: string;
+  email: string;
+  display_name: string;
+  is_team: boolean;
+  city: string;
+  country: string | null;
+  group_size: number;
+  plans: string[];
+  note: string;
+  status: "pending" | "granted" | "declined";
+  created_at: string;
+  decided_at: string | null;
+  decline_reason: string | null;
+};
+
+export type SquadBetaApplicationsResponse = {
+  items: SquadBetaApplication[];
+  counts: {
+    pending: number;
+    granted: number;
+    declined: number;
+    with_access: number;
+    pending_by_country: Record<string, number>;
+  };
+};
+
+export type SquadBetaDeclineReason = "not_yet" | "full" | "other";
+
+export function listSquadBetaApplications(status: "pending" | "granted" | "declined" | "all") {
+  return api.get<SquadBetaApplicationsResponse>(`/v1/admin/squad/beta/applications${qs({ status })}`);
+}
+
+export function grantSquadBeta(body: { user_id: string }) {
+  return api.post<{ status: string }>("/v1/admin/squad/beta/grant", body);
+}
+
+export function declineSquadBeta(body: { user_id: string; reason: SquadBetaDeclineReason }) {
+  return api.post<{ status: string }>("/v1/admin/squad/beta/decline", body);
+}
+
 export function listCoachBetaApplicationsBy(status: "pending" | "granted" | "declined" | "all") {
   return api.get<CoachBetaApplicationsResponse>(
     `/v1/admin/chaperon/coach-beta/applications${qs({ status })}`,

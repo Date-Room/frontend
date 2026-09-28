@@ -118,7 +118,7 @@ function isActiveTier(entitlement: Entitlement, tierId: AccountTier): boolean {
 function recommendedUpgrade(entitlement: Entitlement | undefined): BillableProduct | null {
   if (!entitlement) return "date_pack";
   if (entitlement.has_active_subscription && entitlement.account_tier === "crew") return null;
-  if (entitlement.has_active_subscription && entitlement.account_tier === "together") return "crew";
+  if (entitlement.has_active_subscription && entitlement.account_tier === "together") return null;
   if (entitlement.account_tier === "long_pack" || entitlement.long_pack_remaining > 0) return "together";
   if (entitlement.account_tier === "date_pack" || entitlement.date_pack_remaining > 0) return "long_pack";
   return "date_pack";
@@ -166,7 +166,11 @@ export function ProfilePlanSection({
   const checkoutBlocked =
     billingConfig && upgradeProduct ? checkoutBlockedMessage(billingConfig) : null;
 
-  const paidTiers = TIER_OPTIONS.filter((o) => o.product);
+  // Crew is no longer sold (Squad replaces it as an invite-only beta); it
+  // only stays listed for an account that still holds it.
+  const paidTiers = TIER_OPTIONS.filter(
+    (o) => o.product && (o.id !== "crew" || (entitlement ? isActiveTier(entitlement, "crew") : false)),
+  );
 
   return (
     <>
@@ -303,6 +307,25 @@ export function ProfilePlanSection({
               );
             })}
           </ul>
+
+          {/* Squad (beta) — friend nights, by request */}
+          <div className="border-t border-white/[0.06] px-5 py-3 sm:px-6">
+            <div className="flex flex-wrap items-center gap-3 text-body">
+              <span className="text-title" aria-hidden>
+                🛋️
+              </span>
+              <div className="min-w-0 flex-1">
+                <span className="font-medium text-cream">Squad</span>
+                <span className="text-muted-foreground"> · beta, a room for 2 to 5 friends</span>
+              </div>
+              <Link
+                to="/squad"
+                className="focus-ring rounded-full border border-primary/35 bg-primary/15 px-3 py-1 text-label font-semibold uppercase tracking-[0.12em] text-primary hover:bg-primary/20"
+              >
+                Request access
+              </Link>
+            </div>
+          </div>
 
           {/* Free Try tier — reference row */}
           <div className="border-t border-white/[0.06] px-5 py-3 sm:px-6">

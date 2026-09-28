@@ -17,11 +17,12 @@ import {
   Radio,
   TrendingUp,
   Sparkles,
+  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/authClient";
-import { getAdminStats, listCoachBetaApplicationsBy } from "@/lib/admin";
+import { getAdminStats, listCoachBetaApplicationsBy, listSquadBetaApplications } from "@/lib/admin";
 import { CommandSearch } from "@/components/admin/CommandSearch";
 
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; count?: number | string };
@@ -32,6 +33,11 @@ export function AdminLayout() {
   const pending = useQuery({
     queryKey: ["admin-coach-beta-applications"],
     queryFn: () => listCoachBetaApplicationsBy("pending"),
+    staleTime: 60_000,
+  });
+  const squad = useQuery({
+    queryKey: ["admin-squad-beta", "pending"],
+    queryFn: () => listSquadBetaApplications("pending"),
     staleTime: 60_000,
   });
 
@@ -52,6 +58,7 @@ export function AdminLayout() {
         { to: "/admin/rooms", label: "Rooms", icon: DoorOpen, count: stats.data?.live_rooms ? `${stats.data.live_rooms} live` : undefined },
         { to: "/admin/chaperon", label: "Chaperon AI", icon: ShieldCheck },
         { to: "/admin/beta", label: "Beta console", icon: Radio, count: pending.data?.pending_count || undefined },
+        { to: "/admin/squad", label: "Squad beta", icon: UsersRound, count: squad.data?.counts.pending || undefined },
         { to: "/admin/audit", label: "Audit log", icon: ScrollText },
       ],
     },
