@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eventLine, formatDuration, funnelRows, isRealMoney, paidViaLabel } from "./AdminGrowth";
+import { eventLine, formatDuration, funnelRows, isRealMoney, loadProblem, paidViaLabel } from "./AdminGrowth";
 
 describe("funnelRows", () => {
   it("gives each step its share of sign-ups and of the step before", () => {
@@ -38,5 +38,18 @@ describe("labels", () => {
     );
     expect(eventLine("room_opened", { package: "date_pack", paid_via: "purchase" })).toBe("Opened a Date Pack room · Paid");
     expect(eventLine("room_purged", { reason: "recap_expired" })).toBe("Room closed · Recap window ended");
+  });
+});
+
+describe("loadProblem", () => {
+  it("explains a server that doesn't have growth tracking yet, without a retry", async () => {
+    const { ApiError } = await import("@/lib/api");
+    const p = loadProblem(new ApiError(404, "Not Found", null));
+    expect(p.title).toMatch(/isn't live/);
+    expect(p.body).not.toMatch(/Not Found/);
+    expect(p.retry).toBe(false);
+  });
+  it("offers a retry for anything transient", () => {
+    expect(loadProblem(new Error("network")).retry).toBe(true);
   });
 });

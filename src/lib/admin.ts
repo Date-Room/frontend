@@ -569,8 +569,9 @@ export type AnalyticsCountryRow = {
 export type AnalyticsReport = {
   days: number;
   include_team: boolean;
-  country: string | null;
-  countries: AnalyticsCountryRow[];
+  country?: string | null;
+  /** Missing on servers older than backend#73. */
+  countries?: AnalyticsCountryRow[];
   tracking_since: string | null;
   funnel: AnalyticsFunnelStep[];
   cohorts: { week_of: string; signed_up: number; active_pct: (number | null)[] }[];

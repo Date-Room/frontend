@@ -52,6 +52,30 @@ const CLOSED_LABELS: Record<string, string> = {
   deleted_by_host: "Deleted by host",
 };
 
+/** Pure: what to tell an admin when the growth numbers can't load. */
+export function loadProblem(error: unknown): { title: string; body: string; retry: boolean } {
+  const status = error instanceof ApiError ? error.status : 0;
+  if (status === 404) {
+    return {
+      title: "Growth tracking isn't live on the server yet",
+      body: "This page is ready, but the server update that records rooms, dates and visits hasn't been deployed. Once it is, numbers appear here on their own. Then press Rebuild history to fill in what we can from before.",
+      retry: false,
+    };
+  }
+  if (status === 401 || status === 403) {
+    return {
+      title: "This account can't see growth numbers",
+      body: "Growth is for platform admins. Sign in with an admin account to see it.",
+      retry: false,
+    };
+  }
+  return {
+    title: "Couldn't reach the server just now",
+    body: "Nothing is lost. The numbers are still being recorded; this page just couldn't fetch them. Try again in a moment.",
+    retry: true,
+  };
+}
+
 /** Pure: a label for a paid_via value, falling back to the raw value. */
 export function paidViaLabel(v: string): string {
   return PAID_VIA_LABELS[v] ?? v;
@@ -198,10 +222,10 @@ export default function AdminGrowth() {
           <h2 className="text-2xl font-semibold tracking-tight text-cream">Growth</h2>
           <p className="mt-1 text-sm text-muted-foreground/70">
             Are people staying · {country ? `${countryName(country)} · ` : ""}last {days} days
-            {r?.tracking_since ? ` · exact since ${day(r.tracking_since)}` : " · tracking starts with the next room"}
+            {r && (r.tracking_since ? ` · exact since ${day(r.tracking_since)}` : " · tracking starts with the next room")}
           </p>
         </div>
-        <select
+        {(r?.countries?.length ?? 0) > 0 && (<select
           aria-label="Country"
           value={country ?? ""}
           onChange={(e) => setCountry(e.target.value || null)}
@@ -213,8 +237,8 @@ export default function AdminGrowth() {
               {flag(c.country)} {countryName(c.country)} ({c.signed_up})
             </option>
           ))}
-        </select>
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        </select>)}
+        <label className={cn("flex items-center gap-2 text-xs text-muted-foreground", !r?.countries?.length && "ml-auto")}>
           <input type="checkbox" checked={includeTeam} onChange={(e) => setIncludeTeam(e.target.checked)} />
           Include team
         </label>
@@ -225,7 +249,20 @@ export default function AdminGrowth() {
         </div>
       </div>
 
-      {q.isError && <p className="text-sm text-rose-300">Couldn't load growth numbers{q.error instanceof ApiError ? `: ${q.error.message}` : ""}.</p>}
+      {q.isError && !r && (() => {
+        const problem = loadProblem(q.error);
+        return (
+          <div className="rounded-xl border border-white/[0.08] bg-card/40 px-6 py-10 text-center">
+            <p className="text-base font-semibold text-cream">{problem.title}</p>
+            <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">{problem.body}</p>
+            {problem.retry && (
+              <button type="button" onClick={() => void q.refetch()} disabled={q.isFetching} className="mt-5 inline-flex items-center gap-1.5 rounded-lg border border-white/[0.14] bg-card px-3 py-1.5 text-xs text-cream/90 hover:bg-white/[0.08] disabled:opacity-40">
+                {q.isFetching && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Try again
+              </button>
+            )}
+          </div>
+        );
+      })()}
       {!r && !q.isError && <p className="py-10 text-center text-sm text-muted-foreground/70">Loading…</p>}
 
       {r && (
@@ -242,10 +279,18 @@ export default function AdminGrowth() {
             hint="sign-ups by location, and how many from each stay · click a country to filter"
             right={country ? <button type="button" onClick={() => setCountry(null)} className="text-xs text-primary hover:underline">Show all</button> : undefined}
           >
-            <CountryBars rows={r.countries} selected={country} onSelect={setCountry} />
-            <p className="border-t border-white/[0.06] px-4 py-2 text-[11px] text-muted-foreground/70">
-              Location is where they signed up from (IP), else the country on their profile.
-            </p>
+            {r.countries ? (
+              <CountryBars rows={r.countries} selected={country} onSelect={setCountry} />
+            ) : (
+              <p className="px-4 py-6 text-sm text-muted-foreground/70">
+                The country breakdown arrives with the next server update.
+              </p>
+            )}
+            {r.countries && (
+              <p className="border-t border-white/[0.06] px-4 py-2 text-[11px] text-muted-foreground/70">
+                Location is where they signed up from (IP), else the country on their profile.
+              </p>
+            )}
           </Section>
 
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
