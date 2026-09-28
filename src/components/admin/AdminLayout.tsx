@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   ArrowLeft,
   Radio,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,7 @@ export function AdminLayout() {
       label: "Overview",
       items: [
         { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
+        { to: "/admin/growth", label: "Growth", icon: TrendingUp },
         { to: "/admin/users", label: "Users", icon: Users, count: stats.data?.total_users },
         { to: "/admin/promo", label: "Promo codes", icon: Ticket },
       ],
