@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eventLine, formatDuration, funnelRows, isRealMoney, loadProblem, paidViaLabel } from "./AdminGrowth";
+import { eventLine, formatDuration, formatMoney, funnelRows, isRealMoney, loadProblem, paidViaLabel } from "./AdminGrowth";
 
 describe("funnelRows", () => {
   it("gives each step its share of sign-ups and of the step before", () => {
@@ -51,5 +51,14 @@ describe("loadProblem", () => {
   });
   it("offers a retry for anything transient", () => {
     expect(loadProblem(new Error("network")).retry).toBe(true);
+  });
+});
+
+describe("formatMoney", () => {
+  it("shows whole amounts without decimals and prices with cents", () => {
+    expect(formatMoney(1200, "KES")).toBe(`KES ${(1200).toLocaleString()}`);
+    expect(formatMoney(4.99, "USD")).toMatch(/^USD 4.99$/);
+    expect(formatMoney(null, "USD")).toBe("—");
+    expect(formatMoney(3, null)).toBe("—");
   });
 });

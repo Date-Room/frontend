@@ -566,6 +566,19 @@ export type AnalyticsCountryRow = {
   paid: number;
 };
 
+export type AnalyticsPurchaseGroup = {
+  product: string;
+  /** apple | google | stripe | mpesa | pokeapay | promo | admin | dev */
+  provider: string;
+  /** real | promo | admin | dev | test */
+  source: string;
+  store_country: string | null;
+  currency: string | null;
+  count: number;
+  buyers: number;
+  amount: number | null;
+};
+
 export type AnalyticsReport = {
   days: number;
   include_team: boolean;
@@ -589,6 +602,8 @@ export type AnalyticsReport = {
     host_email: string | null;
     team: boolean;
   }[];
+  /** Missing on servers older than the purchase log (backend#76). */
+  purchases?: AnalyticsPurchaseGroup[];
   recent: {
     kind: string;
     at: string;

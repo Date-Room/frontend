@@ -38,6 +38,41 @@ const PAID_VIA_LABELS: Record<string, string> = {
   unknown: "Unknown (from before tracking)",
 };
 
+const PROVIDER_LABELS: Record<string, string> = {
+  apple: "App Store",
+  google: "Google Play",
+  stripe: "Card (Stripe)",
+  mpesa: "M-Pesa",
+  pokeapay: "M-Pesa (PokeaPay)",
+  promo: "Promo code",
+  admin: "Admin grant",
+  dev: "Dev checkout",
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  real: "Real money",
+  test: "Store test",
+  promo: "Gift · promo",
+  admin: "Gift · admin",
+  dev: "Dev",
+};
+
+const PRODUCT_LABELS: Record<string, string> = {
+  date_pack: "Date Pack",
+  long_pack: "Long Pack",
+  together: "Together",
+  crew: "Crew",
+  time_extension: "Time extension",
+  other: "Other",
+};
+
+/** Pure: "KES 1,200" / "USD 4.99" / "—". */
+export function formatMoney(amount: number | null | undefined, currency: string | null | undefined): string {
+  if (amount == null || !currency) return "—";
+  const decimals = Number.isInteger(amount) ? 0 : 2;
+  return `${currency} ${amount.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: 2 })}`;
+}
+
 const PACKAGE_LABELS: Record<string, string> = {
   single_pass: "Try",
   date_pack: "Date Pack",
@@ -288,7 +323,8 @@ export default function AdminGrowth() {
             )}
             {r.countries && (
               <p className="border-t border-white/[0.06] px-4 py-2 text-[11px] text-muted-foreground/70">
-                Location is where they signed up from (IP), else the country on their profile.
+                Location is where they signed up from, else where they last visited from, else their profile country. IP geolocation by{" "}
+                <a href="https://db-ip.com" target="_blank" rel="noreferrer" className="underline hover:text-cream/80">DB-IP</a>.
               </p>
             )}
           </Section>
@@ -406,6 +442,47 @@ export default function AdminGrowth() {
               </dl>
             </Section>
           </div>
+
+          {r.purchases && (
+            <Section title="What's being paid for" hint={`every purchase and gift · last ${days} days · store country is the store or card, not the person`}>
+              {r.purchases.length === 0 ? (
+                <p className="px-4 py-6 text-sm text-muted-foreground/70">No purchases or gifts in this period.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[560px] text-sm">
+                    <thead className="whitespace-nowrap text-left text-[11px] uppercase tracking-wider text-muted-foreground/70">
+                      <tr>
+                        <th className="px-4 py-2">Product</th>
+                        <th className="px-2 py-2">Paid through</th>
+                        <th className="px-2 py-2">Store country</th>
+                        <th className="px-2 py-2">Kind</th>
+                        <th className="px-2 py-2 text-right">Sales</th>
+                        <th className="px-2 py-2 text-right">Buyers</th>
+                        <th className="px-4 py-2 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.purchases.map((g, i) => (
+                        <tr key={i} className="border-t border-white/[0.06]">
+                          <td className="px-4 py-1.5 text-cream/90">{PRODUCT_LABELS[g.product] ?? g.product}</td>
+                          <td className="px-2 py-1.5 text-muted-foreground">{PROVIDER_LABELS[g.provider] ?? g.provider}</td>
+                          <td className="whitespace-nowrap px-2 py-1.5 text-muted-foreground">
+                            {g.store_country ? `${flag(g.store_country)} ${countryName(g.store_country)}` : "—"}
+                          </td>
+                          <td className={cn("px-2 py-1.5", g.source === "real" ? "text-emerald-300" : "text-muted-foreground")}>
+                            {SOURCE_LABELS[g.source] ?? g.source}
+                          </td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{g.count}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{g.buyers}</td>
+                          <td className="px-4 py-1.5 text-right tabular-nums">{formatMoney(g.amount, g.currency)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Section>
+          )}
 
           <Section
             title="Permanent rooms nobody is paying for"
