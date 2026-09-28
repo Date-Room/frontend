@@ -16,7 +16,7 @@ import {
 } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
 import { RevenueChart } from "@/components/admin/RevenueChart";
-import { CountryBars, countryName, flag } from "@/components/admin/CountryBars";
+import { BreakdownBars, CountryBars, countryName, flag } from "@/components/admin/CountryBars";
 import { cn } from "@/lib/utils";
 
 const FUNNEL_LABELS: Record<AnalyticsFunnelStep["step"], string> = {
@@ -65,6 +65,31 @@ const PRODUCT_LABELS: Record<string, string> = {
   time_extension: "Time extension",
   other: "Other",
 };
+
+const PLATFORM_LABELS: Record<string, string> = { web: "Web", ios: "iPhone", android: "Android" };
+
+/** Pure: "recap" → "Recap", "chaperon_badge" → "Chaperon badge"; referral and direct get plain names. */
+export function channelLabel(channel: string): string {
+  if (channel === "direct") return "Direct (no link tag)";
+  if (channel === "referral") return "Referred by a friend";
+  const words = channel.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/** Pure: the active filters as one subtitle fragment. */
+export function filterSummary(f: { country: string | null; platform: string | null; channel: string | null }): string {
+  const parts = [
+    f.country ? countryName(f.country) : null,
+    f.platform ? (PLATFORM_LABELS[f.platform] ?? f.platform) : null,
+    f.channel ? channelLabel(f.channel) : null,
+  ].filter(Boolean);
+  return parts.length ? `${parts.join(" · ")} · ` : "";
+}
+
+/** Pure: "40%" of a total, or "—" when there's nothing to divide. */
+export function share(n: number, of: number): string {
+  return of ? `${Math.round((100 * n) / of)}%` : "—";
+}
 
 /** Pure: "KES 1,200" / "USD 4.99" / "—". */
 export function formatMoney(amount: number | null | undefined, currency: string | null | undefined): string {
@@ -235,13 +260,18 @@ function Backfill() {
   );
 }
 
+const SELECT = "rounded-lg border border-white/[0.14] bg-card px-2.5 py-1.5 text-xs text-cream/90";
+
 export default function AdminGrowth() {
-  const [days, setDays] = useState<7 | 30 | 90>(30);
+  const [days, setDays] = useState<7 | 30 | 90 | 365>(30);
   const [includeTeam, setIncludeTeam] = useState(false);
   const [country, setCountry] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<string | null>(null);
+  const [channel, setChannel] = useState<string | null>(null);
+  const filtered = Boolean(country || platform || channel);
   const q = useQuery({
-    queryKey: ["admin-analytics", days, includeTeam, country],
-    queryFn: () => getAdminAnalytics(days, includeTeam, country),
+    queryKey: ["admin-analytics", days, includeTeam, country, platform, channel],
+    queryFn: () => getAdminAnalytics(days, includeTeam, { country, platform, channel }),
     refetchInterval: 60_000,
     placeholderData: (prev) => prev,
   });
@@ -256,30 +286,54 @@ export default function AdminGrowth() {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-cream">Growth</h2>
           <p className="mt-1 text-sm text-muted-foreground/70">
-            Are people staying · {country ? `${countryName(country)} · ` : ""}last {days} days
+            Are people staying · {filterSummary({ country, platform, channel })}last {days === 365 ? "year" : `${days} days`}
             {r && (r.tracking_since ? ` · exact since ${day(r.tracking_since)}` : " · tracking starts with the next room")}
           </p>
         </div>
-        {(r?.countries?.length ?? 0) > 0 && (<select
-          aria-label="Country"
-          value={country ?? ""}
-          onChange={(e) => setCountry(e.target.value || null)}
-          className="ml-auto rounded-lg border border-white/[0.14] bg-card px-2.5 py-1.5 text-xs text-cream/90"
-        >
-          <option value="">All countries</option>
-          {(r?.countries ?? []).map((c) => (
-            <option key={c.country} value={c.country}>
-              {flag(c.country)} {countryName(c.country)} ({c.signed_up})
-            </option>
-          ))}
-        </select>)}
-        <label className={cn("flex items-center gap-2 text-xs text-muted-foreground", !r?.countries?.length && "ml-auto")}>
-          <input type="checkbox" checked={includeTeam} onChange={(e) => setIncludeTeam(e.target.checked)} />
-          Include team
-        </label>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {(r?.countries?.length ?? 0) > 0 && (
+            <select aria-label="Country" value={country ?? ""} onChange={(e) => setCountry(e.target.value || null)} className={SELECT}>
+              <option value="">All countries</option>
+              {(r?.countries ?? []).map((c) => (
+                <option key={c.country} value={c.country}>
+                  {flag(c.country)} {countryName(c.country)} ({c.signed_up})
+                </option>
+              ))}
+            </select>
+          )}
+          {r?.platforms && (
+            <select aria-label="Platform" value={platform ?? ""} onChange={(e) => setPlatform(e.target.value || null)} className={SELECT}>
+              <option value="">All platforms</option>
+              {["web", "ios", "android"].map((p) => (
+                <option key={p} value={p}>
+                  {PLATFORM_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          )}
+          {(r?.channels?.length ?? 0) > 0 && (
+            <select aria-label="Sign-up channel" value={channel ?? ""} onChange={(e) => setChannel(e.target.value || null)} className={SELECT}>
+              <option value="">All channels</option>
+              {(r?.channels ?? []).map((c) => (
+                <option key={c.channel} value={c.channel}>
+                  {channelLabel(c.channel)} ({c.signed_up})
+                </option>
+              ))}
+            </select>
+          )}
+          {filtered && (
+            <button type="button" onClick={() => { setCountry(null); setPlatform(null); setChannel(null); }} className="text-xs text-primary hover:underline">
+              Clear filters
+            </button>
+          )}
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <input type="checkbox" checked={includeTeam} onChange={(e) => setIncludeTeam(e.target.checked)} />
+            Include team
+          </label>
+        </div>
         <div className="inline-flex overflow-hidden rounded-lg border border-white/[0.14]">
-          {([7, 30, 90] as const).map((d) => (
-            <button key={d} type="button" onClick={() => setDays(d)} className={cn("px-3 py-1.5 text-xs", days === d ? "bg-white/[0.12] text-cream" : "text-muted-foreground hover:bg-white/[0.05]")}>{d}d</button>
+          {([7, 30, 90, 365] as const).map((d) => (
+            <button key={d} type="button" onClick={() => setDays(d)} className={cn("px-3 py-1.5 text-xs", days === d ? "bg-white/[0.12] text-cream" : "text-muted-foreground hover:bg-white/[0.05]")}>{d === 365 ? "1y" : `${d}d`}</button>
           ))}
         </div>
       </div>
@@ -328,6 +382,34 @@ export default function AdminGrowth() {
               </p>
             )}
           </Section>
+
+          {(r.channels || r.platforms) && (
+            <div className="grid gap-4 2xl:grid-cols-2">
+              {r.channels && (
+                <Section title="How they found us" hint="the link they signed up through · click to filter">
+                  <BreakdownBars
+                    rows={r.channels.map(({ channel: key, ...rest }) => ({ key, ...rest }))}
+                    header="Channel"
+                    label={channelLabel}
+                    selected={channel}
+                    onSelect={setChannel}
+                  />
+                </Section>
+              )}
+              {r.platforms && (
+                <Section title="Where they use it" hint="someone on web and iPhone counts in both · click to filter">
+                  <BreakdownBars
+                    rows={r.platforms.map(({ platform: key, ...rest }) => ({ key, ...rest }))}
+                    header="Platform"
+                    label={(k) => PLATFORM_LABELS[k] ?? k}
+                    selected={platform}
+                    onSelect={setPlatform}
+                    empty="No sign-ins recorded yet."
+                  />
+                </Section>
+              )}
+            </div>
+          )}
 
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <Section title="From sign-up to staying" hint="all time · right column is % of the step before">
@@ -390,6 +472,41 @@ export default function AdminGrowth() {
             </Section>
           </div>
 
+          {r.room_types && (
+            <Section title="Most-used rooms" hint={`rooms opened in the period, and what happened in them · last ${days} days`}>
+              {r.room_types.length === 0 ? (
+                <p className="px-4 py-6 text-sm text-muted-foreground/70">No rooms opened in this period.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[560px] text-sm">
+                    <thead className="whitespace-nowrap text-left text-[11px] uppercase tracking-wider text-muted-foreground/70">
+                      <tr>
+                        <th className="px-4 py-2">Room</th>
+                        <th className="px-2 py-2 text-right">Opened</th>
+                        <th className="px-2 py-2 text-right" title="booked for a later time rather than opened now">Scheduled</th>
+                        <th className="px-2 py-2 text-right" title="both people were on the call">Became a date</th>
+                        <th className="px-2 py-2 text-right" title="the partner joined without an account">Guest partner</th>
+                        <th className="px-4 py-2 text-right">Typical call</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.room_types.map((t) => (
+                        <tr key={t.package} className="border-t border-white/[0.06]">
+                          <td className="px-4 py-1.5 text-cream/90">{PACKAGE_LABELS[t.package] ?? t.package}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{t.opened}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{share(t.scheduled, t.opened)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{share(t.dates, t.opened)}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{share(t.guest_partner, t.opened)}</td>
+                          <td className="px-4 py-1.5 text-right tabular-nums">{formatDuration(t.median_call_seconds)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Section>
+          )}
+
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
             <Section title="Rooms opened" hint={`by type and how they were paid for · last ${days} days`}>
               {r.rooms_by_package.length === 0 ? (
@@ -442,6 +559,40 @@ export default function AdminGrowth() {
               </dl>
             </Section>
           </div>
+
+          {r.revenue && (
+            <Section title="Revenue by product" hint={`real money only, gifts and store tests left out · last ${days} days`}>
+              {r.revenue.length === 0 ? (
+                <p className="px-4 py-6 text-sm text-muted-foreground/70">No real-money sales in this period.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[420px] text-sm">
+                    <thead className="whitespace-nowrap text-left text-[11px] uppercase tracking-wider text-muted-foreground/70">
+                      <tr>
+                        <th className="px-4 py-2">Product</th>
+                        <th className="px-2 py-2 text-right">Sales</th>
+                        <th className="px-2 py-2 text-right">Buyers</th>
+                        <th className="px-4 py-2 text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.revenue.map((v) => (
+                        <tr key={`${v.product}-${v.currency}`} className="border-t border-white/[0.06]">
+                          <td className="px-4 py-1.5 text-cream/90">{PRODUCT_LABELS[v.product] ?? v.product}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{v.sales}</td>
+                          <td className="px-2 py-1.5 text-right tabular-nums">{v.buyers}</td>
+                          <td className="px-4 py-1.5 text-right tabular-nums text-emerald-300">{formatMoney(v.amount, v.currency)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <p className="border-t border-white/[0.06] px-4 py-2 text-[11px] text-muted-foreground/70">
+                Amounts are per currency and never converted. Google Play doesn't report prices, so Play sales show "—".
+              </p>
+            </Section>
+          )}
 
           {r.purchases && (
             <Section title="What's being paid for" hint={`every purchase and gift · last ${days} days · store country is the store or card, not the person`}>

@@ -585,6 +585,20 @@ export type AnalyticsReport = {
   country?: string | null;
   /** Missing on servers older than backend#73. */
   countries?: AnalyticsCountryRow[];
+  /** Missing on servers older than backend#77. */
+  platform?: string | null;
+  channel?: string | null;
+  channels?: (Omit<AnalyticsCountryRow, "country"> & { channel: string })[];
+  platforms?: (Omit<AnalyticsCountryRow, "country"> & { platform: string })[];
+  room_types?: {
+    package: string;
+    opened: number;
+    scheduled: number;
+    dates: number;
+    guest_partner: number;
+    median_call_seconds: number | null;
+  }[];
+  revenue?: { product: string; currency: string | null; sales: number; buyers: number; amount: number | null }[];
   tracking_since: string | null;
   funnel: AnalyticsFunnelStep[];
   cohorts: { week_of: string; signed_up: number; active_pct: (number | null)[] }[];
@@ -622,9 +636,12 @@ export type AnalyticsBackfillResult = {
   users_with_activity: number;
 };
 
-export async function getAdminAnalytics(days: number, includeTeam = false, country: string | null = null) {
-  const c = country ? `&country=${encodeURIComponent(country)}` : "";
-  return api.get<AnalyticsReport>(`/v1/admin/analytics?days=${days}&include_team=${includeTeam}${c}`);
+export type AnalyticsFilters = { country?: string | null; platform?: string | null; channel?: string | null };
+
+export async function getAdminAnalytics(days: number, includeTeam = false, filters: AnalyticsFilters = {}) {
+  const q = new URLSearchParams({ days: String(days), include_team: String(includeTeam) });
+  for (const [k, v] of Object.entries(filters)) if (v) q.set(k, v);
+  return api.get<AnalyticsReport>(`/v1/admin/analytics?${q.toString()}`);
 }
 
 export async function postAdminAnalyticsBackfill(apply: boolean) {

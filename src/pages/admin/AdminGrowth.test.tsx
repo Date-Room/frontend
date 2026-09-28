@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { eventLine, formatDuration, formatMoney, funnelRows, isRealMoney, loadProblem, paidViaLabel } from "./AdminGrowth";
+import { channelLabel, eventLine, filterSummary, formatDuration, formatMoney, funnelRows, isRealMoney, loadProblem, paidViaLabel, share } from "./AdminGrowth";
 
 describe("funnelRows", () => {
   it("gives each step its share of sign-ups and of the step before", () => {
@@ -60,5 +60,21 @@ describe("formatMoney", () => {
     expect(formatMoney(4.99, "USD")).toMatch(/^USD 4.99$/);
     expect(formatMoney(null, "USD")).toBe("—");
     expect(formatMoney(3, null)).toBe("—");
+  });
+});
+
+describe("layer 1 helpers", () => {
+  it("names channels plainly", () => {
+    expect(channelLabel("direct")).toMatch(/Direct/);
+    expect(channelLabel("referral")).toBe("Referred by a friend");
+    expect(channelLabel("chaperon_badge")).toBe("Chaperon badge");
+  });
+  it("summarises active filters for the subtitle", () => {
+    expect(filterSummary({ country: null, platform: null, channel: null })).toBe("");
+    expect(filterSummary({ country: "KE", platform: "ios", channel: "recap" })).toBe("Kenya · iPhone · Recap · ");
+  });
+  it("shows shares safely", () => {
+    expect(share(1, 4)).toBe("25%");
+    expect(share(0, 0)).toBe("—");
   });
 });
