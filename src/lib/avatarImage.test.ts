@@ -5,6 +5,7 @@ import {
   assertValidAvatarFile,
   dataUrlByteSize,
   encodeUnderBudget,
+  fitWithinEdge,
   squareCropRect,
 } from "@/lib/avatarImage";
 
@@ -75,5 +76,20 @@ describe("assertValidAvatarFile", () => {
     expect(() =>
       assertValidAvatarFile({ type: "image/png", size: 20 * 1024 * 1024 }),
     ).toThrow(/under 15 MB/);
+  });
+});
+
+describe("fitWithinEdge", () => {
+  it("scales a large landscape photo so the long edge hits the cap", () => {
+    expect(fitWithinEdge(4032, 3024, 1600)).toEqual({ width: 1600, height: 1200 });
+  });
+  it("scales a large portrait photo so the long edge hits the cap", () => {
+    expect(fitWithinEdge(3024, 4032, 1600)).toEqual({ width: 1200, height: 1600 });
+  });
+  it("never upscales a small photo", () => {
+    expect(fitWithinEdge(800, 600, 1600)).toEqual({ width: 800, height: 600 });
+  });
+  it("keeps extreme panoramas at least 1px tall", () => {
+    expect(fitWithinEdge(20000, 5, 1600)).toEqual({ width: 1600, height: 1 });
   });
 });

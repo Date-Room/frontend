@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useActivitySession } from "@/hooks/useActivitySession";
 import { ApiError } from "@/lib/api";
+import { resizePhoto } from "@/lib/avatarImage";
 import {
   parseVisionBoard,
   pickVisionGradient,
@@ -36,7 +37,6 @@ type PhotoMode = "upload" | "link";
 type BoardMode = "board" | "add" | "edit";
 
 const DRAG_THRESHOLD_PX = 8;
-const MAX_IMAGE_BYTES = 900_000;
 const MAX_PDF_BYTES = 2_500_000;
 /** How many vision items may be pinned onto the room stage at once. */
 const MAX_STAGE_PINS = 2;
@@ -795,20 +795,29 @@ export function VisionBoard() {
       toast.error("Pick a photo (JPEG, PNG, WebP) or PDF.");
       return;
     }
-    const maxSize = isPdf ? MAX_PDF_BYTES : MAX_IMAGE_BYTES;
-    if (file.size > maxSize) {
-      toast.error(
-        isPdf
-          ? "PDF is too large — try one under 2.5 MB."
-          : "Photo is too large — try one under 900 KB.",
-      );
+    if (isImage) {
+      // Any reasonable phone photo is fine — we shrink it to what we store.
+      resizePhoto(file)
+        .then((dataUrl) => {
+          setUploadDataUrl(dataUrl);
+          setUploadMediaType("image");
+          setUploadFilename(file.name);
+          setPhotoMode("upload");
+        })
+        .catch((err: unknown) => {
+          toast.error(err instanceof Error ? err.message : "Couldn't use that photo.");
+        });
+      return;
+    }
+    if (file.size > MAX_PDF_BYTES) {
+      toast.error("PDF is too large — try one under 2.5 MB.");
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") {
         setUploadDataUrl(reader.result);
-        setUploadMediaType(isPdf ? "pdf" : "image");
+        setUploadMediaType("pdf");
         setUploadFilename(file.name);
         setPhotoMode("upload");
       }
