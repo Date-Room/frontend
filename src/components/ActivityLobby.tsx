@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { ACTIVITY_TILES } from "@/lib/activityTiles";
+import { SQUAD_GAMES, SQUAD_GAME_IDS } from "@/lib/squadGames";
 import { useTryRoom } from "@/lib/tryDemo";
 
 /**
@@ -31,6 +32,8 @@ type GamePick = { id: string; line: string; minutes?: string };
 /** Ordered lightest-first: the three shown up front are the three that ask
  *  least of two people who have only just sat down. */
 const GAMES: GamePick[] = [
+  // Squad games (only squad rooms carry these tabs, and none of the ones below).
+  ...SQUAD_GAME_IDS.map((id) => ({ id, line: SQUAD_GAMES[id].line, minutes: SQUAD_GAMES[id].minutes })),
   { id: "this_or_that", line: "Five snap choices, seven seconds each.", minutes: "5–10 min" },
   { id: "2_truths", line: "Three stories. One never happened.", minutes: "10–15 min" },
   { id: "guacamole", line: "Fast fingers, hidden bowls, loud sabotage.", minutes: "2 min a batch" },

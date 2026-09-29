@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useReportTabOpened } from "@/lib/featureOpened";
-import { isTryPackage, getRoomExperience, isActivityEnabled, getRoomPlan, saveRoomPlanFromServer, isSubscriptionPackage, type CuratableActivityId } from "@/lib/roomExperience";
+import { CURATABLE_ACTIVITIES, isTryPackage, getRoomExperience, isActivityEnabled, getRoomPlan, saveRoomPlanFromServer, isSubscriptionPackage, type CuratableActivityId } from "@/lib/roomExperience";
 import { isWatchPartyRoom } from "@/lib/watchParty";
 import { getRoomExperienceApi, listMyRooms, type Room, type RoomPackage } from "@/lib/rooms";
 import { getSquadNights } from "@/lib/squad";
@@ -55,6 +55,8 @@ import { MusicLibrary } from "@/components/MusicRoom";
 import { RoomSettings } from "@/components/RoomSettings";
 import { ActivityLobby } from "@/components/ActivityLobby";
 import { GuacamolePanic } from "@/components/GuacamolePanic";
+import { SquadGame } from "@/components/squad/SquadGame";
+import { SQUAD_GAMES, isSquadGame, type SquadGameId } from "@/lib/squadGames";
 import { QuestionDeck } from "@/components/QuestionDeck";
 import { Closer } from "@/components/Closer";
 import { TwoTruths } from "@/components/TwoTruths";
@@ -182,6 +184,7 @@ type ActivityTabId =
   | "pick_a_door"
   | "rank_it"
   | "guacamole"
+  | SquadGameId
   | "watch"
   | "dj"
   | "chat";
@@ -209,11 +212,21 @@ const ACTIVITY_TABS: TabDef[] = [
   { id: "pick_a_door", label: "Pick a Door", icon: "🚪", curatableId: "pick_a_door" },
   { id: "rank_it", label: "Rank It", icon: "📊", curatableId: "rank_it" },
   { id: "guacamole", label: "Guacamole Panic", icon: "🥑", curatableId: "guacamole" },
+  // Squad games: squad rooms only, and they replace the date games there.
+  { id: "most_likely", label: SQUAD_GAMES.most_likely.label, icon: "👉", curatableId: null },
+  { id: "who_said_it", label: SQUAD_GAMES.who_said_it.label, icon: "🗣️", curatableId: null },
+  { id: "imposter", label: SQUAD_GAMES.imposter.label, icon: "🕵️", curatableId: null },
+  { id: "spill_tea", label: SQUAD_GAMES.spill_tea.label, icon: "🫖", curatableId: null },
+  { id: "heads_up", label: SQUAD_GAMES.heads_up.label, icon: "🤔", curatableId: null },
   { id: "watch", label: "Watch", icon: "📺", curatableId: "watch" },
   { id: "dj", label: "Music", icon: "🎵", curatableId: "dj" },
 ];
 
 const ALL_TABS: TabDef[] = [...WALL_TABS, ...ACTIVITY_TABS];
+/** The two-person date games, hidden in squad rooms. */
+const DATE_GAME_IDS = new Set<ActivityTabId>(
+  CURATABLE_ACTIVITIES.filter((a) => a.category === "games").map((a) => a.id as ActivityTabId),
+);
 const WALL_TAB_IDS = new Set<ActivityTabId>(WALL_TABS.map((t) => t.id));
 
 /* ───────────────── RoomShell ───────────────── */
@@ -251,6 +264,8 @@ function RoomShell({
   // Squad nights get the group call (and squads always have an account, so
   // the rooms list is there to read this from).
   const isSquad = room?.room_kind === "squad";
+  // The menu can't wait on the rooms list: the package comes with the room.
+  const squadRoom = isSquad || roomPackage === "squad";
   const squadNames = useMemo(
     () =>
       isSquad
@@ -516,6 +531,9 @@ function RoomShell({
       // Resting rooms: games and shared media rest from Quiet onward;
       // the wall and chat stay so people can look back and write.
       if (!caps.can_play && !WALL_TAB_IDS.has(t.id) && t.id !== "chat") return false;
+      // A squad plays its own games; the date games are made for two.
+      if (isSquadGame(t.id)) return squadRoom;
+      if (squadRoom && DATE_GAME_IDS.has(t.id)) return false;
       if (t.id === "fridge_notes") return wallRoom;
       if (t.id === "bookshelf" || t.curatableId === "vision_board" || t.curatableId === "fridge") {
         if (!wallRoom) return false;
@@ -524,7 +542,7 @@ function RoomShell({
       }
       return t.curatableId === null || isActivityEnabled(t.curatableId, curated, roomPackage);
     }),
-    [curated, roomPackage, wallRoom, caps.can_play],
+    [curated, roomPackage, wallRoom, caps.can_play, squadRoom],
   );
 
   const tabBarDividerBefore = useMemo(() => {
@@ -589,6 +607,12 @@ function RoomShell({
         return <RankIt />;
       case "guacamole":
         return <GuacamolePanic />;
+      case "most_likely":
+      case "who_said_it":
+      case "imposter":
+      case "spill_tea":
+      case "heads_up":
+        return <SquadGame game={id as SquadGameId} />;
       case "watch":
         return <WatchTogether />;
       case "dj":

@@ -36,6 +36,11 @@ import {
   Pin,
   Settings,
   Salad,
+  Pointer,
+  MessageSquareQuote,
+  VenetianMask,
+  Coffee,
+  Timer,
   type LucideIcon,
   Loader2,
   Check,
@@ -44,6 +49,7 @@ import {
 import { RoomVideo } from "@/components/RoomVideo";
 import type { GroupLayout } from "@/components/squad/GroupStage";
 import { squadHereLine } from "@/lib/squadCall";
+import { SQUAD_GAMES, SQUAD_GAME_IDS } from "@/lib/squadGames";
 import {
   isSidePane,
   useCallLayout,
@@ -71,6 +77,7 @@ import { ChaperonSeam } from "@/components/ChaperonSeam";
 import { CHAT_OPEN_EVENT, ChatDrawer } from "@/components/ChatDrawer";
 import { ActivityInvite, inviteChime } from "@/components/ActivityInvite";
 import { ChatToast } from "@/components/ChatToast";
+import { ChatTicker, tickerLines, usePresenceNames } from "@/components/squad/ChatTicker";
 import { useChatRoom } from "@/context/ChatContext";
 import {
   INITIAL_INVITE_STATE,
@@ -106,7 +113,7 @@ const CATEGORIES: { id: string; label: string; icon: LucideIcon; itemIds: string
     id: "games",
     label: "Games",
     icon: Gamepad2,
-    itemIds: ["questions", "this_or_that", "the_36", "2_truths", "truth_or_dare", "one_has_to_go", "pick_a_door", "rank_it", "guacamole"],
+    itemIds: ["questions", "this_or_that", "the_36", "2_truths", "truth_or_dare", "one_has_to_go", "pick_a_door", "rank_it", "guacamole", ...SQUAD_GAME_IDS],
   },
   { id: "watch", label: "Watch", icon: PlayCircle, itemIds: ["watch"] },
   { id: "music", label: "Music", icon: Headphones, itemIds: ["dj"] },
@@ -150,6 +157,11 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   pick_a_door: DoorOpen,
   rank_it: BarChart3,
   guacamole: Salad,
+  most_likely: Pointer,
+  who_said_it: MessageSquareQuote,
+  imposter: VenetianMask,
+  spill_tea: Coffee,
+  heads_up: Timer,
   watch: PlayCircle,
   dj: Headphones,
   chat: MessageCircle,
@@ -173,6 +185,7 @@ const ITEM_TAGLINES: Record<string, string> = {
   pick_a_door: "Choose blind. Answer what's behind it.",
   rank_it: "Order five things. Compare priorities.",
   guacamole: "Fast fingers, hidden bowls, loud sabotage.",
+  ...Object.fromEntries(SQUAD_GAME_IDS.map((g) => [g, SQUAD_GAMES[g].line])),
   watch: "Sync up something to watch.",
   dj: "Take turns picking the soundtrack.",
   chat: "Side chat while you play.",
@@ -463,13 +476,19 @@ export function RoomStage({
   }, []);
   const chat = useChatRoom();
   const chatUnread = chat?.unread ?? 0;
-  const [chatToast, setChatToast] = useState<{ id: string; text: string } | null>(null);
+  const [inviterName, setInviterName] = useState<string | null>(null);
+  const [chatToast, setChatToast] = useState<{ id: string; text: string; from: string } | null>(null);
   const lastIncomingId = chat?.lastIncoming?.id ?? null;
+  // Squads: who said it (a date only has the one partner).
+  const presenceName = usePresenceNames(room.presence);
+  // Set below, once the layout is known: the ticker under the film already
+  // shows the line, so no toast (or chime) over the film.
+  const chatTickerRef = useRef(false);
   useEffect(() => {
     const m = chat?.lastIncoming;
     if (!m || !lastIncomingId) return;
-    if (chatOpenRef.current) return;
-    setChatToast({ id: m.id, text: m.text });
+    if (chatOpenRef.current || chatTickerRef.current) return;
+    setChatToast({ id: m.id, text: m.text, from: m.from_user_id });
     // Chat is how you reach someone when the mic or speakers are gone, so
     // the arrival is audible whenever the panel isn't open (not only in a
     // background tab).
@@ -506,9 +525,11 @@ export function RoomStage({
         return;
       }
       if (e.kind === "stage") {
-        const d = e.payload as { activity_id?: string | null; from?: string; at?: string };
+        const d = e.payload as { activity_id?: string | null; from?: string; name?: string; at?: string };
         if (d.from === room.senderId) return;
         const at = d.at ? Date.parse(d.at) || Date.now() : Date.now();
+        // A squad has more than one "partner": the invite names whoever opened it.
+        if (d.activity_id && d.name?.trim()) setInviterName(d.name.trim());
         dispatchInvite({ type: "stage", id: d.activity_id ?? null, at });
         return;
       }
@@ -557,6 +578,9 @@ export function RoomStage({
   const floatingCall = (!splitCallLayout && !squadHangout && !squadCouch) || watchFullscreen;
   /** Squad full-screen film: faces as a column of bubbles down the side. */
   const squadStrip = squad && callActive && watchFullscreen;
+  /** Phone, squad night, watching: chat lines run under the film. */
+  const squadTicker = squadCouch && WATCHING_IDS.has(staged) && !wide;
+  chatTickerRef.current = squadTicker;
   const squadGroupLayout: GroupLayout | undefined = squadStrip
     ? "strip"
     : squadCouch
@@ -1015,7 +1039,9 @@ export function RoomStage({
               : partnerInRoom
                 ? "Invite them to the call"
                 : "Start the call";
-            const sub = partnerInCall
+            const sub = squad && squadNames.length
+              ? squadHereLine(squadNames)
+              : partnerInCall
               ? `${partnerName} is in the call`
               : partnerInRoom
                 ? `${partnerName} is in the room`
@@ -1279,6 +1305,12 @@ export function RoomStage({
               </ActivityBoundary>
             ) : null}
           </div>
+          {squadTicker && (
+            <ChatTicker
+              lines={tickerLines(chat?.messages ?? [], room.senderId, presenceName)}
+              onOpen={() => setChatOpen(true)}
+            />
+          )}
           {squadCouch && (
             // The live call is re-homed into this row (see couchSlotRef).
             <div
@@ -1475,11 +1507,11 @@ export function RoomStage({
           const title = item?.title ?? inviteId;
           return (
             <ActivityInvite
-              partnerName={partnerName}
-              partnerPhotoUrl={partnerPhotoUrl}
+              partnerName={squad ? (inviterName ?? partnerName) : partnerName}
+              partnerPhotoUrl={squad ? null : partnerPhotoUrl}
               activityId={inviteId}
               activityTitle={title}
-              headline={inviteHeadline(partnerName, inviteId, title)}
+              headline={inviteHeadline(squad ? (inviterName ?? partnerName) : partnerName, inviteId, title)}
               tileSrc={ACTIVITY_TILES[inviteId]}
               Icon={ITEM_ICONS[inviteId]}
               onJoin={() => commitStage(inviteId)}
@@ -1493,8 +1525,8 @@ export function RoomStage({
       {chatToast && (
         <ChatToast
           key={chatToast.id}
-          partnerName={partnerName}
-          partnerPhotoUrl={partnerPhotoUrl}
+          partnerName={squad ? presenceName(chatToast.from) : partnerName}
+          partnerPhotoUrl={squad ? null : partnerPhotoUrl}
           text={chatToast.text}
           count={chatUnread}
           offset={Boolean(inviteId)}
