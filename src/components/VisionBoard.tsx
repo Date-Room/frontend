@@ -868,9 +868,9 @@ export function VisionBoard() {
       <div className="wall-surface">
         <EmptyState
           variant="vision"
-          title="Vision Board"
+          title={room.roomPackage === "squad" ? "Trip board" : "Vision Board"}
           onAdd={room.canPersist ? openAdd : undefined}
-          addLabel="Add a vision"
+          addLabel={room.roomPackage === "squad" ? "Add a place or plan" : "Add a vision"}
           subtitle={room.canPersist ? undefined : "Sign in to add to your shared board."}
         />
       </div>
