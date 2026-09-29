@@ -113,6 +113,8 @@ export type SquadMembers = {
   members: SquadMember[];
   locked_until: string | null;
   my_role: "owner" | "cohost" | "member";
+  /** My "email me about nights" switch (missing on older servers: on). */
+  my_night_emails?: boolean;
 };
 
 export type CreateSquadRoom = { seats: number; name: string };
@@ -199,6 +201,11 @@ export function squadInviteUrl(code: string, pin: string, origin = window.locati
 /** Tell the squad where I am (city optional, zone from the browser). */
 export function setSquadWhere(roomId: string, body: { city?: string | null; tz?: string | null }) {
   return api.patch<SquadMember>(`/v1/rooms/${roomId}/members/me`, body);
+}
+
+/** Email me about nights (plan decided, starting soon, started without me). */
+export function setSquadNightEmails(roomId: string, on: boolean) {
+  return api.patch<SquadMember>(`/v1/rooms/${roomId}/members/me`, { night_emails: on });
 }
 
 export function browserTimeZone(): string | null {
