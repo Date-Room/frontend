@@ -33,10 +33,18 @@ import {
 import { gridColumns, liveVideoFor, nearTheEnd, placeLine, speakerFirst, timeLeft } from "@/lib/squadCall";
 import { cn } from "@/lib/utils";
 
+/**
+ * grid         the hang-out grid (laptop, nothing on stage)
+ * focus        whoever's talking big, others as bubbles (phones, tucked call)
+ * row-tiles    the couch: a row of small faces under the film
+ * row-bubbles  the game layout: faces shrunk to bubbles under the game
+ * strip        full-screen film: a column of bubbles down the side
+ */
+export type GroupLayout = "grid" | "focus" | "row-tiles" | "row-bubbles" | "strip";
+
 type Props = {
   roomId: string;
-  /** Whoever's talking big, others as bubbles (phones, or tucked beside an activity). */
-  focus: boolean;
+  layout: GroupLayout;
   /** Just the faces: no controls, no clock (the call is a bubble). */
   bare?: boolean;
   onLeave: () => void;
@@ -52,7 +60,8 @@ function useMinute(): Date {
   return now;
 }
 
-export function GroupStage({ roomId, focus, bare, onLeave }: Props) {
+export function GroupStage({ roomId, layout, bare, onLeave }: Props) {
+  const focus = layout === "focus";
   const qc = useQueryClient();
   const lowPower = useLowPowerMode();
   const now = useMinute();
@@ -99,7 +108,7 @@ export function GroupStage({ roomId, focus, bare, onLeave }: Props) {
   const clock = timeLeft(night?.ends_at, now);
   const ending = nearTheEnd(night?.ends_at, now);
 
-  const face = (id: string, size: "big" | "tile" | "bubble") => {
+  const face = (id: string, size: "big" | "tile" | "bubble" | "mini") => {
     const ref = byId.get(id);
     if (!ref) return null;
     const m = byIdentity.get(id);
@@ -158,6 +167,53 @@ export function GroupStage({ roomId, focus, bare, onLeave }: Props) {
     </div>
   );
 
+  if (layout === "strip") {
+    return (
+      <div className="flex flex-col items-center gap-2 rounded-2xl bg-black/45 p-2 backdrop-blur-md">
+        {order.map((id) => face(id, "bubble"))}
+      </div>
+    );
+  }
+
+  if (layout === "row-tiles" || layout === "row-bubbles") {
+    const tiles = layout === "row-tiles";
+    return (
+      <div className="flex h-full w-full items-center gap-2 bg-black/35 px-2 py-2">
+        {clock && (
+          <div
+            className={cn(
+              "flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+              ending ? "bg-primary text-primary-foreground" : "bg-black/60 text-cream",
+            )}
+          >
+            <Clock className="h-3 w-3" aria-hidden /> {clock}
+          </div>
+        )}
+        <div className="flex h-full min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+          {order.map((id) => face(id, tiles ? "mini" : "bubble"))}
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            type="button"
+            aria-label={isMicrophoneEnabled ? "Mute" : "Unmute"}
+            onClick={() => void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-cream hover:bg-black/70"
+          >
+            {isMicrophoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4 text-rose-300" />}
+          </button>
+          <button
+            type="button"
+            aria-label={isCameraEnabled ? "Camera off" : "Camera on"}
+            onClick={() => void localParticipant.setCameraEnabled(!isCameraEnabled)}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-cream hover:bg-black/70"
+          >
+            {isCameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4 text-rose-300" />}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (focus) {
     const [first, ...rest] = order;
     return (
@@ -214,11 +270,37 @@ function Face({
   photo: string | null;
   talking: boolean;
   showVideo: boolean;
-  size: "big" | "tile" | "bubble";
+  size: "big" | "tile" | "bubble" | "mini";
 }) {
   const hasVideo =
     showVideo && isTrackReference(trackRef) && !trackRef.publication.isMuted && Boolean(trackRef.publication.track);
   const initial = (name || "?").charAt(0).toUpperCase();
+
+  if (size === "mini") {
+    // The couch: a small face under the film, lit when talking.
+    return (
+      <div
+        className={cn(
+          "relative flex h-full max-h-[120px] w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.06]",
+          talking && "ring-[3px] ring-inset ring-primary",
+        )}
+      >
+        {hasVideo ? (
+          <VideoTrack trackRef={trackRef} className="h-full w-full object-cover" />
+        ) : photo ? (
+          <img src={photo} alt="" className="h-11 w-11 rounded-full object-cover" />
+        ) : (
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/25 text-lg font-bold text-cream">
+            {initial}
+          </span>
+        )}
+        <div className="absolute inset-x-1.5 bottom-1.5 flex items-center gap-1 rounded-md bg-black/65 px-1.5 py-0.5 text-[11px]">
+          <span className="truncate font-semibold text-cream">{name}</span>
+          {place && <span className="ml-auto shrink-0 truncate text-cream/70">{place}</span>}
+        </div>
+      </div>
+    );
+  }
 
   if (size === "bubble") {
     return (

@@ -42,6 +42,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
+import type { GroupLayout } from "@/components/squad/GroupStage";
+import { squadHereLine } from "@/lib/squadCall";
 import {
   isSidePane,
   useCallLayout,
@@ -245,6 +247,10 @@ function useCompactViewport(): boolean {
  * the person's choice; smaller screens: draggable PiP; phones: bubble).
  * The last thing staged persists per room.
  */
+/** Staged things you watch or listen to: a squad gets the couch row of
+ *  faces under them. Games get bubbles instead. */
+const WATCHING_IDS = new Set(["watch", "music", "dj"]);
+
 export function RoomStage({
   roomId,
   items,
@@ -259,6 +265,7 @@ export function RoomStage({
   onCallIn,
   onLeaveCall,
   squad = false,
+  squadNames = [],
 }: {
   roomId: string;
   items: StageItem[];
@@ -274,6 +281,8 @@ export function RoomStage({
   onLeaveCall: () => void;
   /** Squad night: group call; with nothing on stage the call IS the stage. */
   squad?: boolean;
+  /** Squad: names of the others here right now (for the top bar). */
+  squadNames?: string[];
 }) {
   // The lobby is the neutral default: nothing preloaded, nothing presumed.
   const fallback =
@@ -538,10 +547,23 @@ export function RoomStage({
   const activityStaged = Boolean(staged) && staged !== "lobby" && staged !== "room_details";
   /** Squad night, nothing on stage: the call fills the stage (the hang-out grid). */
   const squadHangout = squad && callActive && !activityStaged && !watchFullscreen;
+  /** Squad night with something on stage: the call becomes a row of faces
+   *  under it (the couch for films and music, bubbles for games). */
+  const squadCouch = squad && callActive && activityStaged && !watchFullscreen;
   /** The right-hand call pane is rendered — `side` and `side-pip` both use it. */
-  const splitCallLayout = callActive && wide && isSidePane(callLayout) && !squadHangout;
+  const splitCallLayout =
+    callActive && wide && isSidePane(callLayout) && !squadHangout && !squadCouch;
   /** The call renders as the floating window rather than in the pane. */
-  const floatingCall = (!splitCallLayout && !squadHangout) || watchFullscreen;
+  const floatingCall = (!splitCallLayout && !squadHangout && !squadCouch) || watchFullscreen;
+  /** Squad full-screen film: faces as a column of bubbles down the side. */
+  const squadStrip = squad && callActive && watchFullscreen;
+  const squadGroupLayout: GroupLayout | undefined = squadStrip
+    ? "strip"
+    : squadCouch
+      ? WATCHING_IDS.has(staged) && wide
+        ? "row-tiles"
+        : "row-bubbles"
+      : undefined;
 
   // Orientation drives the capture shape, so the window's frame matches the
   // stream inside it — and so the partner receives the framing you chose.
@@ -580,7 +602,7 @@ export function RoomStage({
   // never what "floating" meant on a large screen.
   const bubble = fsOverlay
     ? !fsExpanded
-    : wide || squadHangout
+    : wide || squadHangout || squadCouch
       ? false
       : compact && (activityStaged ? !callOpen : manualBubble);
   const pairBubble = bubble && wide;
@@ -755,6 +777,8 @@ export function RoomStage({
   // Squad nights: the call's fourth home, filling the stage when nothing
   // else is on it (the hang-out grid).
   const hangoutSlotRef = useRef<HTMLDivElement>(null);
+  // ...and its fifth: the couch row under a film or game.
+  const couchSlotRef = useRef<HTMLDivElement>(null);
   // Layout effect, not effect: React has just detached the pane (and the
   // host with it) when leaving split mode. A <video> removed from the
   // document pauses once the task yields, so re-home it in the same task.
@@ -769,7 +793,9 @@ export function RoomStage({
         ? fsEl
         : squadHangout
           ? hangoutSlotRef.current
-          : splitCallLayout
+          : squadCouch
+            ? couchSlotRef.current
+            : splitCallLayout
             ? splitSlotRef.current
             : pipAnchorRef.current;
       if (!target || host.parentElement === target) return;
@@ -781,7 +807,10 @@ export function RoomStage({
     place();
     document.addEventListener("fullscreenchange", place);
     return () => document.removeEventListener("fullscreenchange", place);
-  }, [splitCallLayout, squadHangout]);
+    // `staged`: the couch row is rebuilt when one activity replaces another,
+    // so the call must be moved into the new row even though the layout
+    // type (couch) didn't change.
+  }, [splitCallLayout, squadHangout, squadCouch, staged]);
   useEffect(() => {
     const host = pipHostRef.current;
     return () => host?.remove();
@@ -971,7 +1000,7 @@ export function RoomStage({
         {callActive && !splitCallLayout ? (
           // Ringing is a status worth a strip; a connected call is not (the
           // video says it). The strip leaves once they are in.
-          !partnerInCall ? (
+          !partnerInCall && !squad ? (
             <div className="perm-status-bar lg:hidden">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" />
@@ -1051,7 +1080,13 @@ export function RoomStage({
                         st === "together" ? "bg-emerald-400" : "bg-primary animate-pulse",
                       )}
                     />
-                    <span className="truncate">{st === "together" ? `${partnerName} is here` : `Inviting ${partnerName}…`}</span>
+                    <span className="truncate">
+                      {squad
+                        ? squadHereLine(squadNames)
+                        : st === "together"
+                          ? `${partnerName} is here`
+                          : `Inviting ${partnerName}…`}
+                    </span>
                   </span>
                 );
               })()}
@@ -1122,7 +1157,8 @@ export function RoomStage({
                     </>
                   );
                 })()}
-                {callActive && !splitCallLayout ? (
+                {callActive && !splitCallLayout && squad ? null : callActive && !splitCallLayout ? (
+                  // Squads: the chip on the left already says who's here.
                   <div className="hidden min-w-0 items-center gap-2 lg:flex">
                     <span
                       className={cn(
@@ -1133,7 +1169,7 @@ export function RoomStage({
                       )}
                     />
                     <p className="truncate text-label text-cream/80">
-                      {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
+                      {squad ? squadHereLine(squadNames) : partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
                     </p>
                   </div>
                 ) : !callActive ? (
@@ -1243,6 +1279,16 @@ export function RoomStage({
               </ActivityBoundary>
             ) : null}
           </div>
+          {squadCouch && (
+            // The live call is re-homed into this row (see couchSlotRef).
+            <div
+              ref={couchSlotRef}
+              className={cn(
+                "relative shrink-0 overflow-hidden border-t border-white/[0.06]",
+                squadGroupLayout === "row-tiles" ? "h-[132px]" : "h-[92px]",
+              )}
+            />
+          )}
         </section>
         </div>
 
@@ -1269,7 +1315,7 @@ export function RoomStage({
                     )}
                   />
                   <p className="truncate text-label text-cream/80">
-                    {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
+                    {squad ? squadHereLine(squadNames) : partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
                   </p>
                 </div>
               </div>
@@ -1466,11 +1512,19 @@ export function RoomStage({
         createPortal(
         <div
           className={cn(
-            floatingCall ? "group fixed z-40 select-none touch-none" : "relative h-full w-full",
+            squadStrip
+              ? "fixed right-3 top-3 z-40"
+              : floatingCall
+                ? "group fixed z-40 select-none touch-none"
+                : "relative h-full w-full",
             // The pair bubble draws its own rings; everything else gets the glass card.
             floatingCall && !pairBubble && "rounded-2xl glass p-1 shadow-[0_20px_56px_rgba(0,0,0,0.55)]",
           )}
-          style={floatingCall && pos ? { left: pos.x, top: pos.y, width: curW, height: curH } : undefined}
+          style={
+            floatingCall && pos && !squadStrip
+              ? { left: pos.x, top: pos.y, width: curW, height: curH }
+              : undefined
+          }
         >
           <div
             className={cn(
@@ -1499,6 +1553,7 @@ export function RoomStage({
             {!bubble && <ChaperonSeam className={floatingCall ? undefined : "rounded-none"} />}
             <RoomVideo
               group={squad}
+              groupLayout={squadGroupLayout}
               // In the pane, `side-pip` gives the phone-call shape — one feed
               // full-bleed with the other floating over it — while `side`
               // shows both tiles.

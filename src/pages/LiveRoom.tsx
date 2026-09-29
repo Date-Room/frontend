@@ -251,6 +251,19 @@ function RoomShell({
   // Squad nights get the group call (and squads always have an account, so
   // the rooms list is there to read this from).
   const isSquad = room?.room_kind === "squad";
+  const squadNames = useMemo(
+    () =>
+      isSquad
+        ? session.presence
+            .filter((p) => {
+              const sid = presenceSenderId(p);
+              return Boolean(sid) && sid !== session.senderId;
+            })
+            .map((p) => partnerDisplayName(p))
+            .filter((name, i, all) => all.indexOf(name) === i)
+        : [],
+    [isSquad, session.presence, session.senderId],
+  );
   // A resting Together room takes things away in stages; the server
   // computes these and refuses anything they forbid, so the UI only
   // hides or dims to match.
@@ -674,6 +687,7 @@ function RoomShell({
           partnerPresent={partnerPresent}
           callActive={liveMode}
           squad={isSquad}
+          squadNames={squadNames}
           onCallIn={() => {
             if (!caps.can_call) {
               toast.message(restingReason("can_call", room));
