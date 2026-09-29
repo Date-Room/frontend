@@ -251,7 +251,7 @@
       "eyebrow": "Or bring the group",
       "title": "Closer than the group chat.",
       "body": "Best friends in three different cities. Sisters in different countries. The book club that lives across time zones. Up to five of you in one room. Watch a movie at the same time. Play the deck. Argue about whose turn it is on the DJ. The group chat, but you can actually see each other.",
-      "cta": "Open a room with friends"
+      "cta": "Request Squad access"
     },
     "pricing": {
       "eyebrow": "Pricing",
@@ -272,6 +272,11 @@
       "crewName": "Crew",
       "crewDesc": "Movie nights, game nights, book clubs. Group watch party for up to 5.",
       "crewCta": "Open Crew",
+      "squadName": "Squad",
+      "squadPrice": "Beta",
+      "squadUnit": "invite only · 2 to 5 friends",
+      "squadDesc": "Film nights, game nights and long catch-ups for 2 to 5 friends, wherever each of you is. Opening to a few groups first.",
+      "squadCta": "Request access",
       "sessionsLabel": "Session packs — pay when you date",
       "subscriptionsLabel": "Rooms that stay open"
     },
