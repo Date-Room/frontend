@@ -10,6 +10,7 @@ import { Check, Loader2, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useSquadStage, type FaceCue } from "@/context/SquadStageContext";
+import { ApiError } from "@/lib/api";
 import { getSquadMembers, squadErrorText } from "@/lib/squad";
 import {
   SQUAD_GAMES,
@@ -19,6 +20,8 @@ import {
   listNames,
   makeMove,
   myTurn,
+  readEnergy,
+  saveEnergy,
   secondsLeft,
   skipCard,
   startBlocker,
@@ -45,7 +48,16 @@ export function SquadGame({ game }: { game: SquadGameId }) {
     queryKey: ["squad-members", room.roomId],
     queryFn: () => getSquadMembers(room.roomId),
   });
+  // "Next round" (or the first open): deal without a setup form.
   const [setup, setSetup] = useState(false);
+  // Tonight's energy, asked once and remembered; the header switch changes it.
+  const [energy, setEnergyState] = useState<Deck | null>(() => readEnergy(room.roomId));
+  const setEnergy = (d: Deck) => {
+    saveEnergy(room.roomId, d);
+    setEnergyState(d);
+  };
+  // Anyone sitting the next round out (kept while this game is open).
+  const [sitOut, setSitOut] = useState<Set<string>>(() => new Set());
 
   // Someone moved: refetch my own view (the push carries no secrets).
   useEffect(() => {
@@ -145,21 +157,40 @@ export function SquadGame({ game }: { game: SquadGameId }) {
       <div className="mx-auto w-full max-w-xl space-y-3 sm:space-y-5">
         <header className="space-y-0.5 text-center sm:space-y-1">
           <p className="dr-eyebrow text-primary/85">
-            {round && !setup ? `Round ${round.number} · ${round.deck === "spicy" ? "Spicy" : "Mild"}` : "Squad game"}
+            {round && !setup ? `Round ${round.number} · ${info.mood}` : info.mood}
           </p>
           <h2 className="font-serif text-2xl text-cream sm:text-3xl">{info.label}</h2>
+          {energy && round && !setup && (
+            <button
+              type="button"
+              onClick={() => setEnergy(energy === "spicy" ? "mild" : "spicy")}
+              title="Changes the next card"
+              className="focus-ring mx-auto mt-1 inline-flex items-center gap-1.5 rounded-full border border-white/[0.1] px-2.5 py-0.5 text-[11px] text-muted-foreground hover:text-cream"
+            >
+              Next card: <span className="font-semibold text-cream">{energy === "spicy" ? "🌶️ Spicy" : "Mild"}</span>
+              <span aria-hidden>⇄</span>
+            </button>
+          )}
         </header>
 
         {!round || setup ? (
-          <Setup
+          <Dealer
             game={game}
             onCall={onCall}
             nameOf={nameOf}
-            onStarted={(s) => {
+            energy={energy}
+            onEnergy={setEnergy}
+            sitOut={sitOut}
+            onSitOut={setSitOut}
+            quick={Boolean(round)}
+            onDealt={(s) => {
               put(s);
               setSetup(false);
             }}
-            onCancel={round ? () => setSetup(false) : undefined}
+            onBusy={() => {
+              setSetup(false);
+              void qc.invalidateQueries({ queryKey: key });
+            }}
           />
         ) : round.stage === "revealed" ? (
           <>
@@ -203,74 +234,134 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   );
 }
 
-/* ───────────────── Setting up a round ───────────────── */
+/* ───────────────── Dealing a round ───────────────── */
 
-function Setup({
+/**
+ * No setup form: tonight's energy is asked once, then every deal is
+ * automatic. The first card of a game gets a 3-2-1 so the squad can settle;
+ * "Next round" deals straight away. Everyone on the call plays unless
+ * someone taps Players and sits out.
+ */
+function Dealer({
   game,
   onCall,
   nameOf,
-  onStarted,
-  onCancel,
+  energy,
+  onEnergy,
+  sitOut,
+  onSitOut,
+  quick,
+  onDealt,
+  onBusy,
 }: {
   game: SquadGameId;
   onCall: string[];
   nameOf: Names;
-  onStarted: (s: RoundState) => void;
-  onCancel?: () => void;
+  energy: Deck | null;
+  onEnergy: (d: Deck) => void;
+  sitOut: Set<string>;
+  onSitOut: (s: Set<string>) => void;
+  quick: boolean;
+  onDealt: (s: RoundState) => void;
+  onBusy: () => void;
 }) {
   const room = useRoomSession();
-  const [deck, setDeck] = useState<Deck>("mild");
-  const [out, setOut] = useState<Set<string>>(() => new Set());
-  const players = onCall.filter((p) => !out.has(p));
+  const [count, setCount] = useState<number | null>(null);
+  const [choosing, setChoosing] = useState(false);
+  const players = onCall.filter((p) => !sitOut.has(p));
   const blocker = startBlocker(game, players.length);
-  const start = useMutation({
-    mutationFn: () => startRound(room.roomId, game, deck, players),
-    onSuccess: onStarted,
-    onError: (e) => toast.error(squadErrorText(e, "The round didn't start. Try again.")),
-  });
   const info = SQUAD_GAMES[game];
+  const start = useMutation({
+    mutationFn: () => startRound(room.roomId, game, energy ?? "mild", players),
+    onSuccess: onDealt,
+    onError: (e) => {
+      const code = e instanceof ApiError ? (e.body as { detail?: { error?: string } })?.detail?.error : null;
+      if (code === "round_in_progress") onBusy(); // someone else dealt first: join theirs
+      else toast.error(squadErrorText(e, "The round didn't start. Try again."));
+    },
+  });
 
-  return (
-    <div className="space-y-5">
-      <p className="text-center text-body leading-relaxed text-muted-foreground">{info.how}</p>
+  const ready = Boolean(energy) && !blocker && !choosing && !start.isPending && !start.isSuccess;
+  const deal = useRef(start.mutate);
+  deal.current = start.mutate;
+  useEffect(() => {
+    if (!ready) return;
+    if (quick) {
+      deal.current();
+      return;
+    }
+    let n = 3;
+    setCount(n);
+    const t = window.setInterval(() => {
+      n -= 1;
+      if (n <= 0) {
+        window.clearInterval(t);
+        setCount(null);
+        deal.current();
+      } else setCount(n);
+    }, 700);
+    return () => {
+      window.clearInterval(t);
+      setCount(null);
+    };
+  }, [ready, quick]);
 
-      <div className="space-y-2">
-        <p className="dr-eyebrow text-muted-foreground">Deck</p>
+  if (!energy) {
+    return (
+      <div className="space-y-4 text-center">
+        <p className="font-serif text-2xl text-cream">Tonight's energy?</p>
         <div className="grid grid-cols-2 gap-2">
-          {(["mild", "spicy"] as Deck[]).map((d) => (
-            <button
-              key={d}
-              type="button"
-              aria-pressed={deck === d}
-              onClick={() => setDeck(d)}
-              className={cn(
-                "focus-ring rounded-2xl border py-3 text-sm font-semibold capitalize transition-colors",
-                deck === d
-                  ? "border-primary/60 bg-primary/15 text-cream"
-                  : "border-white/[0.08] bg-card/30 text-cream/80 hover:border-primary/25",
-              )}
-            >
-              {d === "spicy" ? "🌶️ Spicy" : "Mild"}
-            </button>
-          ))}
+          <button
+            type="button"
+            onClick={() => onEnergy("mild")}
+            className="focus-ring rounded-2xl border border-white/[0.1] bg-card/30 px-3 py-5 text-cream hover:border-primary/40"
+          >
+            <span className="block text-2xl" aria-hidden>😇</span>
+            <span className="mt-1 block font-semibold">Mild</span>
+            <span className="block text-xs text-muted-foreground">Everyone's comfortable</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onEnergy("spicy")}
+            className="focus-ring rounded-2xl border border-white/[0.1] bg-card/30 px-3 py-5 text-cream hover:border-primary/40"
+          >
+            <span className="block text-2xl" aria-hidden>🌶️</span>
+            <span className="mt-1 block font-semibold">Spicy</span>
+            <span className="block text-xs text-muted-foreground">No mercy tonight</span>
+          </button>
         </div>
+        <p className="text-xs text-muted-foreground">We'll remember it for tonight. Switch any time on the card.</p>
       </div>
+    );
+  }
 
-      <div className="space-y-2">
-        <p className="dr-eyebrow text-muted-foreground">Who's playing</p>
-        <div className="flex flex-wrap gap-2">
+  const playersLink = (
+    <button
+      type="button"
+      onClick={() => setChoosing(true)}
+      className="focus-ring rounded text-sm text-muted-foreground underline-offset-2 hover:text-cream hover:underline"
+    >
+      Players · {players.length}
+    </button>
+  );
+
+  if (choosing) {
+    return (
+      <div className="space-y-3">
+        <p className="text-center text-sm text-muted-foreground">Who's playing this round?</p>
+        <div className="flex flex-wrap justify-center gap-2">
           {onCall.map((pid) => {
-            const on = !out.has(pid);
+            const on = !sitOut.has(pid);
             return (
               <button
                 key={pid}
                 type="button"
                 aria-pressed={on}
                 onClick={() => {
-                  const next = new Set(out);
+                  const next = new Set(sitOut);
                   if (on) next.add(pid);
                   else next.delete(pid);
-                  setOut(next);
+                  onSitOut(next);
                 }}
                 className={cn(
                   "focus-ring inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors",
@@ -283,30 +374,40 @@ function Setup({
             );
           })}
         </div>
-        {onCall.length === 0 && <p className="text-sm text-muted-foreground">Nobody's on the call yet.</p>}
-      </div>
-
-      {blocker && <p className="text-center text-sm text-muted-foreground">{blocker}</p>}
-      <div className="flex gap-2">
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="focus-ring flex-1 rounded-full border border-white/[0.12] py-3.5 text-sm text-cream hover:bg-white/[0.06]"
-          >
-            Back
-          </button>
-        )}
         <button
           type="button"
-          disabled={Boolean(blocker) || start.isPending}
-          onClick={() => start.mutate()}
-          className="btn-primary focus-ring flex flex-[2] items-center justify-center gap-2 rounded-full py-3.5 font-semibold disabled:opacity-40"
+          onClick={() => setChoosing(false)}
+          className="btn-primary focus-ring w-full rounded-full py-3 font-semibold"
         >
-          {start.isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-          Deal the card
+          Deal
         </button>
       </div>
+    );
+  }
+
+  if (blocker) {
+    return (
+      <div className="space-y-2 text-center">
+        <p className="text-sm text-cream">
+          {info.label} needs {info.min} players. {players.length === 1 ? "1 is" : `${players.length} are`} here.
+        </p>
+        <p className="text-xs text-muted-foreground">Invite someone from the squad sheet, or pick another game.</p>
+        {sitOut.size > 0 && playersLink}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 text-center" aria-live="polite">
+      {count !== null ? (
+        <p className="font-serif text-7xl text-primary" aria-label={`Dealing in ${count}`}>
+          {count}
+        </p>
+      ) : (
+        <Loader2 className="mx-auto h-6 w-6 animate-spin text-muted-foreground" aria-label="Dealing" />
+      )}
+      <p className="text-sm text-muted-foreground">{info.how}</p>
+      {playersLink}
     </div>
   );
 }

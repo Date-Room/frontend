@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   canSkip,
+  readEnergy,
+  saveEnergy,
   stageCueFor,
   isSquadGame,
   listNames,
@@ -138,5 +140,14 @@ describe("stageCueFor", () => {
     expect(tea.faces.a.ring).toBe(true);
     expect(stageCueFor(null, null, "a", false).mode).toBe("reading");
     expect(stageCueFor(round({}), null, "a", true).mode).toBe("reading");
+  });
+});
+
+describe("tonight's energy", () => {
+  it("is remembered per room", () => {
+    expect(readEnergy("room-x")).toBeNull();
+    saveEnergy("room-x", "spicy");
+    expect(readEnergy("room-x")).toBe("spicy");
+    expect(readEnergy("room-y")).toBeNull();
   });
 });

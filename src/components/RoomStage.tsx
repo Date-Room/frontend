@@ -190,7 +190,7 @@ const ITEM_TAGLINES: Record<string, string> = {
   pick_a_door: "Choose blind. Answer what's behind it.",
   rank_it: "Order five things. Compare priorities.",
   guacamole: "Fast fingers, hidden bowls, loud sabotage.",
-  ...Object.fromEntries(SQUAD_GAME_IDS.map((g) => [g, SQUAD_GAMES[g].line])),
+  ...Object.fromEntries(SQUAD_GAME_IDS.map((g) => [g, `${SQUAD_GAMES[g].mood}. ${SQUAD_GAMES[g].line}`])),
   watch: "Sync up something to watch.",
   dj: "Take turns picking the soundtrack.",
   chat: "Side chat while you play.",

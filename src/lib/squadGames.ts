@@ -15,6 +15,8 @@ export const SQUAD_GAME_IDS: SquadGameId[] = ["most_likely", "who_said_it", "imp
 export type SquadGameInfo = {
   id: SquadGameId;
   label: string;
+  /** What the menu calls it: the mood, not the mechanics. */
+  mood: string;
   line: string;
   how: string;
   min: number;
@@ -24,6 +26,7 @@ export type SquadGameInfo = {
 export const SQUAD_GAMES: Record<SquadGameId, SquadGameInfo> = {
   most_likely: {
     id: "most_likely",
+    mood: "Roast each other",
     label: "Most Likely To",
     line: "Point at your friends. Everyone votes at once.",
     how: "Vote for who fits the card. Vote with the room and you score.",
@@ -32,6 +35,7 @@ export const SQUAD_GAMES: Record<SquadGameId, SquadGameInfo> = {
   },
   who_said_it: {
     id: "who_said_it",
+    mood: "Expose each other",
     label: "Who Said It",
     line: "Finish the line. Then guess whose answer is whose.",
     how: "Everyone finishes the line in secret. Guess who wrote each answer: a right guess scores, and so does fooling people.",
@@ -40,6 +44,7 @@ export const SQUAD_GAMES: Record<SquadGameId, SquadGameInfo> = {
   },
   imposter: {
     id: "imposter",
+    mood: "Lie to each other",
     label: "Imposter",
     line: "Everyone knows the word but one.",
     how: "Take turns saying one word about the secret word. The imposter doesn't know it and has to blend in. Then vote them out.",
@@ -48,6 +53,7 @@ export const SQUAD_GAMES: Record<SquadGameId, SquadGameInfo> = {
   },
   spill_tea: {
     id: "spill_tea",
+    mood: "Get messy",
     label: "Spill the Tea",
     line: "Fill the blank. The judge picks the best.",
     how: "Everyone but the judge fills the blank. The judge picks a favourite without knowing who wrote it. The judge changes every round.",
@@ -56,6 +62,7 @@ export const SQUAD_GAMES: Record<SquadGameId, SquadGameInfo> = {
   },
   heads_up: {
     id: "heads_up",
+    mood: "Get loud",
     // Shown as "Clue Me In"; the id stays heads_up (the server, decks and
     // league all key on it).
     label: "Clue Me In",
@@ -252,4 +259,24 @@ export function stageCueFor(round: Round | null, mine: MyView | null, me: string
   // Writing, guessing or judging: the card needs the room; faces are a strip.
   if (round.game === "spill_tea" && round.lead_id) faces[round.lead_id] = { ...faces[round.lead_id], ring: true };
   return { ...QUIET, faces };
+}
+
+/** Tonight's energy, remembered per room on this device. */
+const ENERGY_KEY = (roomId: string) => `dr_squad_energy:${roomId}`;
+
+export function readEnergy(roomId: string): Deck | null {
+  try {
+    const v = localStorage.getItem(ENERGY_KEY(roomId));
+    return v === "mild" || v === "spicy" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveEnergy(roomId: string, deck: Deck): void {
+  try {
+    localStorage.setItem(ENERGY_KEY(roomId), deck);
+  } catch {
+    /* private mode: it'll ask again next time */
+  }
 }
