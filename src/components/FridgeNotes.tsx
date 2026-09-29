@@ -543,7 +543,7 @@ export function FridgeNotes({ active = true }: Props) {
               ref={textareaRef}
               value={text}
               onChange={(e) => setText(e.target.value.slice(0, NOTE_MAX))}
-              placeholder="Thinking about you today…"
+              placeholder={room.roomPackage === "squad" ? "Something for the squad…" : "Thinking about you today…"}
               rows={4}
               className="resize-none border-white/10 bg-secondary/60 text-body leading-relaxed"
             />
