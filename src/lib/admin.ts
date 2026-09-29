@@ -490,8 +490,41 @@ export function listSquadBetaApplications(status: "pending" | "granted" | "decli
   return api.get<SquadBetaApplicationsResponse>(`/v1/admin/squad/beta/applications${qs({ status })}`);
 }
 
-export function grantSquadBeta(body: { user_id: string }) {
-  return api.post<{ status: string }>("/v1/admin/squad/beta/grant", body);
+export type SquadBetaGrantResult = {
+  status: string;
+  gift_nights: number;
+  /** Where the gift landed; null while it waits for their first squad room. */
+  gift_room_id: string | null;
+};
+
+/** Let someone into the Squad beta, optionally with nights as a gift. */
+export function grantSquadBeta(body: { user_id: string; gift_nights?: number }) {
+  return api.post<SquadBetaGrantResult>("/v1/admin/squad/beta/grant", body);
+}
+
+export type AdminSquadRoom = {
+  id: string;
+  code: string;
+  name: string | null;
+  owner_id: string;
+  owner_email: string;
+  owner_name: string;
+  seats: number;
+  nights_left: number;
+  seat_nights: number;
+  members: number;
+  nights_played: number;
+  night_on: boolean;
+  created_at: string;
+};
+
+export function listAdminSquadRooms(q?: string) {
+  return api.get<{ items: AdminSquadRoom[] }>(`/v1/admin/squad/rooms${qs({ q: q?.trim() || undefined })}`);
+}
+
+/** Free nights for a squad room, sized to its seats. Never expire. */
+export function giftSquadNights(roomId: string, body: { nights: number; note?: string }) {
+  return api.post<AdminSquadRoom>(`/v1/admin/squad/rooms/${roomId}/nights`, body);
 }
 
 export function declineSquadBeta(body: { user_id: string; reason: SquadBetaDeclineReason }) {

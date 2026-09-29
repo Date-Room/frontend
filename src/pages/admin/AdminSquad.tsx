@@ -1,7 +1,9 @@
 /**
- * Squad beta queue: who asked, where they are, how many, what for. Pick a
- * spread of groups (the country counts help), then let them in or decline.
- * Granting is idempotent and audited server-side.
+ * Squad admin. The beta queue: who asked, where they are, how many, what
+ * for. Pick a spread of groups (the country counts help), then let them in
+ * (optionally with a 4-night pack that lands in their first room) or
+ * decline. Below it, the squad rooms: find one and add nights for free.
+ * Everything is audited server-side.
  */
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,10 +12,14 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api";
 import {
   declineSquadBeta,
+  giftSquadNights,
   grantSquadBeta,
+  listAdminSquadRooms,
   listSquadBetaApplications,
+  type AdminSquadRoom,
   type SquadBetaApplication,
   type SquadBetaDeclineReason,
+  type SquadBetaGrantResult,
 } from "@/lib/admin";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +38,19 @@ const DECLINE_REASONS: { id: SquadBetaDeclineReason; label: string }[] = [
 ];
 
 type Filter = "pending" | "granted" | "declined" | "all";
+
+/** The pack an admin can gift with access, or later to someone let in. */
+const GIFT_PACK_NIGHTS = 4;
+const GIFT_NIGHT_CHOICES = [1, 2, 4, 8];
+
+/** Pure: what happened to a gift, for the toast. */
+export function giftLine(name: string, r: SquadBetaGrantResult): string {
+  if (!r.gift_nights) return `${name} is in`;
+  const nights = `${r.gift_nights} night${r.gift_nights === 1 ? "" : "s"}`;
+  return r.gift_room_id
+    ? `${name} got ${nights}, added to their squad room`
+    : `${name} got ${nights}. They land in their first squad room`;
+}
 
 /** Pure: "KE 3 · NG 2 · ?? 1", biggest first. */
 export function countryLine(byCountry: Record<string, number>): string {
@@ -95,6 +114,157 @@ export default function AdminSquad() {
       <div className="space-y-3">
         {q.data?.items.map((app) => <RequestCard key={app.id} app={app} />)}
       </div>
+
+      <SquadRooms />
+    </div>
+  );
+}
+
+/* ───────────────── Squad rooms: find one, add nights ───────────────── */
+
+function SquadRooms() {
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const rooms = useQuery({
+    queryKey: ["admin-squad-rooms", query],
+    queryFn: () => listAdminSquadRooms(query),
+  });
+
+  return (
+    <section className="space-y-3 pt-6" aria-labelledby="squad-rooms-h">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex-1">
+          <h2 id="squad-rooms-h" className="text-xl font-semibold">Squad rooms</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Newest first. Add nights for free: they&rsquo;re sized to the room&rsquo;s seats and never expire.
+          </p>
+        </div>
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setQuery(search);
+          }}
+        >
+          <input
+            id="squad-room-search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Code, room name, owner email"
+            className="admin-input w-64 rounded-lg px-3 py-1.5 text-sm"
+            aria-label="Search squad rooms"
+          />
+          <button type="submit" className="rounded-lg border border-white/[0.14] px-3 py-1.5 text-sm text-cream hover:bg-white/[0.06]">
+            Search
+          </button>
+        </form>
+      </div>
+      {rooms.isLoading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label="Loading" />}
+      {rooms.data && rooms.data.items.length === 0 && (
+        <p className="rounded-lg border border-white/[0.08] bg-card/40 px-4 py-6 text-center text-sm text-muted-foreground/70">
+          {query ? "No squad rooms match." : "No squad rooms yet."}
+        </p>
+      )}
+      <div className="space-y-2">
+        {rooms.data?.items.map((room) => <RoomRow key={room.id} room={room} />)}
+      </div>
+    </section>
+  );
+}
+
+function RoomRow({ room }: { room: AdminSquadRoom }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [nights, setNights] = useState(GIFT_PACK_NIGHTS);
+  const [note, setNote] = useState("");
+  const gift = useMutation({
+    mutationFn: () => giftSquadNights(room.id, { nights, note: note.trim() || undefined }),
+    onSuccess: (r) => {
+      toast.success(`Added ${nights} night${nights === 1 ? "" : "s"}. ${r.nights_left} left in ${room.name || room.code}`);
+      setOpen(false);
+      setNote("");
+      void qc.invalidateQueries({ queryKey: ["admin-squad-rooms"] });
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Couldn't add nights"),
+  });
+
+  return (
+    <div className="rounded-lg border border-white/[0.08] bg-card/40">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold">
+            {room.name || "Unnamed squad"} <span className="font-mono text-xs text-muted-foreground">{room.code}</span>
+            {room.night_on && (
+              <span className="ml-2 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-200">night on</span>
+            )}
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {room.owner_name || room.owner_email} · {room.owner_email}
+          </p>
+        </div>
+        <Mini label="Seats" value={room.seats} />
+        <Mini label="Nights left" value={room.nights_left} />
+        <Mini label="Played" value={room.nights_played} />
+        <Mini label="Members" value={room.members} />
+        {!open && (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            Add nights
+          </button>
+        )}
+      </div>
+      {open && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-white/[0.08] px-4 py-3">
+          <span className="text-xs text-muted-foreground">Nights</span>
+          {GIFT_NIGHT_CHOICES.map((n) => (
+            <button
+              key={n}
+              type="button"
+              aria-pressed={nights === n}
+              onClick={() => setNights(n)}
+              className={cn(
+                "rounded-full border px-3 py-0.5 text-sm tabular-nums",
+                nights === n ? "border-primary/60 bg-primary/15 text-cream" : "border-white/[0.14] text-cream/80",
+              )}
+            >
+              {n}
+            </button>
+          ))}
+          <input
+            id={`gift-note-${room.id}`}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            maxLength={200}
+            placeholder="Note for the audit log (optional)"
+            className="admin-input min-w-[12rem] flex-1 rounded-lg px-3 py-1.5 text-sm"
+            aria-label="Note"
+          />
+          <button
+            type="button"
+            disabled={gift.isPending}
+            onClick={() => gift.mutate()}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+          >
+            {gift.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Add {nights} night{nights === 1 ? "" : "s"} free
+          </button>
+          <button type="button" onClick={() => setOpen(false)} className="text-xs text-muted-foreground hover:text-cream">
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Mini({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="text-right">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70">{label}</p>
+      <p className="font-semibold tabular-nums">{value}</p>
     </div>
   );
 }
@@ -112,10 +282,15 @@ function RequestCard({ app }: { app: SquadBetaApplication }) {
   const qc = useQueryClient();
   const [declineOpen, setDeclineOpen] = useState(false);
   const [reason, setReason] = useState<SquadBetaDeclineReason>("not_yet");
-  const refresh = () => void qc.invalidateQueries({ queryKey: ["admin-squad-beta"] });
+  const [withPack, setWithPack] = useState(false);
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ["admin-squad-beta"] });
+    void qc.invalidateQueries({ queryKey: ["admin-squad-rooms"] });
+  };
+  const name = app.display_name || app.email;
   const grant = useMutation({
-    mutationFn: () => grantSquadBeta({ user_id: app.user_id }),
-    onSuccess: () => { toast.success(`${app.display_name || app.email} is in`); refresh(); },
+    mutationFn: (gift: number) => grantSquadBeta({ user_id: app.user_id, gift_nights: gift }),
+    onSuccess: (r) => { toast.success(giftLine(name, r)); refresh(); },
     onError: (e) => toast.error(e instanceof ApiError ? e.message : "Grant failed"),
   });
   const decline = useMutation({
@@ -151,11 +326,21 @@ function RequestCard({ app }: { app: SquadBetaApplication }) {
           <button
             type="button"
             disabled={grant.isPending}
-            onClick={() => grant.mutate()}
+            onClick={() => grant.mutate(withPack ? GIFT_PACK_NIGHTS : 0)}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground neon-btn hover:bg-primary/90 disabled:opacity-40"
           >
             {grant.isPending && <Loader2 className="h-4 w-4 animate-spin" />}Let them in
           </button>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-cream/90">
+            <input
+              id={`gift-pack-${app.id}`}
+              type="checkbox"
+              checked={withPack}
+              onChange={(e) => setWithPack(e.target.checked)}
+              className="h-4 w-4 accent-[hsl(var(--primary))]"
+            />
+            Include a {GIFT_PACK_NIGHTS}-night pack
+          </label>
           {!declineOpen ? (
             <button type="button" onClick={() => setDeclineOpen(true)} className="rounded-lg border border-rose-500/40 bg-rose-500/[0.06] px-4 py-2 text-sm text-rose-200 hover:bg-rose-500/10">
               Decline
@@ -176,6 +361,22 @@ function RequestCard({ app }: { app: SquadBetaApplication }) {
             </div>
           )}
           <span className="text-xs text-muted-foreground/70">They only ever see &ldquo;not this round&rdquo;.</span>
+        </div>
+      )}
+      {app.status === "granted" && (
+        <div className="flex flex-wrap items-center gap-3 border-t border-white/[0.08] px-4 py-3">
+          <button
+            type="button"
+            disabled={grant.isPending}
+            onClick={() => grant.mutate(GIFT_PACK_NIGHTS)}
+            className="inline-flex items-center gap-2 rounded-lg border border-primary/40 px-3 py-1.5 text-sm text-cream hover:bg-primary/10 disabled:opacity-40"
+          >
+            {grant.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Gift a {GIFT_PACK_NIGHTS}-night pack
+          </button>
+          <span className="text-xs text-muted-foreground/70">
+            Goes to their newest squad room, or their first one when they open it.
+          </span>
         </div>
       )}
     </div>

@@ -25,7 +25,6 @@ const GRANTS = [
   { id: "date_pack", label: "Date Pack" },
   { id: "long_pack", label: "Long Pack" },
   { id: "together", label: "Together +1" },
-  { id: "crew", label: "Crew +1" },
 ] as const;
 
 export default function AdminUsers() {

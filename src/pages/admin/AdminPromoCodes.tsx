@@ -57,13 +57,6 @@ const PRESETS = [
     subscription_days: 30,
   },
   {
-    label: "Influencer Crew",
-    prefix: "CREW",
-    kind: "tier_grant" as const,
-    tier_product: "crew",
-    subscription_days: 90,
-  },
-  {
     label: "Free Date Pack",
     prefix: "DATE",
     kind: "tier_grant" as const,
@@ -223,7 +216,6 @@ function BenefitFields({
             <SelectItem value="date_pack">Date Pack</SelectItem>
             <SelectItem value="long_pack">Long Pack</SelectItem>
             <SelectItem value="together">Together</SelectItem>
-            <SelectItem value="crew">Crew</SelectItem>
           </SelectContent>
         </Select>
       </div>
