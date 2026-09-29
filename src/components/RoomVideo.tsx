@@ -24,7 +24,7 @@ import "@livekit/components-styles";
 import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Minus, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AmbientController } from "@/components/AmbientController";
-import { GroupStage } from "@/components/squad/GroupStage";
+import { GroupStage, type GroupLayout } from "@/components/squad/GroupStage";
 import { ChaperonAgentBridge } from "@/components/ChaperonAgentBridge";
 import { CallPeersBridge } from "@/context/CallPeersContext";
 import {
@@ -599,6 +599,9 @@ type CallControls = {
   onRotate?: () => void;
   /** Squad night: capped group video and the group stage (see GroupStage). */
   group?: boolean;
+  /** Squad night: how the room wants the faces laid out right now (couch,
+   *  game, full-screen strip). Unset: grid on laptops, focus elsewhere. */
+  groupLayout?: GroupLayout;
 };
 
 function Stage({
@@ -1143,6 +1146,7 @@ export function RoomVideo({
   onCollapse,
   onRotate,
   group,
+  groupLayout,
 }: { onLeave?: () => void } & CallControls = {}) {
   const room = useRoomSession();
   const wideScreen = useWideViewport();
@@ -1265,7 +1269,10 @@ export function RoomVideo({
       {group ? (
         <GroupStage
           roomId={room.roomId}
-          focus={Boolean(collapsed) || variant === "pip" || Boolean(compact) || !wideScreen}
+          layout={
+            groupLayout ??
+            (collapsed || variant === "pip" || compact || !wideScreen ? "focus" : "grid")
+          }
           bare={collapsed}
           onLeave={onLeave ?? (() => {})}
         />

@@ -79,3 +79,16 @@ export function gridColumns(n: number): number {
   if (n <= 4) return 2;
   return 3;
 }
+
+/** "Amaka", "Amaka and Salma", "Amaka, Salma and Nia". */
+export function joinNames(names: string[]): string {
+  const n = names.filter(Boolean);
+  if (n.length <= 1) return n[0] ?? "";
+  return `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`;
+}
+
+/** The squad's line in the room's top bar: who's here, or who we're waiting for. */
+export function squadHereLine(names: string[]): string {
+  if (names.length === 0) return "Waiting for the squad…";
+  return `${joinNames(names)} ${names.length === 1 ? "is" : "are"} here`;
+}

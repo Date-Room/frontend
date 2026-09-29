@@ -87,6 +87,24 @@ function loadYT() {
   return ensureYtShim();
 }
 
+
+/** Full-screen films on a phone play sideways. Supported on Android
+ *  browsers; elsewhere (iOS, desktops) the lock is refused and nothing
+ *  changes, which is fine. */
+function lockLandscapeOnPhones(): void {
+  if (!window.matchMedia?.("(pointer: coarse)").matches) return;
+  const o = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+  void o?.lock?.("landscape").catch(() => {});
+}
+
+function unlockOrientation(): void {
+  try {
+    screen.orientation?.unlock?.();
+  } catch {
+    /* not locked, or not supported */
+  }
+}
+
 export function WatchTogether() {
   const { t } = useTranslation();
   const room = useRoomSession();
@@ -182,10 +200,13 @@ export function WatchTogether() {
       // when the `fullscreenchange` event fires — RoomStage keys the PiP move
       // off this attribute and reacts on that same event.
       el.setAttribute("data-dr-watch-fs", "1");
-      void el.requestFullscreen().catch(() => {
-        el.removeAttribute("data-dr-watch-fs");
-        setFullscreen((v) => !v);
-      });
+      void el
+        .requestFullscreen()
+        .then(() => lockLandscapeOnPhones())
+        .catch(() => {
+          el.removeAttribute("data-dr-watch-fs");
+          setFullscreen((v) => !v);
+        });
     } else {
       // No Fullscreen API — fall back to the CSS `fixed inset-0` layer.
       setFullscreen((v) => !v);
@@ -195,7 +216,10 @@ export function WatchTogether() {
     const onChange = () => {
       const isFs = document.fullscreenElement === fullscreenWrapRef.current;
       setFullscreen(isFs);
-      if (!isFs) fullscreenWrapRef.current?.removeAttribute("data-dr-watch-fs");
+      if (!isFs) {
+        fullscreenWrapRef.current?.removeAttribute("data-dr-watch-fs");
+        unlockOrientation();
+      }
     };
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
@@ -767,6 +791,10 @@ export function WatchTogether() {
           void 0;
         }
       } else if (e.type === "pause") {
+        // Squad nights: anyone can pause for everyone, so say who did.
+        if (room.roomPackage === "squad" && typeof e.payload.by === "string" && e.payload.by) {
+          toast.message(`${e.payload.by} paused for everyone`);
+        }
         const leader = lastControllerRef.current === userId;
         if (leader && (videoId || directActiveRef.current) && wIsPlaying()) {
           return;
@@ -783,7 +811,7 @@ export function WatchTogether() {
         if (ts != null) wDriftCorrect(ts);
       }
     });
-  }, [session, userId, videoId, room.canPersist]);
+  }, [session, userId, videoId, room.canPersist, room.roomPackage]);
 
   // Ask the room what's on. Durable hydrate covers the signed-in case; this
   // covers a guest who loaded the video while nobody else had Watch open.
@@ -878,7 +906,7 @@ export function WatchTogether() {
       } catch {
         void 0;
       }
-      void session?.sendEvent("pause", { timestamp_seconds: time });
+      void session?.sendEvent("pause", { timestamp_seconds: time, by: room.displayName });
       persistWatch({ video_id: videoId, playing: false, timestamp_seconds: time });
       setPlaying(false);
     }

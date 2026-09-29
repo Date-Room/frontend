@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gridColumns, liveVideoFor, localClock, nearTheEnd, placeLine, speakerFirst, timeLeft } from "./squadCall";
+import { gridColumns, joinNames, liveVideoFor, squadHereLine, localClock, nearTheEnd, placeLine, speakerFirst, timeLeft } from "./squadCall";
 
 const at = new Date("2026-09-29T17:30:00Z");
 
@@ -34,6 +34,14 @@ describe("squad call helpers", () => {
     expect(speakerFirst(["a", "b"], null, "a", true)).toEqual(["b", "a"]);
     // You talking doesn't put you big on your own phone.
     expect(speakerFirst(["a", "b"], "a", "a", true)).toEqual(["b", "a"]);
+  });
+
+  it("names who's here", () => {
+    expect(joinNames(["Amaka"])).toBe("Amaka");
+    expect(joinNames(["Amaka", "Salma", "Nia"])).toBe("Amaka, Salma and Nia");
+    expect(squadHereLine([])).toBe("Waiting for the squad…");
+    expect(squadHereLine(["Amaka"])).toBe("Amaka is here");
+    expect(squadHereLine(["Amaka", "Salma"])).toBe("Amaka and Salma are here");
   });
 
   it("picks grid columns", () => {
