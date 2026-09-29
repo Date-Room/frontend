@@ -117,6 +117,20 @@ export function makeMove(roomId: string, game: SquadGameId, value: unknown) {
   return api.post<RoundState>(`${base(roomId, game)}/current/moves`, { value });
 }
 
+/** Skip the card before anyone plays it: a fresh one is dealt, no points,
+ *  and the skip counts against the card (what the beta skips gets cut). */
+export function skipCard(roomId: string, game: SquadGameId) {
+  return api.post<RoundState>(`${base(roomId, game)}/current/skip`, {});
+}
+
+/** Pure: can this card still be skipped (nobody has played it yet)? */
+export function canSkip(round: Round, me: string | null): boolean {
+  if (!me || !round.players.includes(me) || round.stage === "revealed") return false;
+  if (round.game === "heads_up") return (round.heads_up?.index ?? 0) === 0;
+  const first = round.game === "most_likely" || round.game === "imposter" ? "vote" : "answer";
+  return round.stage === first && round.submitted.length === 0;
+}
+
 export function closeStage(roomId: string, game: SquadGameId) {
   return api.post<RoundState>(`${base(roomId, game)}/current/close`, {});
 }

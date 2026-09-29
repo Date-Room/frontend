@@ -14,8 +14,10 @@ import {
   declineSquadBeta,
   giftSquadNights,
   grantSquadBeta,
+  listAdminSquadCards,
   listAdminSquadRooms,
   listSquadBetaApplications,
+  type AdminSquadCard,
   type AdminSquadRoom,
   type SquadBetaApplication,
   type SquadBetaDeclineReason,
@@ -116,6 +118,7 @@ export default function AdminSquad() {
       </div>
 
       <SquadRooms />
+      <SkippedCards />
     </div>
   );
 }
@@ -389,5 +392,75 @@ function Field({ label, value }: { label: string; value: string }) {
       <p className="text-[11px] uppercase tracking-wider text-muted-foreground/70">{label}</p>
       <p className="mt-1 text-cream">{value}</p>
     </div>
+  );
+}
+
+const GAME_LABELS: Record<string, string> = {
+  most_likely: "Most Likely To",
+  who_said_it: "Who Said It",
+  imposter: "Imposter",
+  spill_tea: "Spill the Tea",
+  heads_up: "Heads Up",
+};
+
+/** Pure: "40%" of the times a card was dealt that someone skipped it. */
+export function skipRate(card: Pick<AdminSquadCard, "dealt" | "skipped">): string {
+  return card.dealt ? `${Math.round((100 * card.skipped) / card.dealt)}%` : "0%";
+}
+
+/* ───────────────── Cards the beta skips ───────────────── */
+
+function SkippedCards() {
+  const cards = useQuery({ queryKey: ["admin-squad-cards"], queryFn: listAdminSquadCards });
+  const items = cards.data?.items ?? [];
+  const skipped = items.filter((c) => c.skipped > 0);
+  return (
+    <section className="space-y-3 pt-6" aria-labelledby="squad-cards-h">
+      <div>
+        <h2 id="squad-cards-h" className="text-xl font-semibold">Cards the beta skips</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Squads can skip a card before anyone plays it. The most skipped are the ones to cut.
+          {items.length > 0 && ` ${items.length} cards dealt so far, ${skipped.length} skipped at least once.`}
+        </p>
+      </div>
+      {cards.isLoading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label="Loading" />}
+      {cards.data && skipped.length === 0 && (
+        <p className="rounded-lg border border-white/[0.08] bg-card/40 px-4 py-6 text-center text-sm text-muted-foreground/70">
+          No skips yet.
+        </p>
+      )}
+      {skipped.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border border-white/[0.08]">
+          <table className="w-full text-sm">
+            <thead className="bg-card/60 text-left text-[11px] uppercase tracking-wider text-muted-foreground/70">
+              <tr>
+                <th className="px-3 py-2 font-medium">Card</th>
+                <th className="px-3 py-2 font-medium">Game</th>
+                <th className="px-3 py-2 text-right font-medium">Skipped</th>
+                <th className="px-3 py-2 text-right font-medium">Dealt</th>
+                <th className="px-3 py-2 text-right font-medium">Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {skipped.slice(0, 50).map((c) => (
+                <tr key={c.id} className="border-t border-white/[0.06]">
+                  <td className="max-w-[28rem] px-3 py-2">
+                    <span className="block text-cream">{c.text}</span>
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      {c.id} · {c.deck}
+                      {c.region !== "all" && ` · ${c.region.toUpperCase()}`}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">{GAME_LABELS[c.game] ?? c.game}</td>
+                  <td className="px-3 py-2 text-right font-semibold tabular-nums">{c.skipped}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{c.dealt}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">{skipRate(c)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }

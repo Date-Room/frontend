@@ -12,12 +12,14 @@ import { useRoomSession } from "@/context/RoomSessionContext";
 import { getSquadMembers, squadErrorText } from "@/lib/squad";
 import {
   SQUAD_GAMES,
+  canSkip,
   closeStage,
   getRound,
   listNames,
   makeMove,
   myTurn,
   secondsLeft,
+  skipCard,
   startBlocker,
   startRound,
   tallyRows,
@@ -76,6 +78,14 @@ export function SquadGame({ game }: { game: SquadGameId }) {
     onSuccess: put,
     onError: fail("That didn't go through. Try again."),
   });
+  const skipThis = useMutation({
+    mutationFn: () => skipCard(room.roomId, game),
+    onSuccess: (s) => {
+      put(s);
+      toast.message("New card dealt.");
+    },
+    onError: fail("That card's already in play."),
+  });
   const skip = useMutation({
     mutationFn: () => closeStage(room.roomId, game),
     onSuccess: put,
@@ -130,6 +140,18 @@ export function SquadGame({ game }: { game: SquadGameId }) {
           <>
             <Play round={round} mine={mine} me={me} nameOf={nameOf} busy={move.isPending} onMove={(v) => move.mutate(v)} />
             <Waiting round={round} me={me} nameOf={nameOf} busy={skip.isPending} onSkip={() => skip.mutate()} />
+            {canSkip(round, me) && (
+              <div className="text-center">
+                <button
+                  type="button"
+                  disabled={skipThis.isPending}
+                  onClick={() => skipThis.mutate()}
+                  className="focus-ring rounded-full px-3 py-1 text-sm text-muted-foreground underline-offset-2 hover:text-cream hover:underline disabled:opacity-40"
+                >
+                  Skip this card
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>
