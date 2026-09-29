@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canSkip,
   isSquadGame,
   listNames,
   myTurn,
@@ -84,5 +85,18 @@ describe("helpers", () => {
   it("recognises squad game ids", () => {
     expect(isSquadGame("imposter")).toBe(true);
     expect(isSquadGame("guacamole")).toBe(false);
+  });
+});
+
+describe("canSkip", () => {
+  it("only before anyone has played the card", () => {
+    expect(canSkip(round({}), "a")).toBe(true);
+    expect(canSkip(round({ submitted: ["b"] }), "a")).toBe(false);
+    expect(canSkip(round({}), "z")).toBe(false);
+    expect(canSkip(round({ stage: "revealed" }), "a")).toBe(false);
+    expect(canSkip(round({ game: "who_said_it", stage: "guess" }), "a")).toBe(false);
+    const hu = { game: "heads_up" as const, stage: "playing" as const };
+    expect(canSkip(round({ ...hu, heads_up: { index: 0, total: 12 } }), "a")).toBe(true);
+    expect(canSkip(round({ ...hu, heads_up: { index: 2, total: 12 } }), "a")).toBe(false);
   });
 });

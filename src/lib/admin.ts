@@ -522,6 +522,21 @@ export function listAdminSquadRooms(q?: string) {
   return api.get<{ items: AdminSquadRoom[] }>(`/v1/admin/squad/rooms${qs({ q: q?.trim() || undefined })}`);
 }
 
+export type AdminSquadCard = {
+  id: string;
+  game: string;
+  deck: "mild" | "spicy";
+  region: string;
+  text: string;
+  dealt: number;
+  skipped: number;
+};
+
+/** Every card dealt so far, most skipped first: the beta's cut list. */
+export function listAdminSquadCards() {
+  return api.get<{ items: AdminSquadCard[] }>("/v1/admin/squad/cards");
+}
+
 /** Free nights for a squad room, sized to its seats. Never expire. */
 export function giftSquadNights(roomId: string, body: { nights: number; note?: string }) {
   return api.post<AdminSquadRoom>(`/v1/admin/squad/rooms/${roomId}/nights`, body);

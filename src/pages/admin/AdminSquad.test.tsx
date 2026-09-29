@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countryLine, giftLine } from "./AdminSquad";
+import { countryLine, giftLine, skipRate } from "./AdminSquad";
 
 describe("AdminSquad helpers", () => {
   it("lists countries biggest first, ties alphabetical", () => {
@@ -17,5 +17,12 @@ describe("giftLine", () => {
     expect(giftLine("Amaka", { status: "granted", gift_nights: 1, gift_room_id: null })).toBe(
       "Amaka got 1 night. They land in their first squad room",
     );
+  });
+});
+
+describe("skipRate", () => {
+  it("is skips over times dealt, rounded", () => {
+    expect(skipRate({ dealt: 3, skipped: 1 })).toBe("33%");
+    expect(skipRate({ dealt: 0, skipped: 0 })).toBe("0%");
   });
 });
