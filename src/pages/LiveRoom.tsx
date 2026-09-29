@@ -13,6 +13,7 @@ import { useReportTabOpened } from "@/lib/featureOpened";
 import { isTryPackage, getRoomExperience, isActivityEnabled, getRoomPlan, saveRoomPlanFromServer, isSubscriptionPackage, type CuratableActivityId } from "@/lib/roomExperience";
 import { isWatchPartyRoom } from "@/lib/watchParty";
 import { getRoomExperienceApi, listMyRooms, type Room, type RoomPackage } from "@/lib/rooms";
+import { getSquadNights } from "@/lib/squad";
 import { LogOut, Clock, Maximize2, Minimize2, Sparkles, ChevronLeft, Home, MessageSquareText } from "lucide-react";
 import { AmbientSceneStack } from "@/components/AmbientSceneStack";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
@@ -848,6 +849,15 @@ export default function LiveRoom() {
       try {
         const exp = await getRoomExperienceApi(roomId, participantId);
         if (cancelled) return;
+        if (exp.room_kind === "squad") {
+          // Between nights a squad room has no call: send people to the
+          // room's own page (keeping ?squad_purchased from a card payment).
+          const nights = await getSquadNights(roomId).catch(() => null);
+          if (!cancelled && nights && !nights.active_night) {
+            navigate(`/squad/room/${roomId}${window.location.search}`, { replace: true });
+            return;
+          }
+        }
         const plan = saveRoomPlanFromServer(roomId, exp);
         setRoomPackage(plan.package);
         setCuratedActivityIds(plan.curatedActivityIds);
@@ -880,7 +890,7 @@ export default function LiveRoom() {
       cancelled = true;
       window.clearInterval(poll);
     };
-  }, [roomId, participantId]);
+  }, [roomId, participantId, navigate]);
 
   useEffect(() => {
     if (!roomId || !timePurchased) return;

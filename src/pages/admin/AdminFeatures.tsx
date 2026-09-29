@@ -7,7 +7,7 @@
  */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAdminFeatures, type FeatureRow } from "@/lib/admin";
+import { getAdminFeatures, ROOM_KIND_LABELS, type FeatureRow, type RoomKindFilter } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
 import { loadProblem } from "@/pages/admin/AdminGrowth";
 import { cn } from "@/lib/utils";
@@ -71,9 +71,10 @@ export default function AdminFeatures() {
   const [days, setDays] = useState<7 | 30 | 90 | 365>(30);
   const [includeTeam, setIncludeTeam] = useState(false);
   const [platform, setPlatform] = useState<string | null>(null);
+  const [kind, setKind] = useState<RoomKindFilter | null>(null);
   const q = useQuery({
-    queryKey: ["admin-features", days, includeTeam, platform],
-    queryFn: () => getAdminFeatures(days, includeTeam, { platform }),
+    queryKey: ["admin-features", days, includeTeam, platform, kind],
+    queryFn: () => getAdminFeatures(days, includeTeam, { platform, kind }),
     refetchInterval: 60_000,
     placeholderData: (prev) => prev,
   });
@@ -92,6 +93,11 @@ export default function AdminFeatures() {
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          <select aria-label="Room kind" value={kind ?? ""} onChange={(e) => setKind((e.target.value || null) as RoomKindFilter | null)} className={SELECT}>
+            <option value="">Dates and squads</option>
+            <option value="date">{ROOM_KIND_LABELS.date}</option>
+            <option value="squad">{ROOM_KIND_LABELS.squad}</option>
+          </select>
           <select aria-label="Platform" value={platform ?? ""} onChange={(e) => setPlatform(e.target.value || null)} className={SELECT}>
             <option value="">All platforms</option>
             <option value="web">Web</option>
