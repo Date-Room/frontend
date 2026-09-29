@@ -9,8 +9,14 @@
  * - Every face: name, city and their own local time.
  * - Weak phones play live video only for the person talking and yourself;
  *   everyone else is a photo bubble that lights up when they speak.
+ * - During a squad game ("game" layout) the faces follow the game's cue
+ *   (SquadStageContext): a strip while you read, a grid of friends to tap
+ *   while you decide, one face forward at a reveal.
+ * - Mute and camera live in the room bar with Activities and chat (the
+ *   call hands them up through the stage context), so they never move.
+ *   Only the full-screen film strip keeps its own.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   VideoTrack,
@@ -21,7 +27,8 @@ import {
   type TrackReferenceOrPlaceholder,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
-import { Armchair, Clock, Mic, MicOff, PhoneOff, Video, VideoOff } from "lucide-react";
+import { Armchair, Clock, Mic, MicOff, Video, VideoOff } from "lucide-react";
+import { useSquadStage, type FaceCue } from "@/context/SquadStageContext";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
 import {
   browserTimeZone,
@@ -30,7 +37,15 @@ import {
   setSquadWhere,
   type SquadMember,
 } from "@/lib/squad";
-import { gridColumns, liveVideoFor, nearTheEnd, placeLine, speakerFirst, timeLeft } from "@/lib/squadCall";
+import {
+  friendGridClass,
+  gridColumns,
+  liveVideoFor,
+  nearTheEnd,
+  placeLine,
+  speakerFirst,
+  timeLeft,
+} from "@/lib/squadCall";
 import { cn } from "@/lib/utils";
 
 /**
@@ -39,15 +54,17 @@ import { cn } from "@/lib/utils";
  * row-tiles    the couch: a row of small faces under the film
  * row-bubbles  the game layout: faces shrunk to bubbles under the game
  * strip        full-screen film: a column of bubbles down the side
+ * game         a squad game on stage: follows the game's cue (see SquadStageContext)
  */
-export type GroupLayout = "grid" | "focus" | "row-tiles" | "row-bubbles" | "strip";
+export type GroupLayout = "grid" | "focus" | "row-tiles" | "row-bubbles" | "strip" | "game";
 
 type Props = {
   roomId: string;
   layout: GroupLayout;
-  /** Just the faces: no controls, no clock (the call is a bubble). */
+  /** Just the faces: no clock (the call is a bubble). */
   bare?: boolean;
-  onLeave: () => void;
+  /** Kept for callers; hanging up lives in the room bar now. */
+  onLeave?: () => void;
 };
 
 /** Ticks once a minute so every clock on screen moves together. */
@@ -60,8 +77,9 @@ function useMinute(): Date {
   return now;
 }
 
-export function GroupStage({ roomId, layout, bare, onLeave }: Props) {
+export function GroupStage({ roomId, layout, bare }: Props) {
   const focus = layout === "focus";
+  const stage = useSquadStage();
   const qc = useQueryClient();
   const lowPower = useLowPowerMode();
   const now = useMinute();
@@ -87,6 +105,22 @@ export function GroupStage({ roomId, layout, bare, onLeave }: Props) {
     }
   }, [me, roomId, qc]);
 
+  // Mute and camera go up to the room bar (next to Activities and chat), so
+  // they sit in the same place on every screen.
+  const lp = useRef(localParticipant);
+  lp.current = localParticipant;
+  const setControls = stage?.setControls;
+  useEffect(() => {
+    if (!setControls) return;
+    setControls({
+      mic: isMicrophoneEnabled,
+      cam: isCameraEnabled,
+      toggleMic: () => void lp.current.setMicrophoneEnabled(!lp.current.isMicrophoneEnabled),
+      toggleCam: () => void lp.current.setCameraEnabled(!lp.current.isCameraEnabled),
+    });
+  }, [setControls, isMicrophoneEnabled, isCameraEnabled]);
+  useEffect(() => () => setControls?.(null), [setControls]);
+
   const byIdentity = useMemo(() => {
     const map = new Map<string, SquadMember>();
     for (const m of members.data?.members ?? []) if (m.user_id) map.set(m.user_id, m);
@@ -108,7 +142,7 @@ export function GroupStage({ roomId, layout, bare, onLeave }: Props) {
   const clock = timeLeft(night?.ends_at, now);
   const ending = nearTheEnd(night?.ends_at, now);
 
-  const face = (id: string, size: "big" | "tile" | "bubble" | "mini") => {
+  const face = (id: string, size: FaceSize, cue?: FaceCue, onTap?: () => void) => {
     const ref = byId.get(id);
     if (!ref) return null;
     const m = byIdentity.get(id);
@@ -123,35 +157,31 @@ export function GroupStage({ roomId, layout, bare, onLeave }: Props) {
         talking={speaking.some((p) => p.identity === id)}
         showVideo={live.has(id)}
         size={size}
+        cue={cue}
+        onTap={onTap}
       />
     );
   };
 
-  const controls = !bare && (
-    <div className="flex items-center justify-center gap-2 p-2">
+  // Full-screen film only: the room bar isn't on screen there, so the strip
+  // keeps its own mute and camera.
+  const stripControls = (
+    <div className="flex flex-col items-center gap-1.5">
       <button
         type="button"
         aria-label={isMicrophoneEnabled ? "Mute" : "Unmute"}
         onClick={() => void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
-        className="flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-cream hover:bg-black/70"
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-cream hover:bg-black/70"
       >
-        {isMicrophoneEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5 text-rose-300" />}
+        {isMicrophoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4 text-rose-300" />}
       </button>
       <button
         type="button"
         aria-label={isCameraEnabled ? "Camera off" : "Camera on"}
         onClick={() => void localParticipant.setCameraEnabled(!isCameraEnabled)}
-        className="flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-cream hover:bg-black/70"
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-cream hover:bg-black/70"
       >
-        {isCameraEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5 text-rose-300" />}
-      </button>
-      <button
-        type="button"
-        aria-label="Leave the call"
-        onClick={onLeave}
-        className="flex h-11 w-11 items-center justify-center rounded-full bg-rose-700/85 text-white hover:bg-rose-700"
-      >
-        <PhoneOff className="h-5 w-5" />
+        {isCameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4 text-rose-300" />}
       </button>
     </div>
   );
@@ -171,6 +201,69 @@ export function GroupStage({ roomId, layout, bare, onLeave }: Props) {
     return (
       <div className="flex flex-col items-center gap-2 rounded-2xl bg-black/45 p-2 backdrop-blur-md">
         {order.map((id) => face(id, "bubble"))}
+        {stripControls}
+      </div>
+    );
+  }
+
+  if (layout === "game") {
+    const cue = stage?.cue;
+    const mode = cue?.mode ?? "reading";
+    const cues = cue?.faces ?? {};
+    const onTap = cue?.onTap;
+    const gface = (id: string, size: FaceSize) =>
+      face(id, size, cues[id], cues[id]?.tappable && onTap ? () => onTap(id) : undefined);
+    const friends = order.filter((id) => id !== self);
+    const clockPill = clock && (
+      <div
+        className={cn(
+          "flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+          ending ? "bg-primary text-primary-foreground" : "bg-black/60 text-cream",
+        )}
+      >
+        <Clock className="h-3 w-3" aria-hidden /> {clock}
+      </div>
+    );
+
+    if (mode === "reading") {
+      // You're reading or writing: everyone shrinks to a strip.
+      return (
+        <div className="flex h-full w-full items-center gap-2 overflow-x-auto bg-black/35 px-3 py-2">
+          {clockPill}
+          {order.map((id) => gface(id, "bubble"))}
+        </div>
+      );
+    }
+
+    if (mode === "spotlight" || mode === "hero") {
+      // One face steps forward; everyone else waits in a row below it.
+      const focusId = cue?.focus && byId.has(cue.focus) ? cue.focus : (friends[0] ?? self);
+      const rest = order.filter((id) => id !== focusId);
+      return (
+        <div className="flex h-full w-full flex-col gap-2 bg-black/40 p-2">
+          <div className="relative min-h-0 flex-1">{gface(focusId, mode === "spotlight" ? "spot" : "big")}</div>
+          {rest.length > 0 && (
+            <div className="flex shrink-0 items-center justify-center gap-2 overflow-x-auto">
+              {clockPill}
+              {rest.map((id) => gface(id, "bubble"))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Deciding or waiting: friends share the grid (never more than four);
+    // you sit small beside the question, never over a friend.
+    return (
+      <div className="flex h-full w-full flex-col gap-2 bg-black/40 p-2">
+        <div className="flex shrink-0 items-center gap-3">
+          {clockPill}
+          <p className="min-w-0 flex-1 text-sm leading-snug text-cream/85">{cue?.hint}</p>
+          {byId.has(self) && <div className="h-[76px] w-[58px] shrink-0">{gface(self, "self")}</div>}
+        </div>
+        <div className={cn("grid min-h-0 flex-1 gap-2", friendGridClass(friends.length))}>
+          {friends.map((id) => gface(id, "tile"))}
+        </div>
       </div>
     );
   }
@@ -192,24 +285,6 @@ export function GroupStage({ roomId, layout, bare, onLeave }: Props) {
         <div className="flex h-full min-w-0 flex-1 items-center gap-2 overflow-x-auto">
           {order.map((id) => face(id, tiles ? "mini" : "bubble"))}
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <button
-            type="button"
-            aria-label={isMicrophoneEnabled ? "Mute" : "Unmute"}
-            onClick={() => void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-cream hover:bg-black/70"
-          >
-            {isMicrophoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4 text-rose-300" />}
-          </button>
-          <button
-            type="button"
-            aria-label={isCameraEnabled ? "Camera off" : "Camera on"}
-            onClick={() => void localParticipant.setCameraEnabled(!isCameraEnabled)}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-cream hover:bg-black/70"
-          >
-            {isCameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4 text-rose-300" />}
-          </button>
-        </div>
       </div>
     );
   }
@@ -225,7 +300,6 @@ export function GroupStage({ roomId, layout, bare, onLeave }: Props) {
             {rest.map((id) => face(id, "bubble"))}
           </div>
         )}
-        {controls}
       </div>
     );
   }
@@ -250,10 +324,11 @@ export function GroupStage({ roomId, layout, bare, onLeave }: Props) {
           </div>
         ))}
       </div>
-      {controls}
     </div>
   );
 }
+
+type FaceSize = "big" | "spot" | "tile" | "self" | "bubble" | "mini";
 
 function Face({
   trackRef,
@@ -263,6 +338,8 @@ function Face({
   talking,
   showVideo,
   size,
+  cue,
+  onTap,
 }: {
   trackRef: TrackReferenceOrPlaceholder;
   name: string;
@@ -270,11 +347,76 @@ function Face({
   photo: string | null;
   talking: boolean;
   showVideo: boolean;
-  size: "big" | "tile" | "bubble" | "mini";
+  size: FaceSize;
+  cue?: FaceCue;
+  onTap?: () => void;
 }) {
   const hasVideo =
     showVideo && isTrackReference(trackRef) && !trackRef.publication.isMuted && Boolean(trackRef.publication.track);
   const initial = (name || "?").charAt(0).toUpperCase();
+  // What the game says about this face: my pick, dimmed, their turn, in/thinking.
+  const cueRing = cue?.picked
+    ? "ring-[3px] ring-primary shadow-[0_0_26px_hsl(var(--primary)/0.45)]"
+    : cue?.ring
+      ? "ring-[3px] ring-primary"
+      : "";
+  const cueDim = cue?.dim ? "opacity-45 saturate-50" : "";
+  const badge = cue?.badge ? (
+    <span
+      className={cn(
+        "absolute right-1.5 top-1.5 z-10 rounded-full px-2 py-0.5 text-[11px] font-bold",
+        cue.badge === "in" ? "bg-emerald-400 text-emerald-950" : "bg-black/65 text-cream",
+      )}
+    >
+      {cue.badge === "in" ? "✓ in" : "•••"}
+    </span>
+  ) : null;
+  const wrap = (el: React.ReactElement, cls: string) =>
+    onTap ? (
+      <button
+        type="button"
+        onClick={onTap}
+        aria-label={`Pick ${name}`}
+        aria-pressed={Boolean(cue?.picked)}
+        className={cn("focus-ring text-left transition", cls)}
+      >
+        {el}
+      </button>
+    ) : (
+      <div className={cls}>{el}</div>
+    );
+
+  if (size === "self" || size === "spot") {
+    // You beside the question (small), or the face that steps forward at a reveal.
+    const spot = size === "spot";
+    return wrap(
+      <div
+        className={cn(
+          "relative flex h-full w-full items-center justify-center overflow-hidden bg-white/[0.06]",
+          spot ? "rounded-2xl ring-[3px] ring-primary shadow-[0_0_60px_hsl(var(--primary)/0.45)]" : "rounded-xl ring-2 ring-cream/60",
+          !spot && cueRing,
+        )}
+      >
+        {badge}
+        {hasVideo ? (
+          <VideoTrack trackRef={trackRef} className="h-full w-full object-cover" />
+        ) : photo ? (
+          <img src={photo} alt="" className={cn("rounded-full object-cover", spot ? "h-28 w-28" : "h-9 w-9")} />
+        ) : (
+          <span className={cn("font-serif font-semibold text-cream", spot ? "text-6xl" : "text-lg")}>{initial}</span>
+        )}
+        <span
+          className={cn(
+            "absolute inset-x-1 bottom-1 truncate rounded bg-black/60 px-1 text-center font-semibold text-cream",
+            spot ? "text-sm" : "text-[10px]",
+          )}
+        >
+          {name}
+        </span>
+      </div>,
+      cn("h-full w-full", cueDim),
+    );
+  }
 
   if (size === "mini") {
     // The couch: a small face under the film, lit when talking.
@@ -303,12 +445,13 @@ function Face({
   }
 
   if (size === "bubble") {
-    return (
-      <div className="flex w-16 shrink-0 flex-col items-center gap-1">
+    return wrap(
+      <>
         <div
           className={cn(
             "relative h-14 w-14 overflow-hidden rounded-full bg-white/[0.08]",
             talking && "ring-[3px] ring-primary",
+            cueRing,
           )}
         >
           {hasVideo ? (
@@ -320,24 +463,32 @@ function Face({
           )}
         </div>
         <span className="max-w-full truncate text-[11px] text-cream/85">{name}</span>
-      </div>
+        {cue?.badge && (
+          <span className={cn("text-[10px] font-bold", cue.badge === "in" ? "text-emerald-300" : "text-cream/60")}>
+            {cue.badge === "in" ? "✓ in" : "•••"}
+          </span>
+        )}
+      </>,
+      cn("flex w-16 shrink-0 flex-col items-center gap-1", cueDim),
     );
   }
 
-  return (
+  return wrap(
     <div
       className={cn(
-        "relative flex min-h-0 items-center justify-center overflow-hidden bg-white/[0.05]",
-        size === "tile" ? "rounded-2xl" : "h-full w-full",
+        "relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-white/[0.05]",
+        size === "tile" ? "rounded-2xl" : "",
         talking && "ring-[3px] ring-inset ring-primary",
+        cueRing,
       )}
     >
+      {badge}
       {hasVideo ? (
         <VideoTrack trackRef={trackRef} className="h-full w-full object-cover" />
       ) : photo ? (
-        <img src={photo} alt="" className="h-24 w-24 rounded-full object-cover sm:h-28 sm:w-28" />
+        <img src={photo} alt="" className="aspect-square h-[62%] max-h-28 w-auto rounded-full object-cover" />
       ) : (
-        <span className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/25 font-serif text-4xl font-semibold text-cream sm:h-28 sm:w-28">
+        <span className="flex aspect-square h-[62%] max-h-28 items-center justify-center rounded-full bg-primary/25 font-serif text-3xl font-semibold text-cream sm:text-4xl">
           {initial}
         </span>
       )}
@@ -347,9 +498,11 @@ function Face({
         </span>
       )}
       <div className="absolute inset-x-2 bottom-2 flex items-center gap-2 rounded-xl bg-black/65 px-3 py-1.5">
-        <span className="truncate text-sm font-semibold text-cream">{name}</span>
-        {place && <span className="ml-auto shrink-0 truncate text-xs text-cream/75">{place}</span>}
+        {/* The name always shows in full; the city and clock give way first. */}
+        <span className="max-w-[70%] shrink-0 truncate text-sm font-semibold text-cream">{name}</span>
+        {place && <span className="ml-auto min-w-0 truncate text-xs text-cream/75">{place}</span>}
       </div>
-    </div>
+    </div>,
+    cn("min-h-0", size === "tile" ? "rounded-2xl" : "h-full w-full", cueDim),
   );
 }

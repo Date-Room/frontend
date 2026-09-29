@@ -41,6 +41,10 @@ import {
   VenetianMask,
   Coffee,
   Timer,
+  Mic,
+  MicOff,
+  VideoOff,
+  PhoneOff,
   type LucideIcon,
   Loader2,
   Check,
@@ -49,7 +53,8 @@ import {
 import { RoomVideo } from "@/components/RoomVideo";
 import type { GroupLayout } from "@/components/squad/GroupStage";
 import { squadHereLine } from "@/lib/squadCall";
-import { SQUAD_GAMES, SQUAD_GAME_IDS } from "@/lib/squadGames";
+import { SQUAD_GAMES, SQUAD_GAME_IDS, isSquadGame } from "@/lib/squadGames";
+import { useSquadStage } from "@/context/SquadStageContext";
 import {
   isSidePane,
   useCallLayout,
@@ -571,6 +576,13 @@ export function RoomStage({
   /** Squad night with something on stage: the call becomes a row of faces
    *  under it (the couch for films and music, bubbles for games). */
   const squadCouch = squad && callActive && activityStaged && !watchFullscreen;
+  /** A squad game on stage: the stage splits into the game and the faces,
+   *  and the faces follow the game's cue (SquadStageContext). */
+  const squadStage = useSquadStage();
+  const squadGameStaged = squadCouch && isSquadGame(staged);
+  const cueMode = squadGameStaged ? (squadStage?.cue?.mode ?? "reading") : null;
+  /** The squad's bar: mute and camera from the call beside Activities and chat. */
+  const squadBar = squad && callActive && !watchFullscreen ? (squadStage?.controls ?? null) : null;
   /** The right-hand call pane is rendered — `side` and `side-pip` both use it. */
   const splitCallLayout =
     callActive && wide && isSidePane(callLayout) && !squadHangout && !squadCouch;
@@ -583,7 +595,9 @@ export function RoomStage({
   chatTickerRef.current = squadTicker;
   const squadGroupLayout: GroupLayout | undefined = squadStrip
     ? "strip"
-    : squadCouch
+    : squadGameStaged
+      ? "game"
+      : squadCouch
       ? WATCHING_IDS.has(staged) && wide
         ? "row-tiles"
         : "row-bubbles"
@@ -803,6 +817,8 @@ export function RoomStage({
   const hangoutSlotRef = useRef<HTMLDivElement>(null);
   // ...and its fifth: the couch row under a film or game.
   const couchSlotRef = useRef<HTMLDivElement>(null);
+  // ...and its sixth: the faces half of a squad game's stage.
+  const gameFacesSlotRef = useRef<HTMLDivElement>(null);
   // Layout effect, not effect: React has just detached the pane (and the
   // host with it) when leaving split mode. A <video> removed from the
   // document pauses once the task yields, so re-home it in the same task.
@@ -817,6 +833,8 @@ export function RoomStage({
         ? fsEl
         : squadHangout
           ? hangoutSlotRef.current
+          : squadGameStaged
+            ? gameFacesSlotRef.current
           : squadCouch
             ? couchSlotRef.current
             : splitCallLayout
@@ -834,7 +852,7 @@ export function RoomStage({
     // `staged`: the couch row is rebuilt when one activity replaces another,
     // so the call must be moved into the new row even though the layout
     // type (couch) didn't change.
-  }, [splitCallLayout, squadHangout, squadCouch, staged]);
+  }, [splitCallLayout, squadHangout, squadCouch, squadGameStaged, staged]);
   useEffect(() => {
     const host = pipHostRef.current;
     return () => host?.remove();
@@ -1086,7 +1104,15 @@ export function RoomStage({
               ref={stageBarRef}
               className="perm-wall-frame flex shrink-0 items-center gap-2 !px-3 !py-2 sm:!px-4"
             >
-              {(() => {
+              {squad && (
+                // Squads: who's here, on every screen size (chat and the call
+                // controls live in the bar at the bottom).
+                <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-label text-emerald-100">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                  <span className="truncate">{squadHereLine(squadNames)}</span>
+                </span>
+              )}
+              {!squad && (() => {
                 // Starter's side: did my date follow me in?
                 const st = starterStatus(invite, staged, partnerPresent, nowTick, 45_000, openedAtRef.current);
                 if (!st) return null;
@@ -1121,7 +1147,7 @@ export function RoomStage({
                     reach someone while everything else carries on. Same pill
                     as the call so the two read as a pair — inverted, so you
                     can tell them apart without reading either. */}
-                {(() => {
+                {!squad && (() => {
                   const unread = chatUnread > 0;
                   const title = unread
                     ? chatUnread === 1
@@ -1291,6 +1317,41 @@ export function RoomStage({
             {squadHangout ? (
               // The live call is re-homed into this slot (see hangoutSlotRef).
               <div ref={hangoutSlotRef} className="relative h-full min-h-0 w-full overflow-hidden rounded-2xl" />
+            ) : squadGameStaged ? (
+              // A squad game: the game and the faces share the stage, sized
+              // by what the moment is (see SquadStageContext).
+              <div className={cn("flex h-full min-h-0 gap-2", wide ? "flex-row" : "flex-col")}>
+                <div
+                  className={cn(
+                    "min-h-0 min-w-0 overflow-y-auto transition-[flex-basis,max-height] duration-300",
+                    wide
+                      ? cueMode === "reading"
+                        ? "basis-[58%]"
+                        : "basis-[42%]"
+                      : cueMode === "reading" || cueMode === "hero"
+                        ? "flex-1"
+                        : "max-h-[52%] shrink-0",
+                  )}
+                >
+                  <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
+                    {renderContent(staged, commitStage)}
+                  </ActivityBoundary>
+                </div>
+                {/* The live call is re-homed into this slot (see gameFacesSlotRef). */}
+                <div
+                  ref={gameFacesSlotRef}
+                  className={cn(
+                    "relative min-h-0 min-w-0 overflow-hidden rounded-2xl",
+                    wide
+                      ? "flex-1"
+                      : cueMode === "reading"
+                        ? "h-[92px] shrink-0"
+                        : cueMode === "hero"
+                          ? "h-[38%] shrink-0"
+                          : "min-h-[220px] flex-1",
+                  )}
+                />
+              </div>
             ) : staged ? (
               <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
                 <div
@@ -1311,7 +1372,7 @@ export function RoomStage({
               onOpen={() => setChatOpen(true)}
             />
           )}
-          {squadCouch && (
+          {squadCouch && !squadGameStaged && (
             // The live call is re-homed into this row (see couchSlotRef).
             <div
               ref={couchSlotRef}
@@ -1448,7 +1509,7 @@ export function RoomStage({
             // there instead of opening the menu.
             const showNotif = notif && !menuOpen;
             const NotifIcon = showNotif ? ITEM_ICONS[notif.target] ?? LayoutGrid : LayoutGrid;
-            return (
+            const pill = (
               <button
                 type="button"
                 onClick={
@@ -1480,6 +1541,51 @@ export function RoomStage({
                   {showNotif ? notif.text : menuOpen ? "Close" : "Activities"}
                 </span>
               </button>
+);
+            if (!squadBar) return pill;
+            // A squad night: mute, camera, Activities, chat and hang up in one
+            // bar, in the same place on every screen. Games never cover it.
+            return (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={squadBar.toggleMic}
+                  aria-label={squadBar.mic ? "Mute" : "Unmute"}
+                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", squadBar.mic ? "border-white/10 bg-card/85 text-cream" : "border-rose-400/50 bg-rose-500/20 text-rose-200")}
+                >
+                  {squadBar.mic ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={squadBar.toggleCam}
+                  aria-label={squadBar.cam ? "Turn camera off" : "Turn camera on"}
+                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", squadBar.cam ? "border-white/10 bg-card/85 text-cream" : "border-rose-400/50 bg-rose-500/20 text-rose-200")}
+                >
+                  {squadBar.cam ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                </button>
+                {pill}
+                <button
+                  type="button"
+                  onClick={() => setChatOpen(true)}
+                  aria-label={chatUnread ? `Chat, ${chatUnread} unread` : "Chat"}
+                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", "relative border-white/10 bg-card/85 text-primary")}
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  {chatUnread > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">
+                      {chatUnread > 99 ? "99+" : chatUnread}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={onLeaveCall}
+                  aria-label="Leave the call"
+                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", "border-rose-500/40 bg-rose-700/85 text-white")}
+                >
+                  <PhoneOff className="h-5 w-5" />
+                </button>
+              </div>
             );
           })()}
         </div>
@@ -1502,6 +1608,9 @@ export function RoomStage({
           re-parented into the Watch fullscreen layer without remounting the
           call. The anchor marks its normal home in the room. */}
       {inviteId &&
+        // A squad round in play keeps its screen: a friend's invite waits
+        // until the reveal.
+        !(squadGameStaged && cueMode !== "spotlight") &&
         (() => {
           const item = items.find((i) => i.id === inviteId);
           const title = item?.title ?? inviteId;

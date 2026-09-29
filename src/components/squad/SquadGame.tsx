@@ -4,11 +4,12 @@
  * stage you're on, then the reveal and "Next round". The server holds the
  * secrets; this only ever draws the public round plus my own card.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { useRoomSession } from "@/context/RoomSessionContext";
+import { useSquadStage, type FaceCue } from "@/context/SquadStageContext";
 import { getSquadMembers, squadErrorText } from "@/lib/squad";
 import {
   SQUAD_GAMES,
@@ -21,6 +22,7 @@ import {
   secondsLeft,
   skipCard,
   startBlocker,
+  stageCueFor,
   startRound,
   tallyRows,
   waitingOn,
@@ -96,6 +98,40 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   const round = state.data?.round ?? null;
   const mine = state.data?.me ?? null;
 
+  // Tell the call what this moment is (SquadStageContext): who can be
+  // tapped, who's in, whose face steps forward. Faces are keyed by call
+  // identity (user id); the round speaks in participant ids.
+  const setCue = useSquadStage()?.setCue;
+  const faceVote = Boolean(setCue);
+  const plan = useMemo(() => stageCueFor(round, mine, me, setup || !round), [round, mine, me, setup]);
+  const vote = useRef(move.mutate);
+  vote.current = move.mutate;
+  useEffect(() => {
+    if (!setCue) return;
+    const uid = (pid: string | null) => (pid ? (byPid.get(pid)?.user_id ?? null) : null);
+    const pidOf = (id: string) => list.find((m) => m.user_id === id)?.participant_id ?? null;
+    const faces: Record<string, FaceCue> = {};
+    for (const [pid, cue] of Object.entries(plan.faces)) {
+      const id = uid(pid);
+      if (id) faces[id] = cue;
+    }
+    setCue({
+      mode: plan.mode,
+      focus: uid(plan.focus),
+      faces,
+      hint: plan.hint,
+      onTap: plan.vote
+        ? (id) => {
+            const pid = pidOf(id);
+            if (pid) vote.current(pid);
+          }
+        : undefined,
+    });
+    // byPid and list follow members.data.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setCue, plan, members.data]);
+  useEffect(() => () => setCue?.(null), [setCue]);
+
   if (state.isLoading || members.isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -105,13 +141,13 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto px-5 pb-6 pt-6 sm:px-8">
-      <div className="mx-auto w-full max-w-xl space-y-5">
-        <header className="space-y-1 text-center">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto px-4 pb-4 pt-2 sm:px-8 sm:pb-6 sm:pt-6">
+      <div className="mx-auto w-full max-w-xl space-y-3 sm:space-y-5">
+        <header className="space-y-0.5 text-center sm:space-y-1">
           <p className="dr-eyebrow text-primary/85">
             {round && !setup ? `Round ${round.number} · ${round.deck === "spicy" ? "Spicy" : "Mild"}` : "Squad game"}
           </p>
-          <h2 className="font-serif text-3xl text-cream">{info.label}</h2>
+          <h2 className="font-serif text-2xl text-cream sm:text-3xl">{info.label}</h2>
         </header>
 
         {!round || setup ? (
@@ -138,7 +174,15 @@ export function SquadGame({ game }: { game: SquadGameId }) {
           </>
         ) : (
           <>
-            <Play round={round} mine={mine} me={me} nameOf={nameOf} busy={move.isPending} onMove={(v) => move.mutate(v)} />
+            <Play
+              round={round}
+              mine={mine}
+              me={me}
+              nameOf={nameOf}
+              busy={move.isPending}
+              onMove={(v) => move.mutate(v)}
+              faceVote={faceVote}
+            />
             <Waiting round={round} me={me} nameOf={nameOf} busy={skip.isPending} onSkip={() => skip.mutate()} />
             {canSkip(round, me) && (
               <div className="text-center">
@@ -362,6 +406,7 @@ function Play({
   nameOf,
   busy,
   onMove,
+  faceVote = false,
 }: {
   round: Round;
   mine: MyView | null;
@@ -369,6 +414,8 @@ function Play({
   nameOf: Names;
   busy: boolean;
   onMove: (value: unknown) => void;
+  /** On a squad night you vote by tapping faces in the call, not names here. */
+  faceVote?: boolean;
 }) {
   const turn = myTurn(round, me);
   const playing = Boolean(mine?.playing);
@@ -401,7 +448,7 @@ function Play({
             One word each, in this order: <span className="text-cream">{order.map(nameOf).join(" → ")}</span>
           </p>
         )}
-        {turn && (
+        {turn && !faceVote && (
           <>
             <p className="text-center text-sm text-cream">When you've all spoken, vote out the imposter:</p>
             <PlayerGrid
@@ -421,7 +468,9 @@ function Play({
     return (
       <div className="space-y-4">
         <Prompt text={text} />
-        {turn && <PlayerGrid players={round.players} nameOf={nameOf} picked={mine?.my_move} disabled={busy} onPick={onMove} />}
+        {turn && !faceVote && (
+          <PlayerGrid players={round.players} nameOf={nameOf} picked={mine?.my_move} disabled={busy} onPick={onMove} />
+        )}
       </div>
     );
   }
