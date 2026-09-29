@@ -1,7 +1,8 @@
 import type { FocusEvent, RefObject } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getSquadBeta } from "@/lib/squad";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -162,6 +163,12 @@ export default function CreateRoom() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<Step>("plan");
+  // "Who's it for?" only exists for people let into the Squad beta; for
+  // everyone else create is exactly what it was.
+  const squadBeta = useQuery({ queryKey: ["squad-beta"], queryFn: getSquadBeta, staleTime: 60_000 });
+  const squadMember = squadBeta.data?.status === "granted";
+  const [who, setWho] = useState<"ask" | "special">("ask");
+  const showWho = squadMember && who === "ask";
   const [selectedPlan, setSelectedPlan] = useState<Plan>("try");
   const [curatedActivities, setCuratedActivities] = useState<CuratableActivityId[]>(
     () => defaultCuratedForPackage("single_pass"),
@@ -638,7 +645,35 @@ export default function CreateRoom() {
           mainMaxWidth(step),
         )}
       >
-        {step === "plan" && (
+        {step === "plan" && showWho && (
+          <div>
+            <h1 className="font-serif text-3xl md:text-4xl font-semibold leading-tight text-cream mb-6 tracking-tight">
+              Who&apos;s it for?
+            </h1>
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setWho("special")}
+                className="focus-ring editorial-card group flex w-full flex-col gap-1.5 px-5 py-5 text-left transition-colors hover:bg-white/[0.025]"
+              >
+                <span className="text-lg font-semibold text-cream">Someone special</span>
+                <span className="text-sm text-muted-foreground">A date for two. Chaperon can keep you company.</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/squad/new")}
+                className="focus-ring editorial-card group flex w-full flex-col gap-1.5 border-primary/40 px-5 py-5 text-left transition-colors hover:bg-white/[0.025]"
+              >
+                <span className="text-lg font-semibold text-cream">My squad</span>
+                <span className="text-sm text-muted-foreground">
+                  2 to 5 friends, wherever they are. Films, music, games and a group wall. 2 hours a night.
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === "plan" && !showWho && (
           <div>
             <h1 className="font-serif text-3xl md:text-4xl font-semibold leading-tight text-cream mb-6 tracking-tight">
               Choose a plan
@@ -676,6 +711,7 @@ export default function CreateRoom() {
                 ))}
               </div>
             )}
+            {!squadMember && (
             <Link
               to="/squad"
               className="focus-ring editorial-card group mt-3 flex w-full items-center gap-3.5 px-4 py-4 text-left transition-colors hover:bg-white/[0.025]"
@@ -691,6 +727,7 @@ export default function CreateRoom() {
               </div>
               <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-cream" />
             </Link>
+            )}
             <button
               type="button"
               onClick={goManagePlans}

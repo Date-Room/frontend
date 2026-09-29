@@ -275,6 +275,11 @@ export default function Home() {
   }
 
   function onTileTap(r: Room) {
+    // Squad rooms have their own home between nights.
+    if (r.room_kind === "squad") {
+      navigate(`/squad/room/${r.id}`);
+      return;
+    }
     // Persistent (Together) rooms always open the pre-room first — camera
     // preview + host management (rotate PIN, theme, destroy) before entering.
     if (r.persistence === "persistent") {

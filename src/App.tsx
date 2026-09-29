@@ -38,6 +38,8 @@ const Paywall = lazy(() => import("./pages/Paywall"));
 const ProfileComplete = lazy(() => import("./pages/ProfileComplete"));
 const ReferralLanding = lazy(() => import("./pages/ReferralLanding"));
 const SquadRequest = lazy(() => import("./pages/SquadRequest"));
+const SquadNew = lazy(() => import("./pages/SquadNew"));
+const SquadRoom = lazy(() => import("./pages/SquadRoom"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminGrowth = lazy(() => import("./pages/admin/AdminGrowth"));
 const AdminFeatures = lazy(() => import("./pages/admin/AdminFeatures"));
@@ -127,6 +129,8 @@ const App = () => {
             <Route path="/profile/complete" element={<AuthGuard><ProfileComplete /></AuthGuard>} />
             <Route path="/settings" element={<AuthGuard><Settings /></AuthGuard>} />
             <Route path="/squad" element={<AuthGuard><SquadRequest /></AuthGuard>} />
+            <Route path="/squad/new" element={<AuthGuard><SquadNew /></AuthGuard>} />
+            <Route path="/squad/room/:id" element={<AuthGuard><SquadRoom /></AuthGuard>} />
 
             {/* Platform admin */}
             <Route

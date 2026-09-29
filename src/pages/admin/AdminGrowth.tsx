@@ -12,8 +12,7 @@ import {
   getAdminAnalytics,
   postAdminAnalyticsBackfill,
   type AnalyticsFunnelStep,
-  type AnalyticsReport,
-} from "@/lib/admin";
+  type AnalyticsReport, ROOM_KIND_LABELS, type RoomKindFilter } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
 import { RevenueChart } from "@/components/admin/RevenueChart";
 import { BreakdownBars, CountryBars, countryName, flag } from "@/components/admin/CountryBars";
@@ -77,8 +76,14 @@ export function channelLabel(channel: string): string {
 }
 
 /** Pure: the active filters as one subtitle fragment. */
-export function filterSummary(f: { country: string | null; platform: string | null; channel: string | null }): string {
+export function filterSummary(f: {
+  country: string | null;
+  platform: string | null;
+  channel: string | null;
+  kind?: RoomKindFilter | null;
+}): string {
   const parts = [
+    f.kind ? ROOM_KIND_LABELS[f.kind] : null,
     f.country ? countryName(f.country) : null,
     f.platform ? (PLATFORM_LABELS[f.platform] ?? f.platform) : null,
     f.channel ? channelLabel(f.channel) : null,
@@ -268,10 +273,11 @@ export default function AdminGrowth() {
   const [country, setCountry] = useState<string | null>(null);
   const [platform, setPlatform] = useState<string | null>(null);
   const [channel, setChannel] = useState<string | null>(null);
-  const filtered = Boolean(country || platform || channel);
+  const [kind, setKind] = useState<RoomKindFilter | null>(null);
+  const filtered = Boolean(country || platform || channel || kind);
   const q = useQuery({
-    queryKey: ["admin-analytics", days, includeTeam, country, platform, channel],
-    queryFn: () => getAdminAnalytics(days, includeTeam, { country, platform, channel }),
+    queryKey: ["admin-analytics", days, includeTeam, country, platform, channel, kind],
+    queryFn: () => getAdminAnalytics(days, includeTeam, { country, platform, channel, kind }),
     refetchInterval: 60_000,
     placeholderData: (prev) => prev,
   });
@@ -286,11 +292,19 @@ export default function AdminGrowth() {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-cream">Growth</h2>
           <p className="mt-1 text-sm text-muted-foreground/70">
-            Are people staying · {filterSummary({ country, platform, channel })}last {days === 365 ? "year" : `${days} days`}
+            Are people staying · {filterSummary({ country, platform, channel, kind })}last {days === 365 ? "year" : `${days} days`}
             {r && (r.tracking_since ? ` · exact since ${day(r.tracking_since)}` : " · tracking starts with the next room")}
           </p>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          <select aria-label="Room kind" value={kind ?? ""} onChange={(e) => setKind((e.target.value || null) as RoomKindFilter | null)} className={SELECT}>
+            <option value="">Dates and squads</option>
+            {(["date", "squad"] as const).map((k) => (
+              <option key={k} value={k}>
+                {ROOM_KIND_LABELS[k]} ({r?.room_kinds?.[k] ?? 0})
+              </option>
+            ))}
+          </select>
           {(r?.countries?.length ?? 0) > 0 && (
             <select aria-label="Country" value={country ?? ""} onChange={(e) => setCountry(e.target.value || null)} className={SELECT}>
               <option value="">All countries</option>
@@ -322,7 +336,7 @@ export default function AdminGrowth() {
             </select>
           )}
           {filtered && (
-            <button type="button" onClick={() => { setCountry(null); setPlatform(null); setChannel(null); }} className="text-xs text-primary hover:underline">
+            <button type="button" onClick={() => { setCountry(null); setPlatform(null); setChannel(null); setKind(null); }} className="text-xs text-primary hover:underline">
               Clear filters
             </button>
           )}

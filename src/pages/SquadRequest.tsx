@@ -89,9 +89,11 @@ function StatusCard({ state, onEdit }: { state: SquadBetaState; onEdit: () => vo
         </span>
         <h2 className="font-serif text-2xl text-cream">You&apos;re in</h2>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Your squad is part of the beta. Squad rooms open soon, and we&apos;ll email you when your
-          first night (on us) is ready.
+          Your squad is part of the beta. Open your room and your first night is on us.
         </p>
+        <Link to="/squad/new" className="btn-primary focus-ring inline-block rounded-full px-5 py-2.5 text-sm font-semibold">
+          Open your squad room
+        </Link>
       </div>
     );
   }

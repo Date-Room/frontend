@@ -16,3 +16,25 @@ describe("squad request helpers", () => {
     expect(toggleSquadPlan(["films", "trip"], "films")).toEqual(["trip"]);
   });
 });
+
+import { formatSquadMoney, nightsLeftLabel, squadInviteUrl, type SquadNights } from "./squad";
+
+describe("squad room helpers", () => {
+  it("formats money the way each currency is used", () => {
+    expect(formatSquadMoney(960, "KES")).toBe("KES 960");
+    expect(formatSquadMoney(8800, "NGN")).toBe("NGN 8,800");
+    expect(formatSquadMoney(15.84, "USD")).toBe("USD 15.84");
+    expect(formatSquadMoney(21, "MAD")).toBe("MAD 21");
+  });
+
+  it("says how many nights are left", () => {
+    const n = (nights_left: number) => ({ nights_left }) as SquadNights;
+    expect(nightsLeftLabel(n(0))).toBe("No nights left");
+    expect(nightsLeftLabel(n(1))).toBe("1 night left");
+    expect(nightsLeftLabel(n(4))).toBe("4 nights left");
+  });
+
+  it("builds the same invite link shape as every room", () => {
+    expect(squadInviteUrl("K7Q2MX", "1234", "https://dateroom.io")).toBe("https://dateroom.io/i/K7Q2MX/1234");
+  });
+});

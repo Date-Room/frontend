@@ -632,6 +632,9 @@ export type AnalyticsReport = {
   /** Missing on servers older than backend#77. */
   platform?: string | null;
   channel?: string | null;
+  /** date | squad filter echoed back, and rooms opened by kind (always all). */
+  kind?: RoomKindFilter | null;
+  room_kinds?: Partial<Record<RoomKindFilter, number>>;
   channels?: (Omit<AnalyticsCountryRow, "country"> & { channel: string })[];
   platforms?: (Omit<AnalyticsCountryRow, "country"> & { platform: string })[];
   room_types?: {
@@ -680,7 +683,17 @@ export type AnalyticsBackfillResult = {
   users_with_activity: number;
 };
 
-export type AnalyticsFilters = { country?: string | null; platform?: string | null; channel?: string | null };
+export type AnalyticsFilters = {
+  country?: string | null;
+  platform?: string | null;
+  channel?: string | null;
+  /** date | squad: only rooms of that kind (untagged history = date). */
+  kind?: RoomKindFilter | null;
+};
+
+export type RoomKindFilter = "date" | "squad";
+
+export const ROOM_KIND_LABELS: Record<RoomKindFilter, string> = { date: "Dates", squad: "Squad nights" };
 
 export async function getAdminAnalytics(days: number, includeTeam = false, filters: AnalyticsFilters = {}) {
   const q = new URLSearchParams({ days: String(days), include_team: String(includeTeam) });

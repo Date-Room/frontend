@@ -53,3 +53,145 @@ export function toggleSquadPlan(plans: SquadPlan[], id: SquadPlan): SquadPlan[] 
   const next = plans.includes(id) ? plans.filter((p) => p !== id) : [...plans, id];
   return SQUAD_PLAN_OPTIONS.map((o) => o.id).filter((p) => next.includes(p));
 }
+
+// ── Squad rooms: create, nights, paying, members ────────────────────────
+// Mirrors backend services.squad_nights / squad_members and
+// api/v1/squad_billing. Nights belong to the room: anyone in the squad
+// can start one or top the room up.
+
+export const SQUAD_SEATS = [2, 3, 4, 5] as const;
+
+export type SquadNight = {
+  id: string;
+  number: number;
+  started_at: string;
+  ends_at: string;
+  seats: number;
+  rate: "free" | "single" | "pack";
+  refunded: boolean;
+  extended_minutes?: number;
+};
+
+export type SquadNights = {
+  seats: number;
+  seat_nights: number;
+  nights_left: number;
+  free_night_expires_at: string | null;
+  active_night: SquadNight | null;
+  nights: SquadNight[];
+};
+
+export type SquadPrice = {
+  product: string;
+  nights: number;
+  per_seat: number;
+  amount: number;
+  currency: string;
+};
+
+export type SquadPrices = {
+  seats: number;
+  provider: "mpesa" | "stripe" | "store";
+  stk_ready: boolean;
+  dev_checkout: boolean;
+  products: SquadPrice[];
+};
+
+export type SquadMember = {
+  participant_id: string;
+  user_id: string | null;
+  display_name: string;
+  photo_url: string | null;
+  city: string | null;
+  tz: string | null;
+  role: "owner" | "cohost" | "member";
+  joined_at: string;
+  new: boolean;
+};
+
+export type SquadMembers = {
+  members: SquadMember[];
+  locked_until: string | null;
+  my_role: "owner" | "cohost" | "member";
+};
+
+export type CreateSquadRoom = { seats: number; name: string };
+
+export function createSquadRoom(body: CreateSquadRoom) {
+  const tz = (() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+      return undefined;
+    }
+  })();
+  return api.post<import("@/lib/rooms").Room>("/v1/rooms", {
+    persistence: "persistent",
+    package: "squad",
+    room_kind: "squad",
+    seats: body.seats,
+    greeting_headline: body.name.trim() || null,
+    scheduled_tz: tz,
+  });
+}
+
+export function getSquadNights(roomId: string) {
+  return api.get<SquadNights>(`/v1/rooms/${roomId}/nights`);
+}
+
+export function startSquadNight(roomId: string) {
+  return api.post<SquadNights>(`/v1/rooms/${roomId}/nights`, {});
+}
+
+export function getSquadPrices(roomId: string) {
+  return api.get<SquadPrices>(`/v1/rooms/${roomId}/squad/prices`);
+}
+
+export function squadCardCheckout(roomId: string, product: string) {
+  return api.post<{ url: string }>(`/v1/rooms/${roomId}/squad/checkout`, { product });
+}
+
+export function squadStkPush(roomId: string, product: string, phone: string) {
+  return api.post<{ transaction_id: string }>(`/v1/rooms/${roomId}/squad/stk-push`, {
+    product,
+    phone,
+  });
+}
+
+export function squadDevPurchase(roomId: string, product: string) {
+  return api.post<void>(`/v1/rooms/${roomId}/squad/dev-purchase`, { product });
+}
+
+export function getSquadMembers(roomId: string) {
+  return api.get<SquadMembers>(`/v1/rooms/${roomId}/members`);
+}
+
+/** "KES 960" / "USD 15.84" / "NGN 8,800", whole units where the currency
+ *  has no useful cents. */
+export function formatSquadMoney(amount: number, currency: string): string {
+  const whole = currency === "KES" || currency === "NGN" || Number.isInteger(amount);
+  try {
+    return new Intl.NumberFormat("en", {
+      style: "currency",
+      currency,
+      currencyDisplay: "code",
+      minimumFractionDigits: whole ? 0 : 2,
+      maximumFractionDigits: whole ? 0 : 2,
+    })
+      .format(amount)
+      .replace(/ /g, " ");
+  } catch {
+    return `${currency} ${amount}`;
+  }
+}
+
+/** Nights left in words, for the room header. */
+export function nightsLeftLabel(n: SquadNights): string {
+  if (n.nights_left === 0) return "No nights left";
+  return n.nights_left === 1 ? "1 night left" : `${n.nights_left} nights left`;
+}
+
+/** The share link for a room (same shape as every invite: /i/CODE/PIN). */
+export function squadInviteUrl(code: string, pin: string, origin = window.location.origin): string {
+  return `${origin}/i/${code}/${pin}`;
+}
