@@ -13,6 +13,6 @@ it's drawn at, and the lobby mounts sixteen of them. On a 3-4 GB phone that
 was enough to get the tab evicted on an app switch.
 
 Squad game tiles (`most-likely`, `who-said-it`, `imposter`, `spill-the-tea`,
-and `clue-me-in` when it lands) come from the prompts in the Squad tiles
+`clue-me-in`) come from the prompts in the Squad tiles
 brief. They're exported at 512 px only: squad games have no landing screen,
 so there's no `-hero` version.
