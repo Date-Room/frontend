@@ -248,6 +248,9 @@ function RoomShell({
   });
   const room: Room | undefined = rooms?.find((r) => r.id === roomId);
   const isPersistent = room?.persistence === "persistent";
+  // Squad nights get the group call (and squads always have an account, so
+  // the rooms list is there to read this from).
+  const isSquad = room?.room_kind === "squad";
   // A resting Together room takes things away in stages; the server
   // computes these and refuses anything they forbid, so the UI only
   // hides or dims to match.
@@ -670,6 +673,7 @@ function RoomShell({
           partnerInCall={partnerInfo.inCall}
           partnerPresent={partnerPresent}
           callActive={liveMode}
+          squad={isSquad}
           onCallIn={() => {
             if (!caps.can_call) {
               toast.message(restingReason("can_call", room));
