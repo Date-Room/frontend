@@ -28,9 +28,12 @@ describe("squad call helpers", () => {
     expect([...liveVideoFor(all, { speaker: "c", self: "a", lowPower: true })].sort()).toEqual(["a", "c"]);
   });
 
-  it("puts the speaker first", () => {
-    expect(speakerFirst(["a", "b", "c"], "c", "a")).toEqual(["c", "a", "b"]);
-    expect(speakerFirst(["a", "b"], null, "b")).toEqual(["b", "a"]);
+  it("orders faces: grid starts with you, focus with the speaker and ends with you", () => {
+    expect(speakerFirst(["a", "b", "c"], "c", "a")).toEqual(["a", "b", "c"]);
+    expect(speakerFirst(["a", "b", "c"], "c", "a", true)).toEqual(["c", "b", "a"]);
+    expect(speakerFirst(["a", "b"], null, "a", true)).toEqual(["b", "a"]);
+    // You talking doesn't put you big on your own phone.
+    expect(speakerFirst(["a", "b"], "a", "a", true)).toEqual(["b", "a"]);
   });
 
   it("picks grid columns", () => {

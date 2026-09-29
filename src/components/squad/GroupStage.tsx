@@ -89,8 +89,9 @@ export function GroupStage({ roomId, focus, bare, onLeave }: Props) {
   const byId = new Map(tracks.map((t) => [t.participant.identity, t]));
   const order = speakerFirst(
     tracks.map((t) => t.participant.identity),
-    focus ? speaker : null,
+    speaker,
     self,
+    focus,
   );
   const live = liveVideoFor(order, { speaker, self, lowPower });
   const night = nights.data?.active_night ?? null;

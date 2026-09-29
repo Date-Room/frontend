@@ -49,9 +49,27 @@ export function liveVideoFor(
   return new Set(identities.filter((id) => id === opts.speaker || id === opts.self));
 }
 
-/** Speaker first, then yourself, then everyone else in joining order. */
-export function speakerFirst(identities: string[], speaker: string | null, self: string | null): string[] {
-  const rank = (id: string) => (id === speaker ? 0 : id === self ? 1 : 2);
+/**
+ * Grid: yourself first, then everyone in joining order. Focus (one big
+ * face): whoever is talking, else a friend, and yourself last, so a phone
+ * never fills the screen with your own face while others are there.
+ */
+export function speakerFirst(
+  identities: string[],
+  speaker: string | null,
+  self: string | null,
+  focus = false,
+): string[] {
+  const rank = (id: string) =>
+    focus
+      ? id === speaker && id !== self
+        ? 0
+        : id === self
+          ? 2
+          : 1
+      : id === self
+        ? 0
+        : 1;
   return [...identities].sort((a, b) => rank(a) - rank(b));
 }
 
