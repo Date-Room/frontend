@@ -17,4 +17,10 @@ export const ACTIVITY_TILES: Record<string, string> = {
   watch: "/dock-tiles/watch.webp",
   dj: "/dock-tiles/dj.webp",
   chat: "/dock-tiles/chat.webp",
+  // Squad games. Clue Me In keeps its old id, heads_up.
+  most_likely: "/dock-tiles/most-likely.webp",
+  who_said_it: "/dock-tiles/who-said-it.webp",
+  imposter: "/dock-tiles/imposter.webp",
+  spill_tea: "/dock-tiles/spill-the-tea.webp",
+  heads_up: "/dock-tiles/clue-me-in.webp",
 };

@@ -1,6 +1,6 @@
 /**
  * The five squad games, the client side of backend services/games/engine.
- * Each round is prompt -> private moves -> reveal (Heads up runs on a
+ * Each round is prompt -> private moves -> reveal (Clue Me In runs on a
  * 60-second clock). The server keeps the secrets and hands each person
  * only their own card and move; after every change the room channel gets
  * a `durable.update` on activity "game_<game>" and everyone refetches.
@@ -56,8 +56,10 @@ export const SQUAD_GAMES: Record<SquadGameId, SquadGameInfo> = {
   },
   heads_up: {
     id: "heads_up",
-    label: "Heads Up",
-    line: "One guesses, everyone else describes. 60 seconds.",
+    // Shown as "Clue Me In"; the id stays heads_up (the server, decks and
+    // league all key on it).
+    label: "Clue Me In",
+    line: "One of you guesses, the squad gives clues. 60 seconds.",
     how: "The guesser can't see the words. Everyone else describes them; tap Got it or Pass. The guesser changes every round.",
     min: 2,
     minutes: "1 min a round",
@@ -82,7 +84,7 @@ export type Round = {
     order?: string[];
   } | null;
   players: string[];
-  /** Spill the tea: the judge. Heads up: the guesser. */
+  /** Spill the tea: the judge. Clue Me In: the guesser. */
   lead_id: string | null;
   deadline_at: string | null;
   /** Who has moved this stage (never what they moved). */
@@ -160,7 +162,7 @@ export function myTurn(round: Round, me: string | null): boolean {
   return true;
 }
 
-/** Pure: seconds left on a Heads up clock (never below 0). */
+/** Pure: seconds left on a Clue Me In clock (never below 0). */
 export function secondsLeft(deadline: string | null, now: number): number {
   if (!deadline) return 0;
   return Math.max(0, Math.ceil((new Date(deadline).getTime() - now) / 1000));
