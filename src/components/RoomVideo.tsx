@@ -24,6 +24,7 @@ import "@livekit/components-styles";
 import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Minus, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AmbientController } from "@/components/AmbientController";
+import { GroupStage } from "@/components/squad/GroupStage";
 import { ChaperonAgentBridge } from "@/components/ChaperonAgentBridge";
 import { CallPeersBridge } from "@/context/CallPeersContext";
 import {
@@ -51,6 +52,16 @@ import type { PresenceState } from "@/lib/realtime/roomChannel";
 // guarded no-op. Handlers below are memoized to stop the churn at the
 // source; warnings and errors still surface.
 setLogLevel("warn");
+
+// Squad nights: up to five people each receiving everyone, so capture at
+// 360p with a single 180p layer. With adaptive stream this keeps a 5-seat
+// night near the modelled ~$0.85 and cool on phones.
+const GROUP_ROOM_OPTIONS: RoomOptions = {
+  adaptiveStream: true,
+  dynacast: true,
+  videoCaptureDefaults: { resolution: VideoPresets.h360.resolution },
+  publishDefaults: { simulcast: true, videoSimulcastLayers: [VideoPresets.h180] },
+};
 
 const LIVEKIT_ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
@@ -586,6 +597,8 @@ type CallControls = {
   onCollapse?: () => void;
   /** pip → rotate portrait/landscape (rendered in the hover controls) */
   onRotate?: () => void;
+  /** Squad night: capped group video and the group stage (see GroupStage). */
+  group?: boolean;
 };
 
 function Stage({
@@ -1129,8 +1142,10 @@ export function RoomVideo({
   stacked,
   onCollapse,
   onRotate,
+  group,
 }: { onLeave?: () => void } & CallControls = {}) {
   const room = useRoomSession();
+  const wideScreen = useWideViewport();
   const [conn, setConn] = useState<{ token: string; url: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -1159,21 +1174,23 @@ export function RoomVideo({
   // render) so the Room isn't reconfigured mid-call; deviceId is an *ideal*
   // constraint, so an unplugged saved device gracefully falls back to default.
   const roomOptions = useMemo<RoomOptions>(() => {
+    const base = group ? GROUP_ROOM_OPTIONS : LIVEKIT_ROOM_OPTIONS;
     const audioId = loadDevicePreference("audioinput");
     const videoId = loadDevicePreference("videoinput");
-    if (!audioId && !videoId) return LIVEKIT_ROOM_OPTIONS;
+    if (!audioId && !videoId) return base;
     return {
-      ...LIVEKIT_ROOM_OPTIONS,
+      ...base,
       audioCaptureDefaults: {
-        ...(LIVEKIT_ROOM_OPTIONS.audioCaptureDefaults ?? {}),
+        ...(base.audioCaptureDefaults ?? {}),
         ...(audioId ? { deviceId: audioId } : {}),
       },
       videoCaptureDefaults: {
-        ...(LIVEKIT_ROOM_OPTIONS.videoCaptureDefaults ?? {}),
+        ...(base.videoCaptureDefaults ?? {}),
         ...(videoId ? { deviceId: videoId } : {}),
       },
     };
-  }, []);
+    // `group` is fixed for a room's lifetime (it comes from the room's kind).
+  }, [group]);
 
   // Stable handler identities: inline arrows re-trigger LiveKitRoom's
   // internal connect effect on every parent re-render (the once-a-second
@@ -1245,17 +1262,26 @@ export function RoomVideo({
       <ChaperonAgentBridge />
       <CallPeersBridge />
       <DeviceChangeToaster />
-      <Stage
-        onLeave={onLeave ?? (() => {})}
-        variant={variant}
-        framed={framed}
-        compact={compact}
-        collapsed={collapsed}
-        pair={pair}
-        stacked={stacked}
-        onCollapse={onCollapse}
-        onRotate={onRotate}
-      />
+      {group ? (
+        <GroupStage
+          roomId={room.roomId}
+          focus={Boolean(collapsed) || variant === "pip" || Boolean(compact) || !wideScreen}
+          bare={collapsed}
+          onLeave={onLeave ?? (() => {})}
+        />
+      ) : (
+        <Stage
+          onLeave={onLeave ?? (() => {})}
+          variant={variant}
+          framed={framed}
+          compact={compact}
+          collapsed={collapsed}
+          pair={pair}
+          stacked={stacked}
+          onCollapse={onCollapse}
+          onRotate={onRotate}
+        />
+      )}
       <RoomAudioRenderer />
       {/* Recovers when the browser blocks autoplay of the partner's audio —
           renders an unobtrusive tap-to-hear affordance only when needed. */}

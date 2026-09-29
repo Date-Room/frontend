@@ -195,3 +195,16 @@ export function nightsLeftLabel(n: SquadNights): string {
 export function squadInviteUrl(code: string, pin: string, origin = window.location.origin): string {
   return `${origin}/i/${code}/${pin}`;
 }
+
+/** Tell the squad where I am (city optional, zone from the browser). */
+export function setSquadWhere(roomId: string, body: { city?: string | null; tz?: string | null }) {
+  return api.patch<SquadMember>(`/v1/rooms/${roomId}/members/me`, body);
+}
+
+export function browserTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}

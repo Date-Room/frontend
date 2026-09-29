@@ -258,6 +258,7 @@ export function RoomStage({
   callActive,
   onCallIn,
   onLeaveCall,
+  squad = false,
 }: {
   roomId: string;
   items: StageItem[];
@@ -271,6 +272,8 @@ export function RoomStage({
   callActive: boolean;
   onCallIn: () => void;
   onLeaveCall: () => void;
+  /** Squad night: group call; with nothing on stage the call IS the stage. */
+  squad?: boolean;
 }) {
   // The lobby is the neutral default: nothing preloaded, nothing presumed.
   const fallback =
@@ -531,10 +534,14 @@ export function RoomStage({
   /** Desktop fullscreen override: pair bubble by default, one tap for a tile. */
   const fsOverlay = wide && watchFullscreen;
   const [fsExpanded, setFsExpanded] = useState(false);
+  // An activity (not the lobby or room settings) owns the stage.
+  const activityStaged = Boolean(staged) && staged !== "lobby" && staged !== "room_details";
+  /** Squad night, nothing on stage: the call fills the stage (the hang-out grid). */
+  const squadHangout = squad && callActive && !activityStaged && !watchFullscreen;
   /** The right-hand call pane is rendered — `side` and `side-pip` both use it. */
-  const splitCallLayout = callActive && wide && isSidePane(callLayout);
+  const splitCallLayout = callActive && wide && isSidePane(callLayout) && !squadHangout;
   /** The call renders as the floating window rather than in the pane. */
-  const floatingCall = !splitCallLayout || watchFullscreen;
+  const floatingCall = (!splitCallLayout && !squadHangout) || watchFullscreen;
 
   // Orientation drives the capture shape, so the window's frame matches the
   // stream inside it — and so the partner receives the framing you chose.
@@ -556,8 +563,6 @@ export function RoomStage({
   useEffect(() => {
     setExpanded(!compact);
   }, [compact]);
-  // An activity (not the lobby or room settings) owns the stage.
-  const activityStaged = Boolean(staged) && staged !== "lobby" && staged !== "room_details";
   // Tapping the bubble opens the call properly; staging something else
   // tucks it away again.
   const [callOpen, setCallOpen] = useState(false);
@@ -575,7 +580,7 @@ export function RoomStage({
   // never what "floating" meant on a large screen.
   const bubble = fsOverlay
     ? !fsExpanded
-    : wide
+    : wide || squadHangout
       ? false
       : compact && (activityStaged ? !callOpen : manualBubble);
   const pairBubble = bubble && wide;
@@ -747,6 +752,9 @@ export function RoomStage({
   // side). One <RoomVideo> lives in the host for the whole call; switching
   // layouts moves the node, so LiveKit never disconnects.
   const splitSlotRef = useRef<HTMLDivElement>(null);
+  // Squad nights: the call's fourth home, filling the stage when nothing
+  // else is on it (the hang-out grid).
+  const hangoutSlotRef = useRef<HTMLDivElement>(null);
   // Layout effect, not effect: React has just detached the pane (and the
   // host with it) when leaving split mode. A <video> removed from the
   // document pauses once the task yields, so re-home it in the same task.
@@ -759,9 +767,11 @@ export function RoomStage({
       setWatchFullscreen(Boolean(inWatchFs));
       const target = inWatchFs
         ? fsEl
-        : splitCallLayout
-          ? splitSlotRef.current
-          : pipAnchorRef.current;
+        : squadHangout
+          ? hangoutSlotRef.current
+          : splitCallLayout
+            ? splitSlotRef.current
+            : pipAnchorRef.current;
       if (!target || host.parentElement === target) return;
       target.appendChild(host);
       host.querySelectorAll("video").forEach((v) => {
@@ -771,7 +781,7 @@ export function RoomStage({
     place();
     document.addEventListener("fullscreenchange", place);
     return () => document.removeEventListener("fullscreenchange", place);
-  }, [splitCallLayout]);
+  }, [splitCallLayout, squadHangout]);
   useEffect(() => {
     const host = pipHostRef.current;
     return () => host?.remove();
@@ -1216,7 +1226,10 @@ export function RoomStage({
                 )}
               </>
             )}
-            {staged ? (
+            {squadHangout ? (
+              // The live call is re-homed into this slot (see hangoutSlotRef).
+              <div ref={hangoutSlotRef} className="relative h-full min-h-0 w-full overflow-hidden rounded-2xl" />
+            ) : staged ? (
               <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
                 <div
                   className={[
@@ -1485,6 +1498,7 @@ export function RoomStage({
           >
             {!bubble && <ChaperonSeam className={floatingCall ? undefined : "rounded-none"} />}
             <RoomVideo
+              group={squad}
               // In the pane, `side-pip` gives the phone-call shape — one feed
               // full-bleed with the other floating over it — while `side`
               // shows both tiles.
