@@ -53,6 +53,7 @@ import {
   nightLine,
   plannedStartDue,
 } from "@/lib/squadRoom";
+import { SQUAD_GAMES } from "@/lib/squadGames";
 import { cn } from "@/lib/utils";
 
 /** Broadcast when someone starts a night, so everyone here sees it at once. */
@@ -402,13 +403,9 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
   );
 }
 
-const GAME_NAMES: Record<string, string> = {
-  most_likely: "Most likely to",
-  who_said_it: "Who said it",
-  imposter: "Imposter",
-  spill_tea: "Spill the tea",
-  heads_up: "Heads up",
-};
+const GAME_NAMES: Record<string, string> = Object.fromEntries(
+  Object.values(SQUAD_GAMES).map((g) => [g.id, g.label]),
+);
 
 function League({ roomId, selfUserId }: { roomId: string; selfUserId: string }) {
   const league = useQuery({ queryKey: ["squad-league", roomId], queryFn: () => getSquadLeague(roomId) });

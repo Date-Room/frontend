@@ -11,3 +11,8 @@ served. Re-export after editing:
 Why WebP at display size: a 1024² PNG decodes to 4 MB of RAM whatever size
 it's drawn at, and the lobby mounts sixteen of them. On a 3-4 GB phone that
 was enough to get the tab evicted on an app switch.
+
+Squad game tiles (`most-likely`, `who-said-it`, `imposter`, `spill-the-tea`,
+and `clue-me-in` when it lands) come from the prompts in the Squad tiles
+brief. They're exported at 512 px only: squad games have no landing screen,
+so there's no `-hero` version.

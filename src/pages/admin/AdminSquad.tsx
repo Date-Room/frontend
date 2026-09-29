@@ -23,6 +23,7 @@ import {
   type SquadBetaDeclineReason,
   type SquadBetaGrantResult,
 } from "@/lib/admin";
+import { SQUAD_GAMES } from "@/lib/squadGames";
 import { cn } from "@/lib/utils";
 
 const PLAN_LABELS: Record<string, string> = {
@@ -395,13 +396,9 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-const GAME_LABELS: Record<string, string> = {
-  most_likely: "Most Likely To",
-  who_said_it: "Who Said It",
-  imposter: "Imposter",
-  spill_tea: "Spill the Tea",
-  heads_up: "Heads Up",
-};
+const GAME_LABELS: Record<string, string> = Object.fromEntries(
+  Object.values(SQUAD_GAMES).map((g) => [g.id, g.label]),
+);
 
 /** Pure: "40%" of the times a card was dealt that someone skipped it. */
 export function skipRate(card: Pick<AdminSquadCard, "dealt" | "skipped">): string {
