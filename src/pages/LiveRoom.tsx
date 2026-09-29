@@ -25,6 +25,7 @@ import { PageShell } from "@/components/PageShell";
 import { RoomSessionProvider, useRoomSession, type RoomIdentity } from "@/context/RoomSessionContext";
 import { ChaperonProvider } from "@/context/ChaperonContext";
 import { CallPeersProvider, useCallPeers } from "@/context/CallPeersContext";
+import { SquadStageProvider } from "@/context/SquadStageContext";
 import { ChaperonAnnounceBadge } from "@/components/ChaperonAnnounceBadge";
 import { TellUsSheet } from "@/components/TellUsSheet";
 import { ChatProvider } from "@/context/ChatContext";
@@ -968,6 +969,7 @@ export default function LiveRoom() {
       <RoomCustomizationProvider>
         <ChaperonProvider enabled={chaperonEnabled}>
          <CallPeersProvider>
+          <SquadStageProvider>
           <RoomShell
             expiresAt={sessionExpiresAt}
             onExpiresAtChange={setSessionExpiresAt}
@@ -978,6 +980,7 @@ export default function LiveRoom() {
           />
           <ChaperonMount />
           <ChaperonAnnounceBadge initial={chaperonAnnouncements} />
+          </SquadStageProvider>
          </CallPeersProvider>
         </ChaperonProvider>
       </RoomCustomizationProvider>

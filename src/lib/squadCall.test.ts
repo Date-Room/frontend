@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gridColumns, joinNames, liveVideoFor, squadHereLine, localClock, nearTheEnd, placeLine, speakerFirst, timeLeft } from "./squadCall";
+import { friendGridClass, gridColumns, joinNames, liveVideoFor, squadHereLine, localClock, nearTheEnd, placeLine, speakerFirst, timeLeft } from "./squadCall";
 
 const at = new Date("2026-09-29T17:30:00Z");
 
@@ -46,5 +46,14 @@ describe("squad call helpers", () => {
 
   it("picks grid columns", () => {
     expect([1, 2, 4, 5, 6].map(gridColumns)).toEqual([1, 2, 2, 3, 3]);
+  });
+});
+
+describe("friendGridClass", () => {
+  it("never needs more than a 2 by 2 for friends", () => {
+    expect(friendGridClass(1)).toContain("grid-cols-1");
+    expect(friendGridClass(2)).toContain("grid-rows-2");
+    expect(friendGridClass(3)).toContain("col-span-2");
+    expect(friendGridClass(4)).toBe("grid-cols-2 grid-rows-2");
   });
 });

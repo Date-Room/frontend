@@ -92,3 +92,16 @@ export function squadHereLine(names: string[]): string {
   if (names.length === 0) return "Waiting for the squad…";
   return `${joinNames(names)} ${names.length === 1 ? "is" : "are"} here`;
 }
+
+/**
+ * The friends' grid during a squad game. You sit small beside the question,
+ * so the grid only ever holds friends, at most four: one fills it, two
+ * stack (side by side on wider screens), three are two plus one wide, four
+ * are two by two.
+ */
+export function friendGridClass(friends: number): string {
+  if (friends <= 1) return "grid-cols-1 grid-rows-1";
+  if (friends === 2) return "grid-cols-1 grid-rows-2 sm:grid-cols-2 sm:grid-rows-1";
+  if (friends === 3) return "grid-cols-2 grid-rows-2 [&>*:nth-child(3)]:col-span-2";
+  return "grid-cols-2 grid-rows-2";
+}

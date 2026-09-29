@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canSkip,
+  stageCueFor,
   isSquadGame,
   listNames,
   myTurn,
@@ -98,5 +99,44 @@ describe("canSkip", () => {
     const hu = { game: "heads_up" as const, stage: "playing" as const };
     expect(canSkip(round({ ...hu, heads_up: { index: 0, total: 12 } }), "a")).toBe(true);
     expect(canSkip(round({ ...hu, heads_up: { index: 2, total: 12 } }), "a")).toBe(false);
+  });
+});
+
+describe("stageCueFor", () => {
+  it("makes faces the ballot, then waits", () => {
+    const r = round({ submitted: [] });
+    const deciding = stageCueFor(r, { playing: true }, "a", false);
+    expect(deciding.mode).toBe("deciding");
+    expect(deciding.vote).toBe(true);
+    expect(deciding.faces.b.tappable).toBe(true);
+    expect(deciding.faces.a.tappable).toBe(true); // you can pick yourself in Most Likely To
+    const waiting = stageCueFor(round({ submitted: ["a"] }), { playing: true, my_move: "b" }, "a", false);
+    expect(waiting.mode).toBe("waiting");
+    expect(waiting.faces.b.picked).toBe(true);
+    expect(waiting.faces.a.badge).toBe("in");
+    expect(waiting.faces.c.badge).toBe("thinking");
+  });
+
+  it("never lets the imposter vote for themselves", () => {
+    const c = stageCueFor(round({ game: "imposter" }), { playing: true }, "a", false);
+    expect(c.faces.a.tappable).toBe(false);
+    expect(c.faces.a.dim).toBe(true);
+  });
+
+  it("puts the winner forward at the reveal, or stays quiet on a tie", () => {
+    const won = round({ stage: "revealed", public: { results: { top: ["b"], tally: { b: 2 } } } });
+    expect(stageCueFor(won, null, "a", false)).toMatchObject({ mode: "spotlight", focus: "b" });
+    const tie = round({ stage: "revealed", public: { results: { top: ["b", "c"] } } });
+    expect(stageCueFor(tie, null, "a", false).mode).toBe("reading");
+  });
+
+  it("keeps the Clue Me In guesser big, and reading rounds as a strip", () => {
+    expect(stageCueFor(round({ game: "heads_up", stage: "playing", lead_id: "c" }), null, "a", false)).toMatchObject({ mode: "hero", focus: "c" });
+    expect(stageCueFor(round({ game: "heads_up", stage: "playing", lead_id: "a" }), null, "a", false).mode).toBe("deciding");
+    const tea = stageCueFor(round({ game: "spill_tea", stage: "answer", lead_id: "a" }), null, "b", false);
+    expect(tea.mode).toBe("reading");
+    expect(tea.faces.a.ring).toBe(true);
+    expect(stageCueFor(null, null, "a", false).mode).toBe("reading");
+    expect(stageCueFor(round({}), null, "a", true).mode).toBe("reading");
   });
 });

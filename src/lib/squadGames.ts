@@ -189,3 +189,67 @@ export function startBlocker(game: SquadGameId, players: number): string | null 
   const min = SQUAD_GAMES[game].min;
   return players >= min ? null : `${SQUAD_GAMES[game].label} needs at least ${min} players.`;
 }
+
+/** What the call should do for this round, keyed by participant id (the
+ *  game maps ids to call identities). See SquadStageContext. */
+export type CuePlan = {
+  mode: "reading" | "deciding" | "waiting" | "spotlight" | "hero";
+  focus: string | null;
+  faces: Record<string, { badge?: "in" | "thinking"; picked?: boolean; dim?: boolean; ring?: boolean; tappable?: boolean }>;
+  hint: string | null;
+  /** Tapping a face casts (or changes) my vote. */
+  vote: boolean;
+};
+
+const QUIET: CuePlan = { mode: "reading", focus: null, faces: {}, hint: null, vote: false };
+
+/** Pure: the stage cue for a round. Faces are the ballot in the voting
+ *  games; everyone shrinks to a strip while reading or writing; the reveal
+ *  puts one face forward; the Clue Me In guesser stays big all round. */
+export function stageCueFor(round: Round | null, mine: MyView | null, me: string | null, settingUp: boolean): CuePlan {
+  if (!round || settingUp) return QUIET;
+  if (round.stage === "revealed") {
+    const r = (round.public.results ?? {}) as Record<string, unknown>;
+    let focus: string | null = null;
+    if (round.game === "most_likely") {
+      const top = r.top as string[] | undefined;
+      focus = top && top.length === 1 ? top[0] : null;
+    } else if (round.game === "imposter") focus = (r.imposter as string) ?? null;
+    else if (round.game === "spill_tea") focus = (r.winner as string) ?? null;
+    else if (round.game === "heads_up") focus = (r.guesser as string) ?? null;
+    return focus ? { ...QUIET, mode: "spotlight", focus } : QUIET;
+  }
+  if (round.game === "heads_up") {
+    // Everyone watches the guesser; the guesser watches the room giving clues.
+    return round.lead_id === me
+      ? { ...QUIET, mode: "deciding", hint: "You're guessing. Listen to the squad." }
+      : { ...QUIET, mode: "hero", focus: round.lead_id };
+  }
+
+  const still = new Set(waitingOn(round));
+  const expected = new Set([...still, ...round.submitted]);
+  const faces: CuePlan["faces"] = {};
+  for (const p of round.players) {
+    if (expected.has(p)) faces[p] = { badge: still.has(p) ? "thinking" : "in" };
+    else faces[p] = {};
+  }
+
+  if (round.stage === "vote") {
+    const turn = myTurn(round, me);
+    const moved = me ? round.submitted.includes(me) : false;
+    for (const p of round.players) {
+      const self = round.game === "imposter" && p === me;
+      faces[p] = { ...faces[p], tappable: turn && !self, picked: mine?.my_move === p, dim: self };
+    }
+    const hint = moved
+      ? `You're in · ${round.submitted.length} of ${round.players.length}. Tap another face to change.`
+      : round.game === "imposter"
+        ? "When you've all spoken, tap who you think it is."
+        : "Tap a face to vote. Only you see your pick.";
+    return { mode: moved ? "waiting" : "deciding", focus: null, faces, hint, vote: turn };
+  }
+
+  // Writing, guessing or judging: the card needs the room; faces are a strip.
+  if (round.game === "spill_tea" && round.lead_id) faces[round.lead_id] = { ...faces[round.lead_id], ring: true };
+  return { ...QUIET, faces };
+}
