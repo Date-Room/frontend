@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Copy, Link2, Lock, MapPin, MoreHorizontal, Users } from "lucide-react";
+import { Copy, Link2, Lock, Mail, MapPin, MoreHorizontal, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -34,6 +34,7 @@ import {
   lockSquad,
   removeSquadMember,
   setSquadCohost,
+  setSquadNightEmails,
   setSquadWhere,
   squadErrorText,
   squadInviteUrl,
@@ -113,6 +114,15 @@ export function SquadMembersSheet({
       toast.success(m.locked_until ? "Locked. No one new can join for now." : "Unlocked.");
     },
     onError: fail("That didn't work."),
+  });
+  const nightEmails = members?.my_night_emails ?? true;
+  const emails = useMutation({
+    mutationFn: (on: boolean) => setSquadNightEmails(roomId, on),
+    onSuccess: (_, on) => {
+      qc.setQueryData<SquadMembers>(["squad-members", roomId], (m) => (m ? { ...m, my_night_emails: on } : m));
+      toast.success(on ? "We'll email you about nights." : "No more night emails from this squad.");
+    },
+    onError: fail("That didn't save."),
   });
   const newLink = useMutation({
     mutationFn: () => rotateRoomPin(roomId),
@@ -239,6 +249,22 @@ export function SquadMembersSheet({
               Your city shows on your face, and planned times show in your clock for everyone.
             </p>
           </section>
+
+          <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/[0.1] px-3 py-3 text-sm text-cream">
+            <Mail className="h-4 w-4 text-primary" aria-hidden />
+            <span className="flex-1">
+              Email me about nights
+              <span className="block text-xs text-muted-foreground">
+                When a time is set, 15 minutes before, and if a night starts without you.
+              </span>
+            </span>
+            <Switch
+              checked={nightEmails}
+              disabled={emails.isPending}
+              onCheckedChange={(on) => emails.mutate(on)}
+              aria-label="Email me about nights"
+            />
+          </label>
 
           <section className="space-y-3">
             <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">The door</p>
