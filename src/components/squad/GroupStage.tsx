@@ -30,6 +30,7 @@ import { Track } from "livekit-client";
 import { Armchair, Clock, Mic, MicOff, Video, VideoOff } from "lucide-react";
 import { useSquadStage, type FaceCue } from "@/context/SquadStageContext";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
+import { useWideViewport } from "@/lib/viewport";
 import {
   browserTimeZone,
   getSquadMembers,
@@ -80,6 +81,7 @@ function useMinute(): Date {
 export function GroupStage({ roomId, layout, bare }: Props) {
   const focus = layout === "focus";
   const stage = useSquadStage();
+  const wide = useWideViewport();
   const qc = useQueryClient();
   const lowPower = useLowPowerMode();
   const now = useMinute();
@@ -225,8 +227,9 @@ export function GroupStage({ roomId, layout, bare }: Props) {
       </div>
     );
 
-    if (mode === "reading") {
-      // You're reading or writing: everyone shrinks to a strip.
+    if (mode === "reading" && !wide) {
+      // Phone, reading or writing: everyone shrinks to a strip. (A laptop has
+      // room, so it keeps the grid below.)
       return (
         <div className="flex h-full w-full items-center gap-2 overflow-x-auto bg-black/35 px-3 py-2">
           {clockPill}

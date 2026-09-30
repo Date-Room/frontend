@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { ACTIVITY_TILES } from "@/lib/activityTiles";
-import { SQUAD_GAMES, SQUAD_GAME_IDS } from "@/lib/squadGames";
+import { SQUAD_GAMES, SQUAD_GAME_IDS, isSquadGame } from "@/lib/squadGames";
 import { useTryRoom } from "@/lib/tryDemo";
 
 /**
@@ -56,10 +56,13 @@ const FEATURED = 3;
 function LobbyCard({
   id,
   label,
+  sub,
   onClick,
 }: {
   id: string;
   label: string;
+  /** A second, quieter line (a squad game's name under its mood). */
+  sub?: string;
   onClick: () => void;
 }) {
   const image = ACTIVITY_TILES[id];
@@ -87,7 +90,10 @@ function LobbyCard({
         aria-hidden
       />
       <span className="relative flex w-full items-center gap-2.5 px-3.5 pb-3 pt-2">
-        <span className="min-w-0 flex-1 truncate text-body text-cream">{label}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-body text-cream">{label}</span>
+          {sub && <span className="block truncate text-label text-cream/65">{sub}</span>}
+        </span>
         <ChevronRight
           className="h-4 w-4 shrink-0 text-primary/80 transition group-hover:translate-x-0.5"
           aria-hidden
@@ -141,6 +147,8 @@ export function ActivityLobby({
 
   const walls = pick(WALL_IDS);
   const games = GAMES.filter((g) => byId.has(g.id));
+  // A squad room's menu is moods ("Roast each other"), not game names.
+  const squadRoom = games.some((g) => isSquadGame(g.id));
   const media = pick(MEDIA_IDS);
 
   // Match on the name AND the line: someone hunting "questions" should find
@@ -179,7 +187,7 @@ export function ActivityLobby({
 
         {games.length > 0 && (
           <Section
-            title="Games"
+            title={squadRoom ? "What are we feeling?" : "Games"}
             action={
               games.length > FEATURED ? (
                 <button
@@ -196,7 +204,13 @@ export function ActivityLobby({
             {games.slice(0, FEATURED).map((g) => {
               const t = byId.get(g.id)!;
               return (
-                <LobbyCard key={g.id} id={g.id} label={t.label} onClick={() => start(g.id)} />
+                <LobbyCard
+                  key={g.id}
+                  id={g.id}
+                  label={isSquadGame(g.id) ? SQUAD_GAMES[g.id].mood : t.label}
+                  sub={isSquadGame(g.id) ? t.label : undefined}
+                  onClick={() => start(g.id)}
+                />
               );
             })}
           </Section>
