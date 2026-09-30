@@ -275,7 +275,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
             style={style}
             className="flex shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-primary/60 text-sm font-semibold text-primary"
           >
-            {m?.display_name ?? "Friend"} · in the middle
+            {id === self ? "You" : (m?.display_name ?? "Friend")} · in the middle
           </div>
         );
       }
@@ -332,7 +332,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
                 {mode === "spotlight" && cue?.caption && (
                   <p
                     key={cue.caption}
-                    className="pointer-events-none absolute inset-x-3 top-3 animate-in text-center font-serif text-2xl font-semibold text-primary drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] fade-in zoom-in-95 duration-500 sm:text-3xl"
+                    className="pointer-events-none absolute inset-x-0 top-0 animate-in rounded-t-2xl bg-gradient-to-b from-black/75 via-black/45 to-transparent px-3 pb-8 pt-3 text-center font-serif text-2xl font-semibold text-primary drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] fade-in zoom-in-95 duration-500 sm:text-3xl"
                   >
                     {cue.caption}
                   </p>
@@ -386,7 +386,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
             {mode === "spotlight" && cue?.caption && (
               <p
                 key={cue.caption}
-                className="pointer-events-none absolute inset-x-3 top-3 animate-in text-center font-serif text-2xl font-semibold text-primary drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] fade-in zoom-in-95 duration-500 sm:text-3xl"
+                className="pointer-events-none absolute inset-x-0 top-0 animate-in rounded-t-2xl bg-gradient-to-b from-black/75 via-black/45 to-transparent px-3 pb-8 pt-3 text-center font-serif text-2xl font-semibold text-primary drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] fade-in zoom-in-95 duration-500 sm:text-3xl"
               >
                 {cue.caption}
               </p>
