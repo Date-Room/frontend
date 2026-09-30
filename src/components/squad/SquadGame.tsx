@@ -4,7 +4,7 @@
  * stage you're on, then the reveal and "Next round". The server holds the
  * secrets; this only ever draws the public round plus my own card.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Loader2, Timer } from "lucide-react";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import { ApiError } from "@/lib/api";
 import { getSquadMembers, squadErrorText } from "@/lib/squad";
 import {
   SQUAD_GAMES,
+  beatCue,
   canSkip,
   closeStage,
   getRound,
@@ -24,6 +25,7 @@ import {
   myTurn,
   pokeLine,
   readEnergy,
+  revealBeats,
   roleCard,
   roleFor,
   roleLine,
@@ -34,8 +36,8 @@ import {
   startBlocker,
   stageCueFor,
   startRound,
-  tallyRows,
   waitingOn,
+  type Beat,
   type Deck,
   type MyView,
   type Round,
@@ -151,7 +153,37 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   }, [readers]);
   const readingPids = list.filter((m) => m.user_id && readers[m.user_id]).map((m) => m.participant_id);
 
+  // The reveal plays beat by beat on devices that saw the round live
+  // (revealBeats); anyone arriving afterwards lands on the result.
+  const beats = useMemo(
+    () => (round && round.stage === "revealed" ? revealBeats(round, me, nameOf) : []),
+    // nameOf follows members.data.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [round, me, members.data],
+  );
+  const lived = useRef(new Set<string>());
+  const [beatAt, setBeatAt] = useState({ id: "", i: 0 });
+  useLayoutEffect(() => {
+    if (!round) return;
+    if (round.stage !== "revealed") {
+      lived.current.add(round.id);
+      return;
+    }
+    // Before paint, so the result never flashes ahead of the drumroll.
+    if (beatAt.id !== round.id) setBeatAt({ id: round.id, i: lived.current.has(round.id) ? 0 : beats.length - 1 });
+  }, [round, beats.length, beatAt.id]);
+  const beatIndex = round && beatAt.id === round.id ? Math.min(beatAt.i, beats.length - 1) : beats.length - 1;
+  const beat = round?.stage === "revealed" && !setup ? (beats[beatIndex] ?? null) : null;
+  const revealDone = beatIndex >= beats.length - 1;
+  useEffect(() => {
+    if (!beat || revealDone) return;
+    const t = window.setTimeout(() => setBeatAt((b) => ({ ...b, i: b.i + 1 })), beat.ms);
+    return () => window.clearTimeout(t);
+  }, [beat, revealDone]);
+  const skipReveal = () => setBeatAt((b) => ({ ...b, i: beats.length - 1 }));
+
   const plan = useMemo(() => {
+    if (beat && round) return beatCue(beat, round);
     const p = { ...stageCueFor(round, mine, me, setup || !round, {
       ready: local.ready,
       guessPick: onScreen ? (local.draft[onScreen.key] ?? null) : null,
@@ -165,7 +197,7 @@ export function SquadGame({ game }: { game: SquadGameId }) {
     return p;
     // nameOf and readingPids follow members.data and readers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [round, mine, me, setup, local, onScreen, reviewing, readers, members.data]);
+  }, [round, mine, me, setup, local, onScreen, reviewing, readers, members.data, beat]);
   const vote = useRef(move.mutate);
   vote.current = move.mutate;
   // Tapping a face on Who Said It: that's my guess for the answer on screen;
@@ -196,6 +228,7 @@ export function SquadGame({ game }: { game: SquadGameId }) {
       focus: uid(plan.focus),
       faces,
       hint: plan.hint,
+      caption: beat?.caption ?? null,
       live: Boolean(round && !setup && round.stage !== "revealed"),
       onTap: plan.vote
         ? (id) => {
@@ -211,7 +244,7 @@ export function SquadGame({ game }: { game: SquadGameId }) {
     });
     // byPid and list follow members.data.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setCue, plan, members.data, setup]);
+  }, [setCue, plan, members.data, setup, beat]);
   useEffect(() => () => setCue?.(null), [setCue]);
 
   // Learning the game: the first time you play a role, a card over the game
@@ -276,8 +309,8 @@ export function SquadGame({ game }: { game: SquadGameId }) {
           <p className="dr-eyebrow text-primary/85">
             {round && !setup ? `Round ${round.number} · ${info.mood}` : info.mood}
           </p>
-          <h2 className="font-serif text-2xl text-cream sm:text-3xl">{info.label}</h2>
-          {energy && round && !setup && (
+          {plan.mode !== "hero" && <h2 className="font-serif text-2xl text-cream sm:text-3xl">{info.label}</h2>}
+          {energy && round && !setup && plan.mode !== "hero" && (
             <button
               type="button"
               onClick={() => setEnergy(energy === "spicy" ? "mild" : "spicy")}
@@ -314,14 +347,26 @@ export function SquadGame({ game }: { game: SquadGameId }) {
           />
         ) : round.stage === "revealed" ? (
           <>
-            <Reveal round={round} nameOf={nameOf} me={me} />
-            <button
-              type="button"
-              onClick={() => setSetup(true)}
-              className="btn-primary focus-ring w-full rounded-full py-3.5 font-semibold"
-            >
-              Next round
-            </button>
+            <Reveal round={round} nameOf={nameOf} me={me} beat={beat} done={revealDone} />
+            {revealDone ? (
+              <button
+                type="button"
+                onClick={() => setSetup(true)}
+                className="btn-primary focus-ring w-full rounded-full py-3.5 font-semibold"
+              >
+                Next round
+              </button>
+            ) : (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={skipReveal}
+                  className="focus-ring rounded-full px-3 py-1 text-sm text-muted-foreground hover:text-cream"
+                >
+                  {round.game === "who_said_it" ? "Show them all ›" : "Skip ›"}
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <>
@@ -1004,45 +1049,61 @@ function HeadsUp({
   const guesser = round.lead_id;
   const progress = round.heads_up ? `${Math.min(round.heads_up.index + 1, round.heads_up.total)} of ${round.heads_up.total}` : "";
   const card = mine?.card;
-  return (
-    <div className="space-y-4 text-center">
-      <p className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-1 font-semibold tabular-nums text-cream">
-        <Timer className="h-4 w-4 text-primary" aria-hidden /> {left}s
-      </p>
-      <p className="dr-eyebrow text-muted-foreground">
-        {round.prompt?.category} · word {progress}
-      </p>
-      {guesser === me ? (
-        <div className="rounded-3xl border border-primary/25 bg-primary/[0.08] px-5 py-8">
-          <p className="font-serif text-3xl text-cream">You're guessing</p>
-          <p className="mt-2 text-sm text-muted-foreground">Listen to the squad and shout your guesses.</p>
-        </div>
-      ) : card?.word && mine?.playing ? (
-        <>
-          <div className="rounded-3xl border border-primary/25 bg-primary/[0.08] px-5 py-8">
-            <p className="text-sm text-muted-foreground">Describe it to {nameOf(guesser ?? "")}. Don't say it!</p>
-            <p className="mt-2 font-serif text-4xl text-cream">{card.word}</p>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => onMove({ result: "pass", index: card.index })}
-              className="focus-ring rounded-full border border-white/[0.12] py-3.5 font-semibold text-cream hover:bg-white/[0.06]"
-            >
-              Pass
-            </button>
-            <button
-              type="button"
-              onClick={() => onMove({ result: "got", index: card.index })}
-              className="btn-primary focus-ring rounded-full py-3.5 font-semibold"
-            >
-              Got it
-            </button>
-          </div>
-        </>
-      ) : (
-        <p className="text-sm text-muted-foreground">{nameOf(guesser ?? "")} is guessing.</p>
+  const clock = (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-sm font-semibold tabular-nums",
+        left <= 10 ? "bg-primary text-primary-foreground" : "bg-white/[0.06] text-cream",
       )}
+    >
+      <Timer className="h-3.5 w-3.5" aria-hidden /> {left}s
+    </span>
+  );
+  // Almost no screen: the guesser's face is the show (the call, above), so
+  // the clue-givers get the word and two thumb-sized buttons.
+  if (guesser === me) {
+    return (
+      <div className="space-y-2 text-center">
+        <div className="flex items-center justify-center gap-2">
+          {clock}
+          <span className="dr-eyebrow text-muted-foreground">word {progress}</span>
+        </div>
+      </div>
+    );
+  }
+  if (!(card?.word && mine?.playing)) {
+    return (
+      <div className="space-y-2 text-center">
+        {clock}
+        <p className="text-sm text-muted-foreground">{nameOf(guesser ?? "")} is guessing.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-3 text-center">
+      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+        {clock}
+        <span>Describe it · don't say it</span>
+      </div>
+      <p key={card.word} className="animate-in font-serif text-4xl leading-tight text-cream fade-in duration-300 sm:text-5xl">
+        {card.word}
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => onMove({ result: "pass", index: card.index })}
+          className="focus-ring h-16 rounded-2xl border border-white/[0.14] text-lg font-semibold text-cream hover:bg-white/[0.06] sm:h-20"
+        >
+          Pass
+        </button>
+        <button
+          type="button"
+          onClick={() => onMove({ result: "got", index: card.index })}
+          className="btn-primary focus-ring h-16 rounded-2xl text-lg font-semibold sm:h-20"
+        >
+          Got it
+        </button>
+      </div>
     </div>
   );
 }
@@ -1158,57 +1219,59 @@ function WaitPanel({
 
 /* ───────────────── The reveal ───────────────── */
 
-function Reveal({ round, nameOf, me }: { round: Round; nameOf: Names; me: string | null }) {
+/** The reveal, beat by beat (see revealBeats). The call carries the face
+ *  and the gold caption; this panel carries the words around it. */
+function Reveal({
+  round,
+  nameOf,
+  me,
+  beat,
+  done,
+}: {
+  round: Round;
+  nameOf: Names;
+  me: string | null;
+  beat: Beat | null;
+  done: boolean;
+}) {
   const r = (round.public.results ?? {}) as Record<string, unknown>;
   const you = (pid: string) => (pid === me ? "You" : nameOf(pid));
   /** Mid-sentence: "spotted by you". */
   const youLower = (pid: string) => (pid === me ? "you" : nameOf(pid));
+  // In the spotlight the caption rides on the face; the panel only says it
+  // when no face is forward (the drumroll, a tie, nobody voted).
+  const caption = beat?.caption && beat.mode !== "spotlight" ? (
+    <p key={beat.caption} className="animate-in text-center font-serif text-3xl text-primary fade-in zoom-in-95 duration-500 sm:text-4xl">
+      {beat.caption}
+    </p>
+  ) : null;
 
-  if (round.game === "most_likely" || round.game === "imposter") {
-    const rows = tallyRows((r.tally ?? {}) as Record<string, number>, nameOf);
-    const max = Math.max(1, ...rows.map((x) => x.votes));
+  if (round.game === "most_likely") {
     return (
-      <div className="space-y-4">
-        {round.game === "most_likely" ? (
-          <>
-            <Prompt text={round.prompt?.text} />
-            <p className="text-center font-serif text-2xl text-cream">
-              {(r.top as string[] | undefined)?.length
-                ? `${listNames((r.top as string[]).map(you))}!`
-                : "Nobody voted."}
-            </p>
-            <p className="text-center text-sm text-muted-foreground">Everyone who voted with the room scores a point.</p>
-          </>
-        ) : (
-          <>
-            <p className="text-center font-serif text-3xl text-cream">
-              {r.imposter === me ? "You were the imposter" : `It was ${nameOf(String(r.imposter ?? ""))}.`}
-            </p>
-            <p className="text-center text-sm text-muted-foreground">
-              The word was <span className="text-cream">{String(r.word ?? "")}</span>.{" "}
-              {r.caught
-                ? "Caught! Everyone else scores a point."
-                : r.imposter === me
-                  ? "You got away with it: 2 points to you."
-                  : "They got away with it: 2 points to the imposter."}
-            </p>
-          </>
+      <div className="space-y-3 sm:space-y-4">
+        <Prompt text={round.prompt?.text} />
+        {caption}
+        {done && (r.top as string[] | undefined)?.length ? (
+          <p className="text-center text-sm text-muted-foreground">Everyone who agreed scores a point.</p>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (round.game === "imposter") {
+    return (
+      <div className="space-y-3 text-center sm:space-y-4">
+        {caption}
+        {done && (
+          <p className="animate-in text-sm text-muted-foreground fade-in duration-700">
+            The word was <span className="font-serif text-lg text-cream">{String(r.word ?? "")}</span>.{" "}
+            {r.caught
+              ? "Everyone else scores a point."
+              : r.imposter === me
+                ? "2 points to you."
+                : `2 points to ${nameOf(String(r.imposter ?? ""))}.`}
+          </p>
         )}
-        <ul className="space-y-1.5">
-          {rows.map((row) => (
-            <li key={row.pid} className="relative overflow-hidden rounded-xl bg-white/[0.04] px-3 py-2 text-sm text-cream">
-              <span
-                className="absolute inset-y-0 left-0 bg-primary/20"
-                style={{ width: `${(row.votes / max) * 100}%` }}
-                aria-hidden
-              />
-              <span className="relative flex justify-between">
-                <span>{you(row.pid)}</span>
-                <span className="tabular-nums">{row.votes} vote{row.votes === 1 ? "" : "s"}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
       </div>
     );
   }
@@ -1217,9 +1280,7 @@ function Reveal({ round, nameOf, me }: { round: Round; nameOf: Names; me: string
     const words = (r.words ?? []) as { word: string; result: string }[];
     return (
       <div className="space-y-4 text-center">
-        <p className="font-serif text-3xl text-cream">
-          {you(String(r.guesser ?? ""))} got {Number(r.got ?? 0)}
-        </p>
+        {caption}
         <div className="flex flex-wrap justify-center gap-1.5">
           {words.map((w, i) => (
             <span
@@ -1241,37 +1302,55 @@ function Reveal({ round, nameOf, me }: { round: Round; nameOf: Names; me: string
   if (round.game === "spill_tea") {
     const authors = (r.authors ?? {}) as Record<string, string>;
     const picked = r.picked as string | undefined;
+    const pick = answers.find((a) => a.key === picked);
     return (
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         <Prompt text={round.prompt?.text} />
-        <p className="text-center font-serif text-2xl text-cream">
-          {r.winner ? `${you(String(r.winner))} wins the round` : "No pick this time."}
-        </p>
-        <ul className="space-y-2">
-          {answers.map((a) => (
-            <li
-              key={a.key}
-              className={cn(
-                "rounded-2xl border px-4 py-3",
-                a.key === picked ? "border-primary/60 bg-primary/15" : "border-white/[0.08] bg-card/30",
-              )}
-            >
-              <p className="text-[15px] text-cream">{a.text}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {authors[a.key] ? you(authors[a.key]) : ""}
-                {a.key === picked && " · the judge's pick"}
-              </p>
-            </li>
-          ))}
-        </ul>
+        {caption}
+        {pick && (
+          <p className="text-center font-serif text-xl text-cream">“{pick.text}”</p>
+        )}
+        {done && (
+          <ul className="space-y-2">
+            {answers
+              .filter((a) => a.key !== picked)
+              .map((a) => (
+                <li key={a.key} className="rounded-2xl border border-white/[0.08] bg-card/30 px-4 py-2.5">
+                  <p className="text-[15px] text-cream">{a.text}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{authors[a.key] ? you(authors[a.key]) : ""}</p>
+                </li>
+              ))}
+          </ul>
+        )}
       </div>
     );
   }
 
-  // who_said_it
+  // who_said_it: one author at a time, then all of them.
   const per = (r.answers ?? {}) as Record<string, { author: string; right: string[]; fooled: string[] }>;
+  const line = (row: { right: string[]; fooled: string[] }) =>
+    [
+      row.right.length ? `spotted by ${listNames(row.right.map(youLower))}` : "",
+      row.fooled.length ? `fooled ${listNames(row.fooled.map(youLower))}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  const now = beat?.answer ? answers.find((a) => a.key === beat.answer) : null;
+  if (now && per[now.key]) {
+    const i = answers.findIndex((a) => a.key === now.key);
+    return (
+      <div key={now.key} className="animate-in space-y-3 text-center fade-in duration-500">
+        <p className="dr-eyebrow text-muted-foreground">
+          {i + 1} of {answers.length}
+        </p>
+        <p className="font-serif text-2xl leading-snug text-cream sm:text-3xl">“{now.text}”</p>
+        {caption}
+        <p className="text-sm text-muted-foreground">{line(per[now.key]) || "Nobody guessed it."}</p>
+      </div>
+    );
+  }
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       <Prompt text={round.prompt?.text} />
       <ul className="space-y-2">
         {answers.map((a) => {
@@ -1282,8 +1361,7 @@ function Reveal({ round, nameOf, me }: { round: Round; nameOf: Names; me: string
               {row && (
                 <p className="mt-1 text-xs text-muted-foreground">
                   <span className="text-primary">{you(row.author)}</span>
-                  {row.right.length > 0 && ` · spotted by ${listNames(row.right.map(youLower))}`}
-                  {row.fooled.length > 0 && ` · fooled ${listNames(row.fooled.map(youLower))}`}
+                  {line(row) && ` · ${line(row)}`}
                 </p>
               )}
             </li>

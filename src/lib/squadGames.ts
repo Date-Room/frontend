@@ -496,3 +496,91 @@ export function markRoleSeen(game: SquadGameId, role: SquadRole): void {
     /* storage off: the card shows again next time */
   }
 }
+
+/* ───────────────── Reveals as moments ───────────────── */
+
+/** One beat of a reveal: what the call shows, what it says, how long it
+ *  holds before the next beat (0 on the last). */
+export type Beat = {
+  mode: CuePlan["mode"];
+  focus: string | null;
+  /** Faces with a gold ring (the drumroll, a tie). */
+  ring?: string[];
+  /** Gold words over the face in the spotlight, and big in the game panel. */
+  caption: string | null;
+  /** Who Said It: the answer this beat is about. */
+  answer?: string;
+  ms: number;
+};
+
+/** Pure: the reveal, beat by beat. The round already holds every result;
+ *  this only decides the order people find out in. Votes stay anonymous:
+ *  counts, never who picked whom. */
+export function revealBeats(round: Round, me: string | null, nameOf: (pid: string) => string): Beat[] {
+  const r = (round.public.results ?? {}) as Record<string, unknown>;
+  const name = (pid: string) => (pid === me ? "You" : nameOf(pid));
+  const obj = (pid: string) => (pid === me ? "you" : nameOf(pid));
+  const tally = (r.tally ?? {}) as Record<string, number>;
+  const cast = Object.values(tally).reduce((a, b) => a + b, 0);
+  const lead: Beat = { mode: "waiting", focus: null, caption: "The votes are in…", ms: 1100 };
+
+  if (round.game === "most_likely") {
+    const top = (r.top ?? []) as string[];
+    if (!top.length) return [{ mode: "reading", focus: null, caption: "Nobody voted.", ms: 0 }];
+    if (top.length > 1) return [lead, { mode: "waiting", focus: null, ring: top, caption: `A tie: ${listNames(top.map(name))}`, ms: 0 }];
+    const votes = tally[top[0]] ?? 0;
+    const caption = cast > 1 && votes === cast ? "The room has spoken" : `${votes} of ${cast} chose ${obj(top[0])}`;
+    return [lead, { mode: "spotlight", focus: top[0], caption, ms: 0 }];
+  }
+
+  if (round.game === "imposter") {
+    const imp = String(r.imposter ?? "");
+    const top = Object.entries(tally).filter(([, n]) => n === Math.max(0, ...Object.values(tally)) && n > 0);
+    const accused = top.length === 1 ? top[0][0] : null;
+    // The drumroll: a ring runs across the faces, twice round.
+    const roll: Beat[] = [...round.players, ...round.players].map((p) => ({
+      mode: "waiting",
+      focus: null,
+      ring: [p],
+      caption: "The votes are in…",
+      ms: 260,
+    }));
+    const accuse: Beat = accused
+      ? { mode: "spotlight", focus: accused, caption: `The squad accused ${obj(accused)}`, ms: 1800 }
+      : { mode: "waiting", focus: null, caption: "The squad couldn't agree", ms: 1500 };
+    const end: Beat = r.caught
+      ? { mode: "spotlight", focus: imp, caption: "Caught 🥂", ms: 0 }
+      : { mode: "spotlight", focus: imp, caption: imp === me ? "You got away with it 😈" : `You got played. It was ${nameOf(imp)}.`, ms: 0 };
+    return [...roll, accuse, end];
+  }
+
+  if (round.game === "who_said_it") {
+    const per = (r.answers ?? {}) as Record<string, { author: string }>;
+    const beats: Beat[] = (round.public.answers ?? [])
+      .filter((a) => per[a.key])
+      .map((a) => ({ mode: "spotlight", focus: per[a.key].author, caption: `${name(per[a.key].author)} wrote it`, answer: a.key, ms: 3200 }));
+    return [...beats, { mode: "reading", focus: null, caption: null, ms: 0 }];
+  }
+
+  if (round.game === "spill_tea") {
+    const winner = r.winner ? String(r.winner) : null;
+    if (!winner) return [{ mode: "reading", focus: null, caption: "No pick this time.", ms: 0 }];
+    return [
+      { mode: "waiting", focus: null, caption: "The judge has picked…", ms: 1100 },
+      { mode: "spotlight", focus: winner, caption: `${name(winner)} ${winner === me ? "win" : "wins"} the round`, ms: 0 },
+    ];
+  }
+
+  // heads_up
+  const guesser = r.guesser ? String(r.guesser) : null;
+  const got = Number(r.got ?? 0);
+  if (!guesser) return [{ mode: "reading", focus: null, caption: null, ms: 0 }];
+  return [{ mode: "spotlight", focus: guesser, caption: `${name(guesser)} got ${got} word${got === 1 ? "" : "s"}`, ms: 0 }];
+}
+
+/** Pure: a reveal beat as a stage cue. */
+export function beatCue(beat: Beat, round: Round): CuePlan {
+  const faces: CuePlan["faces"] = {};
+  for (const p of round.players) faces[p] = beat.ring?.includes(p) ? { ring: true } : {};
+  return { mode: beat.mode, focus: beat.focus, faces, hint: beat.mode === "waiting" ? beat.caption : null, vote: false };
+}

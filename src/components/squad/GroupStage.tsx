@@ -244,7 +244,17 @@ export function GroupStage({ roomId, layout, bare }: Props) {
       const rest = order.filter((id) => id !== focusId);
       return (
         <div className="flex h-full w-full flex-col gap-2 bg-black/40 p-2">
-          <div className="relative min-h-0 flex-1">{gface(focusId, mode === "spotlight" ? "spot" : "big")}</div>
+          <div className="relative min-h-0 flex-1">
+            {gface(focusId, mode === "spotlight" ? "spot" : "big")}
+            {mode === "spotlight" && cue?.caption && (
+              <p
+                key={cue.caption}
+                className="pointer-events-none absolute inset-x-3 top-3 animate-in text-center font-serif text-2xl font-semibold text-primary drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] fade-in zoom-in-95 duration-500 sm:text-3xl"
+              >
+                {cue.caption}
+              </p>
+            )}
+          </div>
           {rest.length > 0 && (
             <div className="flex shrink-0 items-center justify-center gap-2 overflow-x-auto">
               {clockPill}

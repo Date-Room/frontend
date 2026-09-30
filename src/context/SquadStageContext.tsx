@@ -40,6 +40,8 @@ export type StageCue = {
   /** One short line over the faces ("Tap a face"). */
   hint?: string | null;
   onTap?: (identity: string) => void;
+  /** Gold words over the face in the spotlight ("3 of 4 chose Amaka"). */
+  caption?: string | null;
   /** A round is being played (not dealing, not the reveal). Invites from
    *  friends wait until this is false. */
   live?: boolean;

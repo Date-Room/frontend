@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   ROLE_CARDS,
   SQUAD_GAME_IDS,
+  beatCue,
   canSkip,
+  revealBeats,
   pokeLine,
   softClockFor,
   hasSeenRole,
@@ -243,5 +245,58 @@ describe("learning a game", () => {
     markRoleSeen("imposter", "word");
     expect(hasSeenRole("imposter", "word")).toBe(true);
     expect(hasSeenRole("imposter", "imposter")).toBe(false);
+  });
+});
+
+describe("reveals as moments", () => {
+  const last = <T,>(xs: T[], k = 1): T => xs[xs.length - k];
+  const n = (p: string) => ({ a: "Amaka", b: "Kofi", c: "Salma", d: "Tobi" })[p] ?? p;
+  const done = (over: Partial<Round>) => round({ stage: "revealed", ...over });
+
+  it("puts the Most Likely winner forward with the count, anonymously", () => {
+    const b = revealBeats(done({ public: { results: { top: ["a"], tally: { a: 2, b: 1 } } } }), "d", n);
+    expect(last(b)).toMatchObject({ mode: "spotlight", focus: "a", caption: "2 of 3 chose Amaka" });
+    const all = revealBeats(done({ public: { results: { top: ["a"], tally: { a: 3 } } } }), "d", n);
+    expect(last(all).caption).toBe("The room has spoken");
+    const me = revealBeats(done({ public: { results: { top: ["d"], tally: { d: 2, a: 1 } } } }), "d", n);
+    expect(last(me).caption).toBe("2 of 3 chose you");
+    const tie = revealBeats(done({ public: { results: { top: ["a", "b"], tally: { a: 1, b: 1 } } } }), "d", n);
+    expect(last(tie)).toMatchObject({ mode: "waiting", ring: ["a", "b"], caption: "A tie: Amaka and Kofi" });
+    expect(revealBeats(done({ public: { results: { top: [], tally: {} } } }), "d", n)).toHaveLength(1);
+  });
+
+  it("runs the Imposter drumroll, the accusation, then the truth", () => {
+    const caught = revealBeats(done({ game: "imposter", public: { results: { tally: { b: 2, a: 1 }, imposter: "b", caught: true } } }), "a", n);
+    expect(caught.filter((x) => x.ring)).toHaveLength(6);
+    expect(last(caught, 2)).toMatchObject({ focus: "b", caption: "The squad accused Kofi" });
+    expect(last(caught)).toMatchObject({ focus: "b", caption: "Caught 🥂" });
+    const played = revealBeats(done({ game: "imposter", public: { results: { tally: { b: 2, a: 1 }, imposter: "c", caught: false } } }), "a", n);
+    expect(last(played)).toMatchObject({ focus: "c", caption: "You got played. It was Salma." });
+    const split = revealBeats(done({ game: "imposter", public: { results: { tally: { b: 1, a: 1 }, imposter: "c", caught: false } } }), "c", n);
+    expect(last(split, 2).caption).toBe("The squad couldn't agree");
+    expect(last(split).caption).toBe("You got away with it 😈");
+  });
+
+  it("brings Who Said It authors out one by one", () => {
+    const b = revealBeats(
+      done({
+        game: "who_said_it",
+        public: {
+          answers: [{ key: "x", text: "1" }, { key: "y", text: "2" }],
+          results: { answers: { x: { author: "b", right: [], fooled: [] }, y: { author: "a", right: [], fooled: [] } } },
+        },
+      }),
+      "a",
+      n,
+    );
+    expect(b.map((x) => x.caption)).toEqual(["Kofi wrote it", "You wrote it", null]);
+    expect(b[0]).toMatchObject({ focus: "b", answer: "x" });
+  });
+
+  it("turns a beat into a cue", () => {
+    const c = beatCue({ mode: "waiting", focus: null, ring: ["b"], caption: "The votes are in…", ms: 200 }, round({}));
+    expect(c.faces.b.ring).toBe(true);
+    expect(c.faces.a.ring).toBeUndefined();
+    expect(c.hint).toBe("The votes are in…");
   });
 });
