@@ -22,6 +22,7 @@ import {
   markRoleSeen,
   makeMove,
   myTurn,
+  pokeLine,
   readEnergy,
   roleCard,
   roleFor,
@@ -29,6 +30,7 @@ import {
   saveEnergy,
   secondsLeft,
   skipCard,
+  softClockFor,
   startBlocker,
   stageCueFor,
   startRound,
@@ -121,9 +123,65 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   // identity (user id); the round speaks in participant ids.
   const setCue = useSquadStage()?.setCue;
   const faceVote = Boolean(setCue);
-  const plan = useMemo(() => stageCueFor(round, mine, me, setup || !round), [round, mine, me, setup]);
+
+  // This device's part of the round: Imposter's "Ready to vote" and the Who
+  // Said It guesses in progress. Both start over with each stage. Updates go
+  // through setLocal(prev => ...) so quick taps never overwrite each other.
+  const stageKey = round ? `${round.id}:${round.stage}` : "";
+  const [localState, setLocal] = useState<Local>(() => freshLocal(stageKey));
+  const local = localState.key === stageKey ? localState : freshLocal(stageKey);
+  const patch = (f: (l: Local) => Partial<Local>) =>
+    setLocal((prev) => {
+      const base = prev.key === stageKey ? prev : freshLocal(stageKey);
+      return { ...base, ...f(base) };
+    });
+  const toGuess = (round?.public.answers ?? []).filter((a) => a.key !== mine?.my_answer_key);
+  const reviewing = local.at >= toGuess.length;
+  const onScreen = reviewing ? null : toGuess[local.at];
+
+  // Friends with their first-round card open: user id -> when it goes stale.
+  const [readers, setReaders] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!Object.keys(readers).length) return;
+    const t = window.setInterval(() => {
+      const now = Date.now();
+      setReaders((r) => Object.fromEntries(Object.entries(r).filter(([, until]) => until > now)));
+    }, 2000);
+    return () => window.clearInterval(t);
+  }, [readers]);
+  const readingPids = list.filter((m) => m.user_id && readers[m.user_id]).map((m) => m.participant_id);
+
+  const plan = useMemo(() => {
+    const p = { ...stageCueFor(round, mine, me, setup || !round, {
+      ready: local.ready,
+      guessPick: onScreen ? (local.draft[onScreen.key] ?? null) : null,
+      reviewing,
+      reading: readingPids,
+    }) };
+    const others = readingPids.filter((pid) => pid !== me);
+    if (others.length && (p.mode === "deciding" || p.mode === "waiting")) {
+      p.hint = `${listNames(others.map(nameOf))} ${others.length > 1 ? "are" : "is"} reading the rules.`;
+    }
+    return p;
+    // nameOf and readingPids follow members.data and readers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [round, mine, me, setup, local, onScreen, reviewing, readers, members.data]);
   const vote = useRef(move.mutate);
   vote.current = move.mutate;
+  // Tapping a face on Who Said It: that's my guess for the answer on screen;
+  // a beat later the next unguessed answer slides in.
+  const guess = useRef<(pid: string) => void>(() => {});
+  guess.current = (pid) => {
+    if (!onScreen) return;
+    const key = onScreen.key;
+    patch((l) => ({ draft: { ...l.draft, [key]: pid } }));
+    window.setTimeout(() => {
+      patch((l) => {
+        const next = toGuess.findIndex((a) => !l.draft[a.key]);
+        return { at: next === -1 ? toGuess.length : next };
+      });
+    }, 450);
+  };
   useEffect(() => {
     if (!setCue) return;
     const uid = (pid: string | null) => (pid ? (byPid.get(pid)?.user_id ?? null) : null);
@@ -138,16 +196,22 @@ export function SquadGame({ game }: { game: SquadGameId }) {
       focus: uid(plan.focus),
       faces,
       hint: plan.hint,
+      live: Boolean(round && !setup && round.stage !== "revealed"),
       onTap: plan.vote
         ? (id) => {
             const pid = pidOf(id);
             if (pid) vote.current(pid);
           }
-        : undefined,
+        : plan.guess
+          ? (id) => {
+              const pid = pidOf(id);
+              if (pid) guess.current(pid);
+            }
+          : undefined,
     });
     // byPid and list follow members.data.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [setCue, plan, members.data]);
+  }, [setCue, plan, members.data, setup]);
   useEffect(() => () => setCue?.(null), [setCue]);
 
   // Learning the game: the first time you play a role, a card over the game
@@ -156,6 +220,45 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   const role = live ? roleFor(round, mine, me) : null;
   const [, setSeen] = useState(0);
   const firstTime = role && !hasSeenRole(game, role) ? roleCard(game, role) : null;
+
+  // While my card is open, the others see "📖 reading" on my face. Said
+  // every few seconds (a friend who arrives late still hears it) and
+  // forgotten after a short while if I vanish.
+  const readingNow = Boolean(firstTime);
+  useEffect(() => {
+    if (!readingNow || !room.senderId) return;
+    const say = (on: boolean) => void room.channel.broadcast("squad_reading", { from: room.senderId, game, on });
+    say(true);
+    const t = window.setInterval(() => say(true), 4000);
+    return () => {
+      window.clearInterval(t);
+      say(false);
+    };
+  }, [readingNow, room.channel, room.senderId, game]);
+  useEffect(
+    () =>
+      room.channel.onBroadcast((e) => {
+        const from = String(e.payload.from ?? "");
+        if (!from || from === room.senderId) return;
+        if (e.kind === "squad_reading" && e.payload.game === game) {
+          setReaders((r) => {
+            const next = { ...r };
+            if (e.payload.on) next[from] = Date.now() + 9000;
+            else delete next[from];
+            return next;
+          });
+        } else if (e.kind === "squad_poke" && Array.isArray(e.payload.to) && e.payload.to.includes(room.senderId)) {
+          toast(`👀 ${String(e.payload.name || "Your squad")} is waiting on you`);
+          navigator.vibrate?.(200);
+        }
+      }),
+    [room.channel, room.senderId, game],
+  );
+  const poke = (pids: string[]) => {
+    const to = pids.map((pid) => byPid.get(pid)?.user_id).filter(Boolean);
+    const name = me ? nameOf(me) : "Someone";
+    void room.channel.broadcast("squad_poke", { from: room.senderId, to, name, game });
+  };
 
   if (state.isLoading || members.isLoading) {
     return (
@@ -186,7 +289,7 @@ export function SquadGame({ game }: { game: SquadGameId }) {
             </button>
           )}
         </header>
-        {live && round && roleLine(round, role, nameOf) && (
+        {live && round && plan.mode !== "waiting" && roleLine(round, role, nameOf) && (
           <p className="text-center text-sm text-cream/80">{roleLine(round, role, nameOf)}</p>
         )}
 
@@ -222,16 +325,39 @@ export function SquadGame({ game }: { game: SquadGameId }) {
           </>
         ) : (
           <>
-            <Play
-              round={round}
-              mine={mine}
-              me={me}
-              nameOf={nameOf}
-              busy={move.isPending}
-              onMove={(v) => move.mutate(v)}
-              faceVote={faceVote}
-            />
-            <Waiting round={round} me={me} nameOf={nameOf} busy={skip.isPending} onSkip={() => skip.mutate()} />
+            {plan.mode === "waiting" && faceVote ? (
+              <>
+                <Folded round={round} mine={mine} />
+                <WaitPanel
+                  key={stageKey}
+                  round={round}
+                  me={me}
+                  nameOf={nameOf}
+                  busy={skip.isPending}
+                  onReveal={() => skip.mutate()}
+                  onPoke={poke}
+                />
+              </>
+            ) : (
+              <Play
+                round={round}
+                mine={mine}
+                me={me}
+                nameOf={nameOf}
+                busy={move.isPending}
+                onMove={(v) => move.mutate(v)}
+                faceVote={faceVote}
+                ready={local.ready}
+                onReady={() => patch(() => ({ ready: true }))}
+                guessing={{
+                  answers: toGuess,
+                  draft: local.draft,
+                  at: local.at,
+                  onPick: (pid) => guess.current(pid),
+                  onJump: (i) => patch(() => ({ at: i })),
+                }}
+              />
+            )}
             {canSkip(round, me) && (
               <div className="text-center">
                 <button
@@ -260,6 +386,9 @@ export function SquadGame({ game }: { game: SquadGameId }) {
     </div>
   );
 }
+
+type Local = { key: string; ready: boolean; draft: Record<string, string>; at: number };
+const freshLocal = (key: string): Local => ({ key, ready: false, draft: {}, at: 0 });
 
 /** Your role, the first time you play it: three lines and the points. Sits
  *  over the game panel only, so the call stays in view. The full rules are
@@ -569,6 +698,9 @@ function Play({
   busy,
   onMove,
   faceVote = false,
+  ready,
+  onReady,
+  guessing,
 }: {
   round: Round;
   mine: MyView | null;
@@ -578,6 +710,10 @@ function Play({
   onMove: (value: unknown) => void;
   /** On a squad night you vote by tapping faces in the call, not names here. */
   faceVote?: boolean;
+  /** Imposter: voting shows once you've tapped "Ready to vote". */
+  ready: boolean;
+  onReady: () => void;
+  guessing: Guessing;
 }) {
   const turn = myTurn(round, me);
   const playing = Boolean(mine?.playing);
@@ -587,40 +723,54 @@ function Play({
 
   if (round.game === "imposter") {
     const order = round.prompt?.order ?? [];
+    // Talking first: your secret fills the panel so a glance is enough.
+    // Voting waits for "Ready to vote" (or a vote already cast).
+    const voting = turn && (ready || round.submitted.includes(me ?? ""));
     return (
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {playing && (
-          <div className="rounded-3xl border border-primary/25 bg-primary/[0.08] px-5 py-6 text-center">
-            <p className="dr-eyebrow text-muted-foreground">{round.prompt?.category}</p>
+          <div
+            className={cn(
+              "rounded-3xl border border-primary/25 bg-primary/[0.08] px-5 text-center",
+              voting ? "py-3" : "py-8 sm:py-10",
+            )}
+          >
+            <p className="dr-eyebrow text-muted-foreground">
+              {round.prompt?.category}
+              {mine?.card?.imposter ? "" : " · your word"}
+            </p>
             {mine?.card?.imposter ? (
               <>
-                <p className="mt-2 font-serif text-3xl text-cream">You're the imposter 🤫</p>
-                <p className="mt-2 text-sm text-muted-foreground">You don't know the word. Listen, then blend in.</p>
+                <p className={cn("mt-1 font-serif text-cream", voting ? "text-2xl" : "text-4xl sm:text-5xl")}>
+                  You're the imposter 🤫
+                </p>
+                {!voting && <p className="mt-2 text-sm text-muted-foreground">Listen, then blend in.</p>}
               </>
             ) : (
-              <>
-                <p className="mt-2 text-sm text-muted-foreground">The secret word</p>
-                <p className="font-serif text-4xl text-cream">{mine?.card?.word}</p>
-              </>
+              <p className={cn("mt-1 font-serif text-cream", voting ? "text-3xl" : "text-5xl sm:text-6xl")}>
+                {mine?.card?.word}
+              </p>
             )}
           </div>
         )}
-        {order.length > 0 && (
+        {order.length > 0 && !voting && (
           <p className="text-center text-sm text-muted-foreground">
-            One word each, in this order: <span className="text-cream">{order.map(nameOf).join(" → ")}</span>
+            One word each: <span className="text-cream">{order.map((p) => (p === me ? "You" : nameOf(p))).join(" → ")}</span>
           </p>
         )}
-        {turn && !faceVote && (
-          <>
-            <p className="text-center text-sm text-cream">When you've all spoken, vote out the imposter:</p>
-            <PlayerGrid
-              players={round.players.filter((p) => p !== me)}
-              nameOf={nameOf}
-              picked={mine?.my_move}
-              disabled={busy}
-              onPick={onMove}
-            />
-          </>
+        {turn && !voting && (
+          <button type="button" onClick={onReady} className="btn-primary focus-ring w-full rounded-full py-3 font-semibold">
+            Ready to vote
+          </button>
+        )}
+        {voting && !faceVote && (
+          <PlayerGrid
+            players={round.players.filter((p) => p !== me)}
+            nameOf={nameOf}
+            picked={mine?.my_move}
+            disabled={busy}
+            onPick={onMove}
+          />
         )}
       </div>
     );
@@ -688,79 +838,138 @@ function Play({
   // who_said_it: guess who wrote each answer.
   return (
     <Guesses
-      key={round.id}
       round={round}
-      mine={mine}
       me={me}
       nameOf={nameOf}
       busy={busy}
       turn={turn}
+      faceVote={faceVote}
+      guessing={guessing}
       onMove={onMove}
     />
   );
 }
 
+type Guessing = {
+  /** The answers I guess on (not my own). */
+  answers: { key: string; text: string }[];
+  draft: Record<string, string>;
+  /** Which answer is on screen; answers.length once they're all guessed. */
+  at: number;
+  onPick: (pid: string) => void;
+  onJump: (index: number) => void;
+};
+
+/** Who Said It: one answer at a time in big type. Tap a face (or a name,
+ *  off the call) and the next slides in; then check them and lock in. */
 function Guesses({
   round,
-  mine,
   me,
   nameOf,
   busy,
   turn,
+  faceVote,
+  guessing,
   onMove,
 }: {
   round: Round;
-  mine: MyView | null;
   me: string | null;
   nameOf: Names;
   busy: boolean;
   turn: boolean;
+  faceVote: boolean;
+  guessing: Guessing;
   onMove: (value: unknown) => void;
 }) {
-  const sent = (mine?.my_move ?? {}) as Record<string, string>;
-  const [guesses, setGuesses] = useState<Record<string, string>>(sent);
-  const others = (round.public.answers ?? []).filter((a) => a.key !== mine?.my_answer_key);
+  const { answers, draft, at, onPick, onJump } = guessing;
   const suspects = round.players.filter((p) => p !== me);
-  const done = others.every((a) => guesses[a.key]);
-  return (
-    <div className="space-y-4">
-      <Prompt text={round.prompt?.text} />
-      <p className="text-center text-sm text-muted-foreground">Who wrote each one?</p>
-      {others.map((a) => (
-        <div key={a.key} className="space-y-2 rounded-2xl border border-white/[0.08] bg-card/30 p-3.5">
-          <p className="text-[15px] text-cream">“{a.text}”</p>
-          {turn && (
-            <div className="flex flex-wrap gap-1.5">
-              {suspects.map((pid) => (
-                <button
-                  key={pid}
-                  type="button"
-                  aria-pressed={guesses[a.key] === pid}
-                  onClick={() => setGuesses({ ...guesses, [a.key]: pid })}
-                  className={cn(
-                    "focus-ring rounded-full border px-3 py-1 text-sm transition-colors",
-                    guesses[a.key] === pid
-                      ? "border-primary/60 bg-primary/20 text-cream"
-                      : "border-white/[0.1] text-cream/80 hover:border-primary/30",
-                  )}
-                >
-                  {nameOf(pid)}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-      {turn && (
+  const current = answers[at];
+
+  if (!turn) {
+    return (
+      <div className="space-y-3">
+        <Prompt text={round.prompt?.text} />
+        <p className="text-center text-sm text-muted-foreground">The squad is guessing who wrote what.</p>
+      </div>
+    );
+  }
+
+  const dots = (
+    <div className="flex justify-center gap-1.5" aria-label="Answers">
+      {answers.map((a, i) => (
         <button
+          key={a.key}
           type="button"
-          disabled={busy || !done}
-          onClick={() => onMove(guesses)}
-          className="btn-primary focus-ring w-full rounded-full py-3 font-semibold disabled:opacity-40"
+          onClick={() => onJump(i)}
+          aria-label={`Answer ${i + 1}${draft[a.key] ? `, you said ${nameOf(draft[a.key])}` : ""}`}
+          className={cn(
+            "focus-ring h-2.5 rounded-full transition-all",
+            i === at ? "w-6 bg-primary" : draft[a.key] ? "w-2.5 bg-primary/60" : "w-2.5 bg-white/20",
+          )}
+        />
+      ))}
+    </div>
+  );
+
+  if (current) {
+    return (
+      <div className="space-y-3 text-center sm:space-y-4">
+        <p className="dr-eyebrow text-muted-foreground">
+          Who wrote this? · {at + 1} of {answers.length}
+        </p>
+        <p key={current.key} className="animate-fade-in font-serif text-2xl leading-snug text-cream sm:text-3xl">
+          “{current.text}”
+        </p>
+        {faceVote ? (
+          draft[current.key] && <p className="text-sm text-muted-foreground">You said {nameOf(draft[current.key])}.</p>
+        ) : (
+          <div className="flex flex-wrap justify-center gap-1.5">
+            {suspects.map((pid) => (
+              <button
+                key={pid}
+                type="button"
+                aria-pressed={draft[current.key] === pid}
+                onClick={() => onPick(pid)}
+                className={cn(
+                  "focus-ring rounded-full border px-3.5 py-1.5 text-sm transition-colors",
+                  draft[current.key] === pid
+                    ? "border-primary/60 bg-primary/20 text-cream"
+                    : "border-white/[0.1] text-cream/80 hover:border-primary/30",
+                )}
+              >
+                {nameOf(pid)}
+              </button>
+            ))}
+          </div>
+        )}
+        {dots}
+      </div>
+    );
+  }
+
+  // All guessed: check them, change any, lock in.
+  return (
+    <div className="space-y-3">
+      <p className="text-center text-sm text-muted-foreground">Your guesses. Tap one to change it.</p>
+      {answers.map((a, i) => (
+        <button
+          key={a.key}
+          type="button"
+          onClick={() => onJump(i)}
+          className="focus-ring flex w-full items-center gap-3 rounded-2xl border border-white/[0.08] bg-card/30 px-3.5 py-2.5 text-left hover:border-primary/30"
         >
-          {Object.keys(sent).length ? "Change my guesses" : "Lock in my guesses"}
+          <span className="min-w-0 flex-1 truncate text-[15px] text-cream">“{a.text}”</span>
+          <span className="shrink-0 text-sm font-semibold text-primary">{draft[a.key] ? nameOf(draft[a.key]) : "?"}</span>
         </button>
-      )}
+      ))}
+      <button
+        type="button"
+        disabled={busy || answers.some((a) => !draft[a.key])}
+        onClick={() => onMove(draft)}
+        className="btn-primary focus-ring w-full rounded-full py-3 font-semibold disabled:opacity-40"
+      >
+        Lock in my guesses
+      </button>
     </div>
   );
 }
@@ -838,36 +1047,111 @@ function HeadsUp({
   );
 }
 
-function Waiting({
+/** Your card, folded small once you've moved: the room takes over. */
+function Folded({ round, mine }: { round: Round; mine: MyView | null }) {
+  if (round.game === "imposter" && mine?.playing) {
+    return (
+      <p className="text-center text-sm text-muted-foreground">
+        {mine.card?.imposter ? (
+          "You're the imposter 🤫"
+        ) : (
+          <>
+            Your word: <span className="font-serif text-lg text-cream">{mine.card?.word}</span>
+          </>
+        )}
+      </p>
+    );
+  }
+  return <p className="line-clamp-2 text-center font-serif text-lg leading-snug text-cream/80">{round.prompt?.text}</p>;
+}
+
+/** Waiting on the others: who's in, a soft clock, Poke, and "Reveal now",
+ *  which becomes the main button once the clock runs out. */
+function WaitPanel({
   round,
   me,
   nameOf,
   busy,
-  onSkip,
+  onReveal,
+  onPoke,
 }: {
   round: Round;
   me: string | null;
   nameOf: Names;
   busy: boolean;
-  onSkip: () => void;
+  onReveal: () => void;
+  onPoke: (pids: string[]) => void;
 }) {
-  const left = waitingOn(round);
-  if (round.game === "heads_up" || left.length === 0) return null;
+  const total = softClockFor(round);
+  const [left, setLeft] = useState(total);
+  const [poked, setPoked] = useState<string | null>(null);
+  useEffect(() => {
+    const started = Date.now();
+    const t = window.setInterval(() => {
+      const l = Math.max(0, total - Math.floor((Date.now() - started) / 1000));
+      setLeft(l);
+      if (l === 0) window.clearInterval(t);
+    }, 250);
+    return () => window.clearInterval(t);
+  }, [total]);
+  useEffect(() => {
+    if (!poked) return;
+    const t = window.setTimeout(() => setPoked(null), 10000);
+    return () => window.clearTimeout(t);
+  }, [poked]);
+
+  const still = waitingOn(round);
+  if (!still.length) return null;
+  const judging = round.game === "spill_tea" && round.stage === "answer" && round.lead_id === me;
+  const expected = still.length + round.submitted.length;
+  const target = pokeLine(round, me, nameOf);
   const imIn = me !== null && round.players.includes(me);
-  const others = left.filter((p) => p !== me);
+  const canReveal = imIn && round.submitted.length > 0;
+  const out = left === 0;
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-sm text-muted-foreground">
-      <span>Waiting on {listNames(left.map((p) => (p === me ? "you" : nameOf(p))))}</span>
-      {imIn && others.length > 0 && round.submitted.length > 0 && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onSkip}
-          className="focus-ring rounded text-cream/80 underline-offset-2 hover:underline disabled:opacity-40"
+    <div className="space-y-3">
+      <div className="flex items-center justify-center gap-3">
+        <p className="text-sm font-semibold text-cream">
+          {judging ? "👑 You're judging" : "✓ You're in"} · {round.submitted.length} of {expected}
+        </p>
+        <span
+          className={cn(
+            "inline-flex h-8 min-w-8 items-center justify-center rounded-full border px-2 text-sm font-semibold tabular-nums",
+            out ? "border-primary/60 text-primary" : "border-white/15 text-cream/80",
+          )}
+          aria-label={out ? "Time's up" : `${left} seconds`}
         >
-          Don't wait
-        </button>
-      )}
+          {out ? <Timer className="h-4 w-4" aria-hidden /> : left}
+        </span>
+      </div>
+      <div className="flex flex-wrap justify-center gap-2">
+        {target && (
+          <button
+            type="button"
+            disabled={Boolean(poked)}
+            onClick={() => {
+              onPoke(target.pids);
+              setPoked(`${listNames(target.pids.map(nameOf))} got a nudge`);
+            }}
+            className="focus-ring rounded-full border border-white/[0.12] px-3.5 py-2.5 text-sm font-semibold text-cream hover:bg-white/[0.06] disabled:opacity-60"
+          >
+            {poked ?? `👀 ${target.label}`}
+          </button>
+        )}
+        {canReveal && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onReveal}
+            className={cn(
+              "focus-ring shrink-0 rounded-full px-4 py-2.5 text-sm font-semibold transition disabled:opacity-40",
+              out ? "btn-primary animate-pulse" : "border border-white/[0.12] text-cream/80 hover:bg-white/[0.06]",
+            )}
+          >
+            {round.stage === "answer" ? "Show answers" : "Reveal now"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

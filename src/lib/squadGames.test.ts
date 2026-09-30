@@ -3,6 +3,8 @@ import {
   ROLE_CARDS,
   SQUAD_GAME_IDS,
   canSkip,
+  pokeLine,
+  softClockFor,
   hasSeenRole,
   markRoleSeen,
   roleCard,
@@ -127,9 +129,50 @@ describe("stageCueFor", () => {
   });
 
   it("never lets the imposter vote for themselves", () => {
-    const c = stageCueFor(round({ game: "imposter" }), { playing: true }, "a", false);
+    const c = stageCueFor(round({ game: "imposter" }), { playing: true }, "a", false, { ready: true });
     expect(c.faces.a.tappable).toBe(false);
     expect(c.faces.a.dim).toBe(true);
+  });
+
+  it("keeps Imposter voting behind Ready to vote", () => {
+    const talk = stageCueFor(round({ game: "imposter" }), { playing: true }, "a", false);
+    expect(talk).toMatchObject({ mode: "reading", vote: false });
+    expect(stageCueFor(round({ game: "imposter" }), { playing: true }, "a", false, { ready: true }).mode).toBe("deciding");
+    // Already voted (another device, or a reload): straight to waiting.
+    expect(stageCueFor(round({ game: "imposter", submitted: ["a"] }), { playing: true }, "a", false).mode).toBe("waiting");
+  });
+
+  it("guesses Who Said It by face, one answer at a time", () => {
+    const r = round({ game: "who_said_it", stage: "guess" });
+    const c = stageCueFor(r, { playing: true }, "a", false, { guessPick: "c" });
+    expect(c).toMatchObject({ mode: "deciding", guess: true, vote: false });
+    expect(c.faces.a.tappable).toBe(false);
+    expect(c.faces.c.picked).toBe(true);
+    expect(stageCueFor(r, { playing: true }, "a", false, { reviewing: true }).mode).toBe("reading");
+    expect(stageCueFor(round({ game: "who_said_it", stage: "guess", submitted: ["a"] }), { playing: true }, "a", false).mode).toBe("waiting");
+  });
+
+  it("hands the room over once you've written, and to the judge", () => {
+    const wrote = stageCueFor(round({ game: "who_said_it", stage: "answer", submitted: ["a"] }), { playing: true }, "a", false);
+    expect(wrote.mode).toBe("waiting");
+    expect(wrote.hint).toBe("You're in · 1 of 3.");
+    const judge = stageCueFor(round({ game: "spill_tea", stage: "answer", lead_id: "a", submitted: ["b"] }), { playing: true }, "a", false);
+    expect(judge).toMatchObject({ mode: "waiting", hint: "You're judging · 1 of 2 in." });
+  });
+
+  it("marks who is reading their first-round card", () => {
+    const c = stageCueFor(round({ submitted: ["a"] }), { playing: true }, "a", false, { reading: ["b", "a"] });
+    expect(c.faces.b.badge).toBe("reading");
+    expect(c.faces.a.badge).toBe("in");
+    expect(c.faces.c.badge).toBe("thinking");
+  });
+
+  it("pokes whoever is still thinking, and sets a soft clock", () => {
+    const r = round({ submitted: ["a"] });
+    expect(pokeLine(r, "a", (p) => p.toUpperCase())).toEqual({ pids: ["b", "c"], label: "Poke B and C" });
+    expect(pokeLine(round({ submitted: ["a", "b", "c"] }), "a", String)).toBeNull();
+    expect(softClockFor(r)).toBe(20);
+    expect(softClockFor(round({ stage: "answer" }))).toBe(45);
   });
 
   it("puts the winner forward at the reveal, or stays quiet on a tie", () => {

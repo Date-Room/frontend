@@ -1609,8 +1609,8 @@ export function RoomStage({
           call. The anchor marks its normal home in the room. */}
       {inviteId &&
         // A squad round in play keeps its screen: a friend's invite waits
-        // until the reveal.
-        !(squadGameStaged && cueMode !== "spotlight") &&
+        // until the reveal (a tie has no spotlight, so ask the game).
+        !(squadGameStaged && squadStage?.cue?.live) &&
         (() => {
           const item = items.find((i) => i.id === inviteId);
           const title = item?.title ?? inviteId;

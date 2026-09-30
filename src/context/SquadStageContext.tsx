@@ -19,8 +19,9 @@ export type StageMode = "reading" | "deciding" | "waiting" | "spotlight" | "hero
 
 /** What a single face shows, keyed by the person's call identity (user id). */
 export type FaceCue = {
-  /** "in": moved this stage. "thinking": still to move. */
-  badge?: "in" | "thinking";
+  /** "in": moved this stage. "thinking": still to move. "reading": still
+   *  to move, with their first-round card open. */
+  badge?: "in" | "thinking" | "reading";
   /** My pick (gold ring). */
   picked?: boolean;
   /** Not pickable, or not picked at a reveal. */
@@ -39,6 +40,9 @@ export type StageCue = {
   /** One short line over the faces ("Tap a face"). */
   hint?: string | null;
   onTap?: (identity: string) => void;
+  /** A round is being played (not dealing, not the reveal). Invites from
+   *  friends wait until this is false. */
+  live?: boolean;
 };
 
 /** Mute and camera, lifted out of the call so the room bar can show them. */
