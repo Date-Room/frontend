@@ -10,6 +10,8 @@ import { Check, Loader2, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { useSquadStage, type FaceCue } from "@/context/SquadStageContext";
+import { TABLE_QUERY } from "@/lib/squadCall";
+import { useMediaQuery } from "@/lib/viewport";
 import { ApiError } from "@/lib/api";
 import { getSquadMembers, squadErrorText } from "@/lib/squad";
 import {
@@ -125,6 +127,8 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   // identity (user id); the round speaks in participant ids.
   const setCue = useSquadStage()?.setCue;
   const faceVote = Boolean(setCue);
+  // On a laptop's table there's no strip over the faces: the hint lives here.
+  const table = useMediaQuery(TABLE_QUERY) && faceVote;
 
   // This device's part of the round: Imposter's "Ready to vote" and the Who
   // Said It guesses in progress. Both start over with each stage. Updates go
@@ -180,6 +184,11 @@ export function SquadGame({ game }: { game: SquadGameId }) {
     const t = window.setTimeout(() => setBeatAt((b) => ({ ...b, i: b.i + 1 })), beat.ms);
     return () => window.clearTimeout(t);
   }, [beat, revealDone]);
+  // A reveal moves the league (the table's scores seat, the room page).
+  const revealedId = round?.stage === "revealed" ? round.id : null;
+  useEffect(() => {
+    if (revealedId) void qc.invalidateQueries({ queryKey: ["squad-league", room.roomId] });
+  }, [revealedId, qc, room.roomId]);
   const skipReveal = () => setBeatAt((b) => ({ ...b, i: beats.length - 1 }));
 
   const plan = useMemo(() => {
@@ -402,6 +411,9 @@ export function SquadGame({ game }: { game: SquadGameId }) {
                   onJump: (i) => patch(() => ({ at: i })),
                 }}
               />
+            )}
+            {table && plan.mode === "deciding" && plan.hint && (
+              <p className="text-center text-sm text-muted-foreground">{plan.hint.replace("Tap a face", "Tap a seat")}</p>
             )}
             {canSkip(round, me) && (
               <div className="text-center">

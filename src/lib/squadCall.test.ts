@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { friendGridClass, gridColumns, joinNames, liveVideoFor, squadHereLine, localClock, nearTheEnd, placeLine, speakerFirst, timeLeft } from "./squadCall";
+import { friendGridClass, gridColumns, joinNames, liveVideoFor, squadHereLine, localClock, nearTheEnd, placeLine, speakerFirst, timeLeft , readSeats, saveSeats, swapSeats, tableFaceShare, tableSeats, tableTile } from "./squadCall";
 
 const at = new Date("2026-09-29T17:30:00Z");
 
@@ -55,5 +55,45 @@ describe("friendGridClass", () => {
     expect(friendGridClass(2)).toContain("grid-rows-2");
     expect(friendGridClass(3)).toContain("col-span-2");
     expect(friendGridClass(4)).toBe("grid-cols-2 grid-rows-2");
+  });
+});
+
+describe("the table", () => {
+  const ids = ["me", "a", "k", "s", "t"];
+  it("seats friends left then right, you under them, and leaves the sixth space", () => {
+    expect(tableSeats(ids.slice(0, 2), "me", null)).toEqual({ left: ["a"], right: ["me"] });
+    expect(tableSeats(ids.slice(0, 3), "me", null)).toEqual({ left: ["a"], right: ["k", "me"] });
+    expect(tableSeats(ids.slice(0, 4), "me", null)).toEqual({ left: ["a", "k"], right: ["s", "me"] });
+    expect(tableSeats(ids, "me", null)).toEqual({ left: ["a", "k", "s"], right: ["t", "me", null] });
+  });
+
+  it("keeps a saved arrangement, drops who left and adds who arrived", () => {
+    expect(tableSeats(["me", "a", "k", "s"], "me", ["me", "s", "gone", "a"])).toEqual({
+      left: ["me", "s"],
+      right: ["a", "k"],
+    });
+  });
+
+  it("sizes seats to the camera's shape and the rows", () => {
+    expect(tableTile(458, 748, 2)).toEqual({ w: 458, h: 257 });
+    expect(tableTile(458, 748, 3)).toEqual({ w: 429, h: 241 });
+  });
+
+  it("gives the middle to a face only at a reveal or for the guesser", () => {
+    expect(tableFaceShare("spotlight", true)).toBeGreaterThan(0.5);
+    expect(tableFaceShare("hero", true)).toBe(0.5);
+    expect(tableFaceShare("spotlight", false)).toBe(0);
+    expect(tableFaceShare("deciding", true)).toBe(0);
+  });
+
+  it("swaps two seats and remembers the arrangement", () => {
+    expect(swapSeats(["a", "b", "c"], "a", "c")).toEqual(["c", "b", "a"]);
+    expect(swapSeats(["a", "b"], "a", "x")).toEqual(["a", "b"]);
+    localStorage.clear();
+    expect(readSeats("r")).toBeNull();
+    saveSeats("r", ["b", "a"]);
+    expect(readSeats("r")).toEqual(["b", "a"]);
+    saveSeats("r", null);
+    expect(readSeats("r")).toBeNull();
   });
 });

@@ -105,3 +105,91 @@ export function friendGridClass(friends: number): string {
   if (friends === 3) return "grid-cols-2 grid-rows-2 [&>*:nth-child(3)]:col-span-2";
   return "grid-cols-2 grid-rows-2";
 }
+
+/* ───────────────── The table (laptops, during a squad game) ───────────────── */
+
+/** The game sits in a middle column this wide; seats fill both sides. */
+export const TABLE_CENTRE = 460;
+export const TABLE_CENTRE_BIG = 520;
+/** Big screens get the wider middle. */
+export const TABLE_BIG_QUERY = "(min-width: 1800px)";
+/** Below this the side seats get too small: keep the split layout. */
+export const TABLE_QUERY = "(min-width: 1200px)";
+export const TABLE_GAP = 16;
+const SEAT_GAP = 12;
+
+/** A seat is a call identity, or null for the space a full squad leaves
+ *  free (it shows the squad's scores). */
+export type Seat = string | null;
+
+/**
+ * Pure: who sits where. Friends fill the left from the top, then the right;
+ * you sit under them on the right. Five on the call is three a side with
+ * the sixth space free. A saved arrangement (this device's own) wins for
+ * everyone still on the call; newcomers join at the end.
+ */
+export function tableSeats(
+  present: string[],
+  self: string,
+  saved: string[] | null,
+): { left: Seat[]; right: Seat[] } {
+  const friends = present.filter((id) => id !== self);
+  const base = present.includes(self) ? [...friends, self] : friends;
+  const order = saved
+    ? [...saved.filter((id) => base.includes(id)), ...base.filter((id) => !saved.includes(id))]
+    : base;
+  const n = order.length;
+  const leftCount = n >= 5 ? 3 : Math.floor(n / 2);
+  const left: Seat[] = order.slice(0, leftCount);
+  const right: Seat[] = order.slice(leftCount);
+  if (n === 5) right.push(null);
+  return { left, right };
+}
+
+/** Pure: one seat's size, the camera's shape (16:9), as big as the side
+ *  column and the rows allow. */
+export function tableTile(sideWidth: number, height: number, rows: number): { w: number; h: number } {
+  const r = Math.max(1, rows);
+  const h = Math.max(0, Math.min((sideWidth * 9) / 16, (height - (r - 1) * SEAT_GAP) / r));
+  return { w: Math.floor((h * 16) / 9), h: Math.floor(h) };
+}
+
+/** Pure: how much of the middle column's height a face takes, top down.
+ *  A reveal puts the winner there; Clue Me In puts the guesser there. */
+export function tableFaceShare(mode: string | null | undefined, hasFocus: boolean): number {
+  if (!hasFocus) return 0;
+  if (mode === "spotlight") return 0.58;
+  if (mode === "hero") return 0.5;
+  return 0;
+}
+
+/** Pure: an arrangement with two seats swapped. */
+export function swapSeats(order: string[], a: string, b: string): string[] {
+  const i = order.indexOf(a);
+  const j = order.indexOf(b);
+  if (i < 0 || j < 0 || i === j) return order;
+  const next = [...order];
+  [next[i], next[j]] = [next[j], next[i]];
+  return next;
+}
+
+/** This device's seating for a room (call identities, in seat order). */
+const SEATS_KEY = (roomId: string) => `dr_squad_seats:${roomId}`;
+
+export function readSeats(roomId: string): string[] | null {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(SEATS_KEY(roomId)) ?? "null");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSeats(roomId: string, order: string[] | null): void {
+  try {
+    if (order) localStorage.setItem(SEATS_KEY(roomId), JSON.stringify(order));
+    else localStorage.removeItem(SEATS_KEY(roomId));
+  } catch {
+    /* storage off: the seats reset next time */
+  }
+}

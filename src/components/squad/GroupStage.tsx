@@ -12,6 +12,10 @@
  * - During a squad game ("game" layout) the faces follow the game's cue
  *   (SquadStageContext): a strip while you read, a grid of friends to tap
  *   while you decide, one face forward at a reveal.
+ * - On laptops a squad game is a table: the game sits in the middle and
+ *   everyone, you included, has a seat down either side at the camera's
+ *   own shape. A reveal brings the winner into the middle. Drag a seat onto
+ *   another to swap them (this device only, remembered per room).
  * - Mute and camera live in the room bar with Activities and chat (the
  *   call hands them up through the stage context), so they never move.
  *   Only the full-screen film strip keeps its own.
@@ -30,17 +34,29 @@ import { Track } from "livekit-client";
 import { Armchair, Clock, Mic, MicOff, Video, VideoOff } from "lucide-react";
 import { useSquadStage, type FaceCue } from "@/context/SquadStageContext";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
-import { useWideViewport } from "@/lib/viewport";
+import { useMediaQuery, useWideViewport } from "@/lib/viewport";
 import {
   browserTimeZone,
+  getSquadLeague,
   getSquadMembers,
   getSquadNights,
   setSquadWhere,
   type SquadMember,
 } from "@/lib/squad";
 import {
+  TABLE_BIG_QUERY,
+  TABLE_CENTRE,
+  TABLE_CENTRE_BIG,
+  TABLE_GAP,
+  TABLE_QUERY,
   friendGridClass,
   gridColumns,
+  readSeats,
+  saveSeats,
+  swapSeats,
+  tableFaceShare,
+  tableSeats,
+  tableTile,
   liveVideoFor,
   nearTheEnd,
   placeLine,
@@ -82,6 +98,8 @@ export function GroupStage({ roomId, layout, bare }: Props) {
   const focus = layout === "focus";
   const stage = useSquadStage();
   const wide = useWideViewport();
+  const tableWide = useMediaQuery(TABLE_QUERY);
+  const bigCentre = useMediaQuery(TABLE_BIG_QUERY);
   const qc = useQueryClient();
   const lowPower = useLowPowerMode();
   const now = useMinute();
@@ -144,6 +162,20 @@ export function GroupStage({ roomId, layout, bare }: Props) {
   const clock = timeLeft(night?.ends_at, now);
   const ending = nearTheEnd(night?.ends_at, now);
 
+  // The table: its size, and this device's own seating.
+  const [tableEl, setTableEl] = useState<HTMLDivElement | null>(null);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  useEffect(() => {
+    if (!tableEl) return;
+    const read = () => setBox({ w: tableEl.clientWidth, h: tableEl.clientHeight });
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(tableEl);
+    return () => ro.disconnect();
+  }, [tableEl]);
+  const [savedSeats, setSavedSeats] = useState<string[] | null>(() => readSeats(roomId));
+  const [dragOver, setDragOver] = useState<string | null>(null);
+
   const face = (id: string, size: FaceSize, cue?: FaceCue, onTap?: () => void) => {
     const ref = byId.get(id);
     if (!ref) return null;
@@ -204,6 +236,111 @@ export function GroupStage({ roomId, layout, bare }: Props) {
       <div className="flex flex-col items-center gap-2 rounded-2xl bg-black/45 p-2 backdrop-blur-md">
         {order.map((id) => face(id, "bubble"))}
         {stripControls}
+      </div>
+    );
+  }
+
+  if (layout === "game" && tableWide) {
+    const cue = stage?.cue;
+    const mode = cue?.mode ?? "reading";
+    const cues = cue?.faces ?? {};
+    const onTap = cue?.onTap;
+    // Seats keep their places (join order, or your own arrangement), not
+    // whoever is talking.
+    const joined = (members.data?.members ?? []).map((m) => m.user_id);
+    const rank = (id: string) => {
+      const i = joined.indexOf(id);
+      return i < 0 ? joined.length : i;
+    };
+    const present = tracks.map((t) => t.participant.identity).sort((a, b) => rank(a) - rank(b));
+    const { left, right } = tableSeats(present, self, savedSeats);
+    const centre = bigCentre ? TABLE_CENTRE_BIG : TABLE_CENTRE;
+    const side = Math.max(0, (box.w - centre - 2 * TABLE_GAP) / 2);
+    const tile = tableTile(side, box.h, Math.max(left.length, right.length));
+    const focusId = cue?.focus && byId.has(cue.focus) ? cue.focus : null;
+    const share = tableFaceShare(mode, Boolean(focusId));
+    const swap = (a: string, b: string) => {
+      const order = swapSeats([...left, ...right].filter((x): x is string => Boolean(x)), a, b);
+      setSavedSeats(order);
+      saveSeats(roomId, order);
+    };
+    const seat = (id: string | null, i: number) => {
+      const style = { width: tile.w, height: tile.h };
+      if (id === null) return <ScoresSeat key="scores" roomId={roomId} self={self} style={style} />;
+      if (share > 0 && id === focusId) {
+        const m = byIdentity.get(id);
+        return (
+          <div
+            key={id}
+            style={style}
+            className="flex shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-primary/60 text-sm font-semibold text-primary"
+          >
+            {m?.display_name ?? "Friend"} · in the middle
+          </div>
+        );
+      }
+      return (
+        <div
+          key={id}
+          style={style}
+          draggable
+          title="Drag onto another seat to swap"
+          onDragStart={(e) => {
+            e.dataTransfer.setData("text/plain", id);
+            e.dataTransfer.effectAllowed = "move";
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (dragOver !== id) setDragOver(id);
+          }}
+          onDragLeave={() => setDragOver((d) => (d === id ? null : d))}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(null);
+            swap(e.dataTransfer.getData("text/plain"), id);
+          }}
+          className={cn(
+            "shrink-0 cursor-grab rounded-2xl transition-[outline] active:cursor-grabbing",
+            dragOver === id && "outline outline-2 outline-offset-4 outline-primary/70",
+          )}
+          data-seat={i}
+        >
+          {face(id, "tile", cues[id], cues[id]?.tappable && onTap ? () => onTap(id) : undefined)}
+        </div>
+      );
+    };
+    const column = (list: (string | null)[], edge: "left" | "right", from: number) => (
+      <div
+        className="absolute top-0 flex h-full flex-col items-center justify-center gap-3"
+        style={{ width: side, [edge]: 0 }}
+      >
+        {list.map((id, i) => seat(id, from + i))}
+      </div>
+    );
+    return (
+      <div ref={setTableEl} className="relative h-full w-full">
+        {box.w > 0 && (
+          <>
+            {column(left, "left", 0)}
+            {column(right, "right", left.length)}
+            {share > 0 && focusId && (
+              <div
+                className="absolute top-0"
+                style={{ left: (box.w - centre) / 2, width: centre, height: box.h * share - TABLE_GAP / 2 }}
+              >
+                {face(focusId, "spot", cues[focusId])}
+                {mode === "spotlight" && cue?.caption && (
+                  <p
+                    key={cue.caption}
+                    className="pointer-events-none absolute inset-x-3 top-3 animate-in text-center font-serif text-2xl font-semibold text-primary drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)] fade-in zoom-in-95 duration-500 sm:text-3xl"
+                  >
+                    {cue.caption}
+                  </p>
+                )}
+              </div>
+            )}
+          </>
+        )}
       </div>
     );
   }
@@ -523,5 +660,28 @@ function Face({
       </div>
     </div>,
     cn("min-h-0", size === "tile" ? "rounded-2xl" : "h-full w-full", cueDim),
+  );
+}
+
+
+/** The sixth space at a full table: the squad's league, top three. */
+function ScoresSeat({ roomId, self, style }: { roomId: string; self: string; style: React.CSSProperties }) {
+  const league = useQuery({ queryKey: ["squad-league", roomId], queryFn: () => getSquadLeague(roomId) });
+  const rows = (league.data ?? []).slice(0, 3);
+  return (
+    <div style={style} className="flex shrink-0 flex-col justify-center gap-1.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4">
+      <p className="dr-eyebrow text-primary/85">Squad league</p>
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Points land here after the first reveal.</p>
+      ) : (
+        rows.map((r, i) => (
+          <div key={r.user_id} className="flex items-center gap-2 text-sm">
+            <span className="w-4 tabular-nums text-muted-foreground">{i + 1}</span>
+            <span className="min-w-0 flex-1 truncate text-cream">{r.user_id === self ? "You" : r.display_name}</span>
+            <span className="font-semibold tabular-nums text-cream">{r.points}</span>
+          </div>
+        ))
+      )}
+    </div>
   );
 }
