@@ -1328,9 +1328,11 @@ export function RoomStage({
                       ? cueMode === "reading"
                         ? "basis-[58%]"
                         : "basis-[42%]"
-                      : cueMode === "reading" || cueMode === "hero"
+                      : cueMode === "reading"
                         ? "flex-1"
-                        : "max-h-[52%] shrink-0",
+                        : cueMode === "hero"
+                          ? "max-h-[46%] shrink-0"
+                          : "max-h-[52%] shrink-0",
                   )}
                 >
                   <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
@@ -1346,9 +1348,7 @@ export function RoomStage({
                       ? "flex-1"
                       : cueMode === "reading"
                         ? "h-[92px] shrink-0"
-                        : cueMode === "hero"
-                          ? "h-[38%] shrink-0"
-                          : "min-h-[220px] flex-1",
+                        : "min-h-[220px] flex-1",
                   )}
                 />
               </div>
