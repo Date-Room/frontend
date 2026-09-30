@@ -202,18 +202,46 @@ export function startBlocker(game: SquadGameId, players: number): string | null 
 export type CuePlan = {
   mode: "reading" | "deciding" | "waiting" | "spotlight" | "hero";
   focus: string | null;
-  faces: Record<string, { badge?: "in" | "thinking"; picked?: boolean; dim?: boolean; ring?: boolean; tappable?: boolean }>;
+  faces: Record<string, { badge?: "in" | "thinking" | "reading"; picked?: boolean; dim?: boolean; ring?: boolean; tappable?: boolean }>;
   hint: string | null;
   /** Tapping a face casts (or changes) my vote. */
   vote: boolean;
+  /** Tapping a face guesses who wrote the answer on screen (Who Said It). */
+  guess?: boolean;
+};
+
+/** What this device knows that the round doesn't. */
+export type CueLocal = {
+  /** Imposter: I've tapped "Ready to vote". */
+  ready?: boolean;
+  /** Who Said It: my guess for the answer on screen. */
+  guessPick?: string | null;
+  /** Who Said It: I've guessed every answer and am reviewing them. */
+  reviewing?: boolean;
+  /** People with their first-round card open (participant ids). */
+  reading?: string[];
 };
 
 const QUIET: CuePlan = { mode: "reading", focus: null, faces: {}, hint: null, vote: false };
 
+/** Pure: how long the soft clock gives the stragglers, in seconds. */
+export function softClockFor(round: Round): number {
+  if (round.stage === "vote") return 20;
+  if (round.stage === "guess") return 30;
+  return 45;
+}
+
 /** Pure: the stage cue for a round. Faces are the ballot in the voting
- *  games; everyone shrinks to a strip while reading or writing; the reveal
- *  puts one face forward; the Clue Me In guesser stays big all round. */
-export function stageCueFor(round: Round | null, mine: MyView | null, me: string | null, settingUp: boolean): CuePlan {
+ *  games; everyone shrinks to a strip while reading or writing; once you've
+ *  moved the faces take over, marked in or still thinking; the reveal puts
+ *  one face forward; the Clue Me In guesser stays big all round. */
+export function stageCueFor(
+  round: Round | null,
+  mine: MyView | null,
+  me: string | null,
+  settingUp: boolean,
+  local: CueLocal = {},
+): CuePlan {
   if (!round || settingUp) return QUIET;
   if (round.stage === "revealed") {
     const r = (round.public.results ?? {}) as Record<string, unknown>;
@@ -235,30 +263,57 @@ export function stageCueFor(round: Round | null, mine: MyView | null, me: string
 
   const still = new Set(waitingOn(round));
   const expected = new Set([...still, ...round.submitted]);
+  const reading = new Set(local.reading ?? []);
   const faces: CuePlan["faces"] = {};
   for (const p of round.players) {
-    if (expected.has(p)) faces[p] = { badge: still.has(p) ? "thinking" : "in" };
-    else faces[p] = {};
+    if (!expected.has(p)) faces[p] = {};
+    else if (!still.has(p)) faces[p] = { badge: "in" };
+    else faces[p] = { badge: reading.has(p) ? "reading" : "thinking" };
   }
+  const turn = myTurn(round, me);
+  const moved = me ? round.submitted.includes(me) : false;
+  const count = `${round.submitted.length} of ${expected.size}`;
+  // Moved, or nothing for me to do this stage: the room takes over.
+  const waiting = (hint: string): CuePlan => ({ mode: "waiting", focus: null, faces, hint, vote: false });
 
   if (round.stage === "vote") {
-    const turn = myTurn(round, me);
-    const moved = me ? round.submitted.includes(me) : false;
+    if (round.game === "imposter" && turn && !moved && !local.ready) {
+      // Talking first: the word fills the screen, voting waits for "Ready to vote".
+      return { ...QUIET, faces };
+    }
     for (const p of round.players) {
       const self = round.game === "imposter" && p === me;
       faces[p] = { ...faces[p], tappable: turn && !self, picked: mine?.my_move === p, dim: self };
     }
     const hint = moved
-      ? `You're in · ${round.submitted.length} of ${round.players.length}. Tap another face to change.`
+      ? `You're in · ${count}. Tap another face to change.`
       : round.game === "imposter"
-        ? "When you've all spoken, tap who you think it is."
+        ? "Tap who you think it is."
         : "Tap a face to vote. Only you see your pick.";
     return { mode: moved ? "waiting" : "deciding", focus: null, faces, hint, vote: turn };
   }
 
-  // Writing, guessing or judging: the card needs the room; faces are a strip.
   if (round.game === "spill_tea" && round.lead_id) faces[round.lead_id] = { ...faces[round.lead_id], ring: true };
+
+  if (round.stage === "guess" && turn && !moved && !local.reviewing) {
+    for (const p of round.players) {
+      faces[p] = { ...faces[p], tappable: p !== me, picked: p === local.guessPick, dim: p === me };
+    }
+    return { mode: "deciding", focus: null, faces, hint: "Tap who you think wrote it.", vote: false, guess: true };
+  }
+
+  if (round.stage === "answer" && round.game === "spill_tea" && me === round.lead_id) {
+    return waiting(`You're judging · ${count} in.`);
+  }
+  if (moved) return waiting(`You're in · ${count}.`);
+  // Writing, reviewing or judging: the card needs the room; faces are a strip.
   return { ...QUIET, faces };
+}
+
+/** Pure: who to poke (still thinking, not me), and the line for it. */
+export function pokeLine(round: Round, me: string | null, nameOf: (pid: string) => string): { pids: string[]; label: string } | null {
+  const pids = waitingOn(round).filter((p) => p !== me);
+  return pids.length ? { pids, label: `Poke ${listNames(pids.map(nameOf))}` } : null;
 }
 
 /** Tonight's energy, remembered per room on this device. */

@@ -333,6 +333,12 @@ export function GroupStage({ roomId, layout, bare }: Props) {
 
 type FaceSize = "big" | "spot" | "tile" | "self" | "bubble" | "mini";
 
+const BADGE_TEXT: Record<NonNullable<FaceCue["badge"]>, string> = {
+  in: "✓ in",
+  thinking: "•••",
+  reading: "📖 reading",
+};
+
 function Face({
   trackRef,
   name,
@@ -371,7 +377,7 @@ function Face({
         cue.badge === "in" ? "bg-emerald-400 text-emerald-950" : "bg-black/65 text-cream",
       )}
     >
-      {cue.badge === "in" ? "✓ in" : "•••"}
+      {BADGE_TEXT[cue.badge]}
     </span>
   ) : null;
   const wrap = (el: React.ReactElement, cls: string) =>
@@ -468,7 +474,7 @@ function Face({
         <span className="max-w-full truncate text-[11px] text-cream/85">{name}</span>
         {cue?.badge && (
           <span className={cn("text-[10px] font-bold", cue.badge === "in" ? "text-emerald-300" : "text-cream/60")}>
-            {cue.badge === "in" ? "✓ in" : "•••"}
+            {BADGE_TEXT[cue.badge]}
           </span>
         )}
       </>,
