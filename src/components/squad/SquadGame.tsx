@@ -412,7 +412,7 @@ export function SquadGame({ game }: { game: SquadGameId }) {
                 }}
               />
             )}
-            {table && plan.mode === "deciding" && plan.hint && (
+            {table && (plan.vote || plan.guess) && plan.hint && (
               <p className="text-center text-sm text-muted-foreground">{plan.hint.replace("Tap a face", "Tap a seat")}</p>
             )}
             {canSkip(round, me) && (

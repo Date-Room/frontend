@@ -300,7 +300,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
             swap(e.dataTransfer.getData("text/plain"), id);
           }}
           className={cn(
-            "shrink-0 cursor-grab rounded-2xl transition-[outline] active:cursor-grabbing",
+            "shrink-0 cursor-grab overflow-hidden rounded-2xl transition-[outline] active:cursor-grabbing",
             dragOver === id && "outline outline-2 outline-offset-4 outline-primary/70",
           )}
           data-seat={i}
@@ -507,6 +507,14 @@ function Face({
   cue?: FaceCue;
   onTap?: () => void;
 }) {
+  // A phone held upright sends a tall picture. In a wide seat, cropping it
+  // leaves a band across the face, so show it whole on a dark ground.
+  const [upright, setUpright] = useState(false);
+  const readShape = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const v = e.currentTarget;
+    if (v.videoWidth && v.videoHeight) setUpright(v.videoHeight > v.videoWidth);
+  };
+  const fit = (big: boolean) => cn("h-full w-full", big && upright ? "bg-black object-contain" : "object-cover");
   const hasVideo =
     showVideo && isTrackReference(trackRef) && !trackRef.publication.isMuted && Boolean(trackRef.publication.track);
   const initial = (name || "?").charAt(0).toUpperCase();
@@ -555,7 +563,7 @@ function Face({
       >
         {badge}
         {hasVideo ? (
-          <VideoTrack trackRef={trackRef} className="h-full w-full object-cover" />
+          <VideoTrack trackRef={trackRef} className={fit(spot)} onLoadedMetadata={readShape} onResize={readShape} />
         ) : photo ? (
           <img src={photo} alt="" className={cn("rounded-full object-cover", spot ? "h-28 w-28" : "h-9 w-9")} />
         ) : (
@@ -640,7 +648,12 @@ function Face({
     >
       {badge}
       {hasVideo ? (
-        <VideoTrack trackRef={trackRef} className="h-full w-full object-cover" />
+        <VideoTrack
+          trackRef={trackRef}
+          className={fit(size === "tile" || size === "big")}
+          onLoadedMetadata={readShape}
+          onResize={readShape}
+        />
       ) : photo ? (
         <img src={photo} alt="" className="aspect-square h-[62%] max-h-28 w-auto rounded-full object-cover" />
       ) : (
@@ -659,7 +672,9 @@ function Face({
         {place && <span className="ml-auto min-w-0 truncate text-xs text-cream/75">{place}</span>}
       </div>
     </div>,
-    cn("min-h-0", size === "tile" ? "rounded-2xl" : "h-full w-full", cueDim),
+    // Always fill the space given: a seat, a grid cell. Left to its content,
+    // a tall phone camera would stretch the tile to its own shape.
+    cn("h-full min-h-0 w-full", size === "tile" && "rounded-2xl", cueDim),
   );
 }
 
