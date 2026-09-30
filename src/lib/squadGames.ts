@@ -280,3 +280,164 @@ export function saveEnergy(roomId: string, deck: Deck): void {
     /* private mode: it'll ask again next time */
   }
 }
+
+/* ───────────────── Learning a game ───────────────── */
+
+/** The part you play this round. It decides your first-time card and the
+ *  one line under the round header. */
+export type SquadRole = "player" | "imposter" | "word" | "judge" | "writer" | "guesser" | "clue";
+
+/** Pure: my role this round, or null when I'm not in it. */
+export function roleFor(round: Round | null, mine: MyView | null, me: string | null): SquadRole | null {
+  if (!round || !me || !round.players.includes(me) || !mine?.playing) return null;
+  switch (round.game) {
+    case "imposter":
+      return mine.card?.imposter ? "imposter" : "word";
+    case "spill_tea":
+      return round.lead_id === me ? "judge" : "writer";
+    case "heads_up":
+      return round.lead_id === me ? "guesser" : "clue";
+    default:
+      return "player";
+  }
+}
+
+export type RoleCard = { title: string; steps: { glyph: string; text: string }[]; score: string };
+
+/** What each role needs to know the first time, in three lines. The full
+ *  rules sit behind the ? (ActivityHelp). */
+export const ROLE_CARDS: Record<string, RoleCard> = {
+  "most_likely:player": {
+    title: "Most Likely To",
+    steps: [
+      { glyph: "🃏", text: "Read the card together." },
+      { glyph: "👆", text: "Tap the friend who fits it best. Only you see your pick." },
+      { glyph: "🗳️", text: "The reveal shows who the room chose, never who voted for whom." },
+    ],
+    score: "Vote with the room: 1 point",
+  },
+  "who_said_it:player": {
+    title: "Who Said It",
+    steps: [
+      { glyph: "✍️", text: "Finish the line in secret." },
+      { glyph: "🔀", text: "The answers come back shuffled, with no names." },
+      { glyph: "🕵️", text: "Guess who wrote each one." },
+    ],
+    score: "Right guess: 1 point. Fool someone: 1 point",
+  },
+  "imposter:imposter": {
+    title: "You're the imposter",
+    steps: [
+      { glyph: "🤫", text: "Everyone else knows a secret word. You don't." },
+      { glyph: "👂", text: "Listen to the words before your turn." },
+      { glyph: "🎭", text: "When it's your turn, say one word that blends in." },
+    ],
+    score: "Survive the vote: 2 points",
+  },
+  "imposter:word": {
+    title: "You know the word",
+    steps: [
+      { glyph: "🔑", text: "Everyone knows the word except one imposter." },
+      { glyph: "🗣️", text: "In the order shown, say one word about it, out loud." },
+      { glyph: "🕵️", text: "Then tap the face you think is faking." },
+    ],
+    score: "Catch the imposter: 1 point each",
+  },
+  "spill_tea:writer": {
+    title: "Spill the Tea",
+    steps: [
+      { glyph: "✍️", text: "Fill the blank in secret." },
+      { glyph: "👑", text: "The judge reads every answer without names." },
+      { glyph: "🫖", text: "They pick a favourite. The judge changes every round." },
+    ],
+    score: "Get picked: 1 point",
+  },
+  "spill_tea:judge": {
+    title: "You're the judge",
+    steps: [
+      { glyph: "⏳", text: "Everyone else fills the blank. You wait." },
+      { glyph: "📜", text: "Read their answers. Nobody's name is on them." },
+      { glyph: "👑", text: "Tap your favourite." },
+    ],
+    score: "Whoever you pick gets 1 point",
+  },
+  "heads_up:guesser": {
+    title: "You're guessing",
+    steps: [
+      { glyph: "🙈", text: "You can't see the words. The squad can." },
+      { glyph: "👂", text: "They describe each word without saying it." },
+      { glyph: "📣", text: "Shout your guesses. 60 seconds." },
+    ],
+    score: "1 point for every word you get",
+  },
+  "heads_up:clue": {
+    title: "You're giving clues",
+    steps: [
+      { glyph: "🗣️", text: "Describe the word without saying it." },
+      { glyph: "✅", text: "Tap Got it when they say it." },
+      { glyph: "⏭️", text: "Tap Pass to skip a hard one. 60 seconds." },
+    ],
+    score: "The guesser gets 1 point a word",
+  },
+};
+
+export function roleCard(game: SquadGameId, role: SquadRole): RoleCard | null {
+  return ROLE_CARDS[`${game}:${role}`] ?? null;
+}
+
+/** Pure: the reminder under the header, every round. Short enough to read
+ *  while someone is talking. */
+export function roleLine(round: Round, role: SquadRole | null, nameOf: (pid: string) => string): string | null {
+  const lead = round.lead_id ? nameOf(round.lead_id) : "Someone";
+  if (!role) {
+    if (round.game === "spill_tea") return `👑 ${lead} is judging this round.`;
+    if (round.game === "heads_up") return `🎯 ${lead} is guessing this round.`;
+    return null;
+  }
+  switch (role) {
+    case "player":
+      if (round.game === "most_likely") return "👆 Tap who fits the card. Match the room to score.";
+      return round.stage === "answer"
+        ? "✍️ Finish the line. Nobody sees who wrote it."
+        : "🕵️ Guess who wrote each answer.";
+    case "imposter":
+      return "🤫 You don't know the word. Blend in.";
+    case "word":
+      return "🔑 One word each about it, then find the faker.";
+    case "judge":
+      return "👑 You're judging. Wait for their answers, then pick your favourite. Nobody knows who wrote what.";
+    case "writer":
+      return `✍️ Fill the blank. ${lead} picks the best one without names.`;
+    case "guesser":
+      return "🎯 You're guessing. Listen and shout.";
+    case "clue":
+      return `🗣️ Describe the word to ${lead}. Don't say it.`;
+  }
+}
+
+/** Role cards this device has seen ("imposter:word"). Per browser, like the
+ *  game intros: squads meet in the same room, but people switch rooms. */
+const ROLE_SEEN_KEY = "dr:squad-role-seen:v1";
+
+function readRoleSeen(): Set<string> {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(ROLE_SEEN_KEY) ?? "[]");
+    return new Set(Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function hasSeenRole(game: SquadGameId, role: SquadRole): boolean {
+  return readRoleSeen().has(`${game}:${role}`);
+}
+
+export function markRoleSeen(game: SquadGameId, role: SquadRole): void {
+  try {
+    const seen = readRoleSeen();
+    seen.add(`${game}:${role}`);
+    localStorage.setItem(ROLE_SEEN_KEY, JSON.stringify([...seen]));
+  } catch {
+    /* storage off: the card shows again next time */
+  }
+}

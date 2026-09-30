@@ -196,6 +196,69 @@ const ACTIVITY_HELP: Record<string, HelpContent> = {
       { glyph: "✅", name: "Mark it done", text: "Tick things off as you get to them." },
     ],
   },
+  // Squad games. No intro gate (the first card is dealt at once and each
+  // player gets a card for their own role, see SquadRoleCard); this is the
+  // full rulebook behind the ? button.
+  most_likely: {
+    title: "Most Likely To",
+    tagline: "Point at your friends. Everyone votes at once.",
+    minutes: "2 min a card",
+    steps: [
+      { glyph: "🃏", name: "Read the card", text: "Everyone sees the same card: who is most likely to...?" },
+      { glyph: "👆", name: "Tap a face", text: "Tap the friend who fits it best. You can pick yourself. Only you see your pick." },
+      { glyph: "🗳️", name: "The reveal", text: "The room's choice steps forward. Nobody sees who voted for whom." },
+      { glyph: "🏆", name: "Scoring", text: "Vote with the room and you get a point." },
+    ],
+    note: "Needs 3 players or more.",
+  },
+  who_said_it: {
+    title: "Who Said It",
+    tagline: "Finish the line. Then guess whose answer is whose.",
+    minutes: "5 min a card",
+    steps: [
+      { glyph: "✍️", name: "Finish the line", text: "Everyone writes an answer in secret." },
+      { glyph: "🔀", name: "Shuffled", text: "The answers come back mixed up, with no names." },
+      { glyph: "🕵️", name: "Guess the authors", text: "Say who wrote each one, then lock in your guesses." },
+      { glyph: "🏆", name: "Scoring", text: "A point for every right guess, and a point every time your answer fools someone." },
+    ],
+    note: "Needs 3 players or more.",
+  },
+  imposter: {
+    title: "Imposter",
+    tagline: "Everyone knows the word but one.",
+    minutes: "5 min a round",
+    steps: [
+      { glyph: "🔑", name: "The word", text: "Everyone gets the secret word except one person: the imposter." },
+      { glyph: "🗣️", name: "One word each", text: "Go round in the order shown. Each of you says one word about it, out loud." },
+      { glyph: "🕵️", name: "Vote", text: "Tap the face you think is faking." },
+      { glyph: "🏆", name: "Scoring", text: "Catch the imposter and everyone else gets a point. If the imposter survives, they get 2." },
+    ],
+    note: "Needs 4 players or more.",
+  },
+  spill_tea: {
+    title: "Spill the Tea",
+    tagline: "Fill the blank. The judge picks the best.",
+    minutes: "4 min a card",
+    steps: [
+      { glyph: "👑", name: "One judge", text: "Each round one of you judges. It moves round the room." },
+      { glyph: "✍️", name: "Fill the blank", text: "Everyone else writes an answer in secret." },
+      { glyph: "🫖", name: "The pick", text: "The judge reads them all and picks a favourite, without knowing who wrote what." },
+      { glyph: "🏆", name: "Scoring", text: "The answer the judge picks gets a point." },
+    ],
+    note: "Needs 3 players or more.",
+  },
+  heads_up: {
+    title: "Clue Me In",
+    tagline: "One of you guesses, the squad gives clues.",
+    minutes: "1 min a round",
+    steps: [
+      { glyph: "🎯", name: "One guesser", text: "Each round one of you guesses and can't see the words. It moves round the room." },
+      { glyph: "🗣️", name: "Give clues", text: "Everyone else sees the word. Describe it without saying it." },
+      { glyph: "✅", name: "Got it or Pass", text: "Tap Got it when they say it, or Pass to skip the word. 60 seconds." },
+      { glyph: "🏆", name: "Scoring", text: "The guesser gets a point for every word." },
+    ],
+    note: "Needs 2 players or more.",
+  },
 };
 
 /** Only games get the pre-game intro gate. Utilities (Watch, Music, Chat)
@@ -211,6 +274,13 @@ const INTRO_SKIP = new Set([
   "vision_board",
   "fridge_notes",
   "bookshelf",
+  // Squad games deal the first card straight away; each player's role card
+  // does the teaching inside the game (SquadRoleCard).
+  "most_likely",
+  "who_said_it",
+  "imposter",
+  "spill_tea",
+  "heads_up",
 ]);
 
 export function hasActivityHelp(id: string): boolean {

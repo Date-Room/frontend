@@ -17,10 +17,15 @@ import {
   canSkip,
   closeStage,
   getRound,
+  hasSeenRole,
   listNames,
+  markRoleSeen,
   makeMove,
   myTurn,
   readEnergy,
+  roleCard,
+  roleFor,
+  roleLine,
   saveEnergy,
   secondsLeft,
   skipCard,
@@ -33,6 +38,7 @@ import {
   type MyView,
   type Round,
   type RoundState,
+  type RoleCard,
   type SquadGameId,
 } from "@/lib/squadGames";
 import { cn } from "@/lib/utils";
@@ -144,6 +150,13 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   }, [setCue, plan, members.data]);
   useEffect(() => () => setCue?.(null), [setCue]);
 
+  // Learning the game: the first time you play a role, a card over the game
+  // says what that role does; after that, one line under the header.
+  const live = Boolean(round && !setup && round.stage !== "revealed");
+  const role = live ? roleFor(round, mine, me) : null;
+  const [, setSeen] = useState(0);
+  const firstTime = role && !hasSeenRole(game, role) ? roleCard(game, role) : null;
+
   if (state.isLoading || members.isLoading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -153,6 +166,7 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   }
 
   return (
+    <div className="relative h-full min-h-0">
     <div className="flex h-full min-h-0 flex-col overflow-y-auto px-4 pb-4 pt-2 sm:px-8 sm:pb-6 sm:pt-6">
       <div className="mx-auto w-full max-w-xl space-y-3 sm:space-y-5">
         <header className="space-y-0.5 text-center sm:space-y-1">
@@ -172,6 +186,9 @@ export function SquadGame({ game }: { game: SquadGameId }) {
             </button>
           )}
         </header>
+        {live && round && roleLine(round, role, nameOf) && (
+          <p className="text-center text-sm text-cream/80">{roleLine(round, role, nameOf)}</p>
+        )}
 
         {!round || setup ? (
           <Dealer
@@ -229,6 +246,50 @@ export function SquadGame({ game }: { game: SquadGameId }) {
             )}
           </>
         )}
+      </div>
+    </div>
+      {firstTime && role && (
+        <FirstTimeCard
+          card={firstTime}
+          onGotIt={() => {
+            markRoleSeen(game, role);
+            setSeen((n) => n + 1);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Your role, the first time you play it: three lines and the points. Sits
+ *  over the game panel only, so the call stays in view. The full rules are
+ *  the stage's own ? just above it (a second ? here would sit right under
+ *  it, and a sheet opened from inside the stage gets clipped by it). */
+function FirstTimeCard({ card, onGotIt }: { card: RoleCard; onGotIt: () => void }) {
+  return (
+    <div className="absolute inset-0 z-20 flex overflow-y-auto bg-background/80 p-2 backdrop-blur-sm animate-fade-in sm:p-6">
+      <div
+        role="dialog"
+        aria-label={card.title}
+        className="relative m-auto w-full max-w-sm rounded-3xl border border-primary/25 bg-card px-4 pb-3 pt-4 shadow-2xl sm:px-5 sm:pb-4 sm:pt-5"
+      >
+        <p className="dr-eyebrow text-primary/85">Your first round</p>
+        <h3 className="mt-0.5 font-serif text-xl text-cream sm:mt-1 sm:text-2xl">{card.title}</h3>
+        <ol className="mt-2 space-y-1.5 sm:mt-3 sm:space-y-2">
+          {card.steps.map((st) => (
+            <li key={st.text} className="flex items-start gap-3 text-sm leading-snug text-cream/85 sm:text-[15px]">
+              <span className="w-6 shrink-0 text-center text-lg leading-none" aria-hidden>
+                {st.glyph}
+              </span>
+              <span>{st.text}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-2.5 rounded-xl bg-primary/[0.1] px-3 py-1.5 sm:mt-3 sm:py-2 text-center text-sm font-semibold text-cream">{card.score}</p>
+        <button type="button" onClick={onGotIt} className="btn-primary focus-ring mt-2.5 w-full rounded-full py-2.5 font-semibold sm:mt-3 sm:py-3">
+          Got it
+        </button>
+        <p className="mt-1.5 text-center text-xs text-muted-foreground sm:mt-2">All the rules are under ? at the top.</p>
       </div>
     </div>
   );
@@ -578,15 +639,9 @@ function Play({
 
   const answers = round.public.answers ?? [];
   if (round.stage === "answer") {
-    const judge = round.game === "spill_tea" ? round.lead_id : null;
     return (
       <div className="space-y-4">
         <Prompt text={text} />
-        {judge && (
-          <p className="text-center text-sm text-muted-foreground">
-            {judge === me ? "You're the judge this round. Wait for the answers." : `${nameOf(judge)} is judging this round.`}
-          </p>
-        )}
         {turn && (
           <AnswerBox
             key={round.id}

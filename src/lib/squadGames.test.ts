@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  ROLE_CARDS,
+  SQUAD_GAME_IDS,
   canSkip,
+  hasSeenRole,
+  markRoleSeen,
+  roleCard,
+  roleFor,
+  roleLine,
   readEnergy,
   saveEnergy,
   stageCueFor,
@@ -149,5 +156,49 @@ describe("tonight's energy", () => {
     saveEnergy("room-x", "spicy");
     expect(readEnergy("room-x")).toBe("spicy");
     expect(readEnergy("room-y")).toBeNull();
+  });
+});
+
+describe("learning a game", () => {
+  const playing = { playing: true };
+  it("works out my role", () => {
+    expect(roleFor(round({}), playing, "a")).toBe("player");
+    expect(roleFor(round({}), playing, "z")).toBeNull();
+    expect(roleFor(round({}), { playing: false }, "a")).toBeNull();
+    expect(roleFor(round({ game: "imposter" }), { playing: true, card: { imposter: true } }, "a")).toBe("imposter");
+    expect(roleFor(round({ game: "imposter" }), { playing: true, card: { word: "Beach" } }, "a")).toBe("word");
+    expect(roleFor(round({ game: "spill_tea", lead_id: "a" }), playing, "a")).toBe("judge");
+    expect(roleFor(round({ game: "spill_tea", lead_id: "a" }), playing, "b")).toBe("writer");
+    expect(roleFor(round({ game: "heads_up", lead_id: "a" }), playing, "a")).toBe("guesser");
+    expect(roleFor(round({ game: "heads_up", lead_id: "a" }), playing, "b")).toBe("clue");
+  });
+
+  it("has a card for every role in every game", () => {
+    for (const g of SQUAD_GAME_IDS) {
+      const r = round({ game: g, lead_id: "a" });
+      for (const me of ["a", "b"]) {
+        for (const card of [{ imposter: true }, { word: "x" }]) {
+          const role = roleFor(r, { playing: true, card }, me);
+          expect(role && roleCard(g, role), `${g} ${me}`).toBeTruthy();
+        }
+      }
+    }
+    for (const c of Object.values(ROLE_CARDS)) expect(c.steps).toHaveLength(3);
+  });
+
+  it("gives a role line, naming the lead for bystanders", () => {
+    const tea = round({ game: "spill_tea", stage: "answer", lead_id: "a" });
+    expect(roleLine(tea, "writer", () => "Amaka")).toContain("Amaka picks");
+    expect(roleLine(tea, null, () => "Amaka")).toBe("👑 Amaka is judging this round.");
+    expect(roleLine(round({ game: "who_said_it", stage: "guess" }), "player", () => "")).toContain("Guess");
+    expect(roleLine(round({}), null, () => "")).toBeNull();
+  });
+
+  it("remembers a role card per game and role", () => {
+    localStorage.clear();
+    expect(hasSeenRole("imposter", "word")).toBe(false);
+    markRoleSeen("imposter", "word");
+    expect(hasSeenRole("imposter", "word")).toBe(true);
+    expect(hasSeenRole("imposter", "imposter")).toBe(false);
   });
 });

@@ -23,6 +23,13 @@ describe("activity help coverage", () => {
     }
   });
 
+  it("the squad games have rules but no intro gate", () => {
+    for (const id of ["most_likely", "who_said_it", "imposter", "spill_tea", "heads_up"]) {
+      expect(hasActivityHelp(id), id).toBe(true);
+      expect(shouldShowGameIntro(id), id).toBe(false);
+    }
+  });
+
   it("unknown ids have no help", () => {
     expect(hasActivityHelp("nope")).toBe(false);
   });
