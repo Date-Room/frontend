@@ -817,3 +817,31 @@ export async function recheckPayment(id: string) {
 export async function creditPayment(id: string, receipt: string) {
   return api.post<{ outcome: string; status: string }>(`/v1/admin/payments/${id}/credit`, { receipt });
 }
+
+export type RecentPayment = {
+  id: string;
+  at: string;
+  user_id: string;
+  customer: string;
+  product: string;
+  amount: number;
+  currency: string;
+  status: "completed" | "pending" | "unconfirmed" | "failed" | string;
+  result_description: string | null;
+  mpesa_receipt: string | null;
+  room_name: string | null;
+  phone_hint: string;
+};
+
+export type RecentPayments = {
+  days: number;
+  received: { currency: string; amount: number }[];
+  completed: number;
+  confirming: number;
+  failed: number;
+  rows: RecentPayment[];
+};
+
+export async function listRecentPayments(days: number) {
+  return api.get<RecentPayments>(`/v1/admin/payments/recent?days=${days}`);
+}

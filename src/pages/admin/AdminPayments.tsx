@@ -10,12 +10,27 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   creditPayment,
+  listRecentPayments,
   listStuckPayments,
   listUnmatchedPayments,
   recheckPayment,
   type StuckPayment,
 } from "@/lib/admin";
 import { cn } from "@/lib/utils";
+
+/** Pure: a person-facing label for a payment's status. */
+export function paymentStatusLabel(status: string): string {
+  if (status === "completed") return "Received";
+  if (status === "failed") return "Didn't go through";
+  return "Confirming";
+}
+
+const PAYMENT_TONE: Record<string, string> = {
+  completed: "bg-emerald-500/15 text-emerald-300",
+  failed: "bg-white/[0.08] text-cream/60",
+  pending: "bg-amber-400/15 text-amber-200",
+  unconfirmed: "bg-rose-500/15 text-rose-300",
+};
 
 /** Pure: a short human status for a stuck order. */
 export function stuckLabel(row: Pick<StuckPayment, "status" | "result_description">): string {
@@ -72,6 +87,11 @@ function CreditForm({ id, initial, onDone }: { id: string; initial?: string; onD
 export default function AdminPayments() {
   const qc = useQueryClient();
   const [days, setDays] = useState(7);
+  const [recentDays, setRecentDays] = useState(7);
+  const recent = useQuery({
+    queryKey: ["admin-payments-recent", recentDays],
+    queryFn: () => listRecentPayments(recentDays),
+  });
   const stuck = useQuery({ queryKey: ["admin-payments-stuck"], queryFn: listStuckPayments });
   const unmatched = useQuery({
     queryKey: ["admin-payments-unmatched", days],
@@ -81,6 +101,7 @@ export default function AdminPayments() {
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["admin-payments-stuck"] });
     void qc.invalidateQueries({ queryKey: ["admin-payments-unmatched"] });
+    void qc.invalidateQueries({ queryKey: ["admin-payments-recent"] });
   };
   const recheck = useMutation({
     mutationFn: recheckPayment,
@@ -105,10 +126,87 @@ export default function AdminPayments() {
       <div>
         <h2 className="text-2xl font-semibold tracking-tight text-cream">Payments</h2>
         <p className="mt-1 text-sm text-muted-foreground/70">
-          M-Pesa payments automatic recovery couldn't settle. Re-check asks PokeaPay; Credit grants against a receipt
-          from the PokeaPay statement. Everything here is in the audit log.
+          Every M-Pesa payment, and the few automatic recovery couldn't settle. Re-check asks PokeaPay; Credit grants
+          against a receipt from the PokeaPay statement. Every action is in the audit log.
         </p>
       </div>
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-medium text-cream">Recent payments</h3>
+            {recent.data && (
+              <p className="mt-0.5 text-xs text-muted-foreground/70">
+                Received{" "}
+                <span className="tabular-nums text-cream">
+                  {recent.data.received.length
+                    ? recent.data.received.map((t) => money(t.amount, t.currency)).join(" · ")
+                    : "nothing yet"}
+                </span>{" "}
+                · {recent.data.completed} received · {recent.data.confirming} confirming · {recent.data.failed} didn't go
+                through
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            {[1, 7, 31].map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setRecentDays(d)}
+                className={cn(small, d === recentDays ? "border-primary/60 bg-primary/[0.12] text-primary" : "border-white/[0.14] bg-card text-cream/80 hover:bg-white/[0.08]")}
+              >
+                {d === 1 ? "Today" : `${d} days`}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="overflow-hidden rounded-xl border border-white/[0.08]">
+          <table className="w-full text-sm">
+            <thead className="bg-card/80 text-left text-muted-foreground/70">
+              <tr>
+                <th className="px-4 py-3">When</th>
+                <th className="px-4 py-3">Customer</th>
+                <th className="px-4 py-3">What</th>
+                <th className="px-4 py-3">Amount</th>
+                <th className="px-4 py-3">Receipt</th>
+                <th className="px-4 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recent.isLoading && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground/70">Loading…</td></tr>
+              )}
+              {recent.data && recent.data.rows.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground/70">No M-Pesa payments in this window.</td></tr>
+              )}
+              {recent.data?.rows.map((p) => (
+                <tr key={p.id} className="border-t border-white/[0.08]">
+                  <td className="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-muted-foreground/70">{when(p.at)}</td>
+                  <td className="px-4 py-3 text-xs text-cream/90">
+                    {p.customer}
+                    <span className="ml-1.5 font-mono text-muted-foreground/60">{p.phone_hint}</span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-cream/90">
+                    {p.product}
+                    {p.room_name && <span className="text-muted-foreground/70"> · {p.room_name}</span>}
+                  </td>
+                  <td className="px-4 py-3 text-xs tabular-nums">{money(p.amount, p.currency)}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{p.mpesa_receipt ?? "—"}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      title={p.status === "failed" ? p.result_description ?? undefined : undefined}
+                      className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", PAYMENT_TONE[p.status] ?? PAYMENT_TONE.pending)}
+                    >
+                      {paymentStatusLabel(p.status)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <section className="space-y-3">
         <h3 className="text-sm font-medium text-cream">Orders waiting on an answer</h3>

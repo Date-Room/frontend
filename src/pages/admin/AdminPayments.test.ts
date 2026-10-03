@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stuckLabel } from "./AdminPayments";
+import { paymentStatusLabel, stuckLabel } from "./AdminPayments";
 
 describe("stuckLabel", () => {
   it("names why an order is stuck", () => {
@@ -8,5 +8,14 @@ describe("stuckLabel", () => {
       "Failed by the old 1-hour cut-off",
     );
     expect(stuckLabel({ status: "pending", result_description: null })).toBe("Waiting on M-Pesa");
+  });
+});
+
+describe("paymentStatusLabel", () => {
+  it("speaks plainly about where a payment stands", () => {
+    expect(paymentStatusLabel("completed")).toBe("Received");
+    expect(paymentStatusLabel("failed")).toBe("Didn't go through");
+    expect(paymentStatusLabel("pending")).toBe("Confirming");
+    expect(paymentStatusLabel("unconfirmed")).toBe("Confirming");
   });
 });
