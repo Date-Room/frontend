@@ -1,3 +1,4 @@
+import { isMpesaStillConfirming } from "@/lib/mpesaFlow";
 import { useMemo, useState } from "react";
 import { Loader2, MapPin, Smartphone } from "lucide-react";
 import { toast } from "sonner";
@@ -96,7 +97,8 @@ export function PaymentCheckout({
         await onComplete?.();
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Payment could not start.");
+      if (isMpesaStillConfirming(e)) toast.message(e.message);
+      else toast.error(e instanceof Error ? e.message : "Payment could not start.");
       setBusy(false);
     }
   }

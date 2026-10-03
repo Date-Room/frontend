@@ -2,6 +2,9 @@ import { lazy, Suspense, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { toast } from "sonner";
+import { MpesaPaymentPanel } from "@/components/billing/MpesaPaymentPanel";
+import { setOnLateConfirm } from "@/lib/mpesaFlow";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { applyThemePreference, detachThemePreferenceListener } from "@/lib/theme";
@@ -50,6 +53,7 @@ const AdminAudit = lazy(() => import("./pages/admin/AdminAudit"));
 const AdminChaperon = lazy(() => import("./pages/admin/AdminChaperon"));
 const AdminBeta = lazy(() => import("./pages/admin/AdminBeta"));
 const AdminSquad = lazy(() => import("./pages/admin/AdminSquad"));
+const AdminPayments = lazy(() => import("./pages/admin/AdminPayments"));
 const AdminLayout = lazy(() =>
   import("./components/admin/AdminLayout").then((m) => ({ default: m.AdminLayout })),
 );
@@ -58,6 +62,13 @@ import { AdminGuard } from "./components/admin/AdminGuard";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
+
+// A payment that confirms after its panel closed: say so, and refresh
+// whatever it bought (plan, passes, room time, squad nights).
+setOnLateConfirm((label) => {
+  toast.success(`M-Pesa payment confirmed. Your ${label} has been added.`);
+  void queryClient.invalidateQueries();
+});
 
 /** Shown for the moment a route's chunk is in flight. Same quiet mark the
  *  room uses while it connects, so a chunk load reads as part of the app,
@@ -89,6 +100,7 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <MpesaPaymentPanel />
         <BrowserRouter>
           <ScrollToTop />
           <Suspense fallback={<RouteLoading />}>
@@ -152,6 +164,7 @@ const App = () => {
               <Route path="chaperon" element={<AdminChaperon />} />
               <Route path="beta" element={<AdminBeta />} />
               <Route path="squad" element={<AdminSquad />} />
+              <Route path="payments" element={<AdminPayments />} />
               <Route path="audit" element={<AdminAudit />} />
             </Route>
 

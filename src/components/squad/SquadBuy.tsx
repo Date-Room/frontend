@@ -8,7 +8,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Smartphone } from "lucide-react";
 import { toast } from "sonner";
-import { waitForMpesaPayment } from "@/lib/billing";
+import { isMpesaStillConfirming, runMpesaPayment } from "@/lib/mpesaFlow";
 import {
   formatSquadMoney,
   getSquadPrices,
@@ -68,9 +68,12 @@ export function SquadBuy({ roomId, onPaid }: { roomId: string; onPaid: () => voi
         await squadDevPurchase(roomId, chosen.price.product);
       } else if (p.provider === "mpesa") {
         if (!phone.trim()) throw new Error("Enter your M-Pesa number.");
-        const { transaction_id } = await squadStkPush(roomId, chosen.price.product, phone.trim());
-        toast.message("Check your phone for the M-Pesa prompt.");
-        await waitForMpesaPayment(transaction_id);
+        const product = chosen.price.product;
+        const number = phone.trim();
+        await runMpesaPayment({
+          label: chosen.title,
+          start: () => squadStkPush(roomId, product, number),
+        });
       } else if (p.provider === "stripe") {
         const { url } = await squadCardCheckout(roomId, chosen.price.product);
         window.location.assign(url);
@@ -79,7 +82,8 @@ export function SquadBuy({ roomId, onPaid }: { roomId: string; onPaid: () => voi
       toast.success("Nights added to the room.");
       onPaid();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Payment didn't go through.");
+      if (isMpesaStillConfirming(e)) toast.message(e.message);
+      else toast.error(e instanceof Error ? e.message : "Payment didn't go through.");
     } finally {
       setBusy(false);
     }

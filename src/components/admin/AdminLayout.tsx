@@ -18,11 +18,12 @@ import {
   TrendingUp,
   Sparkles,
   UsersRound,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/authClient";
-import { getAdminStats, listCoachBetaApplicationsBy, listSquadBetaApplications } from "@/lib/admin";
+import { getAdminStats, listCoachBetaApplicationsBy, listSquadBetaApplications, listStuckPayments } from "@/lib/admin";
 import { CommandSearch } from "@/components/admin/CommandSearch";
 
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; count?: number | string };
@@ -41,6 +42,12 @@ export function AdminLayout() {
     staleTime: 60_000,
   });
 
+  const stuckPayments = useQuery({
+    queryKey: ["admin-payments-stuck"],
+    queryFn: listStuckPayments,
+    staleTime: 60_000,
+  });
+
   const groups: { label: string; items: NavItem[] }[] = [
     {
       label: "Overview",
@@ -55,6 +62,7 @@ export function AdminLayout() {
     {
       label: "Operations",
       items: [
+        { to: "/admin/payments", label: "Payments", icon: Wallet, count: stuckPayments.data?.rows.length || undefined },
         { to: "/admin/rooms", label: "Rooms", icon: DoorOpen, count: stats.data?.live_rooms ? `${stats.data.live_rooms} live` : undefined },
         { to: "/admin/chaperon", label: "Chaperon AI", icon: ShieldCheck },
         { to: "/admin/beta", label: "Beta console", icon: Radio, count: pending.data?.pending_count || undefined },
