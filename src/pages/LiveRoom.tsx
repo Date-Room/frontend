@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AddMoreTimeCheckout } from "@/components/AddMoreTimeCheckout";
+import { ROOM_PLAN_CHANGED, announceRoomPlanChanged, type TimeSheetMode } from "@/lib/timeExtensions";
 import {
   Dialog,
   DialogContent,
@@ -467,6 +468,22 @@ function RoomShell({
   const [ambianceOpen, setAmbianceOpen] = useState(false);
   const [ambianceOverride, setAmbianceOverride] = useState<LobbyMood | null>(null);
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [sheetMode, setSheetMode] = useState<TimeSheetMode>("time");
+  const openSheet = (mode: TimeSheetMode) => {
+    setSheetMode(mode);
+    setUpgradeOpen(true);
+  };
+  const tryRoom = roomPackage != null && isTryPackage(roomPackage);
+
+  // The server says the room was upgraded (paid time or a pack): reload
+  // the plan so everyone's menu opens up at once.
+  useEffect(
+    () =>
+      session.channel.onBroadcast((e) => {
+        if ((e as { kind?: string }).kind === "room_upgraded") announceRoomPlanChanged();
+      }),
+    [session.channel],
+  );
 
   // Expiry is a moment, not a clock: one timeout armed at that moment rather
   // than a once-a-second tick. The tick used to re-render this whole page
@@ -659,7 +676,17 @@ function RoomShell({
           <div className="flex items-center gap-3 sm:gap-4">
             {/* Session (time-limited) rooms keep their countdown + add-time. */}
             {expiryMs != null && (
-              <SessionCountdown expiryMs={expiryMs} onAddTime={() => setUpgradeOpen(true)} />
+              <SessionCountdown expiryMs={expiryMs} onAddTime={() => openSheet("time")} />
+            )}
+            {/* Try rooms can upgrade at any time, not only when time runs out. */}
+            {expiryMs != null && tryRoom && (
+              <button
+                type="button"
+                onClick={() => openSheet("upgrade")}
+                className="shrink-0 rounded-full border border-primary/45 bg-primary/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-primary transition hover:bg-primary/25"
+              >
+                Upgrade
+              </button>
             )}
             {/* Desktop call layout — in the top bar so it is reachable in
                 every mode and every stage state. */}
@@ -761,12 +788,19 @@ function RoomShell({
           <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
             <DialogContent className="max-h-[85vh] overflow-y-auto border-white/10 bg-card/95 text-cream sm:max-w-md">
               <DialogHeader>
-                <DialogTitle className="font-serif font-semibold text-xl">Add more time</DialogTitle>
+                <DialogTitle className="font-serif font-semibold text-xl">
+                  {sheetMode === "upgrade" ? "Upgrade this date" : "Add more time"}
+                </DialogTitle>
               </DialogHeader>
               <p className="text-sm text-muted-foreground">
-                Keep the evening going — add 15 minutes, 30 minutes, or a full hour.
+                {sheetMode === "upgrade"
+                  ? "Every game opens the moment you pay: The 36, Truth or Dare, Guacamole Panic and the rest."
+                  : tryRoom
+                    ? "Keep the evening going. Any time you add also unlocks every game."
+                    : "Keep the evening going: add more minutes."}
               </p>
               <AddMoreTimeCheckout
+                mode={sheetMode}
                 roomId={roomId}
                 participantId={session.participantId}
                 canPay={session.canPersist}
@@ -789,7 +823,12 @@ function RoomShell({
                 Time&apos;s up — add more minutes to keep the date going.
               </p>
               <div className="flex flex-col gap-3">
-                <button type="button" className="btn-primary w-full py-3 rounded-full" onClick={() => setUpgradeOpen(true)}>
+                {tryRoom && (
+                  <button type="button" className="btn-primary w-full py-3 rounded-full" onClick={() => openSheet("upgrade")}>
+                    Upgrade this date
+                  </button>
+                )}
+                <button type="button" className="btn-primary w-full py-3 rounded-full" onClick={() => openSheet("time")}>
                   Add more time
                 </button>
                 <button type="button" className="btn-primary w-full py-3 rounded-full" onClick={() => navigate(`/room/${roomId}/recap`)}>
@@ -817,6 +856,11 @@ export default function LiveRoom() {
   const [identity, setIdentity] = useState<RoomIdentity | null>(null);
   const [resolving, setResolving] = useState(true);
   const [roomPackage, setRoomPackage] = useState<RoomPackage | null>(null);
+  // The package the page last showed, so a refresh can tell "just unlocked".
+  const packageRef = useRef<RoomPackage | null>(null);
+  useEffect(() => {
+    packageRef.current = roomPackage;
+  }, [roomPackage]);
   const [curatedActivityIds, setCuratedActivityIds] = useState<CuratableActivityId[]>([]);
   const [maxParticipants, setMaxParticipants] = useState(2);
   const [chaperonEnabled, setChaperonEnabled] = useState(false);
@@ -917,7 +961,9 @@ export default function LiveRoom() {
       }
     })();
 
-    const poll = window.setInterval(() => {
+    // Keep timer, menu and package in step with the server. A Try room
+    // that someone paid for opens up for everyone here, with a word on it.
+    const refresh = () => {
       void getRoomExperienceApi(roomId, participantId)
         .then((exp) => {
           if (cancelled) return;
@@ -925,13 +971,24 @@ export default function LiveRoom() {
             setSessionExpiresAt(exp.expires_at);
           }
           setChaperonAnnouncements(exp.chaperon_announcements ?? []);
+          const plan = saveRoomPlanFromServer(roomId, exp);
+          const was = packageRef.current;
+          if (was && isTryPackage(was) && !isTryPackage(plan.package)) {
+            toast.success("You've unlocked the full room. Every game is open.");
+          }
+          packageRef.current = plan.package;
+          setRoomPackage(plan.package);
+          setCuratedActivityIds(plan.curatedActivityIds);
         })
         .catch(() => undefined);
-    }, 15_000);
+    };
+    const poll = window.setInterval(refresh, 15_000);
+    window.addEventListener(ROOM_PLAN_CHANGED, refresh);
 
     return () => {
       cancelled = true;
       window.clearInterval(poll);
+      window.removeEventListener(ROOM_PLAN_CHANGED, refresh);
     };
   }, [roomId, participantId, navigate]);
 
