@@ -2,6 +2,7 @@
  * Billing client — Stripe (global) + M-Pesa (KE/TZ/UG) payment rails.
  */
 import { api } from "@/lib/api";
+import { runMpesaPayment } from "@/lib/mpesaFlow";
 
 export type AccountTier = "try" | "date_pack" | "long_pack" | "together" | "crew";
 // "store" = web can't take payment in this region (non-KE while card
@@ -142,26 +143,12 @@ export function getMpesaTransactionStatus(
   );
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-/** Poll M-Pesa STK until completed or failed (max ~2 min). */
-export async function waitForMpesaPayment(
-  transactionId: string,
-  opts?: { onPending?: () => void },
-): Promise<MpesaTransactionStatus> {
-  for (let i = 0; i < 40; i += 1) {
-    const status = await getMpesaTransactionStatus(transactionId);
-    if (status.status === "completed") return status;
-    if (status.status === "failed") {
-      throw new Error(status.result_description || "M-Pesa payment failed.");
-    }
-    opts?.onPending?.();
-    await sleep(3000);
-  }
-  throw new Error("Payment is taking longer than expected — check your phone and try again.");
-}
+const PRODUCT_LABELS: Partial<Record<BillableProduct, string>> = {
+  date_pack: "Date Pack",
+  long_pack: "Long Pack",
+  together: "Together plan",
+  crew: "Crew plan",
+};
 
 /** Start checkout on the correct rail. Stripe redirects; M-Pesa returns when done. */
 export async function purchaseProduct(
@@ -188,12 +175,12 @@ export async function purchaseProduct(
     if (!config.country_code) {
       throw new Error("Pick your country below before paying with M-Pesa.");
     }
-    const { transaction_id } = await initiateMpesaStkPush({
-      phone: phone.trim(),
-      product_kind: product,
-      country_code: config.country_code,
+    const countryCode = config.country_code;
+    await runMpesaPayment({
+      label: PRODUCT_LABELS[product] ?? "purchase",
+      start: () =>
+        initiateMpesaStkPush({ phone: phone.trim(), product_kind: product, country_code: countryCode }),
     });
-    await waitForMpesaPayment(transaction_id);
     return "completed";
   }
 

@@ -775,3 +775,45 @@ export async function getAdminFeatures(days: number, includeTeam = false, filter
   for (const [k, v] of Object.entries(filters)) if (v) q.set(k, v);
   return api.get<FeaturesReport>(`/v1/admin/features?${q.toString()}`);
 }
+
+/* ── Payments (/v1/admin/payments) ──────────────────────────────────────── */
+
+export type StuckPayment = {
+  id: string;
+  user_id: string;
+  room_id: string | null;
+  product_kind: string;
+  amount: number;
+  currency: string;
+  status: string;
+  result_description: string | null;
+  order_reference: string | null;
+  mpesa_receipt: string | null;
+  phone_hint: string;
+  created_at: string;
+};
+
+export type UnmatchedCredit = {
+  receipt: string;
+  amount: number;
+  at: string;
+  description: string;
+  phone_hint: string;
+  candidates: { id: string; product_kind: string; status: string; phone_hint: string; created_at: string }[];
+};
+
+export async function listStuckPayments() {
+  return api.get<{ rows: StuckPayment[] }>("/v1/admin/payments/attention");
+}
+
+export async function listUnmatchedPayments(days: number) {
+  return api.get<{ days: number; credits: UnmatchedCredit[] }>(`/v1/admin/payments/unmatched?days=${days}`);
+}
+
+export async function recheckPayment(id: string) {
+  return api.post<{ outcome: string; status: string }>(`/v1/admin/payments/${id}/recheck`, {});
+}
+
+export async function creditPayment(id: string, receipt: string) {
+  return api.post<{ outcome: string; status: string }>(`/v1/admin/payments/${id}/credit`, { receipt });
+}

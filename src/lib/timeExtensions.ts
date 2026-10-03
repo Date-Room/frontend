@@ -1,12 +1,12 @@
 /**
  * In-session time extensions — add minutes to the live room timer.
  */
+import { runMpesaPayment } from "@/lib/mpesaFlow";
 import { api } from "@/lib/api";
 import {
   paymentRailLabel,
   STORE_ONLY_MESSAGE,
   type PaymentProvider,
-  waitForMpesaPayment,
 } from "@/lib/billing";
 
 export type TimeExtensionProductId = "time_15" | "time_30" | "time_60";
@@ -189,12 +189,12 @@ export async function purchaseTimeExtension(
     if (!config.country_code) {
       throw new Error("Set your country in Profile before paying with M-Pesa.");
     }
-    const { transaction_id } = await initiateTimeExtensionMpesa(roomId, {
-      product,
-      phone: phone.trim(),
-      country_code: config.country_code,
+    const countryCode = config.country_code;
+    await runMpesaPayment({
+      label: "extra time",
+      start: () =>
+        initiateTimeExtensionMpesa(roomId, { product, phone: phone.trim(), country_code: countryCode }),
     });
-    await waitForMpesaPayment(transaction_id);
     return { result: "completed" };
   }
 

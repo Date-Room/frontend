@@ -1,3 +1,4 @@
+import { isMpesaStillConfirming } from "@/lib/mpesaFlow";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Clock, Loader2, Smartphone } from "lucide-react";
@@ -76,7 +77,8 @@ export function AddMoreTimeCheckout({
         }
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Payment could not start.");
+      if (isMpesaStillConfirming(e)) toast.message(e.message);
+      else toast.error(e instanceof Error ? e.message : "Payment could not start.");
     } finally {
       setBusyProduct(null);
     }
