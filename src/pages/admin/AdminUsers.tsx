@@ -1,3 +1,5 @@
+import { PurchaseHistory } from "@/components/billing/PurchaseHistory";
+import { getUserPurchaseHistory } from "@/lib/purchases";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -228,6 +230,13 @@ export default function AdminUsers() {
                   <p className="text-xs text-emerald-400">Active paid subscription</p>
                 )}
               </div>
+
+              <PurchaseHistory
+                key={selected.id}
+                queryKey={["admin-user-purchases", selected.id]}
+                fetcher={() => getUserPurchaseHistory(selected.id)}
+                readOnly
+              />
 
               <div className="space-y-2">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground/70">Grant plan (stacks — never replaces)</p>

@@ -76,6 +76,8 @@ export type SquadNights = {
   seats: number;
   seat_nights: number;
   nights_left: number;
+  /** The latest nights bought or gifted into the room. */
+  last_top_up?: { by: string; nights: number; source: "purchase" | "admin"; at: string } | null;
   free_night_expires_at: string | null;
   active_night: SquadNight | null;
   nights: SquadNight[];
@@ -191,6 +193,15 @@ export function formatSquadMoney(amount: number, currency: string): string {
 export function nightsLeftLabel(n: SquadNights): string {
   if (n.nights_left === 0) return "No nights left";
   return n.nights_left === 1 ? "1 night left" : `${n.nights_left} nights left`;
+}
+
+/** "Joshua added 1 night · 3 Oct" / "DateRoom gifted 3 nights · 3 Oct", or null. */
+export function lastTopUpLabel(n: SquadNights): string | null {
+  const t = n.last_top_up;
+  if (!t) return null;
+  const nights = t.nights === 1 ? "1 night" : `${t.nights} nights`;
+  const when = new Date(t.at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  return t.source === "admin" ? `DateRoom gifted ${nights} · ${when}` : `${t.by} added ${nights} · ${when}`;
 }
 
 /** The share link for a room (same shape as every invite: /i/CODE/PIN). */
