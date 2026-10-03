@@ -41,6 +41,7 @@ import {
   getSquadMembers,
   getSquadNights,
   getSquadPlan,
+  lastTopUpLabel,
   nightsLeftLabel,
   startSquadNight,
   type SquadNights,
@@ -266,6 +267,7 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
           {n && (
             <p className="text-sm text-muted-foreground">
               {nightsLeftLabel(n)} · {n.seats} seats
+              {lastTopUpLabel(n) && <span className="text-muted-foreground/70"> · Last top-up: {lastTopUpLabel(n)}</span>}
             </p>
           )}
         </header>

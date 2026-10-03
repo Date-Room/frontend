@@ -30,6 +30,7 @@ import {
 } from "@/lib/rooms";
 import { PageShell } from "@/components/PageShell";
 import { ProfilePlanSection } from "@/components/ProfilePlanSection";
+import { PurchaseHistory } from "@/components/billing/PurchaseHistory";
 import { ShimmerSkeleton } from "@/components/ui/skeleton";
 import { UserAvatarImg } from "@/components/UserAvatarImg";
 import { cn } from "@/lib/utils";
@@ -959,6 +960,9 @@ function ProfilePane({
             billingConfig={billingConfig}
             loading={billingLoading}
           />
+        </div>
+        <div className="lg:col-span-12">
+          <PurchaseHistory />
         </div>
       </div>
     </div>
