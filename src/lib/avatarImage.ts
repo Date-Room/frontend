@@ -9,6 +9,8 @@
  * functions so they're unit-testable without a canvas.
  */
 
+import type { SourceRect } from "./avatarCrop";
+
 /** Output square edge in px — crisp at avatar sizes on retina. */
 export const AVATAR_SIZE = 512;
 /** Reject absurd inputs before decoding (a sanity cap, not the old limit). */
@@ -80,7 +82,22 @@ export function assertValidAvatarFile(
   }
 }
 
-type DecodedImage = { source: CanvasImageSource; width: number; height: number; close: () => void };
+export type DecodedImage = {
+  source: CanvasImageSource;
+  width: number;
+  height: number;
+  close: () => void;
+};
+
+/**
+ * Decode a picked file, applying EXIF orientation where the browser offers
+ * it. Exported so the cropper can preview the *same* bitmap it will cut
+ * from — previewing an `<img>` instead risks the two disagreeing about
+ * rotation, and the user then frames one photo and gets another.
+ */
+export async function decodeAvatarImage(file: File): Promise<DecodedImage> {
+  return decodeImage(file);
+}
 
 async function decodeImage(file: File): Promise<DecodedImage> {
   // Preferred path — createImageBitmap applies EXIF orientation, so rotated
@@ -141,6 +158,39 @@ export async function resizeAvatar(file: File): Promise<string> {
   } finally {
     decoded.close();
   }
+}
+
+/**
+ * Render a source rect of an already-decoded image as the square avatar
+ * JPEG. This is the positioned-crop counterpart to `resizeAvatar`'s
+ * centre-crop; the rect comes from `avatarCrop.ts`.
+ */
+export function renderAvatarCrop(decoded: DecodedImage, rect: SourceRect): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = AVATAR_SIZE;
+  canvas.height = AVATAR_SIZE;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new AvatarImageError("Couldn't process that image.");
+  // JPEG has no alpha, so paint white first: a transparent PNG, or a rect
+  // that rounds a hair outside the bitmap, would otherwise come out black.
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, AVATAR_SIZE, AVATAR_SIZE);
+  ctx.drawImage(
+    decoded.source,
+    rect.left,
+    rect.top,
+    rect.width,
+    rect.height,
+    0,
+    0,
+    AVATAR_SIZE,
+    AVATAR_SIZE,
+  );
+  return encodeUnderBudget(
+    (q) => canvas.toDataURL("image/jpeg", q),
+    AVATAR_QUALITIES,
+    AVATAR_TARGET_BYTES,
+  );
 }
 
 /* ── General photos (vision board etc.) ─────────────────────────────────── */

@@ -556,6 +556,21 @@
 .text-amber { color: #F5A623; }
 .bg-rosegold { background-color: #D4826A; }
 
+/* The three above are literals rather than tokens because `--cream` and
+   `--rose` were never defined at `:root` — Tailwind's generated `.text-cream`
+   is therefore an invalid colour and gets dropped, which is also why the
+   `/opacity` variants inherit their parent instead of tinting.
+   `text-cream` is the app's primary ink (847 uses), so on paper a near-white
+   literal is simply invisible; amber and rose at their dark-mode values land
+   around 2:1 and 2.6:1 on the light ground.
+   Overridden here rather than by defining those tokens: defining them would
+   also give ~270 inheriting `/opacity` sites a colour they don't have today,
+   which would change dark mode in places nobody has reviewed. This way dark
+   mode stays byte-for-byte and only paper changes. */
+:root[data-theme="light"] .text-cream { color: hsl(var(--foreground)); }
+:root[data-theme="light"] .text-rose { color: hsl(var(--destructive)); }
+:root[data-theme="light"] .text-amber { color: hsl(var(--amber)); }
+
 /* ── Lovable-parity landing page (ported from date-room-escape.lovable.app) ──
    Typography standardised to match the in-app design: Playfair Display for
    serif/display headings + DM Sans body (same as the Rooms page).
