@@ -74,7 +74,7 @@ export function ChaperonAnnounceBadge({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={`${who} has a chaperon on`}
-        className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-black/50 px-3 py-1.5 text-label font-medium text-cream/85 backdrop-blur transition hover:bg-black/70"
+        className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-black/50 px-3 py-1.5 text-label font-medium text-ondark/85 backdrop-blur transition hover:bg-black/70"
       >
         <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" aria-hidden />
         <span className="truncate">{who} has a chaperon on</span>

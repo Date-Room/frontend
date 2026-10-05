@@ -88,7 +88,7 @@ export function ChaperonTryCard({ partnerName }: { partnerName: string | null })
           <p className="mt-1 text-cream/70">
             Say this to {them}, as a joke if you like. Only you will see what I make of it.
           </p>
-          <p className="mt-2 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-body italic text-cream">
+          <p className="mt-2 rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-body italic text-ondark">
             &ldquo;{PROBE_LINE}&rdquo;
           </p>
           <div className="mt-2 flex gap-2">

@@ -180,7 +180,7 @@ function VisionGridCard({
             title={item.pinned ? "Unpin from room" : pinDisabled ? "Two dreams already pinned" : "Pin to room"}
             className={cn(
               "flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md transition disabled:opacity-35",
-              item.pinned ? "bg-fill text-fill-foreground" : "bg-black/50 text-cream hover:bg-black/70",
+              item.pinned ? "bg-fill text-fill-foreground" : "bg-black/50 text-ondark hover:bg-black/70",
             )}
           >
             <Pin className={cn("h-4 w-4", item.pinned && "fill-current")} />
@@ -189,7 +189,7 @@ function VisionGridCard({
             type="button"
             onClick={onEdit}
             aria-label="Edit"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-cream backdrop-blur-md transition hover:bg-black/70"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-ondark backdrop-blur-md transition hover:bg-black/70"
           >
             <Pencil className="h-4 w-4" />
           </button>
@@ -197,7 +197,7 @@ function VisionGridCard({
             type="button"
             onClick={onRemove}
             aria-label="Remove"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-cream backdrop-blur-md transition hover:bg-red-500/70"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-ondark backdrop-blur-md transition hover:bg-red-500/70"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -413,7 +413,7 @@ function VisionCard({
                   e.stopPropagation();
                   onView();
                 }}
-                className="rounded-full bg-black/60 p-1.5 text-cream hover:bg-black/80"
+                className="rounded-full bg-black/60 p-1.5 text-ondark hover:bg-black/80"
                 title="View"
                 aria-label="View"
               >
@@ -422,7 +422,7 @@ function VisionCard({
               <button
                 type="button"
                 onClick={onEdit}
-                className="rounded-full bg-black/60 p-1.5 text-cream hover:bg-black/80"
+                className="rounded-full bg-black/60 p-1.5 text-ondark hover:bg-black/80"
                 title="Edit"
                 aria-label="Edit"
               >
@@ -431,7 +431,7 @@ function VisionCard({
               <button
                 type="button"
                 onClick={onRemove}
-                className="rounded-full bg-black/60 p-1.5 text-cream hover:bg-red-500/80"
+                className="rounded-full bg-black/60 p-1.5 text-ondark hover:bg-red-500/80"
                 title="Remove"
                 aria-label="Remove"
               >

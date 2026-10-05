@@ -151,7 +151,7 @@ export default function ProfileComplete() {
             className="h-full w-full object-cover"
             fallback={<span>{initial}</span>}
           />
-          <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/55 py-1 text-[10px] uppercase tracking-[0.2em] text-cream">
+          <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/55 py-1 text-[10px] uppercase tracking-[0.2em] text-ondark">
             <Camera className="h-3 w-3" /> {photoUrl ? "Change" : "Add"}
           </span>
         </button>

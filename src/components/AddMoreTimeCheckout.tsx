@@ -320,7 +320,7 @@ export function AddMoreTimeCheckout({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="07XX XXX XXX"
-              className="w-full rounded-xl border border-white/[0.08] bg-black/25 py-3.5 pl-10 pr-4 text-body text-cream placeholder:text-muted-foreground/45 focus:border-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/35"
+              className="w-full rounded-xl border border-white/[0.08] bg-black/25 py-3.5 pl-10 pr-4 text-body text-ondark placeholder:text-muted-foreground/45 focus:border-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/35"
             />
           </div>
           <p className="text-label leading-relaxed text-muted-foreground">

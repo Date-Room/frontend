@@ -27,7 +27,7 @@ export function SquadClock({ roomId }: { roomId: string }) {
     <span
       className={cn(
         "inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold",
-        nearTheEnd(endsAt, now) ? "bg-fill text-primary-foreground" : "bg-black/45 text-cream/85",
+        nearTheEnd(endsAt, now) ? "bg-fill text-primary-foreground" : "bg-black/45 text-ondark/85",
       )}
     >
       <Clock className="h-3 w-3" aria-hidden /> {left}

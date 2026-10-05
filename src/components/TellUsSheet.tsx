@@ -103,7 +103,7 @@ export function TellUsSheet({
               maxLength={2000}
               rows={3}
               placeholder="What happened, in your words (optional)"
-              className="focus-ring w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-body text-cream placeholder:text-muted-foreground/60"
+              className="focus-ring w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-body text-ondark placeholder:text-muted-foreground/60"
             />
             <button
               type="button"

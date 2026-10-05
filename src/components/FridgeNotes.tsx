@@ -183,7 +183,7 @@ function StickyNoteCard({
               onEdit();
             }}
             aria-label="Edit"
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-[#141019]/90 text-cream/80 shadow-md backdrop-blur-sm transition hover:text-cream"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-[#141019]/90 text-ondark/80 shadow-md backdrop-blur-sm transition hover:text-ondark"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
@@ -194,7 +194,7 @@ function StickyNoteCard({
               onRemove();
             }}
             aria-label="Remove"
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-[#141019]/90 text-cream/80 shadow-md backdrop-blur-sm transition hover:border-red-400/40 hover:text-red-300"
+            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-[#141019]/90 text-ondark/80 shadow-md backdrop-blur-sm transition hover:border-red-400/40 hover:text-red-300"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

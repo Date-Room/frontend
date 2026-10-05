@@ -868,7 +868,7 @@ function Stage({
   // PiP — video fills the frame; controls fade in on hover.
   if (isPip) {
     const ctrlBtn =
-      "flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-cream backdrop-blur-md transition hover:bg-black/65";
+      "flex h-8 w-8 items-center justify-center rounded-full bg-black/45 text-ondark backdrop-blur-md transition hover:bg-black/65";
     // The caret rides inside its control's pill rather than being a control
     // itself, so it reads as "more of this button", not another button.
     const caretBtn =
@@ -876,7 +876,7 @@ function Stage({
     const pipPill =
       "flex h-8 items-center gap-0.5 rounded-full bg-black/35 py-0.5 pl-1.5 pr-0.5 backdrop-blur-md";
     const pipToggleBtn =
-      "flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-cream transition hover:bg-black/75";
+      "flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-ondark transition hover:bg-black/75";
     const partner = remotes[0];
     const partnerLabel = partner?.participant.name || partnerDisplay.name;
     // Big vs inset: default big = partner, inset = you; tapping the inset swaps.

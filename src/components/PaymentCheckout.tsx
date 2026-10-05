@@ -139,7 +139,7 @@ export function PaymentCheckout({
             value={countryQuery}
             onChange={(e) => setCountryQuery(e.target.value)}
             placeholder="Search country…"
-            className="w-full rounded-xl border border-white/[0.08] bg-black/25 py-3 px-4 text-body text-cream placeholder:text-muted-foreground/45 focus:border-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/35"
+            className="w-full rounded-xl border border-white/[0.08] bg-black/25 py-3 px-4 text-body text-ondark placeholder:text-muted-foreground/45 focus:border-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/35"
           />
           <ul className="max-h-40 space-y-1 overflow-y-auto">
             {filteredCountries.map((c) => (
@@ -187,7 +187,7 @@ export function PaymentCheckout({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="07XX XXX XXX"
-              className="w-full rounded-xl border border-white/[0.08] bg-black/25 py-3.5 pl-10 pr-4 text-body text-cream placeholder:text-muted-foreground/45 focus:border-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/35"
+              className="w-full rounded-xl border border-white/[0.08] bg-black/25 py-3.5 pl-10 pr-4 text-body text-ondark placeholder:text-muted-foreground/45 focus:border-primary/25 focus:outline-none focus:ring-2 focus:ring-primary/35"
             />
           </div>
           <p className="text-label leading-relaxed text-muted-foreground">

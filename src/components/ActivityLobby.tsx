@@ -244,7 +244,7 @@ export function ActivityLobby({
                 }}
                 aria-label="Back to the lobby"
                 title="Back"
-                className="focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.14] bg-black/35 text-cream/80 backdrop-blur-md transition hover:bg-black/55 hover:text-cream"
+                className="focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/[0.14] bg-black/35 text-ondark/80 backdrop-blur-md transition hover:bg-black/55 hover:text-ondark"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>

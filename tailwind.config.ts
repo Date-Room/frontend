@@ -35,6 +35,12 @@ export default {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
         },
+        /* Ink for a surface that stays dark in BOTH themes — a scrim over a
+           photo, a video control, in-room chrome. Theme-independent on
+           purpose: `cream` becomes dark ink on paper, which vanishes on a
+           black scrim. Same hex as dark-mode cream, so nothing shifts in
+           dark mode. */
+        ondark: "#F8F7F3",
         /* The chrome/content edge. A complete colour, not channels, because
            it carries its own alpha — so no `/opacity` suffix on this one. */
         hairline: "var(--hairline)",
