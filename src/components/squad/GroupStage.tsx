@@ -205,7 +205,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
         type="button"
         aria-label={isMicrophoneEnabled ? "Mute" : "Unmute"}
         onClick={() => void localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)}
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-cream hover:bg-black/70"
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-ondark hover:bg-black/70"
       >
         {isMicrophoneEnabled ? <Mic className="h-4 w-4" /> : <MicOff className="h-4 w-4 text-rose-300" />}
       </button>
@@ -213,7 +213,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
         type="button"
         aria-label={isCameraEnabled ? "Camera off" : "Camera on"}
         onClick={() => void localParticipant.setCameraEnabled(!isCameraEnabled)}
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-cream hover:bg-black/70"
+        className="flex h-10 w-10 items-center justify-center rounded-full bg-black/55 text-ondark hover:bg-black/70"
       >
         {isCameraEnabled ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4 text-rose-300" />}
       </button>
@@ -224,7 +224,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
     <div
       className={cn(
         "pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold",
-        ending ? "bg-fill text-primary-foreground" : "bg-black/60 text-cream",
+        ending ? "bg-fill text-primary-foreground" : "bg-black/60 text-ondark",
       )}
     >
       <Clock className="h-3.5 w-3.5" aria-hidden /> {clock}
@@ -357,7 +357,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
       <div
         className={cn(
           "flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-          ending ? "bg-fill text-primary-foreground" : "bg-black/60 text-cream",
+          ending ? "bg-fill text-primary-foreground" : "bg-black/60 text-ondark",
         )}
       >
         <Clock className="h-3 w-3" aria-hidden /> {clock}
@@ -426,7 +426,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
           <div
             className={cn(
               "flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-              ending ? "bg-fill text-primary-foreground" : "bg-black/60 text-cream",
+              ending ? "bg-fill text-primary-foreground" : "bg-black/60 text-ondark",
             )}
           >
             <Clock className="h-3 w-3" aria-hidden /> {clock}
@@ -529,7 +529,7 @@ function Face({
     <span
       className={cn(
         "absolute right-1.5 top-1.5 z-10 rounded-full px-2 py-0.5 text-[11px] font-bold",
-        cue.badge === "in" ? "bg-emerald-400 text-emerald-950" : "bg-black/65 text-cream",
+        cue.badge === "in" ? "bg-emerald-400 text-emerald-950" : "bg-black/65 text-ondark",
       )}
     >
       {BADGE_TEXT[cue.badge]}
@@ -571,7 +571,7 @@ function Face({
         )}
         <span
           className={cn(
-            "absolute inset-x-1 bottom-1 truncate rounded bg-black/60 px-1 text-center font-semibold text-cream",
+            "absolute inset-x-1 bottom-1 truncate rounded bg-black/60 px-1 text-center font-semibold text-ondark",
             spot ? "text-sm" : "text-[10px]",
           )}
         >

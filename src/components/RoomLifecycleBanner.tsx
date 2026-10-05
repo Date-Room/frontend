@@ -316,7 +316,7 @@ function Card({
             value={code}
             onChange={(e) => setCode(e.target.value)}
             placeholder="6-digit code"
-            className="w-full rounded-full border border-white/10 bg-black/30 px-4 py-2.5 text-body text-cream placeholder:text-muted-foreground/50 sm:max-w-[200px]"
+            className="w-full rounded-full border border-white/10 bg-black/30 px-4 py-2.5 text-body text-ondark placeholder:text-muted-foreground/50 sm:max-w-[200px]"
           />
           <button
             type="button"

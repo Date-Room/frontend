@@ -791,7 +791,7 @@ export default function PreRoom() {
                   </div>
                 )}
                 <span className="pr-pre-room__vignette" aria-hidden />
-                <div className="absolute left-4 top-4 rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-cream/80 backdrop-blur-md">
+                <div className="absolute left-4 top-4 rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-ondark/80 backdrop-blur-md">
                   Mirror check
                 </div>
                 <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-3">
@@ -812,7 +812,7 @@ export default function PreRoom() {
                       className={cn(
                         "focus-ring flex h-11 w-11 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition",
                         micEnabled
-                          ? "border-white/15 bg-black/50 text-cream hover:bg-black/65"
+                          ? "border-white/15 bg-black/50 text-ondark hover:bg-black/65"
                           : "border-rose-500/40 bg-rose-500/25 text-rose-200",
                       )}
                     >
@@ -825,7 +825,7 @@ export default function PreRoom() {
                       className={cn(
                         "focus-ring flex h-11 w-11 items-center justify-center rounded-full border shadow-lg backdrop-blur-md transition",
                         cameraEnabled
-                          ? "border-white/15 bg-black/50 text-cream hover:bg-black/65"
+                          ? "border-white/15 bg-black/50 text-ondark hover:bg-black/65"
                           : "border-rose-500/40 bg-rose-500/25 text-rose-200",
                       )}
                     >
@@ -844,7 +844,7 @@ export default function PreRoom() {
                         <select
                           value={selectedMic}
                           onChange={(e) => pickMic(e.target.value)}
-                          className="w-full rounded-xl border border-white/10 bg-black/35 px-3 py-2.5 text-sm normal-case tracking-normal text-cream focus:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="w-full rounded-xl border border-white/10 bg-black/35 px-3 py-2.5 text-sm normal-case tracking-normal text-ondark focus:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
                         >
                           <option value="">System default</option>
                           {groupedDevices.audioinput.map((d, i) => (
@@ -861,7 +861,7 @@ export default function PreRoom() {
                         <select
                           value={selectedCam}
                           onChange={(e) => pickCam(e.target.value)}
-                          className="w-full rounded-xl border border-white/10 bg-black/35 px-3 py-2.5 text-sm normal-case tracking-normal text-cream focus:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="w-full rounded-xl border border-white/10 bg-black/35 px-3 py-2.5 text-sm normal-case tracking-normal text-ondark focus:border-primary/30 focus:outline-none focus:ring-2 focus:ring-primary/30"
                         >
                           <option value="">System default</option>
                           {groupedDevices.videoinput.map((d, i) => (
@@ -959,7 +959,7 @@ export default function PreRoom() {
                     onClick={() => room && void copyValue(inviteUrl, "link")}
                     disabled={!room}
                     className={cn(
-                      "flex items-center justify-center gap-2 rounded-full border border-white/15 bg-black/25 py-3 text-sm font-medium text-cream transition hover:bg-black/35 disabled:opacity-50",
+                      "flex items-center justify-center gap-2 rounded-full border border-white/15 bg-black/25 py-3 text-sm font-medium text-ondark transition hover:bg-black/35 disabled:opacity-50",
                       copiedKey === "link" && "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
                     )}
                   >

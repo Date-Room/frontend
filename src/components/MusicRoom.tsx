@@ -1101,7 +1101,7 @@ export function MusicRoomProvider({
             /* Below the video: YouTube's MINI layout puts its controls (and
                the speaker button) along the TOP edge — live-tested: a top
                caption covered the very button it pointed at. */
-            <p className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/75 px-2 py-1.5 text-center text-label font-medium text-cream">
+            <p className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/75 px-2 py-1.5 text-center text-label font-medium text-ondark">
               Tap the speaker icon to unmute
             </p>
           )}

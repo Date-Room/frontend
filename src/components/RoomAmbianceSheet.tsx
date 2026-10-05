@@ -46,7 +46,7 @@ export function RoomAmbianceSheet({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="max-h-[min(92dvh,820px)] overflow-hidden border-white/10 bg-[#100e14]/95 p-0 text-cream sm:max-w-[min(720px,94vw)]">
+      <DialogContent className="max-h-[min(92dvh,820px)] overflow-hidden border-white/10 bg-[#100e14]/95 p-0 text-ondark sm:max-w-[min(720px,94vw)]">
         <div className="border-b border-white/[0.06] px-5 pb-4 pt-5 sm:px-6">
           <DialogHeader className="space-y-1 text-left">
             <DialogTitle className="font-serif text-display italic">Set the mood</DialogTitle>

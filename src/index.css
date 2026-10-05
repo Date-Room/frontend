@@ -73,16 +73,16 @@
     --primary-foreground: 0 0% 100%;
     /* An input or chip is RECESSED into the page — slightly darker than the
        ground, where a card is lighter. */
-    --secondary: 34 33% 92%;
+    --secondary: 34 28% 88%;
     --secondary-foreground: 24 16% 10%;
-    --muted: 34 25% 90%;
+    --muted: 33 22% 85%;
     --muted-foreground: 28 12% 38%;
     --accent: 30 76% 34%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 56% 46%;
     --destructive-foreground: 0 0% 100%;
-    --border: 32 22% 86%;
-    --input: 32 22% 84%;
+    --border: 32 20% 81%;
+    --input: 32 20% 76%;
     --ring: 30 76% 34%;
     --champagne: 32 44% 46%;
     --amber: 30 76% 34%;
@@ -621,6 +621,24 @@
   background-color: hsl(0 0% 100% / 0.72);
   border-color: var(--hairline);
 }
+
+/* Recessed fills go solid on paper. An alpha tuned against a near-black page
+   blends a surface darker; the same alpha over 96% paper blends it into the
+   page — which is how the search inputs ended up indistinguishable from the
+   background. Solid here means the token ladder alone decides depth, the way
+   the raised/recessed split does on mobile.
+   Scrims (`bg-background/NN`) and card panels are deliberately left alpha'd:
+   a dimmer has to dim, and a panel separates with its border. */
+:root[data-theme="light"] .bg-secondary\/40 { background-color: hsl(var(--secondary)); }
+:root[data-theme="light"] .bg-secondary\/50 { background-color: hsl(var(--secondary)); }
+:root[data-theme="light"] .bg-secondary\/60 { background-color: hsl(var(--secondary)); }
+:root[data-theme="light"] .bg-secondary\/65 { background-color: hsl(var(--secondary)); }
+:root[data-theme="light"] .bg-secondary\/70 { background-color: hsl(var(--secondary)); }
+:root[data-theme="light"] .bg-secondary\/80 { background-color: hsl(var(--secondary)); }
+:root[data-theme="light"] .bg-secondary\/90 { background-color: hsl(var(--secondary)); }
+:root[data-theme="light"] .bg-muted\/25 { background-color: hsl(var(--muted)); }
+:root[data-theme="light"] .bg-muted\/40 { background-color: hsl(var(--muted)); }
+:root[data-theme="light"] .bg-muted\/50 { background-color: hsl(var(--muted)); }
 
 /* ── Lovable-parity landing page (ported from date-room-escape.lovable.app) ──
    Typography standardised to match the in-app design: Playfair Display for

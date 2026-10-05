@@ -1314,7 +1314,7 @@ export function RoomStage({
                     onClick={() => commitStage("lobby")}
                     aria-label="Back to the lobby"
                     title="Back"
-                    className="focus-ring flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.14] bg-black/35 text-cream/80 backdrop-blur-md transition hover:bg-black/55 hover:text-cream"
+                    className="focus-ring flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.14] bg-black/35 text-ondark/80 backdrop-blur-md transition hover:bg-black/55 hover:text-ondark"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </button>
@@ -1340,7 +1340,7 @@ export function RoomStage({
                     aria-label="How this works"
                     title="How this works"
                     className={cn(
-                      "focus-ring absolute right-3 top-3 z-30 flex h-8 w-8 animate-in items-center justify-center rounded-full border border-white/[0.14] bg-black/35 text-cream/80 backdrop-blur-md transition fade-in slide-in-from-right-3 duration-300 hover:bg-black/55 hover:text-cream",
+                      "focus-ring absolute right-3 top-3 z-30 flex h-8 w-8 animate-in items-center justify-center rounded-full border border-white/[0.14] bg-black/35 text-ondark/80 backdrop-blur-md transition fade-in slide-in-from-right-3 duration-300 hover:bg-black/55 hover:text-ondark",
                       helpPulse && "dr-help-pulse",
                     )}
                   >
@@ -1798,7 +1798,7 @@ export function RoomStage({
             onClick={() => setPortrait((v) => !v)}
             aria-label={portrait ? "Switch to landscape" : "Switch to portrait"}
             title={portrait ? "Switch to landscape" : "Switch to portrait"}
-            className="absolute right-2 top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-cream opacity-0 backdrop-blur transition duration-200 hover:bg-black/70 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+            className="absolute right-2 top-2 z-20 flex h-7 w-7 items-center justify-center rounded-full bg-black/50 text-ondark opacity-0 backdrop-blur transition duration-200 hover:bg-black/70 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
           >
             <RotateCw className="h-3.5 w-3.5" />
           </button>
