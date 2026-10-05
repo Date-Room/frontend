@@ -28,6 +28,18 @@ import {
   type InviteCard,
   type ParticipantInfo,
 } from "@/lib/rooms";
+import {
+  ROOM_KINDS,
+  lastVisitedAt,
+  lastVisitedLabel,
+  ROOM_KIND_CHIPS,
+  ROOM_KIND_HEADINGS,
+  compareByLastVisited,
+  loadRoomVisits,
+  markRoomVisited,
+  matchesKind,
+  type RoomKind,
+} from "@/lib/roomList";
 import { PageShell } from "@/components/PageShell";
 import { ProfilePlanSection } from "@/components/ProfilePlanSection";
 import { PurchaseHistory } from "@/components/billing/PurchaseHistory";
@@ -242,11 +254,29 @@ export default function Home() {
   // Search query for the unified Rooms list.
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
-  const visibleAliveRooms = aliveRooms.filter((r) => {
-    if (!q) return true;
-    const isHost = me?.id ? r.host_id === me.id : false;
-    return tileSearchHay(r, cardByRoomId[r.id], isHost).includes(q);
-  });
+  // Kind filter, chat-app style. Only offered once the account has both
+  // kinds — a lone "All" chip filters nothing, and an empty "Squads" tab
+  // advertises a dead end to anyone outside the beta.
+  const [kind, setKind] = useState<RoomKind>("all");
+  // Read once per render: entering a room navigates away, so the map only
+  // needs to be fresh when the list is built.
+  const visits = loadRoomVisits();
+  const byLastVisited = (a: Room, b: Room) => compareByLastVisited(a, b, visits);
+  const hasSquad = aliveRooms.some((r) => r.room_kind === "squad");
+  const hasDate = aliveRooms.some((r) => r.room_kind !== "squad");
+  const showKinds = hasSquad && hasDate;
+  const visibleAliveRooms = aliveRooms
+    .filter((r) => matchesKind(r, showKinds ? kind : "all"))
+    .filter((r) => {
+      if (!q) return true;
+      const isHost = me?.id ? r.host_id === me.id : false;
+      return tileSearchHay(r, cardByRoomId[r.id], isHost).includes(q);
+    })
+    // Rooms you've been in first, most recent visit on top; then the ones
+    // you haven't, newest-created first. The server returns creation order,
+    // which says nothing about where you actually were last.
+    .slice()
+    .sort(byLastVisited);
 
   // WhatsApp-style header — fade in the compact pinned title once the
   // big inline title has scrolled past.
@@ -263,6 +293,9 @@ export default function Home() {
   const compactT = Math.min(1, Math.max(0, (scrollY - 36) / 36));
 
   function enterRoom(r: Room) {
+    // Stamps "last visited" so the list can order by where you actually
+    // were, not by when the row was created.
+    markRoomVisited(r.id);
     const slot = me && r.host_id === me.id ? "a" : "b";
     // Persistent rooms have no hard cutoff — never forward an
     // expires_at on the URL even if the cached Room row still carries
@@ -278,6 +311,7 @@ export default function Home() {
   function onTileTap(r: Room) {
     // Squad rooms have their own home between nights.
     if (r.room_kind === "squad") {
+      markRoomVisited(r.id);
       navigate(`/squad/room/${r.id}`);
       return;
     }
@@ -438,7 +472,29 @@ export default function Home() {
 
             {/* Unified rooms list (no separate Our Rooms section). */}
             <section className="pt-2">
-              <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Rooms</p>
+              {showKinds && (
+                <div className="flex gap-2 px-2 pb-3 pt-1">
+                  {ROOM_KINDS.map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      aria-pressed={kind === k}
+                      onClick={() => setKind(k)}
+                      className={cn(
+                        "focus-ring rounded-full px-3.5 py-1.5 text-[13px] transition-colors",
+                        kind === k
+                          ? "border border-primary/55 bg-primary/[0.18] font-semibold text-cream"
+                          : "border border-transparent bg-card/40 text-muted-foreground hover:text-cream",
+                      )}
+                    >
+                      {ROOM_KIND_CHIPS[k]}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                {showKinds ? ROOM_KIND_HEADINGS[kind] : "Rooms"}
+              </p>
               {roomsLoading ? (
                 <RoomsSkeletonList />
               ) : visibleAliveRooms.length === 0 ? (
@@ -452,6 +508,8 @@ export default function Home() {
                         card={cardByRoomId[r.id]}
                         me={me}
                         onTap={() => onTileTap(r)}
+                        visits={visits}
+                        now={now}
                       />
                     </li>
                   ))}
@@ -586,11 +644,17 @@ function RoomTileRow({
   card,
   me,
   onTap,
+  visits,
+  now,
 }: {
   room: Room;
   card: InviteCard | undefined;
   me: UserMe | undefined;
   onTap: () => void;
+  /** roomId → ISO last-visited, read once by the page. */
+  visits: Record<string, string>;
+  /** Ticked once a minute by the page, so "14m ago" stays current. */
+  now: number;
 }) {
   const isHost = me?.id ? room.host_id === me.id : false;
   const isPersistent = room.persistence === "persistent";
@@ -602,20 +666,38 @@ function RoomTileRow({
     : null);
 
   const title = room.greeting_headline?.trim() || room.code;
-  const withLine = effectivePartner?.name ? `with ${effectivePartner.name}` : null;
+  // A squad room matched none of the package branches below and came out
+  // labelled "Try".
+  const isSquad = room.room_kind === "squad";
+  // "with <Name>" is a date's line; a squad has a size, and seats cap who
+  // can be on the call at once.
+  const squadSeats = card?.max_participants ?? 5;
+  const squadSize = card?.participants?.length ?? 0;
+  const withLine = isSquad
+    ? squadSize > 1
+      ? `${squadSize} in the squad · ${squadSeats} seats`
+      : `Just you so far · ${squadSeats} seats`
+    : effectivePartner?.name
+      ? `with ${effectivePartner.name}`
+      : null;
   const endsLine = isPersistent ? null : expiryLabel(room.expires_at);
+  // Per-browser, like mobile's per-device stamp: a room only opened
+  // elsewhere has none and simply shows nothing rather than a wrong time.
+  const lastVisit = lastVisitedAt(room.id, visits);
   const roleWord = isHost ? "Host" : "Guest";
 
   // Subtle room-type label. Persistent rooms are all "Together" — Crew is an
   // account tier, not a room type, and isn't distinguishable on the room
   // itself (both use the subscription package with a 12-seat capacity).
-  const typeLabel = isPersistent
-    ? "Together"
-    : room.package === "date_pack"
-      ? "Date Pack"
-      : room.package === "long_pack"
-        ? "Long Pack"
-        : "Try";
+  const typeLabel = isSquad
+    ? "Squad"
+    : isPersistent
+      ? "Together"
+      : room.package === "date_pack"
+        ? "Date Pack"
+        : room.package === "long_pack"
+          ? "Long Pack"
+          : "Try";
 
   return (
     <button
@@ -623,12 +705,21 @@ function RoomTileRow({
       onClick={onTap}
       className="focus-ring group flex h-full w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-card/30 px-3.5 py-3.5 text-left transition-colors hover:border-white/[0.1] hover:bg-white/[0.04]"
     >
-      <DuoAvatar
-        meName={me?.display_name ?? ""}
-        mePhoto={me?.photo_url ?? null}
-        partnerName={effectivePartner?.name ?? ""}
-        partnerPhoto={effectivePartner?.photo ?? null}
-      />
+      {isSquad ? (
+        <SquadAvatar
+          faces={(card?.participants ?? []).map((p) => ({
+            name: p.display_name ?? "",
+            photo: p.photo_url ?? null,
+          }))}
+        />
+      ) : (
+        <DuoAvatar
+          meName={me?.display_name ?? ""}
+          mePhoto={me?.photo_url ?? null}
+          partnerName={effectivePartner?.name ?? ""}
+          partnerPhoto={effectivePartner?.photo ?? null}
+        />
+      )}
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-semibold leading-tight text-cream">
@@ -663,10 +754,10 @@ function RoomTileRow({
                     ? "Resting"
                     : "Read only"}
             </span>
-          ) : isPersistent ? (
-            <span className="flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-primary ring-1 ring-primary/25">
-              <Play className="h-2.5 w-2.5" fill="currentColor" />
-              Enter room
+          ) : lastVisit != null ? (
+            <span className="flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground">
+              <History className="h-3 w-3" strokeWidth={1.5} />
+              {lastVisitedLabel(lastVisit, now)}
             </span>
           ) : endsLine ? (
             <span className="flex items-center gap-1 text-[11px] tabular-nums text-muted-foreground">
@@ -757,6 +848,42 @@ function RecapTileRow({
  * (right). When no partner has joined yet the partner slot shows a
  * person-plus glyph so the empty seat reads as 'waiting for someone'.
  */
+/**
+ * A squad room's avatar: a huddle of faces with a +N overflow, rather than
+ * the two overlapping circles a date gets. Two circles literally say "a
+ * room for two", which is the one thing a squad isn't.
+ */
+function SquadAvatar({ faces }: { faces: { name: string; photo: string | null }[] }) {
+  const shown = faces.slice(0, 3);
+  // Counted from who has actually joined, never from seats — "+3" on an
+  // empty room would be claiming people who aren't there.
+  const hidden = faces.length - shown.length;
+  const initial = (n: string | undefined) => (n ? n[0]?.toUpperCase() ?? null : null);
+  return (
+    <div className="relative h-12 w-[60px] shrink-0">
+      {[0, 1].map((i) => (
+        <DuoCircle
+          key={i}
+          photo={shown[i]?.photo ?? null}
+          initial={initial(shown[i]?.name)}
+          className={cn("absolute top-0 h-7 w-7", i === 0 ? "left-0" : "left-5")}
+        />
+      ))}
+      {hidden > 0 ? (
+        <span className="absolute left-2.5 top-5 flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-primary/20 text-[11px] font-bold text-primary">
+          +{hidden}
+        </span>
+      ) : (
+        <DuoCircle
+          photo={shown[2]?.photo ?? null}
+          initial={initial(shown[2]?.name)}
+          className="absolute left-2.5 top-5 h-7 w-7"
+        />
+      )}
+    </div>
+  );
+}
+
 function DuoAvatar({
   meName,
   mePhoto,

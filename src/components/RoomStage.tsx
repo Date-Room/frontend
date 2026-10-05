@@ -1501,7 +1501,7 @@ export function RoomStage({
             <div
               ref={panelRef}
               className={cn(
-                "origin-bottom px-4 py-5 transition-transform duration-300 ease-out",
+                "origin-bottom px-6 py-5 transition-transform duration-300 ease-out",
                 menuOpen ? "scale-100" : "scale-90",
               )}
             >
@@ -1840,30 +1840,36 @@ export function RoomStage({
         <ActivityHelp id={staged} onClose={() => setHelpOpen(false)} />
       )}
 
-      {(linkDown || caughtUp) && (
-        <div
-          role="status"
-          aria-live="polite"
-          className={cn(
-            "pointer-events-none fixed left-1/2 top-3 z-[90] flex -translate-x-1/2 items-center gap-2 rounded-full border px-3.5 py-1.5 text-label font-medium shadow-lg backdrop-blur-md animate-fade-in",
-            linkDown
-              ? "border-amber-300/50 bg-black/70 text-amber-200"
-              : "border-emerald-400/50 bg-black/70 text-emerald-200",
-          )}
-        >
-          {linkDown ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-              Reconnecting to the room… your moves will catch up
-            </>
-          ) : (
-            <>
-              <Check className="h-3.5 w-3.5" aria-hidden />
-              Back on — caught up
-            </>
-          )}
-        </div>
-      )}
+      {/* Portalled to <body>: `fixed` is positioned against the nearest
+          ancestor with a transform or backdrop-filter, and the room has
+          several — so this sat centred on a card rather than on the screen.
+          Top centre, over everything. */}
+      {(linkDown || caughtUp) &&
+        createPortal(
+          <div
+            role="status"
+            aria-live="polite"
+            className={cn(
+              "pointer-events-none fixed left-1/2 top-3 z-[95] flex -translate-x-1/2 items-center gap-2 rounded-full border px-4 py-2 text-label font-medium shadow-lg backdrop-blur-md animate-fade-in",
+              linkDown
+                ? "border-amber-300/50 bg-black/70 text-amber-200"
+                : "border-emerald-400/50 bg-black/70 text-emerald-200",
+            )}
+          >
+            {linkDown ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                Reconnecting to the room…
+              </>
+            ) : (
+              <>
+                <Check className="h-3.5 w-3.5" aria-hidden />
+                Back on — caught up
+              </>
+            )}
+          </div>,
+          document.body,
+        )}
 
       <RoomAmbianceSheet
         open={themeOpen}
@@ -1908,7 +1914,7 @@ function MenuTile({
           around it. */}
       <span
         className={cn(
-          "relative flex aspect-square w-full items-center justify-center rounded-[26%] border transition duration-150 group-active:scale-90",
+          "relative flex aspect-square w-full items-center justify-center rounded-xl border transition duration-150 group-active:scale-90",
           active
             ? "border-primary/30 bg-primary/[0.07]"
             // Barely-there surfaces: the glyph and the outline carry the tile,
