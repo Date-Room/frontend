@@ -10,7 +10,8 @@ export type RoomPackage =
   | "single_pass"  // Try — free 20-min session
   | "date_pack"    // Date Pack consumable — 60-min session
   | "long_pack"    // Long Pack consumable — 120-min session
-  | "subscription"; // Together — persistent
+  | "subscription" // Together — persistent
+  | "squad"; // Squad — a friends' room; nights come from the room's balance
 export type RoomStateName =
   | "created"
   | "waiting"
@@ -75,6 +76,8 @@ export type Room = {
   background_id: string | null;
   curated_activity_ids?: string[] | null;
   max_participants?: number;
+  /** date | squad (who the room is for). */
+  room_kind?: "date" | "squad";
   created_at: string;
   /** Signed JWT — URL-bearer recap access. Embed in share URLs as
    *  `#k=<token>`. See backend services/rooms/invites.py. */
@@ -171,6 +174,9 @@ export type JoinRoomResponse = {
 
 export type RoomExperience = {
   package: RoomPackage;
+  /** date | squad. Squad rooms: no Chaperon, capped group video. */
+  room_kind?: "date" | "squad";
+  video_profile?: "standard" | "group";
   curated_activity_ids: string[];
   expires_at?: string | null;
   max_participants?: number;

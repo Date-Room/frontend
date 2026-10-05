@@ -35,6 +35,15 @@ export default {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
         },
+        /* The accent as a FILL, plus the ink that survives it. Separate from
+           `primary` because the two have opposite constraints: an accent used
+           as text on the page must be dark enough to read against it, while a
+           fill only owes contrast to its own label and can stay saturated. */
+        fill: {
+          DEFAULT: "hsl(var(--primary-fill))",
+          alt: "hsl(var(--primary-fill-alt))",
+          foreground: "hsl(var(--on-fill))",
+        },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",

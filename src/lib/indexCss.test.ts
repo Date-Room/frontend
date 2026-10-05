@@ -1,6 +1,8 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+
+// Imported through Vite's `?raw` rather than node:fs so this test typechecks
+// under the app tsconfig, which carries no node types.
+import css from "../index.css?raw";
 
 /**
  * index.css is one global stylesheet, so a repeated @keyframes name is a
@@ -11,14 +13,12 @@ import { describe, expect, it } from "vitest";
  */
 describe("index.css", () => {
   it("never defines the same @keyframes name twice", () => {
-    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     const names = [...css.matchAll(/@keyframes\s+([A-Za-z0-9_-]+)/g)].map((m) => m[1]);
     const dupes = [...new Set(names.filter((n, i) => names.indexOf(n) !== i))];
     expect(dupes, `duplicate @keyframes: ${dupes.join(", ")}`).toEqual([]);
   });
 
   it("every animation: <name> has a matching @keyframes", () => {
-    const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
     const defined = new Set(
       [...css.matchAll(/@keyframes\s+([A-Za-z0-9_-]+)/g)].map((m) => m[1]),
     );

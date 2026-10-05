@@ -41,6 +41,60 @@
     /* Brand amber (#F5A623) as HSL channels — themed rooms override this. */
     --amber: 37 91% 55%;
   }
+
+  /* Light mode. Warm ink on warm paper, scoped the same way .theme-admin is
+     so one attribute on <html> flips every token at once.
+
+     Deliberately NOT an inversion. The dark palette's amber is tuned to glow
+     against near-black and lands around 2:1 on paper, so it is darkened for
+     anything that carries text. Fills are handled separately (see
+     --primary-fill): an accent used as a FILL has no contrast duty against
+     the page, only against its own label, so it stays saturated instead of
+     going muddy. Using the text-safe amber as a fill is what turned buttons
+     brown on mobile. */
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --background: 36 43% 96%;
+    --foreground: 24 16% 10%;
+    /* A card RISES off the page on paper, so it goes lighter, not darker. */
+    --card: 0 0% 100%;
+    --card-foreground: 24 16% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 24 16% 10%;
+    /* Deepened well past the dark theme's 62% lightness: the original fails
+       contrast on paper for anything smaller than a heading. */
+    --primary: 30 76% 34%;
+    --primary-foreground: 0 0% 100%;
+    /* An input or chip is RECESSED into the page — slightly darker than the
+       ground, where a card is lighter. */
+    --secondary: 34 33% 92%;
+    --secondary-foreground: 24 16% 10%;
+    --muted: 34 25% 90%;
+    --muted-foreground: 28 12% 38%;
+    --accent: 30 76% 34%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 56% 46%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 32 22% 86%;
+    --input: 32 22% 84%;
+    --ring: 30 76% 34%;
+    --champagne: 32 44% 46%;
+    --amber: 30 76% 34%;
+  }
+
+  /* The accent as a FILL, and the ink that sits on it. Dark mode's bright
+     accents already work as fills; light mode needs clay rather than the
+     ink-safe ochre above. */
+  :root {
+    --primary-fill: 33 76% 62%;
+    --primary-fill-alt: 0 56% 62%;
+    --on-fill: 22 22% 9%;
+  }
+  :root[data-theme="light"] {
+    --primary-fill: 14 64% 46%;
+    --primary-fill-alt: 18 78% 33%;
+    --on-fill: 0 0% 100%;
+  }
 }
 
 @layer base {
