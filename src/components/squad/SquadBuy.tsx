@@ -116,7 +116,7 @@ export function SquadBuy({ roomId, onPaid }: { roomId: string; onPaid: () => voi
               )}
             >
               {o.save && (
-                <span className="absolute -top-2.5 left-4 rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
+                <span className="absolute -top-2.5 left-4 rounded-full bg-fill px-2 py-0.5 text-[11px] font-bold text-fill-foreground">
                   {o.save}
                 </span>
               )}

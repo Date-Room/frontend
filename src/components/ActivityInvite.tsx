@@ -104,7 +104,7 @@ export function ActivityInvite({
             type="button"
             onClick={onJoin}
             autoFocus
-            className="focus-ring rounded-full bg-primary px-3.5 py-1.5 text-label font-semibold text-primary-foreground shadow-[0_0_18px_hsl(var(--primary)/0.4)] transition hover:brightness-110"
+            className="focus-ring rounded-full bg-fill px-3.5 py-1.5 text-label font-semibold text-primary-foreground shadow-[0_0_18px_hsl(var(--primary)/0.4)] transition hover:brightness-110"
           >
             Join {activityTitle.length <= 12 ? activityTitle : ""}
           </button>

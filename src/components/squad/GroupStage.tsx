@@ -224,7 +224,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
     <div
       className={cn(
         "pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold",
-        ending ? "bg-primary text-primary-foreground" : "bg-black/60 text-cream",
+        ending ? "bg-fill text-primary-foreground" : "bg-black/60 text-cream",
       )}
     >
       <Clock className="h-3.5 w-3.5" aria-hidden /> {clock}
@@ -357,7 +357,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
       <div
         className={cn(
           "flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-          ending ? "bg-primary text-primary-foreground" : "bg-black/60 text-cream",
+          ending ? "bg-fill text-primary-foreground" : "bg-black/60 text-cream",
         )}
       >
         <Clock className="h-3 w-3" aria-hidden /> {clock}
@@ -426,7 +426,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
           <div
             className={cn(
               "flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-              ending ? "bg-primary text-primary-foreground" : "bg-black/60 text-cream",
+              ending ? "bg-fill text-primary-foreground" : "bg-black/60 text-cream",
             )}
           >
             <Clock className="h-3 w-3" aria-hidden /> {clock}
@@ -662,7 +662,7 @@ function Face({
         </span>
       )}
       {talking && (
-        <span className="absolute left-3 top-3 rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
+        <span className="absolute left-3 top-3 rounded-full bg-fill px-2 py-0.5 text-[11px] font-bold text-fill-foreground">
           Talking
         </span>
       )}

@@ -145,7 +145,7 @@ export function InviteSharePanel({ recipientName, shareLink, guestInviteId, clas
           onClick={() => void copyText(invitationBody, "invite")}
           className={cn(
             "w-full rounded-lg py-3 px-4 text-body font-semibold transition-all flex items-center justify-center gap-2",
-            "bg-primary text-primary-foreground hover:opacity-[0.96] shadow-[0_4px_24px_rgba(232,166,83,0.28)]",
+            "bg-fill text-primary-foreground hover:opacity-[0.96] shadow-[0_4px_24px_rgba(232,166,83,0.28)]",
           )}
         >
           {copiedKey === "invite" ? (

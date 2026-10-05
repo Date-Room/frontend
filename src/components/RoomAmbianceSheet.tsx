@@ -154,7 +154,7 @@ export function RoomAmbianceSheet({
                       {m.emoji}
                     </span>
                     {isCurrent && (
-                      <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md">
+                      <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-fill text-primary-foreground shadow-md">
                         <Check className="h-3.5 w-3.5" aria-hidden />
                       </span>
                     )}

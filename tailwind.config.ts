@@ -35,6 +35,9 @@ export default {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
         },
+        /* The chrome/content edge. A complete colour, not channels, because
+           it carries its own alpha — so no `/opacity` suffix on this one. */
+        hairline: "var(--hairline)",
         /* The accent as a FILL, plus the ink that survives it. Separate from
            `primary` because the two have opposite constraints: an accent used
            as text on the page must be dark enough to read against it, while a

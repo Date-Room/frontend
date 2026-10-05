@@ -180,7 +180,7 @@ function VisionGridCard({
             title={item.pinned ? "Unpin from room" : pinDisabled ? "Two dreams already pinned" : "Pin to room"}
             className={cn(
               "flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md transition disabled:opacity-35",
-              item.pinned ? "bg-primary text-[#1a1207]" : "bg-black/50 text-cream hover:bg-black/70",
+              item.pinned ? "bg-fill text-fill-foreground" : "bg-black/50 text-cream hover:bg-black/70",
             )}
           >
             <Pin className={cn("h-4 w-4", item.pinned && "fill-current")} />

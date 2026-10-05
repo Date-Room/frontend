@@ -69,7 +69,7 @@ function ItemRow({
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
           <span className="truncate text-body text-cream">{item.title}</span>
-          {fromPartner && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-label="From your partner" />}
+          {fromPartner && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-fill" aria-label="From your partner" />}
         </span>
         {(item.author || item.note) && (
           <span className="mt-0.5 block truncate text-label text-muted-foreground">
