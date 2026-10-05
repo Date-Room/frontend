@@ -5,9 +5,9 @@ import { Loader2, Camera, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import { CardPage } from "@/components/CardPage";
 import { UserAvatarImg } from "@/components/UserAvatarImg";
+import AvatarCropDialog from "@/components/AvatarCropDialog";
 import { authClient } from "@/lib/authClient";
 import { getMe, updateMe, type UserMe } from "@/lib/users";
-import { resizeAvatar } from "@/lib/avatarImage";
 
 /**
  * First-run profile gate.
@@ -33,6 +33,8 @@ export default function ProfileComplete() {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  // The photo waiting to be framed — non-null means the cropper is open.
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,14 +62,9 @@ export default function ProfileComplete() {
 
   const initial = (displayName || me?.email || "?")[0]?.toUpperCase();
 
-  async function onPickPhoto(file: File) {
-    try {
-      // Downscale to a small square JPEG — no user-visible size limit.
-      const dataUrl = await resizeAvatar(file);
-      setPhotoUrl(dataUrl);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't load that photo.");
-    }
+  function onCroppedPhoto(dataUrl: string) {
+    setCropFile(null);
+    setPhotoUrl(dataUrl);
   }
 
   const canSubmit =
@@ -122,8 +119,17 @@ export default function ProfileComplete() {
         aria-label="Profile photo"
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f) void onPickPhoto(f);
+          // Cleared so re-picking the same file still fires a change — easy
+          // to hit after cancelling the cropper.
+          e.target.value = "";
+          if (f) setCropFile(f);
         }}
+      />
+
+      <AvatarCropDialog
+        file={cropFile}
+        onCancel={() => setCropFile(null)}
+        onConfirm={onCroppedPhoto}
       />
 
       <p className="text-sm text-muted-foreground leading-relaxed">

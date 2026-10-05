@@ -49,9 +49,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { AppearanceSwitcher } from "@/components/AppearanceSwitcher";
+import AvatarCropDialog from "@/components/AvatarCropDialog";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { COUNTRIES, countryByCode, flagFor, type Country } from "@/lib/countries";
-import { resizeAvatar } from "@/lib/avatarImage";
 
 /**
  * Profile page — redesigned to match mobile `profile_view.dart`.
@@ -92,6 +92,8 @@ export default function Settings() {
 
   const [countryOpen, setCountryOpen] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
+  // The photo waiting to be framed — non-null means the cropper is open.
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const [signOutBusy, setSignOutBusy] = useState(false);
   const [promoCode, setPromoCode] = useState("");
   const [promoBusy, setPromoBusy] = useState(false);
@@ -149,11 +151,10 @@ export default function Settings() {
     }
   }
 
-  async function pickPhoto(file: File) {
+  async function uploadPhoto(dataUrl: string) {
+    setCropFile(null);
     setUploading(true);
     try {
-      // Downscale to a small square JPEG — no user-visible size limit.
-      const dataUrl = await resizeAvatar(file);
       const updated = await updateMe({ photo_url: dataUrl });
       setMe(updated);
       setAvatarUrl(updated.photo_url || null);
@@ -201,8 +202,9 @@ export default function Settings() {
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
+          // Cleared so picking the same file twice still fires a change.
           e.target.value = "";
-          if (f) void pickPhoto(f);
+          if (f) setCropFile(f);
         }}
       />
 
@@ -390,10 +392,16 @@ export default function Settings() {
         }}
       />
 
+      <AvatarCropDialog
+        file={cropFile}
+        onCancel={() => setCropFile(null)}
+        onConfirm={(dataUrl) => void uploadPhoto(dataUrl)}
+      />
+
       <Sheet open={signOutOpen} onOpenChange={setSignOutOpen}>
         <SheetContent
           side="bottom"
-          className="bg-[#1A1410] border-white/10 rounded-t-3xl"
+          className="bg-card border-border rounded-t-3xl"
         >
           <SheetHeader>
             <SheetTitle className="text-cream">Sign out?</SheetTitle>
@@ -571,7 +579,7 @@ function CountryPickerSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="bg-[#1A1410] border-white/10 rounded-t-3xl max-h-[80vh] flex flex-col"
+        className="bg-card border-border rounded-t-3xl max-h-[80vh] flex flex-col"
       >
         <SheetHeader className="pb-2">
           <SheetTitle className="text-cream">Country</SheetTitle>
@@ -646,7 +654,7 @@ function CountryPickerCommand({
   }, [current]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg border-white/[0.08] bg-[#1A1410] p-0 text-cream">
+      <DialogContent className="max-w-lg border-border bg-card p-0 text-cream">
         <DialogHeader className="px-4 pt-4">
           <DialogTitle className="text-cream font-serif text-lg italic">Country</DialogTitle>
         </DialogHeader>
