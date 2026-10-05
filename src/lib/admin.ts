@@ -454,6 +454,98 @@ export function declineCoachBeta(body: { user_id: string; reason: CoachBetaDecli
   return api.post<{ status: string; reason: string }>("/v1/admin/chaperon/coach-beta/decline", body);
 }
 
+// --- Squad beta (friend nights) - request queue + grant/decline -----------
+
+export type SquadBetaApplication = {
+  id: string;
+  user_id: string;
+  email: string;
+  display_name: string;
+  is_team: boolean;
+  city: string;
+  country: string | null;
+  group_size: number;
+  plans: string[];
+  note: string;
+  status: "pending" | "granted" | "declined";
+  created_at: string;
+  decided_at: string | null;
+  decline_reason: string | null;
+};
+
+export type SquadBetaApplicationsResponse = {
+  items: SquadBetaApplication[];
+  counts: {
+    pending: number;
+    granted: number;
+    declined: number;
+    with_access: number;
+    pending_by_country: Record<string, number>;
+  };
+};
+
+export type SquadBetaDeclineReason = "not_yet" | "full" | "other";
+
+export function listSquadBetaApplications(status: "pending" | "granted" | "declined" | "all") {
+  return api.get<SquadBetaApplicationsResponse>(`/v1/admin/squad/beta/applications${qs({ status })}`);
+}
+
+export type SquadBetaGrantResult = {
+  status: string;
+  gift_nights: number;
+  /** Where the gift landed; null while it waits for their first squad room. */
+  gift_room_id: string | null;
+};
+
+/** Let someone into the Squad beta, optionally with nights as a gift. */
+export function grantSquadBeta(body: { user_id: string; gift_nights?: number }) {
+  return api.post<SquadBetaGrantResult>("/v1/admin/squad/beta/grant", body);
+}
+
+export type AdminSquadRoom = {
+  id: string;
+  code: string;
+  name: string | null;
+  owner_id: string;
+  owner_email: string;
+  owner_name: string;
+  seats: number;
+  nights_left: number;
+  seat_nights: number;
+  members: number;
+  nights_played: number;
+  night_on: boolean;
+  created_at: string;
+};
+
+export function listAdminSquadRooms(q?: string) {
+  return api.get<{ items: AdminSquadRoom[] }>(`/v1/admin/squad/rooms${qs({ q: q?.trim() || undefined })}`);
+}
+
+export type AdminSquadCard = {
+  id: string;
+  game: string;
+  deck: "mild" | "spicy";
+  region: string;
+  text: string;
+  dealt: number;
+  skipped: number;
+};
+
+/** Every card dealt so far, most skipped first: the beta's cut list. */
+export function listAdminSquadCards() {
+  return api.get<{ items: AdminSquadCard[] }>("/v1/admin/squad/cards");
+}
+
+/** Free nights for a squad room, sized to its seats. Never expire. */
+export function giftSquadNights(roomId: string, body: { nights: number; note?: string }) {
+  return api.post<AdminSquadRoom>(`/v1/admin/squad/rooms/${roomId}/nights`, body);
+}
+
+export function declineSquadBeta(body: { user_id: string; reason: SquadBetaDeclineReason }) {
+  return api.post<{ status: string }>("/v1/admin/squad/beta/decline", body);
+}
+
 export function listCoachBetaApplicationsBy(status: "pending" | "granted" | "declined" | "all") {
   return api.get<CoachBetaApplicationsResponse>(
     `/v1/admin/chaperon/coach-beta/applications${qs({ status })}`,
@@ -534,4 +626,222 @@ export function listAdminAudit(params: { action?: string; cursor?: string; limit
 }
 export function listAdminPromoCodes(params: { label?: string; cursor?: string; limit?: number }) {
   return api.get<Page<PromoCode> & { total?: number | null }>(`/v1/admin/promo-codes${qs(params)}`);
+}
+
+/* ── Growth analytics (/v1/admin/analytics) ─────────────────────────────── */
+
+export type AnalyticsFunnelStep = {
+  step: "signed_up" | "opened_or_joined_room" | "had_a_date" | "came_back_later" | "paid";
+  users: number;
+};
+
+export type AnalyticsDay = {
+  day: string;
+  opened: number;
+  opened_paid: number;
+  opened_free: number;
+  dates: number;
+  ended: number;
+  closed: number;
+  promoted: number;
+  active_users: number;
+  signups: number;
+};
+
+export type AnalyticsCountryRow = {
+  /** ISO alpha-2, or "unknown". */
+  country: string;
+  signed_up: number;
+  new_in_period: number;
+  had_a_date: number;
+  came_back_later: number;
+  paid: number;
+};
+
+export type AnalyticsPurchaseGroup = {
+  product: string;
+  /** apple | google | stripe | mpesa | pokeapay | promo | admin | dev */
+  provider: string;
+  /** real | promo | admin | dev | test */
+  source: string;
+  store_country: string | null;
+  currency: string | null;
+  count: number;
+  buyers: number;
+  amount: number | null;
+};
+
+export type AnalyticsReport = {
+  days: number;
+  include_team: boolean;
+  country?: string | null;
+  /** Missing on servers older than backend#73. */
+  countries?: AnalyticsCountryRow[];
+  /** Missing on servers older than backend#77. */
+  platform?: string | null;
+  channel?: string | null;
+  /** date | squad filter echoed back, and rooms opened by kind (always all). */
+  kind?: RoomKindFilter | null;
+  room_kinds?: Partial<Record<RoomKindFilter, number>>;
+  channels?: (Omit<AnalyticsCountryRow, "country"> & { channel: string })[];
+  platforms?: (Omit<AnalyticsCountryRow, "country"> & { platform: string })[];
+  room_types?: {
+    package: string;
+    opened: number;
+    scheduled: number;
+    dates: number;
+    guest_partner: number;
+    median_call_seconds: number | null;
+  }[];
+  revenue?: { product: string; currency: string | null; sales: number; buyers: number; amount: number | null }[];
+  tracking_since: string | null;
+  funnel: AnalyticsFunnelStep[];
+  cohorts: { week_of: string; signed_up: number; active_pct: (number | null)[] }[];
+  daily: AnalyticsDay[];
+  rooms_by_package: { package: string; paid_via: string; rooms: number }[];
+  promotions: Record<string, number>;
+  renewals: Record<string, number>;
+  closed_reasons: Record<string, number>;
+  median_call_seconds: number | null;
+  open_ended_unpaid_rooms: {
+    room_id: string;
+    code: string;
+    created_at: string;
+    state: string;
+    host_email: string | null;
+    team: boolean;
+  }[];
+  /** Missing on servers older than the purchase log (backend#76). */
+  purchases?: AnalyticsPurchaseGroup[];
+  recent: {
+    kind: string;
+    at: string;
+    user_email: string | null;
+    room_id: string | null;
+    props: Record<string, unknown>;
+    backfilled: boolean;
+  }[];
+};
+
+export type AnalyticsBackfillResult = {
+  applied: boolean;
+  events: number;
+  events_by_kind: Record<string, number>;
+  active_user_days: number;
+  users_with_activity: number;
+};
+
+export type AnalyticsFilters = {
+  country?: string | null;
+  platform?: string | null;
+  channel?: string | null;
+  /** date | squad: only rooms of that kind (untagged history = date). */
+  kind?: RoomKindFilter | null;
+};
+
+export type RoomKindFilter = "date" | "squad";
+
+export const ROOM_KIND_LABELS: Record<RoomKindFilter, string> = { date: "Dates", squad: "Squad nights" };
+
+export async function getAdminAnalytics(days: number, includeTeam = false, filters: AnalyticsFilters = {}) {
+  const q = new URLSearchParams({ days: String(days), include_team: String(includeTeam) });
+  for (const [k, v] of Object.entries(filters)) if (v) q.set(k, v);
+  return api.get<AnalyticsReport>(`/v1/admin/analytics?${q.toString()}`);
+}
+
+export async function postAdminAnalyticsBackfill(apply: boolean) {
+  return api.post<AnalyticsBackfillResult>(`/v1/admin/analytics/backfill?apply=${apply}`, {});
+}
+
+/* ── Feature usage (/v1/admin/features) ─────────────────────────────────── */
+
+export type FeatureRow = {
+  feature: string;
+  rooms_used: number;
+  rooms_opened_only: number;
+  abandon_rate: number | null;
+  share_of_dates: number | null;
+  median_minutes: number | null;
+  users: number;
+  repeat_users: number;
+  in_paid_rooms: number | null;
+  by_package: Record<string, number>;
+};
+
+export type FeaturesReport = { days: number; rooms: number; dated_rooms: number; features: FeatureRow[] };
+
+export async function getAdminFeatures(days: number, includeTeam = false, filters: AnalyticsFilters = {}) {
+  const q = new URLSearchParams({ days: String(days), include_team: String(includeTeam) });
+  for (const [k, v] of Object.entries(filters)) if (v) q.set(k, v);
+  return api.get<FeaturesReport>(`/v1/admin/features?${q.toString()}`);
+}
+
+/* ── Payments (/v1/admin/payments) ──────────────────────────────────────── */
+
+export type StuckPayment = {
+  id: string;
+  user_id: string;
+  room_id: string | null;
+  product_kind: string;
+  amount: number;
+  currency: string;
+  status: string;
+  result_description: string | null;
+  order_reference: string | null;
+  mpesa_receipt: string | null;
+  phone_hint: string;
+  created_at: string;
+};
+
+export type UnmatchedCredit = {
+  receipt: string;
+  amount: number;
+  at: string;
+  description: string;
+  phone_hint: string;
+  candidates: { id: string; product_kind: string; status: string; phone_hint: string; created_at: string }[];
+};
+
+export async function listStuckPayments() {
+  return api.get<{ rows: StuckPayment[] }>("/v1/admin/payments/attention");
+}
+
+export async function listUnmatchedPayments(days: number) {
+  return api.get<{ days: number; credits: UnmatchedCredit[] }>(`/v1/admin/payments/unmatched?days=${days}`);
+}
+
+export async function recheckPayment(id: string) {
+  return api.post<{ outcome: string; status: string }>(`/v1/admin/payments/${id}/recheck`, {});
+}
+
+export async function creditPayment(id: string, receipt: string) {
+  return api.post<{ outcome: string; status: string }>(`/v1/admin/payments/${id}/credit`, { receipt });
+}
+
+export type RecentPayment = {
+  id: string;
+  at: string;
+  user_id: string;
+  customer: string;
+  product: string;
+  amount: number;
+  currency: string;
+  status: "completed" | "pending" | "unconfirmed" | "failed" | string;
+  result_description: string | null;
+  mpesa_receipt: string | null;
+  room_name: string | null;
+  phone_hint: string;
+};
+
+export type RecentPayments = {
+  days: number;
+  received: { currency: string; amount: number }[];
+  completed: number;
+  confirming: number;
+  failed: number;
+  rows: RecentPayment[];
+};
+
+export async function listRecentPayments(days: number) {
+  return api.get<RecentPayments>(`/v1/admin/payments/recent?days=${days}`);
 }

@@ -1,12 +1,12 @@
 /**
  * In-session time extensions — add minutes to the live room timer.
  */
+import { runMpesaPayment } from "@/lib/mpesaFlow";
 import { api } from "@/lib/api";
 import {
   paymentRailLabel,
   STORE_ONLY_MESSAGE,
   type PaymentProvider,
-  waitForMpesaPayment,
 } from "@/lib/billing";
 
 export type TimeExtensionProductId = "time_15" | "time_30" | "time_60";
@@ -28,7 +28,101 @@ export type TimeExtensionConfig = {
   dev_checkout_enabled?: boolean;
   expires_at: string | null;
   products: TimeExtensionProduct[];
+  /** A Try room: paying anything unlocks the full room; it can become a pack date. */
+  is_try?: boolean;
+  /** The 15-minute top-up is offered in the last 5 minutes only. */
+  time_15_open?: boolean;
+  upgrade_packs?: UpgradePack[];
 };
+
+export type UpgradePackId = "date_pack" | "long_pack";
+
+export type UpgradePack = {
+  id: UpgradePackId;
+  sessions: number;
+  minutes: number;
+  amount: number;
+  currency: string;
+  /** vs the same hours bought as 1-hour add-ons; null when it isn't a saving */
+  save_percent: number | null;
+  /** Unused dates of this pack the caller already owns. */
+  owned: number;
+};
+
+/** "Upgrade this date" leads with packs; "Add more time" with minutes. */
+export type TimeSheetMode = "upgrade" | "time";
+
+/** Pure: which time options to show. 15 minutes only near the end, never on the upgrade sheet. */
+export function visibleTimeProducts(config: TimeExtensionConfig, mode: TimeSheetMode): TimeExtensionProduct[] {
+  return config.products.filter((p) => {
+    if (p.id !== "time_15") return true;
+    return mode === "time" && config.time_15_open !== false;
+  });
+}
+
+/** Pure: packs best value first (Long Pack), with the badge text. */
+export function upgradePackRows(config: TimeExtensionConfig): (UpgradePack & {
+  title: string;
+  sub: string;
+  badge: string | null;
+  bestValue: boolean;
+})[] {
+  const packs = [...(config.upgrade_packs ?? [])].sort((a, b) => (b.save_percent ?? 0) - (a.save_percent ?? 0));
+  return packs.map((p, i) => {
+    const hours = p.minutes / 60;
+    const words: Record<number, string> = { 1: "one", 2: "two", 3: "three" };
+    const length = `${words[hours] ?? hours}-hour`;
+    return {
+      ...p,
+      title: p.id === "long_pack" ? "Long Pack" : "Date Pack",
+      sub: `${p.sessions} ${length} dates · this one starts now`,
+      badge: p.save_percent ? `Save ${p.save_percent}%` : null,
+      bestValue: i === 0 && packs.length > 1,
+    };
+  });
+}
+
+/** Pure: "KES 600" / "$4.99". */
+export function formatPackPrice(pack: Pick<UpgradePack, "amount" | "currency">): string {
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: pack.currency,
+      minimumFractionDigits: pack.currency === "USD" ? 2 : 0,
+      maximumFractionDigits: pack.currency === "USD" ? 2 : 0,
+    }).format(pack.amount);
+  } catch {
+    return `${pack.currency} ${pack.amount}`;
+  }
+}
+
+/** Make this Try room a pack date with one of my own dates. */
+export function upgradeRoomWithOwnedPack(
+  roomId: string,
+  pack: UpgradePackId,
+): Promise<{ package: string; expires_at: string | null }> {
+  return api.post(`/v1/rooms/${roomId}/upgrade`, { pack });
+}
+
+/** Buy a pack by M-Pesa "for this room": once paid, the room becomes its first date. */
+export async function buyPackForRoom(roomId: string, pack: UpgradePackId, phone: string): Promise<void> {
+  const number = phone.trim();
+  await runMpesaPayment({
+    label: pack === "long_pack" ? "Long Pack" : "Date Pack",
+    start: () =>
+      api.post<{ transaction_id: string }>("/v1/billing/mpesa/stk-push", {
+        phone: number,
+        product_kind: pack,
+        room_id: roomId,
+      }),
+  });
+}
+
+/** Tell the room page to reload its plan now (menu, timer, package). */
+export const ROOM_PLAN_CHANGED = "dateroom:room-plan-changed";
+export function announceRoomPlanChanged(): void {
+  window.dispatchEvent(new Event(ROOM_PLAN_CHANGED));
+}
 
 /** List prices — always shown in the Add more time dialog. */
 export const TIME_EXTENSION_CATALOG: TimeExtensionProduct[] = [
@@ -189,12 +283,12 @@ export async function purchaseTimeExtension(
     if (!config.country_code) {
       throw new Error("Set your country in Profile before paying with M-Pesa.");
     }
-    const { transaction_id } = await initiateTimeExtensionMpesa(roomId, {
-      product,
-      phone: phone.trim(),
-      country_code: config.country_code,
+    const countryCode = config.country_code;
+    await runMpesaPayment({
+      label: "extra time",
+      start: () =>
+        initiateTimeExtensionMpesa(roomId, { product, phone: phone.trim(), country_code: countryCode }),
     });
-    await waitForMpesaPayment(transaction_id);
     return { result: "completed" };
   }
 

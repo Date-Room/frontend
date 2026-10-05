@@ -1,15 +1,15 @@
 /** Hero art + choice atmospheres for in-game UI (dock tiles reused as mood backdrops). */
 
 export const GAME_HERO_IMAGES: Record<string, string> = {
-  this_or_that: "/dock-tiles/this-or-that.png",
-  "2_truths": "/dock-tiles/2-truths.png",
-  truth_or_dare: "/dock-tiles/truth-or-dare.png",
-  one_has_to_go: "/dock-tiles/one-has-to-go.png",
-  pick_a_door: "/dock-tiles/pick-a-door.png",
-  rank_it: "/dock-tiles/rank-it.png",
-  guacamole: "/dock-tiles/guacamole.png",
-  questions: "/dock-tiles/questions.png",
-  the_36: "/dock-tiles/the-36.png",
+  this_or_that: "/dock-tiles/this-or-that-hero.webp",
+  "2_truths": "/dock-tiles/2-truths-hero.webp",
+  truth_or_dare: "/dock-tiles/truth-or-dare-hero.webp",
+  one_has_to_go: "/dock-tiles/one-has-to-go-hero.webp",
+  pick_a_door: "/dock-tiles/pick-a-door-hero.webp",
+  rank_it: "/dock-tiles/rank-it-hero.webp",
+  guacamole: "/dock-tiles/guacamole-hero.webp",
+  questions: "/dock-tiles/questions-hero.webp",
+  the_36: "/dock-tiles/the-36-hero.webp",
 };
 
 export type ChoiceTheme = {

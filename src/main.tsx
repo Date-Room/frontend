@@ -12,4 +12,17 @@ initCatalogDefaultsFromBundle();
 // Applied before the first paint so a light-mode visitor never sees a dark
 // flash. Nothing else needs to run first: it only sets an attribute.
 applyTheme(loadThemeMode());
+
+// Routes load as separate chunks. Someone who kept a tab open across a deploy
+// asks for a chunk hash that no longer exists; rather than a blank page, take
+// the fresh build. Once per page life, so a genuinely broken host doesn't
+// reload in a loop.
+let reloadedForStaleChunk = false;
+window.addEventListener("vite:preloadError", (event) => {
+  if (reloadedForStaleChunk) return;
+  reloadedForStaleChunk = true;
+  event.preventDefault();
+  window.location.reload();
+});
+
 createRoot(document.getElementById("root")!).render(<App />);

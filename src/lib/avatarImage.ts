@@ -142,3 +142,79 @@ export async function resizeAvatar(file: File): Promise<string> {
     decoded.close();
   }
 }
+
+/* ── General photos (vision board etc.) ─────────────────────────────────── */
+
+/** Longest edge for a general photo — sharp full-screen, light to sync. */
+export const PHOTO_MAX_EDGE = 1600;
+/** Step quality down until the encoded data URL is under this. */
+export const PHOTO_TARGET_BYTES = 400 * 1024;
+/** JPEG qualities tried in order (first that fits wins). */
+export const PHOTO_QUALITIES = [0.85, 0.75, 0.65, 0.5] as const;
+/** Types kept byte-for-byte when already small (keeps PNG transparency, GIF motion). */
+const PASSTHROUGH_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+/**
+ * Scale WxH down (never up) so the longest edge is at most `maxEdge`,
+ * keeping the aspect ratio. Pure.
+ */
+export function fitWithinEdge(
+  width: number,
+  height: number,
+  maxEdge: number,
+): { width: number; height: number } {
+  const longest = Math.max(width, height);
+  if (longest <= maxEdge || longest <= 0) return { width, height };
+  const scale = maxEdge / longest;
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () =>
+      typeof reader.result === "string"
+        ? resolve(reader.result)
+        : reject(new AvatarImageError("Couldn't read that image."));
+    reader.onerror = () => reject(new AvatarImageError("Couldn't read that image."));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Like resizeAvatar but keeps the photo's shape: validate → decode → scale
+ * the longest edge to PHOTO_MAX_EDGE → JPEG under PHOTO_TARGET_BYTES. Small,
+ * already-web-friendly files pass through untouched. Throws AvatarImageError
+ * with a user-facing message.
+ */
+export async function resizePhoto(file: File): Promise<string> {
+  assertValidAvatarFile(file);
+  const decoded = await decodeImage(file);
+  try {
+    const small =
+      Math.max(decoded.width, decoded.height) <= PHOTO_MAX_EDGE &&
+      file.size <= PHOTO_TARGET_BYTES;
+    if (small && PASSTHROUGH_TYPES.has(file.type)) return readAsDataUrl(file);
+
+    const { width, height } = fitWithinEdge(decoded.width, decoded.height, PHOTO_MAX_EDGE);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new AvatarImageError("Couldn't process that image.");
+    // JPEG has no alpha — paint white so transparent PNGs don't turn black.
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(decoded.source, 0, 0, width, height);
+    return encodeUnderBudget(
+      (q) => canvas.toDataURL("image/jpeg", q),
+      PHOTO_QUALITIES,
+      PHOTO_TARGET_BYTES,
+    );
+  } finally {
+    decoded.close();
+  }
+}

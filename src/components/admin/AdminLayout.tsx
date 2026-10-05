@@ -15,11 +15,15 @@ import {
   ShieldCheck,
   ArrowLeft,
   Radio,
+  TrendingUp,
+  Sparkles,
+  UsersRound,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/authClient";
-import { getAdminStats, listCoachBetaApplicationsBy } from "@/lib/admin";
+import { getAdminStats, listCoachBetaApplicationsBy, listSquadBetaApplications, listStuckPayments } from "@/lib/admin";
 import { CommandSearch } from "@/components/admin/CommandSearch";
 
 type NavItem = { to: string; label: string; icon: LucideIcon; end?: boolean; count?: number | string };
@@ -32,12 +36,25 @@ export function AdminLayout() {
     queryFn: () => listCoachBetaApplicationsBy("pending"),
     staleTime: 60_000,
   });
+  const squad = useQuery({
+    queryKey: ["admin-squad-beta", "pending"],
+    queryFn: () => listSquadBetaApplications("pending"),
+    staleTime: 60_000,
+  });
+
+  const stuckPayments = useQuery({
+    queryKey: ["admin-payments-stuck"],
+    queryFn: listStuckPayments,
+    staleTime: 60_000,
+  });
 
   const groups: { label: string; items: NavItem[] }[] = [
     {
       label: "Overview",
       items: [
         { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
+        { to: "/admin/growth", label: "Growth", icon: TrendingUp },
+        { to: "/admin/features", label: "Features", icon: Sparkles },
         { to: "/admin/users", label: "Users", icon: Users, count: stats.data?.total_users },
         { to: "/admin/promo", label: "Promo codes", icon: Ticket },
       ],
@@ -45,9 +62,11 @@ export function AdminLayout() {
     {
       label: "Operations",
       items: [
+        { to: "/admin/payments", label: "Payments", icon: Wallet, count: stuckPayments.data?.rows.length || undefined },
         { to: "/admin/rooms", label: "Rooms", icon: DoorOpen, count: stats.data?.live_rooms ? `${stats.data.live_rooms} live` : undefined },
         { to: "/admin/chaperon", label: "Chaperon AI", icon: ShieldCheck },
         { to: "/admin/beta", label: "Beta console", icon: Radio, count: pending.data?.pending_count || undefined },
+        { to: "/admin/squad", label: "Squad beta", icon: UsersRound, count: squad.data?.counts.pending || undefined },
         { to: "/admin/audit", label: "Audit log", icon: ScrollText },
       ],
     },

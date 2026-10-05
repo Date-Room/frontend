@@ -9,7 +9,10 @@ import { useRoomSession } from "@/context/RoomSessionContext";
 import { useChatRoom } from "@/context/ChatContext";
 import { cn } from "@/lib/utils";
 
-export function Chat() {
+/** In a squad, bubbles carry the sender's name ("them" only works for two).
+ *  `names` (user id to name) covers people who aren't in the room right now;
+ *  everyone present is named from presence. */
+export function Chat({ names }: { names?: Record<string, string> } = {}) {
   const room = useRoomSession();
   const chat = useChatRoom();
   const messages = chat?.messages ?? [];
@@ -72,6 +75,16 @@ export function Chat() {
   }, [text]);
 
   const mine = useMemo(() => new Set([room.senderId]), [room.senderId]);
+  const isGroup = room.roomPackage === "squad";
+  // Names seen on presence stick for the visit, so a friend who stepped
+  // out keeps their name on what they said.
+  const seenNames = useRef<Record<string, string>>({});
+  for (const p of room.presence) {
+    const id = String(p.user_id ?? p.sender_id ?? "");
+    const name = p.display_name ?? p.name;
+    if (id && typeof name === "string" && name) seenNames.current[id] = name;
+  }
+  const nameOf = (id: string) => names?.[id] ?? seenNames.current[id] ?? "someone";
 
   return (
     // Three bands: the transcript scrolls, the composer does not. The drawer
@@ -83,7 +96,7 @@ export function Chat() {
       >
         {messages.length === 0 ? (
           <div className="m-auto px-6 text-center text-body text-muted-foreground">
-            Say something sweet, or just check in.
+            {isGroup ? "Say hi to the squad." : "Say something sweet, or just check in."}
           </div>
         ) : (
           messages.map((m, idx) => {
@@ -106,7 +119,7 @@ export function Chat() {
               >
                 {showAttribution && (
                   <span className="dr-eyebrow mb-1 px-1 text-muted-foreground/80">
-                    {isMine ? "you" : "them"}
+                    {isMine ? "you" : isGroup ? nameOf(m.from_user_id) : "them"}
                   </span>
                 )}
                 <div

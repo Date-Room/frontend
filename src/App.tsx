@@ -1,7 +1,10 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { toast } from "sonner";
+import { MpesaPaymentPanel } from "@/components/billing/MpesaPaymentPanel";
+import { setOnLateConfirm } from "@/lib/mpesaFlow";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { applyThemePreference, detachThemePreferenceListener } from "@/lib/theme";
@@ -9,40 +12,76 @@ import { applyThemePreference, detachThemePreferenceListener } from "@/lib/theme
 // Pages
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
-import AuthCallback from "./pages/AuthCallback";
-import Home from "./pages/Home";
-import CreateRoom from "./pages/CreateRoom";
-import PreRoom from "./pages/PreRoom";
-import JoinByCode from "./pages/JoinByCode";
 import Lobby from "./pages/Lobby";
-import LiveRoom from "./pages/LiveRoom";
-import { RoomErrorBoundary } from "@/components/RoomErrorBoundary";
-import Recap from "./pages/Recap";
-import OurRoom from "./pages/OurRoom";
-import Settings from "./pages/Settings";
-import DeleteAccount from "./pages/DeleteAccount";
-import Privacy from "./pages/Privacy";
-import ChildSafety from "./pages/ChildSafety";
-import Terms from "./pages/Terms";
-import Support from "./pages/Support";
-import NotFound from "./pages/NotFound";
 import NeedInvite from "./pages/NeedInvite";
-import Paywall from "./pages/Paywall";
-import ProfileComplete from "./pages/ProfileComplete";
-import ReferralLanding from "./pages/ReferralLanding";
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminPromoCodes from "./pages/admin/AdminPromoCodes";
-import AdminRooms from "./pages/admin/AdminRooms";
-import AdminAudit from "./pages/admin/AdminAudit";
-import AdminChaperon from "./pages/admin/AdminChaperon";
-import AdminBeta from "./pages/admin/AdminBeta";
+import { RoomErrorBoundary } from "@/components/RoomErrorBoundary";
+import { PageShell } from "@/components/PageShell";
+
+// Everything past the front door loads on demand. The entry used to be one
+// 1.9 MB script: the live room (and livekit-client, a quarter of it), every
+// game, and the admin console all shipped to someone opening an invite link
+// on mobile data. The front door itself (landing, auth, invite lobby) stays
+// eager so those pages paint without a second round trip.
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const Home = lazy(() => import("./pages/Home"));
+const CreateRoom = lazy(() => import("./pages/CreateRoom"));
+const PreRoom = lazy(() => import("./pages/PreRoom"));
+const JoinByCode = lazy(() => import("./pages/JoinByCode"));
+const LiveRoom = lazy(() => import("./pages/LiveRoom"));
+const Recap = lazy(() => import("./pages/Recap"));
+const OurRoom = lazy(() => import("./pages/OurRoom"));
+const Settings = lazy(() => import("./pages/Settings"));
+const DeleteAccount = lazy(() => import("./pages/DeleteAccount"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const ChildSafety = lazy(() => import("./pages/ChildSafety"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Support = lazy(() => import("./pages/Support"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Paywall = lazy(() => import("./pages/Paywall"));
+const ProfileComplete = lazy(() => import("./pages/ProfileComplete"));
+const ReferralLanding = lazy(() => import("./pages/ReferralLanding"));
+const SquadRequest = lazy(() => import("./pages/SquadRequest"));
+const SquadNew = lazy(() => import("./pages/SquadNew"));
+const SquadRoom = lazy(() => import("./pages/SquadRoom"));
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminGrowth = lazy(() => import("./pages/admin/AdminGrowth"));
+const AdminFeatures = lazy(() => import("./pages/admin/AdminFeatures"));
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const AdminPromoCodes = lazy(() => import("./pages/admin/AdminPromoCodes"));
+const AdminRooms = lazy(() => import("./pages/admin/AdminRooms"));
+const AdminAudit = lazy(() => import("./pages/admin/AdminAudit"));
+const AdminChaperon = lazy(() => import("./pages/admin/AdminChaperon"));
+const AdminBeta = lazy(() => import("./pages/admin/AdminBeta"));
+const AdminSquad = lazy(() => import("./pages/admin/AdminSquad"));
+const AdminPayments = lazy(() => import("./pages/admin/AdminPayments"));
+const AdminLayout = lazy(() =>
+  import("./components/admin/AdminLayout").then((m) => ({ default: m.AdminLayout })),
+);
 import { AuthGuard } from "./components/AuthGuard";
 import { AdminGuard } from "./components/admin/AdminGuard";
-import { AdminLayout } from "./components/admin/AdminLayout";
 import { ScrollToTop } from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
+
+// A payment that confirms after its panel closed: say so, and refresh
+// whatever it bought (plan, passes, room time, squad nights).
+setOnLateConfirm((label) => {
+  toast.success(`M-Pesa payment confirmed. Your ${label} has been added.`);
+  void queryClient.invalidateQueries();
+});
+
+/** Shown for the moment a route's chunk is in flight. Same quiet mark the
+ *  room uses while it connects, so a chunk load reads as part of the app,
+ *  not a blank page. */
+function RouteLoading() {
+  return (
+    <PageShell className="flex items-center justify-center">
+      <div className="relative z-10 animate-fade-in">
+        <div className="mx-auto h-2 w-2 rounded-full bg-rosegold animate-pulse-glow" />
+      </div>
+    </PageShell>
+  );
+}
 
 const App = () => {
   useEffect(() => {
@@ -61,8 +100,10 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <MpesaPaymentPanel />
         <BrowserRouter>
           <ScrollToTop />
+          <Suspense fallback={<RouteLoading />}>
           <Routes>
             {/* Public / Marketing */}
             <Route path="/" element={<AuthGuard requireAuth={false}><Landing /></AuthGuard>} />
@@ -99,6 +140,9 @@ const App = () => {
             <Route path="/paywall" element={<AuthGuard><Paywall /></AuthGuard>} />
             <Route path="/profile/complete" element={<AuthGuard><ProfileComplete /></AuthGuard>} />
             <Route path="/settings" element={<AuthGuard><Settings /></AuthGuard>} />
+            <Route path="/squad" element={<AuthGuard><SquadRequest /></AuthGuard>} />
+            <Route path="/squad/new" element={<AuthGuard><SquadNew /></AuthGuard>} />
+            <Route path="/squad/room/:id" element={<AuthGuard><SquadRoom /></AuthGuard>} />
 
             {/* Platform admin */}
             <Route
@@ -112,17 +156,22 @@ const App = () => {
               }
             >
               <Route index element={<AdminDashboard />} />
+              <Route path="growth" element={<AdminGrowth />} />
+              <Route path="features" element={<AdminFeatures />} />
               <Route path="users" element={<AdminUsers />} />
               <Route path="promo" element={<AdminPromoCodes />} />
               <Route path="rooms" element={<AdminRooms />} />
               <Route path="chaperon" element={<AdminChaperon />} />
               <Route path="beta" element={<AdminBeta />} />
+              <Route path="squad" element={<AdminSquad />} />
+              <Route path="payments" element={<AdminPayments />} />
               <Route path="audit" element={<AdminAudit />} />
             </Route>
 
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

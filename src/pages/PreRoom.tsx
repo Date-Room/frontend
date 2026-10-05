@@ -53,6 +53,7 @@ import { ChaperonSetupSheet } from "@/components/ChaperonSetupSheet";
 import { RoomAmbianceSheet } from "@/components/RoomAmbianceSheet";
 import { RoomThemeChip } from "@/components/RoomThemeChip";
 import { AmbientSceneStack } from "@/components/AmbientSceneStack";
+import { useLowPowerMode } from "@/hooks/useLowPowerMode";
 import { PLAIN_MOOD, resolveLobbyMood, type LobbyMood } from "@/lib/ambiance";
 import { ambianceAccentStyle } from "@/lib/roomAmbiance";
 import {
@@ -1112,16 +1113,22 @@ function PreRoomShell({
   mood?: LobbyMood;
 }) {
   const shellStyle = mood ? ambianceAccentStyle(mood) : undefined;
+  const lowPower = useLowPowerMode();
   return (
     <PageShell className="overflow-hidden" style={shellStyle}>
       {mood ? (
         <>
-          <AmbientSceneStack ambiance={mood} positionClassName="pointer-events-none fixed inset-0 z-0" />
+          <AmbientSceneStack
+            ambiance={mood}
+            positionClassName="pointer-events-none fixed inset-0 z-0"
+            kenBurns={!lowPower}
+          />
           {mood !== PLAIN_MOOD && (
             <div
               className="live-room-ambient pointer-events-none fixed inset-0 z-[1]"
               data-live-ambiance={mood}
               data-photo-backdrop="true"
+              data-low-power={lowPower ? "true" : undefined}
               aria-hidden
             />
           )}

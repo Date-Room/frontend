@@ -9,6 +9,7 @@ import { authClient } from "@/lib/authClient";
 import { resolveLobbyMood, ambianceMeta, PLAIN_MOOD, type LobbyMood } from "@/lib/ambiance";
 import { PageShell } from "@/components/PageShell";
 import { AmbientSceneStack } from "@/components/AmbientSceneStack";
+import { useLowPowerMode } from "@/hooks/useLowPowerMode";
 import { toast } from "sonner";
 
 const OPEN_BUFFER_MS = 5 * 60 * 1000;
@@ -45,6 +46,8 @@ export default function Lobby() {
   // are never asked. Only anonymous guests type a name.
   const [signedIn, setSignedIn] = useState(false);
   const [profileName, setProfileName] = useState("");
+
+  const lowPower = useLowPowerMode();
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(Date.now()), 1000);
@@ -299,12 +302,17 @@ export default function Lobby() {
 
   return (
     <PageShell orbs={false} vignette={false} className="overflow-hidden">
-      <AmbientSceneStack ambiance={ambientPreset} positionClassName="fixed inset-0 z-[1]" />
+      <AmbientSceneStack
+        ambiance={ambientPreset}
+        positionClassName="fixed inset-0 z-[1]"
+        kenBurns={!lowPower}
+      />
       <div className="live-room-soft-vignette" aria-hidden />
       <div
         className="live-room-ambient !z-[6]"
         data-live-ambiance={ambientPreset}
         data-photo-backdrop="true"
+        data-low-power={lowPower ? "true" : undefined}
         aria-hidden
       />
 

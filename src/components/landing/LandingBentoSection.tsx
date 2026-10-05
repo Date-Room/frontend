@@ -13,14 +13,14 @@ import { LandingReveal } from "@/components/landing/LandingReveal";
 import { LandingSection, LandingSectionHeader } from "@/components/landing/LandingPrimitives";
 
 const BENTO_LAYOUT: { span: string; icon: LucideIcon; image: string }[] = [
-  { span: "lg:col-span-2 lg:row-span-2", icon: Zap, image: "/lobby-cards/play-a-game.png" },
-  { span: "lg:col-span-1", icon: Play, image: "/lobby-cards/watch-together.png" },
-  { span: "lg:col-span-1", icon: Music2, image: "/lobby-cards/listen-together.png" },
-  { span: "lg:col-span-1", icon: MessageCircleQuestion, image: "/lobby-cards/just-talk.png" },
-  { span: "lg:col-span-1", icon: HelpCircle, image: "/lobby-cards/the-36.png" },
-  { span: "lg:col-span-1", icon: Flame, image: "/dock-tiles/truth-or-dare.png" },
-  { span: "lg:col-span-1", icon: Camera, image: "/lobby-cards/photo-booth.png" },
-  { span: "lg:col-span-2", icon: MoreHorizontal, image: "/lobby-cards/vision-board.png" },
+  { span: "lg:col-span-2 lg:row-span-2", icon: Zap, image: "/lobby-cards/play-a-game.webp" },
+  { span: "lg:col-span-1", icon: Play, image: "/lobby-cards/watch-together.webp" },
+  { span: "lg:col-span-1", icon: Music2, image: "/lobby-cards/listen-together.webp" },
+  { span: "lg:col-span-1", icon: MessageCircleQuestion, image: "/lobby-cards/just-talk.webp" },
+  { span: "lg:col-span-1", icon: HelpCircle, image: "/dock-tiles/the-36.webp" },
+  { span: "lg:col-span-1", icon: Flame, image: "/dock-tiles/truth-or-dare.webp" },
+  { span: "lg:col-span-1", icon: Camera, image: "/lobby-cards/photo-booth.webp" },
+  { span: "lg:col-span-2", icon: MoreHorizontal, image: "/lobby-cards/vision-board.webp" },
 ];
 
 export function LandingBentoSection({

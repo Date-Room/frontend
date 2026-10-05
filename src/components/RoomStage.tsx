@@ -36,12 +36,32 @@ import {
   Pin,
   Settings,
   Salad,
+  Pointer,
+  MessageSquareQuote,
+  VenetianMask,
+  Coffee,
+  Timer,
+  Mic,
+  MicOff,
+  VideoOff,
+  PhoneOff,
   type LucideIcon,
   Loader2,
   Check,
   ShieldCheck,
 } from "lucide-react";
 import { RoomVideo } from "@/components/RoomVideo";
+import type { GroupLayout } from "@/components/squad/GroupStage";
+import {
+  TABLE_BIG_QUERY,
+  TABLE_CENTRE,
+  TABLE_CENTRE_BIG,
+  TABLE_QUERY,
+  squadHereLine,
+  tableFaceShare,
+} from "@/lib/squadCall";
+import { SQUAD_GAMES, SQUAD_GAME_IDS, isSquadGame } from "@/lib/squadGames";
+import { useSquadStage } from "@/context/SquadStageContext";
 import {
   isSidePane,
   useCallLayout,
@@ -63,12 +83,14 @@ import { useRoomSession } from "@/context/RoomSessionContext";
 import { ACTIVITY_TILES } from "@/lib/activityTiles";
 import { useBottomBarHeight } from "@/lib/bottomBar";
 import { useVideoOrientation } from "@/lib/videoOrientation";
-import { useWideViewport } from "@/lib/viewport";
+import { useMediaQuery, useWideViewport } from "@/lib/viewport";
+import { SquadClock } from "@/components/squad/SquadClock";
 import { useChaperonController } from "@/context/ChaperonContext";
 import { ChaperonSeam } from "@/components/ChaperonSeam";
 import { CHAT_OPEN_EVENT, ChatDrawer } from "@/components/ChatDrawer";
 import { ActivityInvite, inviteChime } from "@/components/ActivityInvite";
 import { ChatToast } from "@/components/ChatToast";
+import { ChatTicker, tickerLines, usePresenceNames } from "@/components/squad/ChatTicker";
 import { useChatRoom } from "@/context/ChatContext";
 import {
   INITIAL_INVITE_STATE,
@@ -104,11 +126,15 @@ const CATEGORIES: { id: string; label: string; icon: LucideIcon; itemIds: string
     id: "games",
     label: "Games",
     icon: Gamepad2,
-    itemIds: ["questions", "this_or_that", "the_36", "2_truths", "truth_or_dare", "one_has_to_go", "pick_a_door", "rank_it", "guacamole"],
+    itemIds: ["questions", "this_or_that", "the_36", "2_truths", "truth_or_dare", "one_has_to_go", "pick_a_door", "rank_it", "guacamole", ...SQUAD_GAME_IDS],
   },
   { id: "watch", label: "Watch", icon: PlayCircle, itemIds: ["watch"] },
   { id: "music", label: "Music", icon: Headphones, itemIds: ["dj"] },
 ];
+
+/** Games made for two. A squad room doesn't offer them: "5 picks left
+ *  between you" makes no sense to a table of five. */
+const DATE_GAME_IDS = new Set(["questions", "this_or_that", "the_36", "2_truths", "truth_or_dare", "one_has_to_go", "pick_a_door", "rank_it", "guacamole"]);
 
 /** Partner-action → notifier copy + which stage item to open. Maps the raw
  *  activity_id (as broadcast) to a friendly line and the stage target. */
@@ -148,6 +174,11 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   pick_a_door: DoorOpen,
   rank_it: BarChart3,
   guacamole: Salad,
+  most_likely: Pointer,
+  who_said_it: MessageSquareQuote,
+  imposter: VenetianMask,
+  spill_tea: Coffee,
+  heads_up: Timer,
   watch: PlayCircle,
   dj: Headphones,
   chat: MessageCircle,
@@ -171,6 +202,7 @@ const ITEM_TAGLINES: Record<string, string> = {
   pick_a_door: "Choose blind. Answer what's behind it.",
   rank_it: "Order five things. Compare priorities.",
   guacamole: "Fast fingers, hidden bowls, loud sabotage.",
+  ...Object.fromEntries(SQUAD_GAME_IDS.map((g) => [g, `${SQUAD_GAMES[g].mood}. ${SQUAD_GAMES[g].line}`])),
   watch: "Sync up something to watch.",
   dj: "Take turns picking the soundtrack.",
   chat: "Side chat while you play.",
@@ -245,6 +277,10 @@ function useCompactViewport(): boolean {
  * the person's choice; smaller screens: draggable PiP; phones: bubble).
  * The last thing staged persists per room.
  */
+/** Staged things you watch or listen to: a squad gets the couch row of
+ *  faces under them. Games get bubbles instead. */
+const WATCHING_IDS = new Set(["watch", "music", "dj"]);
+
 export function RoomStage({
   roomId,
   items,
@@ -258,6 +294,8 @@ export function RoomStage({
   callActive,
   onCallIn,
   onLeaveCall,
+  squad = false,
+  squadNames = [],
 }: {
   roomId: string;
   items: StageItem[];
@@ -271,6 +309,10 @@ export function RoomStage({
   callActive: boolean;
   onCallIn: () => void;
   onLeaveCall: () => void;
+  /** Squad night: group call; with nothing on stage the call IS the stage. */
+  squad?: boolean;
+  /** Squad: names of the others here right now (for the top bar). */
+  squadNames?: string[];
 }) {
   // The lobby is the neutral default: nothing preloaded, nothing presumed.
   const fallback =
@@ -451,13 +493,19 @@ export function RoomStage({
   }, []);
   const chat = useChatRoom();
   const chatUnread = chat?.unread ?? 0;
-  const [chatToast, setChatToast] = useState<{ id: string; text: string } | null>(null);
+  const [inviterName, setInviterName] = useState<string | null>(null);
+  const [chatToast, setChatToast] = useState<{ id: string; text: string; from: string } | null>(null);
   const lastIncomingId = chat?.lastIncoming?.id ?? null;
+  // Squads: who said it (a date only has the one partner).
+  const presenceName = usePresenceNames(room.presence);
+  // Set below, once the layout is known: the ticker under the film already
+  // shows the line, so no toast (or chime) over the film.
+  const chatTickerRef = useRef(false);
   useEffect(() => {
     const m = chat?.lastIncoming;
     if (!m || !lastIncomingId) return;
-    if (chatOpenRef.current) return;
-    setChatToast({ id: m.id, text: m.text });
+    if (chatOpenRef.current || chatTickerRef.current) return;
+    setChatToast({ id: m.id, text: m.text, from: m.from_user_id });
     // Chat is how you reach someone when the mic or speakers are gone, so
     // the arrival is audible whenever the panel isn't open (not only in a
     // background tab).
@@ -494,9 +542,11 @@ export function RoomStage({
         return;
       }
       if (e.kind === "stage") {
-        const d = e.payload as { activity_id?: string | null; from?: string; at?: string };
+        const d = e.payload as { activity_id?: string | null; from?: string; name?: string; at?: string };
         if (d.from === room.senderId) return;
         const at = d.at ? Date.parse(d.at) || Date.now() : Date.now();
+        // A squad has more than one "partner": the invite names whoever opened it.
+        if (d.activity_id && d.name?.trim()) setInviterName(d.name.trim());
         dispatchInvite({ type: "stage", id: d.activity_id ?? null, at });
         return;
       }
@@ -531,10 +581,46 @@ export function RoomStage({
   /** Desktop fullscreen override: pair bubble by default, one tap for a tile. */
   const fsOverlay = wide && watchFullscreen;
   const [fsExpanded, setFsExpanded] = useState(false);
+  // An activity (not the lobby or room settings) owns the stage.
+  const activityStaged = Boolean(staged) && staged !== "lobby" && staged !== "room_details";
+  /** Squad night, nothing on stage: the call fills the stage (the hang-out grid). */
+  const squadHangout = squad && callActive && !activityStaged && !watchFullscreen;
+  /** Squad night with something on stage: the call becomes a row of faces
+   *  under it (the couch for films and music, bubbles for games). */
+  const squadCouch = squad && callActive && activityStaged && !watchFullscreen;
+  /** A squad game on stage: the stage splits into the game and the faces,
+   *  and the faces follow the game's cue (SquadStageContext). */
+  const squadStage = useSquadStage();
+  const squadGameStaged = squadCouch && isSquadGame(staged);
+  const cueMode = squadGameStaged ? (squadStage?.cue?.mode ?? "reading") : null;
+  /** Laptops: a squad game is a table. The game sits in a middle column and
+   *  the call puts everyone's seat down both sides (GroupStage). */
+  const tableWide = useMediaQuery(TABLE_QUERY);
+  const bigCentre = useMediaQuery(TABLE_BIG_QUERY);
+  const table = squadGameStaged && tableWide;
+  const tableCentre = bigCentre ? TABLE_CENTRE_BIG : TABLE_CENTRE;
+  const tableShare = tableFaceShare(cueMode, Boolean(squadStage?.cue?.focus));
+  /** The squad's bar: mute and camera from the call beside Activities and chat. */
+  const squadBar = squad && callActive && !watchFullscreen ? (squadStage?.controls ?? null) : null;
   /** The right-hand call pane is rendered — `side` and `side-pip` both use it. */
-  const splitCallLayout = callActive && wide && isSidePane(callLayout);
+  const splitCallLayout =
+    callActive && wide && isSidePane(callLayout) && !squadHangout && !squadCouch;
   /** The call renders as the floating window rather than in the pane. */
-  const floatingCall = !splitCallLayout || watchFullscreen;
+  const floatingCall = (!splitCallLayout && !squadHangout && !squadCouch) || watchFullscreen;
+  /** Squad full-screen film: faces as a column of bubbles down the side. */
+  const squadStrip = squad && callActive && watchFullscreen;
+  /** Phone, squad night, watching: chat lines run under the film. */
+  const squadTicker = squadCouch && WATCHING_IDS.has(staged) && !wide;
+  chatTickerRef.current = squadTicker;
+  const squadGroupLayout: GroupLayout | undefined = squadStrip
+    ? "strip"
+    : squadGameStaged
+      ? "game"
+      : squadCouch
+      ? WATCHING_IDS.has(staged) && wide
+        ? "row-tiles"
+        : "row-bubbles"
+      : undefined;
 
   // Orientation drives the capture shape, so the window's frame matches the
   // stream inside it — and so the partner receives the framing you chose.
@@ -556,8 +642,6 @@ export function RoomStage({
   useEffect(() => {
     setExpanded(!compact);
   }, [compact]);
-  // An activity (not the lobby or room settings) owns the stage.
-  const activityStaged = Boolean(staged) && staged !== "lobby" && staged !== "room_details";
   // Tapping the bubble opens the call properly; staging something else
   // tucks it away again.
   const [callOpen, setCallOpen] = useState(false);
@@ -575,7 +659,7 @@ export function RoomStage({
   // never what "floating" meant on a large screen.
   const bubble = fsOverlay
     ? !fsExpanded
-    : wide
+    : wide || squadHangout || squadCouch
       ? false
       : compact && (activityStaged ? !callOpen : manualBubble);
   const pairBubble = bubble && wide;
@@ -606,10 +690,11 @@ export function RoomStage({
       CATEGORIES.map((c) => ({
         ...c,
         items: c.itemIds
+          .filter((id) => !(squad && DATE_GAME_IDS.has(id)))
           .map((id) => items.find((i) => i.id === id))
           .filter((i): i is StageItem => Boolean(i)),
       })).filter((c) => c.items.length > 0),
-    [items],
+    [items, squad],
   );
   const activeCat = catId ? availCats.find((c) => c.id === catId) ?? null : null;
   /** The launcher is a floating dropup again, not a resident dock: the stage
@@ -747,6 +832,13 @@ export function RoomStage({
   // side). One <RoomVideo> lives in the host for the whole call; switching
   // layouts moves the node, so LiveKit never disconnects.
   const splitSlotRef = useRef<HTMLDivElement>(null);
+  // Squad nights: the call's fourth home, filling the stage when nothing
+  // else is on it (the hang-out grid).
+  const hangoutSlotRef = useRef<HTMLDivElement>(null);
+  // ...and its fifth: the couch row under a film or game.
+  const couchSlotRef = useRef<HTMLDivElement>(null);
+  // ...and its sixth: the faces half of a squad game's stage.
+  const gameFacesSlotRef = useRef<HTMLDivElement>(null);
   // Layout effect, not effect: React has just detached the pane (and the
   // host with it) when leaving split mode. A <video> removed from the
   // document pauses once the task yields, so re-home it in the same task.
@@ -759,9 +851,15 @@ export function RoomStage({
       setWatchFullscreen(Boolean(inWatchFs));
       const target = inWatchFs
         ? fsEl
-        : splitCallLayout
-          ? splitSlotRef.current
-          : pipAnchorRef.current;
+        : squadHangout
+          ? hangoutSlotRef.current
+          : squadGameStaged
+            ? gameFacesSlotRef.current
+          : squadCouch
+            ? couchSlotRef.current
+            : splitCallLayout
+            ? splitSlotRef.current
+            : pipAnchorRef.current;
       if (!target || host.parentElement === target) return;
       target.appendChild(host);
       host.querySelectorAll("video").forEach((v) => {
@@ -771,7 +869,10 @@ export function RoomStage({
     place();
     document.addEventListener("fullscreenchange", place);
     return () => document.removeEventListener("fullscreenchange", place);
-  }, [splitCallLayout]);
+    // `staged`: the couch row is rebuilt when one activity replaces another,
+    // so the call must be moved into the new row even though the layout
+    // type (couch) didn't change.
+  }, [splitCallLayout, squadHangout, squadCouch, squadGameStaged, staged, table]);
   useEffect(() => {
     const host = pipHostRef.current;
     return () => host?.remove();
@@ -946,7 +1047,9 @@ export function RoomStage({
           "flex h-full min-h-0 w-full gap-2 sm:gap-2.5",
           splitCallLayout
             ? "max-w-none flex-col lg:flex-row lg:items-stretch lg:gap-0"
-            : "mx-auto max-w-[57.6rem] flex-col",
+            : table
+              ? "max-w-none flex-col"
+              : "mx-auto max-w-[57.6rem] flex-col",
         )}
       >
         {/* Left — stage + app dock. Takes whatever the call pane leaves. */}
@@ -961,7 +1064,7 @@ export function RoomStage({
         {callActive && !splitCallLayout ? (
           // Ringing is a status worth a strip; a connected call is not (the
           // video says it). The strip leaves once they are in.
-          !partnerInCall ? (
+          !partnerInCall && !squad ? (
             <div className="perm-status-bar lg:hidden">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)]" />
@@ -976,7 +1079,9 @@ export function RoomStage({
               : partnerInRoom
                 ? "Invite them to the call"
                 : "Start the call";
-            const sub = partnerInCall
+            const sub = squad && squadNames.length
+              ? squadHereLine(squadNames)
+              : partnerInCall
               ? `${partnerName} is in the call`
               : partnerInRoom
                 ? `${partnerName} is in the room`
@@ -1012,16 +1117,28 @@ export function RoomStage({
             !splitCallLayout && "w-full self-center",
           )}
           style={
-            !splitCallLayout && stageH > 0
+            !splitCallLayout && !table && stageH > 0
               ? { maxWidth: `min(60rem, ${Math.round(stageH * STAGE_WIDTH_RATIO)}px)` }
               : undefined
           }
         >
             <div
               ref={stageBarRef}
-              className="perm-wall-frame flex shrink-0 items-center gap-2 !px-3 !py-2 sm:!px-4"
+              className={cn(
+                "perm-wall-frame flex shrink-0 items-center gap-2 !px-3 !py-2 sm:!px-4",
+                // The table says who's here beside the game's name instead.
+                table && "hidden",
+              )}
             >
-              {(() => {
+              {squad && (
+                // Squads: who's here, on every screen size (chat and the call
+                // controls live in the bar at the bottom).
+                <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-label text-emerald-100">
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                  <span className="truncate">{squadHereLine(squadNames)}</span>
+                </span>
+              )}
+              {!squad && (() => {
                 // Starter's side: did my date follow me in?
                 const st = starterStatus(invite, staged, partnerPresent, nowTick, 45_000, openedAtRef.current);
                 if (!st) return null;
@@ -1041,7 +1158,13 @@ export function RoomStage({
                         st === "together" ? "bg-emerald-400" : "bg-primary animate-pulse",
                       )}
                     />
-                    <span className="truncate">{st === "together" ? `${partnerName} is here` : `Inviting ${partnerName}…`}</span>
+                    <span className="truncate">
+                      {squad
+                        ? squadHereLine(squadNames)
+                        : st === "together"
+                          ? `${partnerName} is here`
+                          : `Inviting ${partnerName}…`}
+                    </span>
                   </span>
                 );
               })()}
@@ -1050,7 +1173,7 @@ export function RoomStage({
                     reach someone while everything else carries on. Same pill
                     as the call so the two read as a pair — inverted, so you
                     can tell them apart without reading either. */}
-                {(() => {
+                {!squad && (() => {
                   const unread = chatUnread > 0;
                   const title = unread
                     ? chatUnread === 1
@@ -1112,7 +1235,8 @@ export function RoomStage({
                     </>
                   );
                 })()}
-                {callActive && !splitCallLayout ? (
+                {callActive && !splitCallLayout && squad ? null : callActive && !splitCallLayout ? (
+                  // Squads: the chip on the left already says who's here.
                   <div className="hidden min-w-0 items-center gap-2 lg:flex">
                     <span
                       className={cn(
@@ -1123,7 +1247,7 @@ export function RoomStage({
                       )}
                     />
                     <p className="truncate text-label text-cream/80">
-                      {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
+                      {squad ? squadHereLine(squadNames) : partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
                     </p>
                   </div>
                 ) : !callActive ? (
@@ -1199,6 +1323,15 @@ export function RoomStage({
                       {stagedItem.title}
                     </span>
                   )}
+                  {table && (
+                    <>
+                      <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-0.5 text-label text-emerald-100">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                        <span className="truncate">{squadHereLine(squadNames)}</span>
+                      </span>
+                      <SquadClock roomId={roomId} />
+                    </>
+                  )}
                 </div>
                 {hasActivityHelp(staged) && (
                   <button
@@ -1216,7 +1349,66 @@ export function RoomStage({
                 )}
               </>
             )}
-            {staged ? (
+            {squadHangout ? (
+              // The live call is re-homed into this slot (see hangoutSlotRef).
+              <div ref={hangoutSlotRef} className="relative h-full min-h-0 w-full overflow-hidden rounded-2xl" />
+            ) : table ? (
+              // The table: the call covers the stage and seats everyone down
+              // both sides; the game sits in the middle column over it. At a
+              // reveal (or for Clue Me In's guesser) a face takes the top of
+              // the middle and the game drops below it.
+              <div className="relative h-full min-h-0 w-full">
+                {/* The live call is re-homed into this slot (see gameFacesSlotRef). */}
+                <div ref={gameFacesSlotRef} className="absolute inset-0" />
+                <div
+                  className="absolute bottom-0 z-10 overflow-y-auto rounded-2xl border border-white/[0.08] bg-card/95 shadow-[0_20px_60px_rgba(0,0,0,0.45)] transition-[top] duration-300"
+                  style={{
+                    width: tableCentre,
+                    left: `calc(50% - ${tableCentre / 2}px)`,
+                    top: tableShare > 0 ? `calc(${tableShare * 100}% + 8px)` : 0,
+                  }}
+                >
+                  <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
+                    {renderContent(staged, commitStage)}
+                  </ActivityBoundary>
+                </div>
+              </div>
+            ) : squadGameStaged ? (
+              // A squad game: the game and the faces share the stage, sized
+              // by what the moment is (see SquadStageContext).
+              <div className={cn("flex h-full min-h-0 gap-2", wide ? "flex-row" : "flex-col")}>
+                <div
+                  className={cn(
+                    "min-h-0 min-w-0 overflow-y-auto transition-[flex-basis,max-height] duration-300",
+                    wide
+                      ? cueMode === "reading"
+                        ? "basis-[58%]"
+                        : "basis-[42%]"
+                      : cueMode === "reading"
+                        ? "flex-1"
+                        : cueMode === "hero"
+                          ? "max-h-[46%] shrink-0"
+                          : "max-h-[52%] shrink-0",
+                  )}
+                >
+                  <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
+                    {renderContent(staged, commitStage)}
+                  </ActivityBoundary>
+                </div>
+                {/* The live call is re-homed into this slot (see gameFacesSlotRef). */}
+                <div
+                  ref={gameFacesSlotRef}
+                  className={cn(
+                    "relative min-h-0 min-w-0 overflow-hidden rounded-2xl",
+                    wide
+                      ? "flex-1"
+                      : cueMode === "reading"
+                        ? "h-[92px] shrink-0"
+                        : "min-h-[220px] flex-1",
+                  )}
+                />
+              </div>
+            ) : staged ? (
               <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
                 <div
                   className={[
@@ -1230,6 +1422,22 @@ export function RoomStage({
               </ActivityBoundary>
             ) : null}
           </div>
+          {squadTicker && (
+            <ChatTicker
+              lines={tickerLines(chat?.messages ?? [], room.senderId, presenceName)}
+              onOpen={() => setChatOpen(true)}
+            />
+          )}
+          {squadCouch && !squadGameStaged && (
+            // The live call is re-homed into this row (see couchSlotRef).
+            <div
+              ref={couchSlotRef}
+              className={cn(
+                "relative shrink-0 overflow-hidden border-t border-white/[0.06]",
+                squadGroupLayout === "row-tiles" ? "h-[132px]" : "h-[92px]",
+              )}
+            />
+          )}
         </section>
         </div>
 
@@ -1256,7 +1464,7 @@ export function RoomStage({
                     )}
                   />
                   <p className="truncate text-label text-cream/80">
-                    {partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
+                    {squad ? squadHereLine(squadNames) : partnerInCall ? `With ${partnerName}` : `Ringing ${partnerName}…`}
                   </p>
                 </div>
               </div>
@@ -1357,7 +1565,7 @@ export function RoomStage({
             // there instead of opening the menu.
             const showNotif = notif && !menuOpen;
             const NotifIcon = showNotif ? ITEM_ICONS[notif.target] ?? LayoutGrid : LayoutGrid;
-            return (
+            const pill = (
               <button
                 type="button"
                 onClick={
@@ -1389,6 +1597,51 @@ export function RoomStage({
                   {showNotif ? notif.text : menuOpen ? "Close" : "Activities"}
                 </span>
               </button>
+);
+            if (!squadBar) return pill;
+            // A squad night: mute, camera, Activities, chat and hang up in one
+            // bar, in the same place on every screen. Games never cover it.
+            return (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={squadBar.toggleMic}
+                  aria-label={squadBar.mic ? "Mute" : "Unmute"}
+                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", squadBar.mic ? "border-white/10 bg-card/85 text-cream" : "border-rose-400/50 bg-rose-500/20 text-rose-200")}
+                >
+                  {squadBar.mic ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={squadBar.toggleCam}
+                  aria-label={squadBar.cam ? "Turn camera off" : "Turn camera on"}
+                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", squadBar.cam ? "border-white/10 bg-card/85 text-cream" : "border-rose-400/50 bg-rose-500/20 text-rose-200")}
+                >
+                  {squadBar.cam ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                </button>
+                {pill}
+                <button
+                  type="button"
+                  onClick={() => setChatOpen(true)}
+                  aria-label={chatUnread ? `Chat, ${chatUnread} unread` : "Chat"}
+                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", "relative border-white/10 bg-card/85 text-primary")}
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  {chatUnread > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">
+                      {chatUnread > 99 ? "99+" : chatUnread}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={onLeaveCall}
+                  aria-label="Leave the call"
+                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", "border-rose-500/40 bg-rose-700/85 text-white")}
+                >
+                  <PhoneOff className="h-5 w-5" />
+                </button>
+              </div>
             );
           })()}
         </div>
@@ -1411,16 +1664,19 @@ export function RoomStage({
           re-parented into the Watch fullscreen layer without remounting the
           call. The anchor marks its normal home in the room. */}
       {inviteId &&
+        // A squad round in play keeps its screen: a friend's invite waits
+        // until the reveal (a tie has no spotlight, so ask the game).
+        !(squadGameStaged && squadStage?.cue?.live) &&
         (() => {
           const item = items.find((i) => i.id === inviteId);
           const title = item?.title ?? inviteId;
           return (
             <ActivityInvite
-              partnerName={partnerName}
-              partnerPhotoUrl={partnerPhotoUrl}
+              partnerName={squad ? (inviterName ?? partnerName) : partnerName}
+              partnerPhotoUrl={squad ? null : partnerPhotoUrl}
               activityId={inviteId}
               activityTitle={title}
-              headline={inviteHeadline(partnerName, inviteId, title)}
+              headline={inviteHeadline(squad ? (inviterName ?? partnerName) : partnerName, inviteId, title)}
               tileSrc={ACTIVITY_TILES[inviteId]}
               Icon={ITEM_ICONS[inviteId]}
               onJoin={() => commitStage(inviteId)}
@@ -1434,8 +1690,8 @@ export function RoomStage({
       {chatToast && (
         <ChatToast
           key={chatToast.id}
-          partnerName={partnerName}
-          partnerPhotoUrl={partnerPhotoUrl}
+          partnerName={squad ? presenceName(chatToast.from) : partnerName}
+          partnerPhotoUrl={squad ? null : partnerPhotoUrl}
           text={chatToast.text}
           count={chatUnread}
           offset={Boolean(inviteId)}
@@ -1453,11 +1709,19 @@ export function RoomStage({
         createPortal(
         <div
           className={cn(
-            floatingCall ? "group fixed z-40 select-none touch-none" : "relative h-full w-full",
+            squadStrip
+              ? "fixed right-3 top-3 z-40"
+              : floatingCall
+                ? "group fixed z-40 select-none touch-none"
+                : "relative h-full w-full",
             // The pair bubble draws its own rings; everything else gets the glass card.
             floatingCall && !pairBubble && "rounded-2xl glass p-1 shadow-[0_20px_56px_rgba(0,0,0,0.55)]",
           )}
-          style={floatingCall && pos ? { left: pos.x, top: pos.y, width: curW, height: curH } : undefined}
+          style={
+            floatingCall && pos && !squadStrip
+              ? { left: pos.x, top: pos.y, width: curW, height: curH }
+              : undefined
+          }
         >
           <div
             className={cn(
@@ -1485,6 +1749,8 @@ export function RoomStage({
           >
             {!bubble && <ChaperonSeam className={floatingCall ? undefined : "rounded-none"} />}
             <RoomVideo
+              group={squad}
+              groupLayout={squadGroupLayout}
               // In the pane, `side-pip` gives the phone-call shape — one feed
               // full-bleed with the other floating over it — while `side`
               // shows both tiles.

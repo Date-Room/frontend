@@ -32,6 +32,12 @@ export const INVITABLE: Record<string, { verb: string }> = {
   pick_a_door: { verb: "started" },
   rank_it: { verb: "started" },
   guacamole: { verb: "fired up" },
+  // Squad games (squad rooms only).
+  most_likely: { verb: "started" },
+  who_said_it: { verb: "started" },
+  imposter: { verb: "started" },
+  spill_tea: { verb: "started" },
+  heads_up: { verb: "started" },
   watch: { verb: "opened" },
   dj: { verb: "opened" },
 };

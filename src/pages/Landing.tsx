@@ -38,6 +38,7 @@ import { LandingJoinMenu } from "@/components/LandingJoinMenu";
  */
 
 const START = "/auth"; // sign-in funnels every room/purchase action
+const SQUAD = "/squad"; // Squad (beta): request access, sign-in first
 
 function Wordmark({ size = "text-xl" }: { size?: string }) {
   return (
@@ -301,7 +302,7 @@ export default function Landing() {
             <p className="mt-8 text-lg leading-relaxed text-lpcream/85">
               {t("landing.friends.body")}
             </p>
-            <Link to={START} className="lp-btn mt-10">{t("landing.friends.cta")}</Link>
+            <Link to={SQUAD} className="lp-btn mt-10">{t("landing.friends.cta")}</Link>
           </div>
         </div>
       </section>
@@ -333,11 +334,12 @@ export default function Landing() {
             featured
           />
           <PricingCard
-            name={t("landing.pricing.crewName")}
-            price={TIER_PRICING.crew.priceLabel}
-            unit={`${TIER_PRICING.crew.priceSuffix ?? ""} · ${TIER_PRICING.crew.unit}`}
-            desc={t("landing.pricing.crewDesc")}
-            cta={t("landing.pricing.crewCta")}
+            name={t("landing.pricing.squadName")}
+            price={t("landing.pricing.squadPrice")}
+            unit={t("landing.pricing.squadUnit")}
+            desc={t("landing.pricing.squadDesc")}
+            cta={t("landing.pricing.squadCta")}
+            to={SQUAD}
             featured
           />
         </div>
@@ -425,7 +427,7 @@ export default function Landing() {
   );
 }
 
-function PricingCard({ name, price, unit, desc, cta, featured }: { name: string; price: string; unit: string; desc: string; cta: string; featured?: boolean }) {
+function PricingCard({ name, price, unit, desc, cta, featured, to = START }: { name: string; price: string; unit: string; desc: string; cta: string; featured?: boolean; to?: string }) {
   return (
     <div className={`relative flex flex-col rounded-2xl border p-7 ${featured ? "border-lppeach/40 bg-gradient-to-b from-[oklch(0.22_0.03_50)] to-lpcard" : "border-lpborder bg-lpcard"}`}>
       <div className="text-sm uppercase tracking-widest text-lppeach">{name}</div>
@@ -434,7 +436,7 @@ function PricingCard({ name, price, unit, desc, cta, featured }: { name: string;
         <span className="text-sm text-lpmuted">{unit}</span>
       </div>
       <p className="mt-4 flex-1 text-sm leading-relaxed text-lpmuted">{desc}</p>
-      <Link to={START} className="lp-btn mt-8 self-start text-sm">{cta}</Link>
+      <Link to={to} className="lp-btn mt-8 self-start text-sm">{cta}</Link>
     </div>
   );
 }
