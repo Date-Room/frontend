@@ -961,7 +961,7 @@ function Guesses({
           aria-label={`Answer ${i + 1}${draft[a.key] ? `, you said ${nameOf(draft[a.key])}` : ""}`}
           className={cn(
             "focus-ring h-2.5 rounded-full transition-all",
-            i === at ? "w-6 bg-primary" : draft[a.key] ? "w-2.5 bg-primary/60" : "w-2.5 bg-white/20",
+            i === at ? "w-6 bg-fill" : draft[a.key] ? "w-2.5 bg-primary/60" : "w-2.5 bg-white/20",
           )}
         />
       ))}
@@ -1065,7 +1065,7 @@ function HeadsUp({
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-sm font-semibold tabular-nums",
-        left <= 10 ? "bg-primary text-primary-foreground" : "bg-white/[0.06] text-cream",
+        left <= 10 ? "bg-fill text-primary-foreground" : "bg-white/[0.06] text-cream",
       )}
     >
       <Timer className="h-3.5 w-3.5" aria-hidden /> {left}s

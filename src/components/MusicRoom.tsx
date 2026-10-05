@@ -1331,7 +1331,7 @@ function EqualizerBars() {
       {[0, 1, 2].map((i) => (
         <span
           key={i}
-          className="w-[3px] origin-bottom rounded-sm bg-primary"
+          className="w-[3px] origin-bottom rounded-sm bg-fill"
           style={{ height: "100%", animation: `eq-bar 0.9s ease-in-out ${i * 0.18}s infinite` }}
         />
       ))}
@@ -1435,7 +1435,7 @@ export function MusicPlayerBar({ onOpenList }: { onOpenList?: () => void }) {
         className="group relative block h-1.5 w-full cursor-pointer bg-white/10"
       >
         <div
-          className="absolute inset-y-0 left-0 bg-primary transition-[width] duration-500 ease-linear group-hover:brightness-110"
+          className="absolute inset-y-0 left-0 bg-fill transition-[width] duration-500 ease-linear group-hover:brightness-110"
           style={{ width: `${pct}%` }}
         />
       </button>

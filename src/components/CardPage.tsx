@@ -30,7 +30,7 @@ export function CardPage({
   return (
     <PageShell>
       <div className={cn("relative z-10 mx-auto w-full px-0 sm:px-6 sm:py-12 lg:py-16", maxWidth)}>
-        <div className="flex flex-col sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-white/[0.10] sm:bg-card/55 sm:shadow-[0_28px_80px_-20px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.05)] sm:backdrop-blur-xl">
+        <div className="flex flex-col sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-hairline sm:bg-card/55 sm:shadow-[0_28px_80px_-20px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.05)] sm:backdrop-blur-xl">
           <header className="sticky top-0 z-10 flex h-14 items-center gap-3 border-b border-white/[0.06] glass-subtle px-5 sm:px-6 backdrop-blur-xl sm:static sm:border-white/[0.06] sm:bg-transparent sm:backdrop-blur-none">
             {onBack && (
               <button

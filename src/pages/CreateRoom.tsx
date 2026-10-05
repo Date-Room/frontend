@@ -927,7 +927,7 @@ export default function CreateRoom() {
                         !available
                           ? "border-white/15 text-muted-foreground/70"
                           : selected
-                            ? "border-primary bg-primary text-primary-foreground"
+                            ? "border-primary bg-fill text-primary-foreground"
                             : "border-white/20 text-transparent",
                       )}
                       aria-hidden

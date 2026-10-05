@@ -166,7 +166,7 @@ export default function AuthCallback() {
             <p className="text-muted-foreground text-sm">{failed}</p>
             <Link
               to="/auth"
-              className="inline-flex items-center justify-center mt-4 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground hover:scale-[1.03] transition-transform"
+              className="inline-flex items-center justify-center mt-4 rounded-full bg-fill px-6 py-2.5 text-sm font-medium text-primary-foreground hover:scale-[1.03] transition-transform"
             >
               Try again
             </Link>

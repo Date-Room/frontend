@@ -994,7 +994,7 @@ export function WatchTogether() {
         className="group relative block h-1.5 w-full cursor-pointer bg-white/10"
       >
         <div
-          className="absolute inset-y-0 left-0 bg-primary transition-[width] duration-500 ease-linear group-hover:brightness-110"
+          className="absolute inset-y-0 left-0 bg-fill transition-[width] duration-500 ease-linear group-hover:brightness-110"
           style={{ width: `${pct}%` }}
         />
       </button>
@@ -1105,7 +1105,7 @@ export function WatchTogether() {
                 aria-label={t("room.watchHistory")}
               >
                 <Clock className="h-4 w-4" />
-                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-label font-semibold text-primary-foreground">
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-fill px-1 text-label font-semibold text-primary-foreground">
                   {history.length}
                 </span>
               </Button>

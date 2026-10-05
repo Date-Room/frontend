@@ -743,7 +743,7 @@ export default function PreRoom() {
             </div>
             {partnerPresent && (
               <span className="hidden shrink-0 items-center gap-1.5 rounded-full border border-primary/35 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary sm:inline-flex">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" aria-hidden />
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-fill" aria-hidden />
                 Partner online
               </span>
             )}

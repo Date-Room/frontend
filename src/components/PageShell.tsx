@@ -67,7 +67,7 @@ export function PageStickyHeader({
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 glass-subtle backdrop-blur-xl border-b border-white/[0.05]",
+        "sticky top-0 z-40 glass-subtle backdrop-blur-xl border-b border-hairline",
         className,
       )}
     >

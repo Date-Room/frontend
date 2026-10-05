@@ -53,4 +53,25 @@ describe("index.css", () => {
       ).toBe(true);
     }
   });
+  /**
+   * Light mode runs one weight notch heavier (see the stylesheet's note).
+   * Overriding utilities is only safe while nothing carries two different
+   * weights in one class string, so the bump stays pinned to weights the
+   * @import actually loads.
+   */
+  it("bumps light-mode weights onto loaded DM Sans weights", () => {
+    const loaded = new Set(
+      [...css.matchAll(/DM\+Sans:[^')]*/g)]
+        .flatMap((m) => [...m[0].matchAll(/9\.\.40,(\d{3})/g)])
+        .map((m) => m[1]),
+    );
+    expect(loaded.size).toBeGreaterThan(2);
+    const bumps = [
+      ...css.matchAll(/:root\[data-theme="light"\] (?:body|\.font-[a-z]+) \{ font-weight: (\d{3}); \}/g),
+    ].map((m) => m[1]);
+    expect(bumps.length).toBeGreaterThan(3);
+    for (const w of bumps) {
+      expect(loaded.has(w), `weight ${w} is bumped to but never loaded`).toBe(true);
+    }
+  });
 });

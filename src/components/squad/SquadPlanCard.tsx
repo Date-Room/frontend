@@ -95,7 +95,7 @@ export function SquadPlanCard({ roomId, selfParticipantId }: { roomId: string; s
                     <span
                       className={cn(
                         "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border",
-                        on ? "border-primary bg-primary text-primary-foreground" : "border-white/25",
+                        on ? "border-primary bg-fill text-primary-foreground" : "border-white/25",
                       )}
                     >
                       {on && <Check className="h-3.5 w-3.5" aria-hidden />}

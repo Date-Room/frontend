@@ -27,7 +27,7 @@ function useNow(active: boolean): number {
 
 const button =
   "inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 text-sm font-medium transition disabled:opacity-50";
-const primary = `${button} bg-primary text-primary-foreground hover:bg-primary/90`;
+const primary = `${button} bg-fill text-primary-foreground hover:bg-primary/90`;
 const secondary = `${button} border border-white/[0.14] text-cream/90 hover:bg-white/[0.06]`;
 
 export function MpesaPaymentPanel() {

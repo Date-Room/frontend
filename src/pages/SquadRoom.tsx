@@ -355,7 +355,7 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
               >
                 {t.label}
                 {t.id === "chat" && tab !== "chat" && (chat?.unread ?? 0) > 0 && (
-                  <span className="ml-1.5 rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground">
+                  <span className="ml-1.5 rounded-full bg-fill px-1.5 text-[11px] font-bold text-primary-foreground">
                     {chat?.unread}
                   </span>
                 )}

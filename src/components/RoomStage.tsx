@@ -1155,7 +1155,7 @@ export function RoomStage({
                     <span
                       className={cn(
                         "h-1.5 w-1.5 shrink-0 rounded-full",
-                        st === "together" ? "bg-emerald-400" : "bg-primary animate-pulse",
+                        st === "together" ? "bg-emerald-400" : "bg-fill animate-pulse",
                       )}
                     />
                     <span className="truncate">
@@ -1242,7 +1242,7 @@ export function RoomStage({
                       className={cn(
                         "h-2 w-2 shrink-0 rounded-full",
                         partnerInCall
-                          ? "bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.65)]"
+                          ? "bg-fill shadow-[0_0_10px_hsl(var(--primary)/0.65)]"
                           : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse",
                       )}
                     />
@@ -1459,7 +1459,7 @@ export function RoomStage({
                     className={cn(
                       "h-2 w-2 shrink-0 rounded-full",
                       partnerInCall
-                        ? "bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.65)]"
+                        ? "bg-fill shadow-[0_0_10px_hsl(var(--primary)/0.65)]"
                         : "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.7)] animate-pulse",
                     )}
                   />
@@ -2078,7 +2078,7 @@ function PinnedVisionCard({
             )}
           </div>
         )}
-        <span className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[#1a1207] shadow">
+        <span className="absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-fill text-fill-foreground shadow">
           <Pin className="h-3 w-3 fill-current" />
         </span>
       </div>

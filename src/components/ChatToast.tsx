@@ -70,7 +70,7 @@ export function ChatToast({
           <p className="flex items-center gap-1.5 text-label uppercase tracking-[0.14em] text-cream/60">
             <MessageCircle className="h-3 w-3 text-primary" aria-hidden />
             <span className="truncate">{partnerName}</span>
-            {count > 1 && <span className="ml-auto rounded-full bg-primary px-1.5 text-label font-bold normal-case tracking-normal text-primary-foreground">{count}</span>}
+            {count > 1 && <span className="ml-auto rounded-full bg-fill px-1.5 text-label font-bold normal-case tracking-normal text-primary-foreground">{count}</span>}
           </p>
           <p className="truncate text-body text-cream">{text}</p>
         </div>

@@ -40,6 +40,12 @@
     --champagne: 38 72% 72%;
     /* Brand amber (#F5A623) as HSL channels — themed rooms override this. */
     --amber: 37 91% 55%;
+    /* Hairline: the near-invisible edge that separates chrome from content.
+       A white tint on a dark page, ink on a light one — the dark recipe
+       written literally (`border-white/[0.06]`) simply vanishes on paper.
+       Matches the mobile palette's `hairline`. A complete colour rather than
+       channels because it carries its own alpha. */
+    --hairline: rgb(255 255 255 / 0.06);
   }
 
   /* Light mode. Warm ink on warm paper, scoped the same way .theme-admin is
@@ -80,6 +86,7 @@
     --ring: 30 76% 34%;
     --champagne: 32 44% 46%;
     --amber: 30 76% 34%;
+    --hairline: rgb(30 24 19 / 0.1);
   }
 
   /* The accent as a FILL, and the ink that sits on it. Dark mode's bright
@@ -117,6 +124,11 @@
      product keeps its warm palette. */
   .theme-admin {
     color-scheme: dark;
+    /* The admin portal retints --primary to cyan, so its fill tokens have to
+       follow or every `bg-fill` in shared components would come out amber. */
+    --primary-fill: 188 100% 60%;
+    --primary-fill-alt: 300 95% 65%;
+    --on-fill: 222 47% 6%;
     --background: 222 47% 5%;
     --foreground: 210 40% 96%;
     --card: 222 40% 9%;
@@ -227,7 +239,7 @@
   }
 
   .btn-primary {
-    @apply px-8 py-4 rounded-full bg-primary text-primary-foreground font-medium transition-all duration-300 
+    @apply px-8 py-4 rounded-full bg-fill text-fill-foreground font-medium transition-all duration-300 
            hover:scale-105 hover:shadow-[0_0_30px_hsl(var(--primary)/0.3)] active:scale-95;
   }
 
@@ -570,6 +582,45 @@
 :root[data-theme="light"] .text-cream { color: hsl(var(--foreground)); }
 :root[data-theme="light"] .text-rose { color: hsl(var(--destructive)); }
 :root[data-theme="light"] .text-amber { color: hsl(var(--amber)); }
+
+/* Light mode runs one weight notch heavier, the same step the mobile text
+   theme makes. Light text on a dark ground blooms and reads heavier than it
+   is; the same weight on paper looks thin and spindly, so matching the
+   NUMBER across themes does not match the APPEARANCE.
+   Every step lands on a weight the @import actually loads (DM Sans
+   300–700), so nothing is synthesised. Safe to do by overriding the
+   utilities because no class string in the app carries two different
+   weights and there are no responsive weight variants — checked — so these
+   can never outrank a heavier sibling.
+   font-bold stays put: there is nothing above 700 in the loaded set. */
+:root[data-theme="light"] body { font-weight: 500; }
+:root[data-theme="light"] .font-light { font-weight: 400; }
+:root[data-theme="light"] .font-normal { font-weight: 500; }
+:root[data-theme="light"] .font-medium { font-weight: 600; }
+:root[data-theme="light"] .font-semibold { font-weight: 700; }
+
+/* Glass on paper. The dark recipes tint with WHITE (`bg-white/[0.04]`,
+   `border-white/[0.08]`), which over a light ground is both invisible as a
+   surface and invisible as an edge — the sticky headers and the bottom nav
+   stopped reading as chrome at all, the same way the mobile bottom nav did
+   before its tokens were split.
+   `.glass-subtle` is the chrome bar, so it takes the page colour at high
+   opacity: the blur still works, but what scrolls under it does not bleed
+   through as a muddy smear the way a 4% tint does. `.glass` is a raised
+   panel, so it goes lighter than the page, like a card.
+   These also override the inline `border-white/[0.0x]` at the call sites —
+   three classes beat one — so every header and nav is fixed from here and
+   dark mode keeps its own recipe untouched.
+   `.glass-strong` is deliberately absent: its only use is the in-room
+   activity tray, and in-room stays dark. */
+:root[data-theme="light"] .glass-subtle {
+  background-color: hsl(var(--background) / 0.88);
+  border-color: var(--hairline);
+}
+:root[data-theme="light"] .glass {
+  background-color: hsl(0 0% 100% / 0.72);
+  border-color: var(--hairline);
+}
 
 /* ── Lovable-parity landing page (ported from date-room-escape.lovable.app) ──
    Typography standardised to match the in-app design: Playfair Display for
@@ -1374,7 +1425,7 @@
   }
 
   .perm-call-btn {
-    @apply inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-[#1a120c] shadow-[0_8px_28px_hsl(var(--primary)/0.4)] transition hover:scale-[1.02];
+    @apply inline-flex items-center gap-2 rounded-full bg-fill px-4 py-2.5 text-sm font-semibold text-fill-foreground shadow-[0_8px_28px_hsl(var(--primary)/0.4)] transition hover:scale-[1.02];
   }
 
   .perm-partner-join-toast {

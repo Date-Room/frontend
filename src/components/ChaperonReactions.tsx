@@ -120,7 +120,7 @@ export function ChaperonReactions({
             onClick={() =>
               onRate(false, { reason: reason ?? undefined, shareWithTeam: share })
             }
-            className={cn(chip, "border-transparent bg-primary font-semibold text-primary-foreground")}
+            className={cn(chip, "border-transparent bg-fill font-semibold text-primary-foreground")}
           >
             Send
           </button>

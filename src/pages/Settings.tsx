@@ -232,7 +232,7 @@ export default function Settings() {
                 onClick={() => photoInputRef.current?.click()}
                 disabled={uploading}
                 aria-label={t("settings.changePhoto")}
-                className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition hover:scale-105 disabled:opacity-50"
+                className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-fill text-primary-foreground shadow-md transition hover:scale-105 disabled:opacity-50"
               >
                 {uploading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

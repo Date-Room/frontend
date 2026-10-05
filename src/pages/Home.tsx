@@ -340,7 +340,7 @@ export default function Home() {
     <PageShell>
       {/* Header — logo + (desktop) tab nav + account. Compact pinned
           page title slides in on scroll on mobile. */}
-      <header className="fixed top-0 left-0 right-0 z-40 glass-subtle backdrop-blur-xl border-b border-white/[0.04]">
+      <header className="fixed top-0 left-0 right-0 z-40 glass-subtle backdrop-blur-xl border-b border-hairline">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-6">
           <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl ring-1 ring-white/10">
             <img src="/dateroom-logo.png" alt={`${BRAND_NAME} logo`} className="h-full w-full object-cover" />
@@ -392,7 +392,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setTab("profile")}
-              className="flex items-center gap-2.5 rounded-full border border-white/[0.08] bg-white/[0.03] py-1 pl-1 pr-3.5 transition-colors hover:border-primary/25"
+              className="flex items-center gap-2.5 rounded-full border border-hairline bg-secondary/60 py-1 pl-1 pr-3.5 transition-colors hover:border-primary/25"
             >
               <UserAvatarImg
                 src={me?.photo_url}
@@ -551,12 +551,12 @@ export default function Home() {
             </div>
 
             {visibleEndedRooms.length === 0 ? (
-              <div className="space-y-2 rounded-[2rem] border border-dashed border-white/[0.1] px-8 py-20 text-center">
+              <div className="space-y-2 rounded-[2rem] border border-dashed border-hairline px-8 py-20 text-center">
                 <p className="font-serif text-lg italic text-cream">No past sessions yet.</p>
                 <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Rooms move here once their session ends</p>
               </div>
             ) : (
-              <ul className="overflow-hidden rounded-2xl border border-white/[0.05] bg-card/30">
+              <ul className="overflow-hidden rounded-2xl border border-hairline bg-card/30">
                 {visibleEndedRooms
                   .filter((r) => {
                     if (!q) return true;
@@ -594,7 +594,7 @@ export default function Home() {
       </main>
 
       {/* Bottom nav — mobile only. */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 glass-subtle backdrop-blur-xl border-t border-white/[0.06] lg:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-40 glass-subtle backdrop-blur-xl border-t border-hairline lg:hidden">
         <div className="mx-auto flex h-[calc(4rem+env(safe-area-inset-bottom))] max-w-2xl px-6 pb-[env(safe-area-inset-bottom)]">
           {tabs.map((item) => (
             <button
@@ -703,7 +703,7 @@ function RoomTileRow({
     <button
       type="button"
       onClick={onTap}
-      className="focus-ring group flex h-full w-full items-center gap-3 rounded-2xl border border-white/[0.06] bg-card/30 px-3.5 py-3.5 text-left transition-colors hover:border-white/[0.1] hover:bg-white/[0.04]"
+      className="focus-ring group flex h-full w-full items-center gap-3 rounded-2xl border border-hairline bg-card/30 px-3.5 py-3.5 text-left transition-colors hover:border-white/[0.1] hover:bg-white/[0.04]"
     >
       {isSquad ? (
         <SquadAvatar
@@ -809,7 +809,7 @@ function RecapTileRow({
       onClick={onTap}
       className={cn(
         "focus-ring group flex w-full items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-white/[0.025]",
-        !isLast && "border-b border-white/[0.05]",
+        !isLast && "border-b border-hairline",
       )}
     >
       <DuoAvatar
@@ -968,7 +968,7 @@ function RoomsSkeletonList() {
       {[0, 1, 2, 3].map((i) => (
         <li
           key={i}
-          className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-card/30 px-3.5 py-3.5"
+          className="flex items-center gap-3 rounded-2xl border border-hairline bg-card/30 px-3.5 py-3.5"
         >
           <div className="relative h-12 w-[60px] shrink-0">
             <ShimmerSkeleton circle={36} className="absolute left-0 top-1 ring-2 ring-background" />
@@ -993,13 +993,13 @@ function RoomsSkeletonList() {
 function RoomsEmptyState({ query }: { query: string }) {
   if (query) {
     return (
-      <div className="rounded-2xl border border-dashed border-white/[0.1] px-6 py-12 text-center">
+      <div className="rounded-2xl border border-dashed border-hairline px-6 py-12 text-center">
         <p className="text-sm text-muted-foreground">No matches.</p>
       </div>
     );
   }
   return (
-    <div className="flex flex-col items-center justify-center space-y-5 rounded-[2rem] border border-dashed border-white/[0.1] px-8 py-16 text-center">
+    <div className="flex flex-col items-center justify-center space-y-5 rounded-[2rem] border border-dashed border-hairline px-8 py-16 text-center">
       <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/25 via-primary/10 to-transparent ring-1 ring-primary/25">
         <Heart className="h-9 w-9 text-primary/75" strokeWidth={1.25} />
       </div>
@@ -1064,7 +1064,7 @@ function ProfilePane({
             <button
               type="button"
               onClick={onSettings}
-              className="focus-ring inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-cream transition hover:bg-white/[0.06]"
+              className="focus-ring inline-flex items-center gap-2 rounded-full border border-hairline bg-secondary/60 px-4 py-2.5 text-sm text-cream transition hover:bg-white/[0.06]"
             >
               <User className="h-4 w-4 text-muted-foreground" />
               Manage profile
@@ -1072,7 +1072,7 @@ function ProfilePane({
             <button
               type="button"
               onClick={onSignOut}
-              className="focus-ring inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2.5 text-sm text-cream transition hover:bg-white/[0.06]"
+              className="focus-ring inline-flex items-center gap-2 rounded-full border border-hairline bg-secondary/60 px-4 py-2.5 text-sm text-cream transition hover:bg-white/[0.06]"
             >
               <LogOut className="h-4 w-4 text-muted-foreground" />
               Sign out
