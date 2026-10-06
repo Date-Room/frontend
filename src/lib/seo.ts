@@ -4,9 +4,9 @@ export const SITE_URL = "https://dateroom.io";
 export const LANDING_SEO = {
   title: "DateRoom | The Room Before the Phone Number",
   description:
-    "Date them before you date them. Private video rooms via a 6-digit code. No phone numbers, zero downloads.",
+    "Every room is a date. Private rooms for a first date, a date night or a night in with friends, with things to do together. No phone numbers, nothing to install.",
   ogImage: `${SITE_URL}/assets/dateroom-preview.jpg`,
-  ogImageAlt: "DateRoom — a private room you share with a six-digit code.",
+  ogImageAlt: "DateRoom, a private room you share with a code.",
   canonical: SITE_URL,
   themeColor: "#111111",
 } as const;

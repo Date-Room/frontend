@@ -1,65 +1,161 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { type ReactNode, type ComponentType } from "react";
-import {
-  ArrowRight,
-  Sparkles,
-  Play,
-  Music2,
-  Zap,
-  Camera,
-  Flame,
-  HelpCircle,
-  MoreHorizontal,
-  MessageCircleQuestion,
-  ShieldCheck,
-  Lock,
-  PhoneOff,
-  KeyRound,
-  Mic,
-  Video,
-  PhoneOff as Hangup,
-  Twitter,
-  Instagram,
-  Mail,
-} from "lucide-react";
+import { type ReactNode } from "react";
+import { ShieldCheck, Smartphone, Play } from "lucide-react";
 import { TIER_PRICING } from "@/lib/tierPricing";
+import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/appStores";
 import { SeoHead } from "@/components/SeoHead";
 import { LANDING_JSON_LD, LANDING_SEO } from "@/lib/seo";
 import { LandingLanguageMenu } from "@/components/LandingLanguageMenu";
 import { LandingJoinMenu } from "@/components/LandingJoinMenu";
 
 /**
- * Marketing landing — a faithful port of date-room-escape.lovable.app.
- * Structure/copy mirror the Lovable source; styling uses lp-prefixed helpers
- * (.lp-display / .lp-eyebrow / .lp-btn / .lp-link / .lp-glow / .lp-vignette in
- * index.css) and the warm `lp*` palette (tailwind.config). Action CTAs route
- * to /auth; in-page links use section anchors.
+ * Marketing landing, v2 (Oct 2026): "Every room is a date."
+ *
+ * Three equal kinds of date (first date, date night, a night in with your
+ * people) drawn as invitations, with the real room shown in the hero. Art
+ * comes from the in-room tiles (public/dock-tiles) so the page shows the
+ * product, not stock photography. Copy lives under `landing2` in en.json;
+ * other locales fall back to English until translated.
+ *
+ * Facts the copy must keep true: every room has a 6-character code AND a
+ * 4-digit PIN; no end-to-end encryption; no ads; the apps are live; Chaperon
+ * is live (Protect free once, Coach in beta); Squad is a request-access beta.
  */
 
 const START = "/auth"; // sign-in funnels every room/purchase action
-const SQUAD = "/squad"; // Squad (beta): request access, sign-in first
+const JOIN = "/join";
+const SQUAD = "/squad";
 
-function Wordmark({ size = "text-xl" }: { size?: string }) {
+const TRAY = ["questions", "the-36", "this-or-that", "watch", "dj", "guacamole"];
+const TRAY_NAMES = ["The Deck", "The 36", "This or That", "Watch", "DJ", "Guacamole"];
+const PROGRAMME = ["questions", "the-36", "this-or-that", "truth-or-dare", "2-truths", "rank-it", "pick-a-door", "guacamole", "most-likely", "imposter"];
+const INVITE_ART = ["the-36", "fridge-notes", "most-likely"];
+const INVITE_TILT = ["md:-rotate-2", "md:rotate-1", "md:-rotate-1"];
+const INVITE_CTA = [START, START, SQUAD];
+
+const tile = (id: string) => `/dock-tiles/${id}.webp`;
+
+type InviteCard = {
+  to: string; what: string; when: string; bring: string; note: string;
+  admit: string; terms: string; code: string; pin: string; cta: string; alt: string;
+};
+type Tile = { name: string; line: string };
+type Step = { n: string; t: string; d: string };
+type Plan = { group: string; name: string; unit: string; cta: string; price?: string };
+
+function Eyebrow({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <p className={`lp-eyebrow ${className}`}>{children}</p>;
+}
+
+function Wordmark() {
   return (
-    <a href="#top" className="group flex items-center gap-2.5">
-      <img src="/dateroom-logo.png" alt="DateRoom" width={32} height={32} className="h-8 w-8 rounded-md object-contain" />
-      <span className={`lp-serif italic ${size} tracking-tight text-lpcream`}>DateRoom</span>
+    <a href="#top" className="flex items-center gap-2.5">
+      <img src="/dateroom-logo.png" alt="" width={32} height={32} className="h-8 w-8 rounded-md object-contain" />
+      <span className="lp-serif text-2xl italic tracking-tight text-lpcream">DateRoom</span>
     </a>
   );
 }
 
-function Eyebrow({ children }: { children: ReactNode }) {
-  return <p className="lp-eyebrow">{children}</p>;
+function ReceivedLink({ className = "" }: { className?: string }) {
+  const { t } = useTranslation();
+  return (
+    <Link to={JOIN} className={`text-[15px] text-lpcream ${className}`}>
+      {t("landing2.hero.received")}{" "}
+      <span className="text-lppeach underline decoration-lppeach/50 underline-offset-4">{t("landing2.hero.enterCode")}</span>
+    </Link>
+  );
+}
+
+/** The room as it looks mid-date: faces, a deck card between them, the tray. */
+function RoomPreview() {
+  const { t } = useTranslation();
+  return (
+    <figure className="m-0">
+      <div className="rounded-[22px] border border-lpborder bg-lpcard p-3 shadow-[0_40px_80px_rgba(0,0,0,0.5)] sm:p-4">
+        <div className="flex items-center gap-2.5 px-1 pb-3 text-[13px]">
+          <span className="h-2 w-2 rounded-full bg-[#7fd18b]" aria-hidden />
+          <span className="text-[#d8cbbd]">{t("landing2.hero.roomWith")}</span>
+          <span className="text-[#b3a89f]">· {t("landing2.hero.roomLeft")}</span>
+          <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-[#4a3a31] bg-[#2a1f1a] px-2.5 py-1 text-lppeachsoft">
+            <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
+            {t("landing2.hero.chaperonOn")}
+          </span>
+        </div>
+        <div className="flex gap-2.5 sm:gap-3">
+          <img src="/lov/room-face-a.jpg" alt="" width={640} height={427} className="hidden aspect-[3/4] w-[34%] rounded-2xl object-cover sm:block" />
+          <div className="flex min-w-0 flex-1 flex-col justify-between gap-5 rounded-2xl bg-[radial-gradient(circle_at_50%_30%,#3a2a20,#211813)] p-5 sm:p-6">
+            <Eyebrow className="!text-[11px]">{t("landing2.hero.deckLabel")}</Eyebrow>
+            <p className="lp-serif text-xl italic leading-snug text-lpcream sm:text-[26px]">{t("landing2.hero.deckQuestion")}</p>
+            <div className="flex gap-2 text-[13px]">
+              <span className="rounded-full bg-lpcream px-3 py-1.5 font-semibold text-[#1a0f0a]">{t("landing2.hero.next")}</span>
+              <span className="rounded-full border border-[#5a4b42] px-3 py-1.5 text-[#d8cbbd]">{t("landing2.hero.skip")}</span>
+            </div>
+          </div>
+          <img src="/lov/room-face-b.jpg" alt="" width={540} height={360} className="hidden aspect-[3/4] w-[26%] self-end rounded-2xl object-cover sm:block" />
+        </div>
+        <div className="mt-3 grid grid-cols-6 gap-2 sm:gap-2.5">
+          {TRAY.map((id, i) => (
+            <div key={id} className="min-w-0 text-center">
+              <img src={tile(id)} alt="" width={512} height={512} loading="lazy" className="aspect-square w-full rounded-[10px] border border-lpborder object-cover" />
+              <div className="mt-1 truncate text-[11px] text-[#b3a89f]">{TRAY_NAMES[i]}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <figcaption className="mt-3 text-center text-[13px] text-[#b3a89f]">{t("landing2.hero.caption")}</figcaption>
+    </figure>
+  );
+}
+
+function Invitation({ card, art, tilt }: { card: InviteCard; art: string; tilt: string }) {
+  const { t } = useTranslation();
+  return (
+    <article className={`w-full overflow-hidden rounded-[10px] bg-lpcream text-[#2a1d15] shadow-[0_30px_60px_rgba(0,0,0,0.55)] ${tilt}`}>
+      <img src={tile(art)} alt={card.alt} width={512} height={512} loading="lazy" className="h-40 w-full object-cover md:h-48" />
+      <div className="px-6 pb-5 pt-6 text-center">
+        <div className="text-xs uppercase tracking-[0.3em] text-[#6e5646]">{t("landing2.invites.to")}</div>
+        <div className="lp-serif mt-1 text-2xl italic">{card.to}</div>
+        <div className="mt-3 text-sm text-[#5a4636]">{t("landing2.invites.invited")}</div>
+        <div className="lp-serif text-[34px] font-medium italic leading-tight">{card.what}</div>
+        <div className="mx-auto my-4 h-px w-12 bg-[#b89c86]" aria-hidden />
+        <div className="text-[15px] text-[#3b2c22]">{card.when}</div>
+        <div className="mt-4 text-xs uppercase tracking-[0.3em] text-[#6e5646]">{t("landing2.invites.bring")}</div>
+        <div className="mt-1 text-[15px] text-[#3b2c22]">{card.bring}</div>
+        <div className="lp-serif mt-3 text-base italic text-[#7a4a2a]">{card.note}</div>
+      </div>
+      <div className="flex items-center justify-between gap-3 border-t-2 border-dashed border-[#c9b3a0] px-6 py-4 text-left">
+        <div className="text-xs uppercase leading-relaxed tracking-[0.16em] text-[#5a4636]">
+          {card.admit}
+          <br />
+          {card.terms}
+        </div>
+        <div className="text-right font-mono text-[#2a1d15]">
+          <div className="text-lg tracking-[0.12em]">{card.code}</div>
+          <div className="text-[11px] uppercase tracking-[0.2em] text-[#6e5646]">{t("landing2.invites.pin")} {card.pin}</div>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 export default function Landing() {
   const { t } = useTranslation();
-  const steps = t("landing.how.steps", { returnObjects: true }) as Array<{ t: string; d: string }>;
-  const insideCards = t("landing.inside.cards", { returnObjects: true }) as Array<{ t: string; d: string }>;
-  const trust = t("landing.trust", { returnObjects: true }) as string[];
+  const invites = t("landing2.invites.cards", { returnObjects: true }) as InviteCard[];
+  const tiles = t("landing2.programme.tiles", { returnObjects: true }) as Tile[];
+  const steps = t("landing2.how.steps", { returnObjects: true }) as Step[];
+  const plans = t("landing2.pricing.plans", { returnObjects: true }) as Plan[];
+  const planPrices = [
+    TIER_PRICING.try.priceLabel,
+    TIER_PRICING.date_pack.priceLabel,
+    TIER_PRICING.long_pack.priceLabel,
+    TIER_PRICING.together.priceLabel,
+    plans[4]?.price ?? "",
+  ];
+  const planLinks = [START, START, START, START, SQUAD];
+
   return (
-    <div id="top" className="lp min-h-screen bg-lpbg text-lpcream">
+    <div id="top" className="lp min-h-screen overflow-x-hidden bg-lpbg text-lpcream">
       <SeoHead
         title={LANDING_SEO.title}
         description={LANDING_SEO.description}
@@ -69,422 +165,215 @@ export default function Landing() {
         themeColor={LANDING_SEO.themeColor}
         jsonLd={LANDING_JSON_LD}
       />
-      {/* Banner */}
-      <a href="#couples" className="block w-full border-b border-lpborder/40 bg-[oklch(0.13_0.01_40)]">
-        <div className="mx-auto max-w-7xl px-6 py-2.5 text-center text-[13px] text-lpmuted">
-          {t("landing.banner")}{" "}
-          <ArrowRight className="ml-1 -mt-0.5 inline h-3.5 w-3.5 text-lppeach" />
-        </div>
-      </a>
 
-      {/* Nav */}
-      <header className="sticky top-0 z-40 border-b border-lpborder/40 bg-lpbg/75 backdrop-blur-md">
-        <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-8 px-6">
+      <header className="sticky top-0 z-40 border-b border-lpborder/40 bg-lpbg/80 backdrop-blur-md">
+        <nav aria-label="Main" className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
           <Wordmark />
-          <ul className="hidden items-center gap-8 text-sm text-lpmuted md:flex">
-            <li><a href="#how" className="transition hover:text-lpcream">{t("landing.nav.how")}</a></li>
-            <li><a href="#inside" className="transition hover:text-lpcream">{t("landing.nav.inside")}</a></li>
-            <li><a href="#pricing" className="transition hover:text-lpcream">{t("landing.nav.pricing")}</a></li>
+          <ul className="hidden flex-1 items-center gap-7 text-sm text-[#d8cbbd] lg:flex">
+            <li><a href="#dates" className="transition hover:text-lpcream">{t("landing2.nav.dates")}</a></li>
+            <li><a href="#programme" className="transition hover:text-lpcream">{t("landing2.nav.inside")}</a></li>
+            <li><a href="#chaperon" className="transition hover:text-lpcream">{t("landing2.nav.chaperon")}</a></li>
+            <li><a href="#pricing" className="transition hover:text-lpcream">{t("landing2.nav.pricing")}</a></li>
           </ul>
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3">
             <LandingLanguageMenu className="hidden sm:block" iconOnly />
-            <LandingJoinMenu className="hidden sm:block" />
-            <Link to={START} className="lp-btn !px-5 !py-2.5 text-sm">{t("landing.nav.login")}</Link>
+            <LandingJoinMenu className="hidden md:block" />
+            <Link to={START} className="px-2 py-3 text-sm text-[#d8cbbd] transition hover:text-lpcream">{t("landing2.nav.login")}</Link>
+            <Link to={START} className="lp-btn hidden !px-5 !py-2.5 text-sm sm:inline-flex">{t("landing2.nav.write")}</Link>
           </div>
         </nav>
       </header>
 
-      {/* Section 1 — Hero */}
-      <section className="lp-vignette relative overflow-hidden">
-        <img src="/lov/hero-candlelit.jpg" alt="Candlelit dinner table with a tablet showing a video date" width={1920} height={1280} className="absolute inset-0 h-full w-full object-cover" />
-        <div className="relative z-10 mx-auto max-w-7xl px-6 pb-32 pt-28 md:pb-38 md:pt-30">
-          <div className="max-w-2xl text-left">
-            <Eyebrow>{t("landing.hero.eyebrow")}</Eyebrow>
-            <h1 className="lp-display mt-6 whitespace-pre-line text-5xl text-lpcream md:text-7xl lg:text-8xl">
-              {t("landing.hero.title")}
-            </h1>
-            <p className="mt-8 max-w-xl text-lg leading-relaxed text-lpcream/85 md:text-xl">
-              {t("landing.hero.subtitle")}
-            </p>
-            <p className="lp-serif mt-5 text-xl italic text-lppeachsoft md:text-2xl">{t("landing.hero.tagline")}</p>
-            <div className="mt-10 flex flex-wrap items-center gap-6">
-              <Link to={START} className="lp-btn">{t("landing.hero.create")}</Link>
-              <a href="#how" className="lp-link">{t("landing.hero.seeHow")}</a>
-            </div>
-            <p className="mt-6 text-[15px] text-lpmuted">
-              {t("landing.hero.gotCode")}{" "}
-              <Link to="/join" className="lp-link">{t("landing.hero.join")}</Link>
-            </p>
+      {/* Hero: the promise, and the real room beside it */}
+      <section className="mx-auto flex max-w-7xl flex-wrap items-center gap-12 px-4 pb-20 pt-12 sm:px-6 md:pt-20 lg:flex-nowrap lg:gap-14">
+        <div className="min-w-0 basis-full lg:basis-[44%]">
+          <Eyebrow>{t("landing2.hero.eyebrow")}</Eyebrow>
+          <h1 className="lp-display mt-5 whitespace-pre-line text-[54px] text-lpcream md:text-7xl lg:text-[84px]">
+            {t("landing2.hero.title")}
+          </h1>
+          <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-[#e4d8ca] md:text-xl">{t("landing2.hero.subtitle")}</p>
+          <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
+            <Link to={START} className="lp-btn">{t("landing2.hero.write")}</Link>
+            <ReceivedLink className="py-2 text-center sm:text-left" />
           </div>
+          <p className="mt-6 text-sm text-[#b3a89f]">{t("landing2.hero.fine")}</p>
+        </div>
+        <div className="min-w-0 basis-full lg:basis-[56%]">
+          <RoomPreview />
         </div>
       </section>
 
-      {/* Section 2 — Why this exists */}
-      <section className="mx-auto grid max-w-7xl items-center gap-10 px-6 py-16 md:grid-cols-2 md:py-7">
-        <div>
-          <Eyebrow>{t("landing.why.eyebrow")}</Eyebrow>
-          <h2 className="lp-display mt-5 whitespace-pre-line text-4xl text-lpcream md:text-6xl">
-            {t("landing.why.title")}
-          </h2>
-          <p className="mt-8 text-lg leading-relaxed text-lpmuted">
-            {t("landing.why.p1")}
-          </p>
-          <p className="mt-5 text-lg leading-relaxed text-lpmuted">
-            {t("landing.why.p2")}
-          </p>
-        </div>
-        <div className="relative">
-          <img
-            src="/hero-virtual-date-rose-petals.png"
-            alt="Virtual date with rose petals"
-            width={800}
-            height={800}
-            loading="lazy"
-            className="lp-glow aspect-square w-half rounded-2xl object-cover"
-          />
-        </div>
-      </section>
-
-      {/* Section 3 — How it works */}
-      <section id="how" className="border-t border-lpborder/40 bg-[oklch(0.14_0.012_40)]">
-        <div className="mx-auto max-w-7xl px-6 py-28 md:py-36">
-          <div className="mx-auto max-w-3xl text-center">
-            <Eyebrow>{t("landing.how.eyebrow")}</Eyebrow>
-            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">{t("landing.how.title")}</h2>
-          </div>
-
-          {/* Room mockup */}
-          <div className="lp-glow mx-auto mt-16 max-w-4xl rounded-3xl border border-lpborder bg-[oklch(0.12_0.01_40)] p-5 md:p-7">
-            <div className="flex items-center justify-between text-xs text-lpmuted">
-              <div className="flex gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.55_0.18_25)]" />
-                <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.78_0.14_75)]" />
-                <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.70_0.14_140)]" />
-              </div>
-              <div className="font-mono tracking-[0.3em] text-lpcream/80">DATE ROOM</div>
-              <div className="text-[11px] uppercase tracking-widest text-lppeach">{t("landing.how.live")}</div>
-            </div>
-
-            <div className="mt-5 grid grid-cols-2 gap-4">
-              <img src="/image copy.png" alt="Man and woman on a virtual date" width={640} height={426} className="object-cover rounded-2xl max-w-xs md:max-w-sm" />
-              <img src="/image.png" alt="Man and woman on a virtual date" width={640} height={426} className="object-cover rounded-2xl max-w-xs md:max-w-sm" />
-            </div>
-
-            <div className="mt-6 flex justify-center gap-4">
-              {[Mic, Video, Hangup].map((Icon, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className={`flex h-12 w-12 items-center justify-center rounded-full ${i === 2 ? "bg-[oklch(0.55_0.18_25)] text-lpcream" : "bg-lppeach text-lpbg"}`}
-                >
-                  <Icon className="h-5 w-5" />
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-20 grid gap-10 md:grid-cols-3">
-            {steps.map((s, i) => (
-              <div key={i}>
-                <div className="lp-serif text-3xl italic text-lppeach">{`0${i + 1}`}</div>
-                <h3 className="lp-display mt-3 text-2xl text-lpcream">{s.t}</h3>
-                <p className="mt-3 leading-relaxed text-lpmuted">{s.d}</p>
+      {/* Three kinds of date, as invitations */}
+      <section id="dates" className="scroll-mt-16 border-y border-lpborder bg-[#170f0c]">
+        <div className="mx-auto max-w-7xl px-4 py-20 text-center sm:px-6 md:py-28">
+          <Eyebrow>{t("landing2.invites.eyebrow")}</Eyebrow>
+          <h2 className="lp-display mt-4 text-5xl text-lpcream md:text-6xl">{t("landing2.invites.title")}</h2>
+          <p className="mx-auto mt-5 max-w-xl text-[17px] text-[#e4d8ca] md:text-lg">{t("landing2.invites.subtitle")}</p>
+          <div className="mt-14 grid gap-12 md:grid-cols-3 md:gap-8">
+            {invites.map((card, i) => (
+              <div key={card.to} className="mx-auto flex w-full max-w-[360px] flex-col items-center gap-5">
+                <Invitation card={card} art={INVITE_ART[i]} tilt={INVITE_TILT[i]} />
+                <Link to={INVITE_CTA[i]} className="py-2 text-[15px] font-semibold text-lppeach hover:text-lppeachsoft">{card.cta}</Link>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Section 4 — Inside the room */}
-      <section id="inside" className="mx-auto max-w-7xl px-6 py-28 md:py-36">
-        <div className="max-w-3xl">
-          <Eyebrow>{t("landing.inside.eyebrow")}</Eyebrow>
-          <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">
-            {t("landing.inside.title")}
+      {/* What you do inside */}
+      <section id="programme" className="mx-auto max-w-7xl scroll-mt-16 px-4 py-20 sm:px-6 md:py-28">
+        <div className="text-center">
+          <Eyebrow>{t("landing2.programme.eyebrow")}</Eyebrow>
+          <h2 className="lp-serif mt-4 text-4xl text-lpcream md:text-[54px] md:leading-tight">
+            {t("landing2.programme.title")} <span className="italic">{t("landing2.programme.titleItalic")}</span>
           </h2>
-          <p className="mt-6 text-lg text-lpmuted">{t("landing.inside.subtitle")}</p>
+          <p className="mx-auto mt-5 max-w-xl text-[17px] text-[#e4d8ca] md:text-lg">{t("landing2.programme.subtitle")}</p>
         </div>
-
-        <div className="mt-16 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {[MessageCircleQuestion, Play, Music2, Zap, Camera, Flame, HelpCircle, MoreHorizontal].map((Icon, i) => {
-            const card = { Icon, t: insideCards[i]?.t ?? "", d: insideCards[i]?.d ?? "" };
-            const bgImages = [
-              '/hero-virtual-date-rose-petals.png',
-              '/image.png',
-              '/lobby-mood-candlelit.png',
-              '/lov/hero-candlelit.jpg',
-              '/lov/friends-evening.jpg',
-              '/lov/phone-code.jpg',
-              '/premium-bg.png',
-              '/lov/final-door.jpg',
-            ];
-            return (
-              <article
-                key={i}
-                className="group relative overflow-hidden rounded-2xl border border-lpborder p-6 transition-all duration-500 ease-in-out hover:scale-[1.03] hover:border-lppeach/40 hover:shadow-lg hover:shadow-lppeach/10"
-                style={{
-                  backgroundImage: `url(${bgImages[i % bgImages.length]})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }}
-              >
-                {/* Dark overlay — hides background image until hover */}
-                <div
-                  className="absolute inset-0 bg-lpcard opacity-[0.95] transition-opacity duration-500 ease-out group-hover:opacity-0"
-                />
-                {/* Gradient accent overlay */}
-                <div
-                  className="absolute inset-0 opacity-0 transition-opacity duration-500 ease-out group-hover:opacity-40"
-                  style={{
-                    background:
-                      'linear-gradient(180deg, transparent 30%, oklch(0.12 0.02 40 / 0.85) 100%)',
-                  }}
-                />
-                <div className="relative z-10">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-full border border-lppeach/30 bg-lppeach/15 transition-colors duration-500 group-hover:border-lppeach/60 group-hover:bg-lppeach/25">
-                    <card.Icon className="h-5 w-5 text-lppeach" />
-                  </div>
-                  <h3 className="lp-display mt-8 text-2xl text-lpcream">{card.t}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-lpmuted transition-colors duration-500 group-hover:text-lpcream/90">{card.d}</p>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Section 5 — One room. Every app. */}
-      <section className="lp-vignette relative overflow-hidden border-y border-lpborder/40">
-        <img src="/lov/phone-code.jpg" alt="A phone showing a 6-digit code by candlelight" width={1280} height={1280} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="relative z-10 mx-auto max-w-7xl px-6 py-28 md:py-40">
-          <div className="max-w-2xl">
-            <Eyebrow>{t("landing.oneRoom.eyebrow")}</Eyebrow>
-            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">{t("landing.oneRoom.title")}</h2>
-            <p className="mt-8 text-lg leading-relaxed text-lpcream/85">
-              {t("landing.oneRoom.p1")}
-            </p>
-            <p className="mt-5 text-lg leading-relaxed text-lpcream/85">
-              {t("landing.oneRoom.p2")}
-            </p>
-            <div className="mt-10 flex gap-3 text-xs uppercase tracking-[0.25em] text-lpmuted">
-              <span className="rounded-full border border-lpborder/60 px-3 py-1.5">Tinder</span>
-              <span className="rounded-full border border-lpborder/60 px-3 py-1.5">Bumble</span>
-              <span className="rounded-full border border-lpborder/60 px-3 py-1.5">Hinge</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 6 — For couples */}
-      <section id="couples" className="relative overflow-hidden">
-        <img src="/premium-bg.png" alt="Warm morning light through curtains onto a rumpled bed" width={1920} height={1080} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, oklch(0.18 0.02 50 / 0.92) 0%, oklch(0.18 0.02 50 / 0.55) 60%, transparent 100%)" }} />
-        <div className="relative z-10 mx-auto max-w-7xl px-6 py-28 md:py-40">
-          <div className="max-w-xl">
-            <Eyebrow>{t("landing.couples.eyebrow")}</Eyebrow>
-            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">{t("landing.couples.title")}</h2>
-            <p className="mt-8 text-lg leading-relaxed text-lpcream/85">
-              {t("landing.couples.body")}
-            </p>
-            <Link to={START} className="lp-btn mt-10">{t("landing.couples.cta")}</Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 7 — For friends */}
-      <section id="friends" className="relative overflow-hidden">
-        <img src="/lov/friends-evening.jpg" alt="Cozy living room with a laptop showing a group video call" width={1920} height={1080} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute inset-0" style={{ background: "linear-gradient(270deg, oklch(0.18 0.02 50 / 0.92) 0%, oklch(0.18 0.02 50 / 0.55) 60%, transparent 100%)" }} />
-        <div className="relative z-10 mx-auto flex max-w-7xl justify-end px-6 py-28 md:py-40">
-          <div className="max-w-xl">
-            <Eyebrow>{t("landing.friends.eyebrow")}</Eyebrow>
-            <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">{t("landing.friends.title")}</h2>
-            <p className="mt-8 text-lg leading-relaxed text-lpcream/85">
-              {t("landing.friends.body")}
-            </p>
-            <Link to={SQUAD} className="lp-btn mt-10">{t("landing.friends.cta")}</Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 8 — Pricing */}
-      <section id="pricing" className="mx-auto max-w-7xl px-6 py-28 md:py-36">
-        <div className="mx-auto max-w-3xl text-center">
-          <Eyebrow>{t("landing.pricing.eyebrow")}</Eyebrow>
-          <h2 className="lp-display mt-5 text-4xl text-lpcream md:text-6xl">{t("landing.pricing.title")}</h2>
-        </div>
-
-        <div className="mt-16 grid gap-5 md:grid-cols-3">
-          {[
-            { name: t("landing.pricing.tryName"), price: TIER_PRICING.try.priceLabel, unit: t("landing.pricing.tryUnit"), desc: t("landing.pricing.tryDesc"), cta: t("landing.pricing.tryCta") },
-            { name: t("landing.pricing.datePackName"), price: TIER_PRICING.date_pack.priceLabel, unit: TIER_PRICING.date_pack.unit!, desc: t("landing.pricing.datePackDesc"), cta: t("landing.pricing.datePackCta") },
-            { name: t("landing.pricing.longPackName"), price: TIER_PRICING.long_pack.priceLabel, unit: TIER_PRICING.long_pack.unit!, desc: t("landing.pricing.longPackDesc"), cta: t("landing.pricing.longPackCta") },
-          ].map((p) => (
-            <PricingCard key={p.name} {...p} />
+        <div className="mt-12 grid grid-cols-2 gap-4 sm:grid-cols-3 md:gap-5 lg:grid-cols-5">
+          {tiles.map((tl, i) => (
+            <figure key={tl.name} className="m-0">
+              <img src={tile(PROGRAMME[i])} alt="" width={512} height={512} loading="lazy" className="aspect-square w-full rounded-2xl border border-lpborder object-cover" />
+              <figcaption className="mt-3">
+                <div className="lp-serif text-lg italic text-lpcream md:text-xl">{tl.name}</div>
+                <div className="mt-0.5 text-[13px] text-[#b3a89f] md:text-sm">{tl.line}</div>
+              </figcaption>
+            </figure>
           ))}
         </div>
-
-        <div className="mt-5 grid gap-5 md:grid-cols-2">
-          <PricingCard
-            name={t("landing.pricing.togetherName")}
-            price={TIER_PRICING.together.priceLabel}
-            unit={`${TIER_PRICING.together.priceSuffix ?? ""} · ${TIER_PRICING.together.unit}`}
-            desc={t("landing.pricing.togetherDesc")}
-            cta={t("landing.pricing.togetherCta")}
-            featured
-          />
-          <PricingCard
-            name={t("landing.pricing.squadName")}
-            price={t("landing.pricing.squadPrice")}
-            unit={t("landing.pricing.squadUnit")}
-            desc={t("landing.pricing.squadDesc")}
-            cta={t("landing.pricing.squadCta")}
-            to={SQUAD}
-            featured
-          />
-        </div>
+        <p className="lp-serif mx-auto mt-10 max-w-2xl text-center text-lg italic text-[#e4d8ca] md:text-xl">{t("landing2.programme.also")}</p>
       </section>
 
-      {/* Section 9 — App badges */}
-      <section className="mx-auto max-w-7xl px-6 pb-20 text-center">
-        <p className="lp-serif text-2xl italic text-lpcream">{t("landing.badges.tagline")}</p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-          {[
-            { top: t("landing.badges.comingSoon"), bot: "App Store" },
-            { top: t("landing.badges.comingSoon"), bot: "Google Play" },
-          ].map((b) => (
-            <div key={b.bot} className="flex cursor-not-allowed items-center gap-3 rounded-xl border border-lpborder bg-lpcard/60 px-6 py-3 text-left opacity-70">
-              <Sparkles className="h-6 w-6 text-lpmuted" />
-              <div>
-                <div className="text-[10px] uppercase tracking-widest text-lpmuted">{b.top}</div>
-                <div className="lp-serif text-lg italic text-lpcream">{b.bot}</div>
+      {/* Chaperon */}
+      <section id="chaperon" className="scroll-mt-16 border-y border-lpborder bg-[#170f0c]">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-12 px-4 py-20 sm:px-6 md:py-28 lg:flex-nowrap">
+          <div className="min-w-0 basis-full lg:basis-1/2">
+            <Eyebrow>{t("landing2.chaperon.eyebrow")}</Eyebrow>
+            <h2 className="lp-display mt-4 text-4xl text-lpcream md:text-[54px]">{t("landing2.chaperon.title")}</h2>
+            <p className="mt-6 text-[17px] leading-relaxed text-[#e4d8ca] md:text-lg">{t("landing2.chaperon.body")}</p>
+            <dl className="mt-7 space-y-4">
+              <div className="flex items-baseline gap-4">
+                <dt className="shrink-0 rounded-md bg-lppeach px-2.5 py-1 text-xs uppercase tracking-[0.16em] text-[#1a0f0a]">{t("landing2.chaperon.protect")}</dt>
+                <dd className="m-0 text-[#e4d8ca]">{t("landing2.chaperon.protectBody")}</dd>
               </div>
+              <div className="flex items-baseline gap-4">
+                <dt className="shrink-0 rounded-md border border-[#5a4b42] px-2.5 py-0.5 text-xs uppercase tracking-[0.16em] text-lppeachsoft">{t("landing2.chaperon.coach")}</dt>
+                <dd className="m-0 text-[#e4d8ca]">{t("landing2.chaperon.coachBody")}</dd>
+              </div>
+            </dl>
+            <p className="mt-8 text-[15px] text-[#b3a89f]">{t("landing2.chaperon.also")}</p>
+          </div>
+          <div className="flex min-w-0 basis-full flex-col gap-3.5 lg:basis-1/2">
+            <div className="rounded-[18px] border border-lpborder bg-lpcard p-6">
+              <div className="flex items-center gap-2 text-[13px] text-lppeachsoft">
+                <ShieldCheck className="h-4 w-4" aria-hidden />
+                {t("landing2.chaperon.noteLabel")}
+                <span className="ml-auto rounded-full border border-[#4a3a31] px-2 py-0.5 text-[11px] text-[#b3a89f]">{t("landing2.chaperon.example")}</span>
+              </div>
+              <p className="mt-3 text-lg leading-relaxed text-lpcream">{t("landing2.chaperon.noteBody")}</p>
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Section 10 — Trust strip */}
-      <section className="border-y border-lpborder/40 bg-[oklch(0.14_0.012_40)]">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-10 gap-y-4 px-6 py-8 text-sm text-lpcream/85">
-          {[ShieldCheck, PhoneOff, KeyRound, Lock].map((Icon, i) => (
-            <div key={i} className="flex items-center gap-2.5">
-              <Icon className="h-4 w-4 text-lppeach" />
-              <span>{trust[i]}</span>
+            <div className="rounded-[18px] border border-lpborder bg-lpcard p-5 sm:ml-12">
+              <div className="text-[13px] text-[#b3a89f]">{t("landing2.chaperon.seesLabel")}</div>
+              <p className="mt-2 text-base text-[#e4d8ca]">{t("landing2.chaperon.seesBody")}</p>
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Section 11 — Final CTA */}
-      <section id="cta" className="lp-vignette relative overflow-hidden">
-        <img src="/lov/final-door.jpg" alt="An open door with warm light spilling into a dark room" width={1920} height={1080} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="relative z-10 mx-auto max-w-3xl px-6 py-36 text-center md:py-48">
-          <h2 className="lp-display text-5xl text-lpcream md:text-7xl">{t("landing.finalCta.title")}</h2>
-          <p className="mt-8 text-lg text-lpcream/85">{t("landing.finalCta.subtitle")}</p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-6">
-            <Link to={START} className="lp-btn">{t("landing.finalCta.create")}</Link>
-            <Link to="/join" className="lp-link">{t("landing.finalCta.join")}</Link>
-            <a href="#pricing" className="lp-link">{t("landing.finalCta.pricing")}</a>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-lpborder/40 bg-[oklch(0.13_0.01_40)]">
-        <div className="mx-auto grid max-w-7xl gap-12 px-6 py-16 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
-          <div>
-            <Wordmark size="text-2xl" />
-            <p className="mt-5 max-w-sm text-sm leading-relaxed text-lpmuted">
-              {t("landing.footer.mission")}
-            </p>
-            <p className="lp-serif mt-5 italic text-lppeachsoft">{t("landing.footer.tagline")}</p>
-          </div>
+      {/* How it works */}
+      <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 md:py-24">
+        <h2 className="lp-serif text-3xl text-lpcream md:text-[44px] md:leading-tight">
+          {t("landing2.how.title")} <span className="italic">{t("landing2.how.titleItalic")}</span>
+        </h2>
+        <ol className="mt-10 grid gap-8 md:grid-cols-3 md:gap-6">
+          {steps.map((s) => (
+            <li key={s.n} className="border-t border-[#5a4b42] pt-5">
+              <div className="lp-serif text-xl italic text-lppeach">{s.n}</div>
+              <div className="mt-1.5 text-xl text-lpcream">{s.t}</div>
+              <p className="mt-2 text-base text-[#b3a89f]">{s.d}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
 
-          <FooterCol
-            title={t("landing.footer.product")}
-            links={[t("landing.footer.productFeatures"), t("landing.footer.productPricing"), t("landing.footer.productHow")]}
-          />
-          <FooterCol
-            title={t("landing.footer.company")}
-            links={[t("landing.footer.companyAbout"), t("landing.footer.companyPrivacy"), t("landing.footer.companyTerms")]}
-            hrefs={[undefined, "/privacy", "/terms"]}
-          />
-          <FooterCol
-            title={t("landing.footer.connect")}
-            links={["Twitter", "Instagram", t("landing.footer.connectContact")]}
-            icons={[Twitter, Instagram, Mail]}
-          />
+      {/* Pricing */}
+      <section id="pricing" className="scroll-mt-16 border-t border-lpborder bg-[#170f0c]">
+        <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 md:py-24">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <h2 className="lp-serif text-4xl text-lpcream md:text-[54px] md:leading-tight">
+              {t("landing2.pricing.title")} <span className="italic">{t("landing2.pricing.titleItalic")}</span>
+            </h2>
+            <p className="max-w-md text-sm text-[#b3a89f]">{t("landing2.pricing.note")}</p>
+          </div>
+          <div className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-5 lg:gap-4">
+            {plans.map((p, i) => (
+              <Link
+                key={p.name}
+                to={planLinks[i]}
+                className={`flex items-center gap-4 rounded-2xl border bg-lpcard p-5 transition hover:border-[#7a5a45] lg:flex-col lg:items-start lg:gap-2.5 lg:p-6 ${i === 3 ? "border-[#7a5a45]" : "border-lpborder"}`}
+              >
+                <span className="min-w-0 flex-1 lg:flex-none">
+                  <span className="block text-[11px] uppercase tracking-[0.18em] text-[#b3a89f]">{p.group}</span>
+                  <span className="block text-lg text-lpcream">{p.name}</span>
+                  <span className="block text-sm text-[#b3a89f] lg:hidden">{p.unit}</span>
+                </span>
+                <span className="lp-serif text-3xl text-lpcream lg:text-[44px] lg:leading-none">{planPrices[i]}</span>
+                <span className="hidden flex-1 text-sm text-[#b3a89f] lg:block">{p.unit}</span>
+                <span className="hidden text-[15px] font-semibold text-lppeach lg:block">{p.cta}</span>
+              </Link>
+            ))}
+          </div>
         </div>
-        <div className="border-t border-lpborder/40">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-6 text-xs text-lpmuted">
-            <span>{t("landing.footer.copyright", { year: new Date().getFullYear() })}</span>
-            <LandingLanguageMenu align="up" />
+      </section>
+
+      {/* Close */}
+      <section className="bg-[radial-gradient(ellipse_at_50%_0%,#3a2418_0%,#120c09_70%)]">
+        <div className="mx-auto max-w-3xl px-4 py-24 text-center sm:px-6 md:py-32">
+          <h2 className="lp-display text-5xl text-lpcream md:text-7xl">{t("landing2.final.title")}</h2>
+          <p className="mt-5 text-[17px] text-[#e4d8ca] md:text-lg">{t("landing2.final.subtitle")}</p>
+          <div className="mt-9 flex flex-col items-center gap-4 sm:flex-row sm:justify-center sm:gap-6">
+            <Link to={START} className="lp-btn">{t("landing2.hero.write")}</Link>
+            <ReceivedLink className="py-2" />
+          </div>
+          <div className="mt-10 flex flex-wrap justify-center gap-3">
+            <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 rounded-xl border border-[#5a4b42] px-4 py-2.5 text-left text-lpcream transition hover:border-lppeach">
+              <Smartphone className="h-5 w-5" aria-hidden />
+              <span className="leading-tight"><span className="block text-[11px] text-[#b3a89f]">{t("landing2.final.appStoreTop")}</span>App Store</span>
+            </a>
+            <a href={PLAY_STORE_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 rounded-xl border border-[#5a4b42] px-4 py-2.5 text-left text-lpcream transition hover:border-lppeach">
+              <Play className="h-5 w-5" aria-hidden />
+              <span className="leading-tight"><span className="block text-[11px] text-[#b3a89f]">{t("landing2.final.googleTop")}</span>Google Play</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-lpborder">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-x-6 gap-y-8 px-4 py-12 text-[15px] sm:px-6 md:grid-cols-[1.6fr_1fr_1fr_1fr]">
+          <div className="col-span-2 md:col-span-1">
+            <div className="lp-serif text-2xl italic text-lpcream">DateRoom</div>
+            <p className="mt-2 text-[#b3a89f]">{t("landing2.footer.tagline")}</p>
+          </div>
+          <ul className="space-y-2">
+            <li><a href="#dates" className="text-[#d8cbbd] hover:text-lpcream">{t("landing2.footer.dates")}</a></li>
+            <li><a href="#pricing" className="text-[#d8cbbd] hover:text-lpcream">{t("landing2.footer.pricing")}</a></li>
+            <li><Link to="/support" className="text-[#d8cbbd] hover:text-lpcream">{t("landing2.footer.help")}</Link></li>
+          </ul>
+          <ul className="space-y-2">
+            <li><Link to="/child-safety" className="text-[#d8cbbd] hover:text-lpcream">{t("landing2.footer.safety")}</Link></li>
+            <li><Link to="/privacy" className="text-[#d8cbbd] hover:text-lpcream">{t("landing2.footer.privacy")}</Link></li>
+            <li><Link to="/terms" className="text-[#d8cbbd] hover:text-lpcream">{t("landing2.footer.terms")}</Link></li>
+          </ul>
+          <ul className="space-y-2">
+            <li><a href="mailto:support@dateroom.io" className="text-[#d8cbbd] hover:text-lpcream">{t("landing2.footer.contact")}</a></li>
+            <li><LandingLanguageMenu align="up" /></li>
+          </ul>
+        </div>
+        <div className="border-t border-lpborder/60">
+          <div className="mx-auto max-w-7xl px-4 py-5 text-xs text-[#b3a89f] sm:px-6">
+            {t("landing2.footer.copyright", { year: new Date().getFullYear() })}
           </div>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function PricingCard({ name, price, unit, desc, cta, featured, to = START }: { name: string; price: string; unit: string; desc: string; cta: string; featured?: boolean; to?: string }) {
-  return (
-    <div className={`relative flex flex-col rounded-2xl border p-7 ${featured ? "border-lppeach/40 bg-gradient-to-b from-[oklch(0.22_0.03_50)] to-lpcard" : "border-lpborder bg-lpcard"}`}>
-      <div className="text-sm uppercase tracking-widest text-lppeach">{name}</div>
-      <div className="mt-5 flex items-baseline gap-2">
-        <span className="lp-display text-5xl text-lpcream">{price}</span>
-        <span className="text-sm text-lpmuted">{unit}</span>
-      </div>
-      <p className="mt-4 flex-1 text-sm leading-relaxed text-lpmuted">{desc}</p>
-      <Link to={to} className="lp-btn mt-8 self-start text-sm">{cta}</Link>
-    </div>
-  );
-}
-
-function FooterCol({
-  title,
-  links,
-  icons,
-  hrefs,
-}: {
-  title: string;
-  links: string[];
-  icons?: Array<ComponentType<{ className?: string }>>;
-  /** Optional per-link hrefs. Internal SPA paths starting with "/" are routed
-   *  via <Link>; anything else falls back to a placeholder anchor. */
-  hrefs?: Array<string | undefined>;
-}) {
-  return (
-    <div>
-      <div className="lp-eyebrow !text-lpmuted">{title}</div>
-      <ul className="mt-5 space-y-3 text-sm text-lpcream/85">
-        {links.map((l, i) => {
-          const Icon = icons?.[i];
-          const href = hrefs?.[i];
-          const inner = (
-            <>
-              {Icon ? <Icon className="h-4 w-4" /> : null}
-              {l}
-            </>
-          );
-          return (
-            <li key={l}>
-              {href && href.startsWith("/") ? (
-                <Link
-                  to={href}
-                  className="inline-flex items-center gap-2 transition hover:text-lppeach"
-                >
-                  {inner}
-                </Link>
-              ) : (
-                <a href={href ?? "#"} className="inline-flex items-center gap-2 transition hover:text-lppeach">
-                  {inner}
-                </a>
-              )}
-            </li>
-          );
-        })}
-      </ul>
     </div>
   );
 }
