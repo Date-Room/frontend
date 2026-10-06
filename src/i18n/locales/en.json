@@ -335,5 +335,223 @@
         "cta": "Open a room with friends"
       }
     }
+  },
+  "landing2": {
+    "nav": {
+      "dates": "The dates",
+      "inside": "Inside a room",
+      "chaperon": "Chaperon",
+      "pricing": "Pricing",
+      "login": "Log in",
+      "write": "Write an invitation",
+      "receivedShort": "Received one?"
+    },
+    "hero": {
+      "eyebrow": "DateRoom requests the pleasure",
+      "title": "Every room\nis a date.",
+      "subtitle": "And every date deserves an invitation. A private code and PIN, no phone numbers swapped, opens on any phone or laptop. Inside: things to do together, and a chaperon if you would like one.",
+      "write": "Write an invitation",
+      "received": "Received one?",
+      "enterCode": "Enter your code",
+      "fine": "Your first date is free · Nothing for them to install",
+      "roomWith": "With Amara",
+      "roomLeft": "42:18 left",
+      "chaperonOn": "Chaperon on",
+      "deckLabel": "The Deck · card 7",
+      "deckQuestion": "What is a small thing that made your week better, that nobody else noticed?",
+      "next": "Next card",
+      "skip": "Skip",
+      "caption": "Inside the room: a question card between you, games one tap away."
+    },
+    "invites": {
+      "eyebrow": "Three kinds of date",
+      "title": "Who is it for?",
+      "subtitle": "Someone new, the one you love, or the people you miss. Write the invitation, send the code, and the room is ready when they are.",
+      "to": "To",
+      "invited": "You are warmly invited to",
+      "bring": "Bring",
+      "pin": "PIN",
+      "cards": [
+        {
+          "to": "Someone new",
+          "what": "a first date",
+          "when": "Thursday, nine o’clock",
+          "bring": "Nothing. Not even your number.",
+          "note": "A chaperon will be present, should you wish.",
+          "admit": "Admit two",
+          "terms": "Free · 20 min",
+          "code": "K7M 2QX",
+          "pin": "4821",
+          "cta": "Write a first-date invitation",
+          "alt": "Two coffee cups by a rainy window"
+        },
+        {
+          "to": "The one in London",
+          "what": "a date night",
+          "when": "Sunday, 8 pm your time",
+          "bring": "The film we started. The note you left on the fridge.",
+          "note": "This room stays open.",
+          "admit": "Admit two",
+          "terms": "$20 a month",
+          "code": "H4R 9TB",
+          "pin": "1706",
+          "cta": "Open a room for the two of you",
+          "alt": "A fridge covered in notes and magnets"
+        },
+        {
+          "to": "Amaka, Kofi & Salma",
+          "what": "a night in",
+          "when": "Saturday, after the kids sleep",
+          "bring": "Opinions. Snacks. Your worst secret.",
+          "note": "Invitation only, while in beta.",
+          "admit": "Up to five",
+          "terms": "From $0.99 a seat",
+          "code": "P2W 6NC",
+          "pin": "9052",
+          "cta": "Request Squad access",
+          "alt": "Drinks on a table under a warm bulb"
+        }
+      ]
+    },
+    "programme": {
+      "eyebrow": "On the evening’s programme",
+      "title": "Not a video call.",
+      "titleItalic": "A date.",
+      "subtitle": "Every room comes with things to do together, so a quiet moment turns into a laugh instead of a stare.",
+      "also": "Also: a film in sync, a song for each other, and a photograph of you both to keep.",
+      "tiles": [
+        {
+          "name": "The Deck",
+          "line": "Questions past the small talk"
+        },
+        {
+          "name": "The 36",
+          "line": "The questions that build closeness"
+        },
+        {
+          "name": "This or That",
+          "line": "Fast choices, real answers"
+        },
+        {
+          "name": "Truth or Dare",
+          "line": "You choose how brave"
+        },
+        {
+          "name": "Two Truths",
+          "line": "And one lie. Spot it."
+        },
+        {
+          "name": "Rank It",
+          "line": "Put it in order, then argue"
+        },
+        {
+          "name": "Pick a Door",
+          "line": "Two doors, one choice"
+        },
+        {
+          "name": "Guacamole Panic",
+          "line": "A race against the clock"
+        },
+        {
+          "name": "Most Likely To",
+          "line": "For a night with your people"
+        },
+        {
+          "name": "Imposter",
+          "line": "One of you is bluffing"
+        }
+      ]
+    },
+    "chaperon": {
+      "eyebrow": "Safety, the old-fashioned way",
+      "title": "A chaperon will be present, should you wish.",
+      "body": "Meeting someone new? Turn on Chaperon, our AI that keeps you company on the call. It quietly points out anything worth a second look, and only you see it. You decide whether your date is told it is there.",
+      "protect": "Protect",
+      "protectBody": "Looks out for you on a first date. Your first protected date is free.",
+      "coach": "Coach · beta",
+      "coachBody": "Private nudges on pace and chemistry, while it is happening.",
+      "also": "Also on every date: no phone numbers swapped, a private code and PIN, report a concern in one tap, and a first-date room that closes when the date ends.",
+      "noteLabel": "Chaperon · only you can see this",
+      "noteBody": "They have asked twice which part of town you live in. You do not have to answer that yet.",
+      "example": "Example",
+      "seesLabel": "What your date sees, if you choose to tell them",
+      "seesBody": "Amara has a chaperon on."
+    },
+    "how": {
+      "title": "From “we should” to",
+      "titleItalic": "“we did” in two minutes.",
+      "steps": [
+        {
+          "n": "One",
+          "t": "Write the invitation",
+          "d": "Who it is for, when, and how long. You get a private code and PIN to send."
+        },
+        {
+          "n": "Two",
+          "t": "Send it",
+          "d": "In whatever app you talk in. They open it on any phone or laptop. Nothing to install."
+        },
+        {
+          "n": "Three",
+          "t": "Open the door",
+          "d": "Talk, play, watch. A first-date room closes when the date ends."
+        }
+      ]
+    },
+    "pricing": {
+      "title": "Pay for the date,",
+      "titleItalic": "not a subscription.",
+      "note": "Prices shown in US dollars; you pay in your own currency at checkout. M-Pesa in Kenya. Packs never expire.",
+      "plans": [
+        {
+          "group": "First date",
+          "name": "Try",
+          "unit": "One 20-minute date",
+          "cta": "Start free"
+        },
+        {
+          "group": "First date",
+          "name": "Date Pack",
+          "unit": "Three 1-hour dates",
+          "cta": "Get the pack"
+        },
+        {
+          "group": "First date",
+          "name": "Long Pack",
+          "unit": "Five 2-hour dates",
+          "cta": "Get the pack"
+        },
+        {
+          "group": "Date night",
+          "name": "Together",
+          "unit": "A month, for two. Your room stays open.",
+          "cta": "Open Together"
+        },
+        {
+          "group": "A night in",
+          "name": "Squad",
+          "price": "$0.99",
+          "unit": "A seat per night in a 4-night pack. Beta.",
+          "cta": "Request access"
+        }
+      ]
+    },
+    "final": {
+      "title": "Open the door.",
+      "subtitle": "Write the invitation. Send the code. The next move is theirs.",
+      "appStoreTop": "Download on the",
+      "googleTop": "Get it on"
+    },
+    "footer": {
+      "tagline": "Every room is a date.",
+      "dates": "The dates",
+      "pricing": "Pricing",
+      "help": "Help",
+      "safety": "Safety",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "contact": "Contact us",
+      "copyright": "© DateRoom, {{year}}."
+    }
   }
 }
