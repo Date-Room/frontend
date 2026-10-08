@@ -17,10 +17,19 @@ export type BreakdownRow = {
   key: string;
   signed_up: number;
   new_in_period: number;
+  /** Missing on servers older than the funnel rework. */
+  opened_a_room?: number;
   had_a_date: number;
+  /** Opened or joined a room a day or more after signing up. */
+  used_again?: number;
   came_back_later: number;
   paid: number;
 };
+
+/** Pure: "used it again" from any server; older ones only had a visit-based count. */
+export function usedAgain(r: BreakdownRow): number {
+  return r.used_again ?? r.came_back_later;
+}
 
 let names: Intl.DisplayNames | null = null;
 /** Pure-ish: "KE" → "Kenya"; "unknown" → "Unknown". */
@@ -50,11 +59,13 @@ export function foldRows(rows: BreakdownRow[], top = TOP): BreakdownRow[] {
       key: "other",
       signed_up: acc.signed_up + r.signed_up,
       new_in_period: acc.new_in_period + r.new_in_period,
+      opened_a_room: (acc.opened_a_room ?? 0) + (r.opened_a_room ?? 0),
       had_a_date: acc.had_a_date + r.had_a_date,
+      used_again: (acc.used_again ?? 0) + usedAgain(r),
       came_back_later: acc.came_back_later + r.came_back_later,
       paid: acc.paid + r.paid,
     }),
-    { key: "other", signed_up: 0, new_in_period: 0, had_a_date: 0, came_back_later: 0, paid: 0 },
+    { key: "other", signed_up: 0, new_in_period: 0, opened_a_room: 0, had_a_date: 0, used_again: 0, came_back_later: 0, paid: 0 },
   );
   return [...sorted.slice(0, top), other];
 }
@@ -91,14 +102,15 @@ export function BreakdownBars({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[560px] text-sm">
+      <table className="w-full min-w-[640px] text-sm">
         <thead className="whitespace-nowrap text-left text-[11px] uppercase tracking-wider text-muted-foreground/70">
           <tr>
             <th className="px-4 py-2">{header}</th>
             <th className="px-2 py-2">Signed up</th>
             <th className="px-2 py-2 text-right" title="signed up in the selected period">New</th>
+            <th className="px-2 py-2 text-right" title="% of this group's sign-ups who opened or joined a room">Opened a room</th>
             <th className="px-2 py-2 text-right" title="% of this group's sign-ups who had a date">Had a date</th>
-            <th className="px-2 py-2 text-right" title="% who came back on a later day">Came back</th>
+            <th className="px-2 py-2 text-right" title="% who opened or joined a room again, a day or more after signing up">Used again</th>
             <th className="px-4 py-2 text-right" title="% who paid real money">Paid</th>
           </tr>
         </thead>
@@ -121,7 +133,7 @@ export function BreakdownBars({
               >
                 <td className="whitespace-nowrap px-4 py-1.5 text-cream/90">{r.key === "other" ? "Other" : label(r.key)}</td>
                 <td className="w-[45%] px-2 py-1.5">
-                  <div className="flex items-center gap-2" title={`${r.signed_up} signed up · ${r.had_a_date} had a date · ${r.came_back_later} came back · ${r.paid} paid`}>
+                  <div className="flex items-center gap-2" title={`${r.signed_up} signed up · ${r.opened_a_room ?? "?"} opened a room · ${r.had_a_date} had a date · ${usedAgain(r)} used it again · ${r.paid} paid`}>
                     <div className="h-2.5 flex-1">
                       <div
                         className={cn("h-full rounded-r-[4px]", active || hover === r.key ? "bg-primary" : "bg-primary/70")}
@@ -132,8 +144,9 @@ export function BreakdownBars({
                   </div>
                 </td>
                 <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground">{r.new_in_period || "—"}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{r.opened_a_room == null ? "—" : pct(r.opened_a_room, r.signed_up)}</td>
                 <td className="px-2 py-1.5 text-right tabular-nums">{pct(r.had_a_date, r.signed_up)}</td>
-                <td className="px-2 py-1.5 text-right tabular-nums">{pct(r.came_back_later, r.signed_up)}</td>
+                <td className="px-2 py-1.5 text-right tabular-nums">{pct(usedAgain(r), r.signed_up)}</td>
                 <td className="px-4 py-1.5 text-right tabular-nums">{pct(r.paid, r.signed_up)}</td>
               </tr>
             );

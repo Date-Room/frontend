@@ -2,17 +2,21 @@
  * Growth answers "are people staying?": who got from sign-up to a real
  * date and back again, what rooms opened and how they were paid for, and
  * which permanent rooms nobody is paying for. Read from the analytics log,
- * which outlives room purges; team and admin accounts are left out.
+ * which outlives room purges; team and test accounts are left out (friends
+ * the founders invite are real users, and rooms they share with a founder
+ * count).
  */
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  getAdminActivity,
   getAdminAnalytics,
   postAdminAnalyticsBackfill,
+  type ActivityGroup,
   type AnalyticsFunnelStep,
-  type AnalyticsReport, ROOM_KIND_LABELS, type RoomKindFilter } from "@/lib/admin";
+  type AnalyticsReport, type AnalyticsUsage, ROOM_KIND_LABELS, type RoomKindFilter } from "@/lib/admin";
 import { ApiError } from "@/lib/api";
 import { RevenueChart } from "@/components/admin/RevenueChart";
 import { BreakdownBars, CountryBars, countryName, flag } from "@/components/admin/CountryBars";
@@ -22,9 +26,22 @@ const FUNNEL_LABELS: Record<AnalyticsFunnelStep["step"], string> = {
   signed_up: "Signed up",
   opened_or_joined_room: "Opened or joined a room",
   had_a_date: "Had a date (both on the call)",
+  used_again: "Used it again (a room, a day or more later)",
+  // Older servers only.
   came_back_later: "Came back on a later day",
   paid: "Paid real money",
 };
+
+/** Pure: the counts beside the funnel, as labelled lines (empty on older servers). */
+export function usageLines(u: AnalyticsUsage | undefined): { label: string; value: number }[] {
+  if (!u) return [];
+  return [
+    { label: "Signed up but never opened a room", value: u.never_opened_a_room },
+    { label: "Opened a room, no date yet", value: u.opened_but_no_date },
+    { label: "Used it again without a date", value: u.used_again_without_a_date },
+    { label: "Paid real money (anyone)", value: u.paid },
+  ];
+}
 
 const PAID_VIA_LABELS: Record<string, string> = {
   free: "Free try",
@@ -192,6 +209,12 @@ export function eventLine(kind: string, props: Record<string, unknown>): string 
       return `Renewed a Together room${via}`;
     case "room_purged":
       return `Room closed · ${CLOSED_LABELS[String(props.reason)] ?? String(props.reason ?? "")}`;
+    case "signed_up":
+      return "Signed up";
+    case "night_started":
+      return "Started a squad night";
+    case "night_refunded":
+      return "Squad night refunded";
     default:
       return kind;
   }
@@ -226,6 +249,107 @@ const when = (iso: string) =>
 
 function sum(rows: AnalyticsReport["daily"], key: keyof AnalyticsReport["daily"][number]) {
   return rows.reduce((n, r) => n + (Number(r[key]) || 0), 0);
+}
+
+/** Rebuild history is a one-off repair (it recovered rooms from before
+ * tracking began); kept out of the way so it isn't pressed by habit. */
+function AdminTools() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="text-xs">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="text-muted-foreground/70 hover:text-cream">
+        {open ? "Hide admin tools" : "Admin tools"}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2 rounded-xl border border-white/[0.08] bg-card/40 px-4 py-3">
+          <p className="max-w-2xl text-muted-foreground">
+            Rebuild history recovers rooms and visits from before tracking began in late September. It replaces its own
+            earlier rebuild, so it is safe to repeat, but you shouldn't need it again.
+          </p>
+          <Backfill />
+        </div>
+      )}
+    </div>
+  );
+}
+
+const FEED_GROUPS: { id: ActivityGroup | null; label: string }[] = [
+  { id: null, label: "Everything" },
+  { id: "calls", label: "Calls" },
+  { id: "signups", label: "Sign-ups" },
+  { id: "rooms", label: "Rooms closed / kept" },
+];
+
+function ActivityFeed({ includeTeam }: { includeTeam: boolean }) {
+  const [group, setGroup] = useState<ActivityGroup | null>(null);
+  const [search, setSearch] = useState("");
+  const q = useInfiniteQuery({
+    queryKey: ["admin-activity", includeTeam, group, search.trim().toLowerCase()],
+    queryFn: ({ pageParam }) => getAdminActivity({ includeTeam, group, search, before: pageParam }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.next_before,
+    refetchInterval: 60_000,
+    placeholderData: (prev) => prev,
+  });
+  const items = q.data?.pages.flatMap((p) => p.items) ?? [];
+  const total = q.data?.pages[0]?.total;
+  return (
+    <Section
+      title="Activity"
+      hint={total == null ? "newest first" : `newest first · ${items.length} of ${total}`}
+      right={
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="One person's email…"
+          aria-label="Filter activity by email"
+          className="w-48 rounded-lg border border-white/[0.14] bg-card px-2.5 py-1.5 text-xs text-cream/90"
+        />
+      }
+    >
+      <div className="flex flex-wrap gap-1.5 border-b border-white/[0.06] px-4 py-2">
+        {FEED_GROUPS.map((g) => (
+          <button
+            key={g.label}
+            type="button"
+            onClick={() => setGroup(g.id)}
+            className={cn(
+              "rounded-full px-2.5 py-1 text-xs",
+              group === g.id ? "bg-white/[0.12] text-cream" : "text-muted-foreground hover:bg-white/[0.05]",
+            )}
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+      {q.isError && items.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-muted-foreground/70">
+          {q.error instanceof ApiError && q.error.status === 404
+            ? "The full activity list arrives with the next server update."
+            : "Couldn't load activity just now."}
+        </p>
+      ) : items.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-muted-foreground/70">{q.isLoading ? "Loading…" : "Nothing here yet."}</p>
+      ) : (
+        <ul>
+          {items.map((e, i) => (
+            <li key={`${e.at}-${e.kind}-${i}`} className="flex flex-wrap items-baseline gap-x-3 border-t border-white/[0.06] px-4 py-2 text-sm first:border-t-0">
+              <span className="w-28 shrink-0 text-xs tabular-nums text-muted-foreground/70">{when(e.at)}</span>
+              <span className="text-cream/90">{eventLine(e.kind, e.props)}</span>
+              <span className="ml-auto text-xs text-muted-foreground/70">{e.user_email ?? "guest"}{e.backfilled ? " · rebuilt" : ""}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {q.hasNextPage && (
+        <div className="border-t border-white/[0.06] px-4 py-2 text-center">
+          <button type="button" onClick={() => void q.fetchNextPage()} disabled={q.isFetchingNextPage} className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline disabled:opacity-40">
+            {q.isFetchingNextPage && <Loader2 className="h-3.5 w-3.5 animate-spin" />}Load older
+          </button>
+        </div>
+      )}
+    </Section>
+  );
 }
 
 function Backfill() {
@@ -373,7 +497,7 @@ export default function AdminGrowth() {
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Tile label="Dates" value={String(sum(daily, "dates"))} sub="both people on the call" />
             <Tile label="Rooms opened" value={String(sum(daily, "opened"))} sub={`${sum(daily, "opened_paid")} paid · ${sum(daily, "opened_free")} free`} />
-            <Tile label="Active per day" value={String(avgActive)} sub={`${active[active.length - 1] ?? 0} today`} />
+            <Tile label="Visits per day" value={String(avgActive)} sub={`signed in · ${active[active.length - 1] ?? 0} today`} />
             <Tile label="Typical call" value={formatDuration(r.median_call_seconds)} sub="median, ended rooms" />
           </div>
 
@@ -426,7 +550,7 @@ export default function AdminGrowth() {
           )}
 
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <Section title="From sign-up to staying" hint="all time · right column is % of the step before">
+            <Section title="From sign-up to staying" hint="all time · each step counts only people who made the one before · right column is % of that step">
               <div className="space-y-3 px-4 py-4">
                 {funnelRows(r.funnel).map((s, i) => (
                   <div key={s.step}>
@@ -443,9 +567,19 @@ export default function AdminGrowth() {
                   </div>
                 ))}
               </div>
+              {usageLines(r.usage).length > 0 && (
+                <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 border-t border-white/[0.06] px-4 py-3 text-xs">
+                  {usageLines(r.usage).map((l) => (
+                    <div key={l.label} className="contents">
+                      <dt className="text-muted-foreground">{l.label}</dt>
+                      <dd className="text-right tabular-nums text-cream/90">{l.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
             </Section>
 
-            <Section title="Do sign-ups come back?" hint="% of each week's sign-ups active N weeks later">
+            <Section title="Do sign-ups come back and use it?" hint="% of each week's sign-ups who opened or joined a room N weeks later">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-left text-[11px] uppercase tracking-wider text-muted-foreground/70">
@@ -481,7 +615,7 @@ export default function AdminGrowth() {
             <Section title="Dates per day" hint="both people on the call">
               <div className="px-4 pb-2 pt-3"><RevenueChart points={daily.map((d) => ({ day: d.day, value: d.dates }))} height={160} /></div>
             </Section>
-            <Section title="Active people per day" hint="signed in and used the app">
+            <Section title="People visiting per day" hint="signed in, whether or not they used a room (an open tab counts)">
               <div className="px-4 pb-2 pt-3"><RevenueChart points={daily.map((d) => ({ day: d.day, value: d.active_users }))} height={160} /></div>
             </Section>
           </div>
@@ -675,21 +809,9 @@ export default function AdminGrowth() {
             )}
           </Section>
 
-          <Section title="Recent activity" hint="newest first" right={<Backfill />}>
-            {r.recent.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-muted-foreground/70">Nothing recorded yet. Use Rebuild history to recover rooms that still exist.</p>
-            ) : (
-              <ul>
-                {r.recent.map((e, i) => (
-                  <li key={i} className="flex flex-wrap items-baseline gap-x-3 border-t border-white/[0.06] px-4 py-2 text-sm first:border-t-0">
-                    <span className="w-28 shrink-0 text-xs tabular-nums text-muted-foreground/70">{when(e.at)}</span>
-                    <span className="text-cream/90">{eventLine(e.kind, e.props)}</span>
-                    <span className="ml-auto text-xs text-muted-foreground/70">{e.user_email ?? "guest"}{e.backfilled ? " · rebuilt" : ""}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Section>
+          <ActivityFeed includeTeam={includeTeam} />
+
+          <AdminTools />
         </>
       )}
     </div>

@@ -23,3 +23,12 @@ describe("CountryBars helpers", () => {
     expect(foldCountries([row("KE", 5), row("NG", 3)], 1).map((r) => r.country)).toEqual(["KE", "NG"]);
   });
 });
+
+describe("usedAgain", () => {
+  it("prefers the room-based count and falls back to the old visit count", async () => {
+    const { usedAgain } = await import("./CountryBars");
+    const base = { key: "KE", signed_up: 5, new_in_period: 1, had_a_date: 2, came_back_later: 4, paid: 0 };
+    expect(usedAgain(base)).toBe(4);
+    expect(usedAgain({ ...base, used_again: 1 })).toBe(1);
+  });
+});
