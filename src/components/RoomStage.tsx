@@ -12,6 +12,7 @@ import { RoomContext } from "@livekit/components-react";
 import { CameraDropup, MicDropup, SquadLayoutMenu } from "@/components/DeviceMenu";
 import { SeatRequestsBanner } from "@/components/squad/SeatRequestsBanner";
 import { JoinRequestsAlert } from "@/components/squad/JoinRequests";
+import { GUEST_HIDDEN_ACTIVITIES, isSquadGuest } from "@/lib/squadGuests";
 import { createPortal } from "react-dom";
 import {
   RotateCw,
@@ -619,6 +620,9 @@ export function RoomStage({
   /** Phone, squad night, watching: chat lines run under the film. */
   const squadTicker = squadCouch && WATCHING_IDS.has(staged) && !wide;
   chatTickerRef.current = squadTicker;
+  /** Tonight's guest in a squad: the call and games, not the squad's chat
+   *  history, fridge or vision board (the server refuses those anyway). */
+  const squadGuest = squad && isSquadGuest(roomId);
   const squadGroupLayout: GroupLayout | undefined = squadStrip
     ? "strip"
     : squadGameStaged
@@ -698,10 +702,11 @@ export function RoomStage({
         ...c,
         items: c.itemIds
           .filter((id) => !(squad && DATE_GAME_IDS.has(id)))
+          .filter((id) => !(squadGuest && GUEST_HIDDEN_ACTIVITIES.has(id)))
           .map((id) => items.find((i) => i.id === id))
           .filter((i): i is StageItem => Boolean(i)),
       })).filter((c) => c.items.length > 0),
-    [items, squad],
+    [items, squad, squadGuest],
   );
   const activeCat = catId ? availCats.find((c) => c.id === catId) ?? null : null;
   /** The launcher is a floating dropup again, not a resident dock: the stage
@@ -1429,7 +1434,7 @@ export function RoomStage({
               </ActivityBoundary>
             ) : null}
           </div>
-          {squadTicker && (
+          {squadTicker && !squadGuest && (
             <ChatTicker
               lines={tickerLines(chat?.messages ?? [], room.senderId, presenceName)}
               onOpen={() => setChatOpen(true)}
@@ -1649,7 +1654,7 @@ export function RoomStage({
                   type="button"
                   onClick={() => setChatOpen(true)}
                   aria-label={chatUnread ? `Chat, ${chatUnread} unread` : "Chat"}
-                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", "relative border-white/10 bg-card/85 text-primary")}
+                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", "relative border-white/10 bg-card/85 text-primary", squadGuest && "!hidden")}
                 >
                   <MessageCircle className="h-5 w-5" />
                   {chatUnread > 0 && (

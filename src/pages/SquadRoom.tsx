@@ -63,6 +63,7 @@ import { cn } from "@/lib/utils";
 import { SquadNightSize } from "@/components/squad/SquadNightSize";
 import { SeatRequestsBanner } from "@/components/squad/SeatRequestsBanner";
 import { JoinRequestsCard } from "@/components/squad/JoinRequests";
+import { GuestsAfterTheNight } from "@/components/squad/GuestsAfterTheNight";
 
 /** Broadcast when someone starts a night, so everyone here sees it at once. */
 const NIGHT_STARTED = "squad.night_started";
@@ -302,6 +303,7 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
         </header>
 
         <JoinRequestsCard roomId={roomId} />
+        <GuestsAfterTheNight roomId={roomId} canRun={canRunSquad(members.data)} />
 
         {!n ? (
           <div className="editorial-card flex justify-center p-8">
