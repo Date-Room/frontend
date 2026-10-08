@@ -76,10 +76,30 @@ export function speakerFirst(
 /** Grid columns for n tiles (faces plus free seats). */
 export function gridColumns(n: number): number {
   if (n <= 1) return 1;
-  // Three is one row of three big tiles, not two over one with a gap.
-  if (n === 3) return 3;
   if (n <= 4) return 2;
   return 3;
+}
+
+/** Pure: grid columns for n tiles in a w x h stage, the count whose tiles
+ *  come closest to a camera's shape (16:9). The stage is filled top to
+ *  bottom, so a single row of three on a laptop made tall, narrow tiles;
+ *  this keeps 3 as 2 x 2 there and allows a row of three only on a very
+ *  wide stage. Falls back to gridColumns before the stage is measured. */
+export function gridColumnsFor(n: number, w: number, h: number): number {
+  if (n <= 1) return 1;
+  if (w <= 0 || h <= 0) return gridColumns(n);
+  const target = Math.log(16 / 9);
+  let best = gridColumns(n);
+  let bestScore = Infinity;
+  for (let cols = 1; cols <= Math.min(n, 4); cols++) {
+    const rows = Math.ceil(n / cols);
+    const score = Math.abs(Math.log(w / cols / (h / rows)) - target);
+    if (score < bestScore - 1e-9) {
+      best = cols;
+      bestScore = score;
+    }
+  }
+  return best;
 }
 
 /** "Amaka", "Amaka and Salma", "Amaka, Salma and Nia". */

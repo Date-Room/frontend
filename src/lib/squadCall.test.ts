@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { friendGridClass, gridColumns, joinNames, liveVideoFor, squadHereLine, localClock, nearTheEnd, placeLine, speakerFirst, timeLeft , readSeats, saveSeats, swapSeats, tableFaceShare, tableSeats, tableTile } from "./squadCall";
+import { friendGridClass, gridColumns, gridColumnsFor, joinNames, liveVideoFor, squadHereLine, localClock, nearTheEnd, placeLine, speakerFirst, timeLeft , readSeats, saveSeats, swapSeats, tableFaceShare, tableSeats, tableTile } from "./squadCall";
 
 const at = new Date("2026-09-29T17:30:00Z");
 
@@ -45,7 +45,7 @@ describe("squad call helpers", () => {
   });
 
   it("picks grid columns", () => {
-    expect([1, 2, 3, 4, 5, 6].map(gridColumns)).toEqual([1, 2, 3, 2, 3, 3]);
+    expect([1, 2, 3, 4, 5, 6].map(gridColumns)).toEqual([1, 2, 2, 2, 3, 3]);
   });
 });
 
@@ -97,5 +97,23 @@ describe("the table", () => {
     expect(readSeats("r")).toEqual(["b", "a"]);
     saveSeats("r", null);
     expect(readSeats("r")).toBeNull();
+  });
+});
+
+
+describe("gridColumnsFor", () => {
+  it("keeps tiles close to a camera's shape for the stage it has", () => {
+    // A laptop stage (about 1220 x 830): three is 2 x 2, not tall slivers.
+    expect(gridColumnsFor(3, 1220, 830)).toBe(2);
+    expect(gridColumnsFor(4, 1220, 830)).toBe(2);
+    // Six: three rows of two keeps wide tiles; two rows of three would be square.
+    expect(gridColumnsFor(6, 1220, 830)).toBe(2);
+    expect(gridColumnsFor(6, 1900, 830)).toBe(3);
+    // A very wide, short stage can take a row of three.
+    expect(gridColumnsFor(3, 2400, 500)).toBe(3);
+    // A tall phone stage stacks them.
+    expect(gridColumnsFor(2, 390, 700)).toBe(1);
+    // Not measured yet: the simple rule.
+    expect(gridColumnsFor(5, 0, 0)).toBe(3);
   });
 });
