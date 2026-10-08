@@ -383,3 +383,77 @@ export function squadErrorText(e: unknown, fallback: string): string {
   }
   return fallback;
 }
+
+// ── Lending a seat (backend#114) ─────────────────────────────────────────
+
+export type SeatRequest = {
+  id: string;
+  user_id: string;
+  name: string;
+  /** pending | lent | declined | cancelled | expired */
+  status: string;
+  created_at: string;
+  expires_at: string;
+};
+
+/** What lending one seat leaves the squad with. */
+export type SeatEffect = {
+  night_size: number;
+  seats_before: number;
+  seats_after: number;
+  nights_before: number;
+  spare_before: number;
+  nights_after: number;
+  spare_after: number;
+  can_lend: boolean;
+};
+
+export type SeatRequests = { requests: SeatRequest[]; effect: SeatEffect | null; can_lend: boolean };
+
+/** Live events: someone asked; a manager answered. `seat_request_paid` is
+ *  sent by a manager's app after paying for the seat themselves. */
+export const SEAT_REQUESTED = "seat_requested";
+export const SEAT_DECIDED = "seat_request_decided";
+export const SEAT_PAID = "seat_request_paid";
+
+export function askForSeat(roomId: string) {
+  return api.post<SeatRequest>(`/v1/rooms/${roomId}/nights/current/seat-requests`, {});
+}
+
+export function getSeatRequests(roomId: string) {
+  return api.get<SeatRequests>(`/v1/rooms/${roomId}/nights/current/seat-requests`);
+}
+
+export function lendSeat(roomId: string, requestId: string) {
+  return api.post<SeatRequest>(`/v1/rooms/${roomId}/nights/current/seat-requests/${requestId}/lend`, {});
+}
+
+export function declineSeat(roomId: string, requestId: string) {
+  return api.post<SeatRequest>(`/v1/rooms/${roomId}/nights/current/seat-requests/${requestId}/decline`, {});
+}
+
+export function cancelSeatRequest(roomId: string, requestId: string) {
+  return api.delete<void>(`/v1/rooms/${roomId}/nights/current/seat-requests/${requestId}`);
+}
+
+/** Pure: the cost of saying yes, in the squad's own terms.
+ *  "Lending a seat leaves 3 nights + 1 spare seat (was 4 nights)." */
+export function seatEffectLine(e: SeatEffect): string {
+  if (!e.can_lend) return "The squad has no seats left to lend.";
+  const after = nightsAndSpare(e.seats_after, e.night_size);
+  const before = nightsAndSpare(e.seats_before, e.night_size);
+  return `Lending a seat leaves ${after} (was ${before}).`;
+}
+
+/** Pure: the squad owner's first name, for "Ask Joshua". */
+export function ownerFirstName(m: SquadMembers | undefined): string {
+  const owner = m?.members.find((x) => x.role === "owner");
+  return (owner?.display_name || "the host").split(" ")[0];
+}
+
+/** Pure: the error code on a squad API refusal, if any. */
+export function squadErrorCode(e: unknown): string | null {
+  if (!(e instanceof ApiError)) return null;
+  const detail = (e.body as { detail?: unknown } | undefined)?.detail;
+  return detail && typeof detail === "object" && "error" in detail ? String((detail as { error: unknown }).error) : null;
+}
