@@ -76,6 +76,8 @@ export function speakerFirst(
 /** Grid columns for n tiles (faces plus free seats). */
 export function gridColumns(n: number): number {
   if (n <= 1) return 1;
+  // Three is one row of three big tiles, not two over one with a gap.
+  if (n === 3) return 3;
   if (n <= 4) return 2;
   return 3;
 }
@@ -124,9 +126,11 @@ export type Seat = string | null;
 
 /**
  * Pure: who sits where. Friends fill the left from the top, then the right;
- * you sit under them on the right. Five on the call is three a side with
- * the sixth space free. A saved arrangement (this device's own) wins for
- * everyone still on the call; newcomers join at the end.
+ * you sit under them on the right. Both sides always match (decided
+ * 2026-10-08, a lopsided 2/1 or 3/2 looked wrong): three on the call is
+ * two a side, five is three a side, with the spare space showing the
+ * squad's scores; six is three a side. A saved arrangement (this device's
+ * own) wins for everyone still on the call; newcomers join at the end.
  */
 export function tableSeats(
   present: string[],
@@ -139,10 +143,12 @@ export function tableSeats(
     ? [...saved.filter((id) => base.includes(id)), ...base.filter((id) => !saved.includes(id))]
     : base;
   const n = order.length;
-  const leftCount = n >= 5 ? 3 : Math.floor(n / 2);
+  // Odd counts above one take the bigger half on the left; the scores
+  // fill the right's spare space so the sides match.
+  const leftCount = n > 1 ? Math.ceil(n / 2) : 0;
   const left: Seat[] = order.slice(0, leftCount);
   const right: Seat[] = order.slice(leftCount);
-  if (n === 5) right.push(null);
+  if (n > 1 && n % 2 === 1) right.push(null);
   return { left, right };
 }
 
