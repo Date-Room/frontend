@@ -6,6 +6,7 @@
  * (RoomStage) shows mute and camera from the call next to Activities and
  * chat. One live call, rearranged: never a second copy of anyone's video.
  */
+import type { Room } from "livekit-client";
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 
 /**
@@ -47,12 +48,14 @@ export type StageCue = {
   live?: boolean;
 };
 
-/** Mute and camera, lifted out of the call so the room bar can show them. */
+/** Mute and camera, lifted out of the call so the room bar can show them,
+ *  with the call itself so the bar's device pickers can switch devices. */
 export type CallControls = {
   mic: boolean;
   cam: boolean;
   toggleMic: () => void;
   toggleCam: () => void;
+  room: Room;
 };
 
 type SquadStage = {

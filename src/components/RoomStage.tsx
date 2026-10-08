@@ -8,6 +8,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { RoomContext } from "@livekit/components-react";
+import { CameraDropup, MicDropup } from "@/components/DeviceMenu";
 import { createPortal } from "react-dom";
 import {
   RotateCw,
@@ -602,6 +604,8 @@ export function RoomStage({
   const tableShare = tableFaceShare(cueMode, Boolean(squadStage?.cue?.focus));
   /** The squad's bar: mute and camera from the call beside Activities and chat. */
   const squadBar = squad && callActive && !watchFullscreen ? (squadStage?.controls ?? null) : null;
+  const squadCaret =
+    "focus-ring flex h-9 w-7 items-center justify-center rounded-full text-cream/70 hover:bg-white/10 hover:text-cream";
   /** The right-hand call pane is rendered — `side` and `side-pip` both use it. */
   const splitCallLayout =
     callActive && wide && isSidePane(callLayout) && !squadHangout && !squadCouch;
@@ -1603,22 +1607,33 @@ export function RoomStage({
             // bar, in the same place on every screen. Games never cover it.
             return (
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={squadBar.toggleMic}
-                  aria-label={squadBar.mic ? "Mute" : "Unmute"}
-                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", squadBar.mic ? "border-white/10 bg-card/85 text-cream" : "border-rose-400/50 bg-rose-500/20 text-rose-200")}
-                >
-                  {squadBar.mic ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={squadBar.toggleCam}
-                  aria-label={squadBar.cam ? "Turn camera off" : "Turn camera on"}
-                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", squadBar.cam ? "border-white/10 bg-card/85 text-cream" : "border-rose-400/50 bg-rose-500/20 text-rose-200")}
-                >
-                  {squadBar.cam ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-                </button>
+                {/* Mic and camera each carry their device list (microphone +
+                    speaker, camera), like a date call. The bar sits outside
+                    the call, so the call is handed in for the pickers. */}
+                <RoomContext.Provider value={squadBar.room}>
+                  <div className={cn("pointer-events-auto flex h-11 shrink-0 items-center rounded-full border pl-1 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", squadBar.mic ? "border-white/10 bg-card/85 text-cream" : "border-rose-400/50 bg-rose-500/20 text-rose-200")}>
+                    <MicDropup triggerClassName={squadCaret} iconClassName="h-4 w-4" />
+                    <button
+                      type="button"
+                      onClick={squadBar.toggleMic}
+                      aria-label={squadBar.mic ? "Mute" : "Unmute"}
+                      className="focus-ring flex h-11 w-10 items-center justify-center rounded-full"
+                    >
+                      {squadBar.mic ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+                    </button>
+                  </div>
+                  <div className={cn("pointer-events-auto flex h-11 shrink-0 items-center rounded-full border pl-1 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", squadBar.cam ? "border-white/10 bg-card/85 text-cream" : "border-rose-400/50 bg-rose-500/20 text-rose-200")}>
+                    <CameraDropup triggerClassName={squadCaret} iconClassName="h-4 w-4" />
+                    <button
+                      type="button"
+                      onClick={squadBar.toggleCam}
+                      aria-label={squadBar.cam ? "Turn camera off" : "Turn camera on"}
+                      className="focus-ring flex h-11 w-10 items-center justify-center rounded-full"
+                    >
+                      {squadBar.cam ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </RoomContext.Provider>
                 {pill}
                 <button
                   type="button"

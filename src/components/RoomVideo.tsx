@@ -35,7 +35,7 @@ import {
 } from "@/components/DeviceMenu";
 import { loadDevicePreference } from "@/lib/devices";
 import { getInvitedGuestName } from "@/lib/invitedGuest";
-import { livekitToken } from "@/lib/rooms";
+import { livekitToken, mutedNotice } from "@/lib/rooms";
 import { nightFullFrom, type NightFull } from "@/lib/squad";
 import { SquadSeatFull } from "@/components/squad/SquadSeatFull";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
@@ -1137,6 +1137,25 @@ function Stage({
   );
 }
 
+/** When someone else mutes my mic or turns off my camera (I stepped away),
+ *  say who and how to undo it. The server tells the room; LiveKit has
+ *  already switched the track off. Must be inside <LiveKitRoom>. */
+function MutedNotice() {
+  const { channel } = useRoomSession();
+  const { localParticipant } = useLocalParticipant();
+  const identity = localParticipant.identity;
+  useEffect(
+    () =>
+      channel.onBroadcast((e) => {
+        if (e.kind !== "participant_muted") return;
+        const text = mutedNotice(e.payload, identity);
+        if (text) toast.message(text, { duration: 8000 });
+      }),
+    [channel, identity],
+  );
+  return null;
+}
+
 export function RoomVideo({
   onLeave,
   variant,
@@ -1278,6 +1297,7 @@ export function RoomVideo({
       <ChaperonAgentBridge />
       <CallPeersBridge />
       <DeviceChangeToaster />
+      <MutedNotice />
       {group ? (
         <GroupStage
           roomId={room.roomId}
