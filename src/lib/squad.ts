@@ -73,9 +73,16 @@ export type SquadNight = {
 };
 
 export type SquadNights = {
+  /** The room's night size. */
   seats: number;
   seat_nights: number;
   nights_left: number;
+  /** Seats left after the whole nights (missing on older servers). */
+  spare_seats?: number;
+  /** The balance as nights + spare at each night size the host could pick. */
+  by_size?: { seats: number; nights: number; spare: number }[];
+  /** People on the call right now; 0 between nights. */
+  on_call?: number;
   /** The latest nights bought or gifted into the room. */
   last_top_up?: { by: string; nights: number; source: "purchase" | "admin"; at: string } | null;
   free_night_expires_at: string | null;
@@ -217,6 +224,16 @@ export function formatSquadMoney(amount: number, currency: string): string {
 }
 
 /** Nights left in words, for the room header. */
+/** Pure: "3 of 3 seats taken" for a night that's on, or null when the
+ *  server doesn't say (older servers) or nobody's on yet. */
+export function seatsTakenLabel(n: SquadNights): { text: string; full: boolean } | null {
+  const night = n.active_night;
+  if (!night || n.on_call == null || n.on_call <= 0) return null;
+  const taken = Math.min(n.on_call, night.seats);
+  const full = n.on_call >= night.seats;
+  return { text: `${taken} of ${night.seats} seat${night.seats === 1 ? "" : "s"} taken`, full };
+}
+
 export function nightsLeftLabel(n: SquadNights): string {
   if (n.nights_left === 0) return "No nights left";
   return n.nights_left === 1 ? "1 night left" : `${n.nights_left} nights left`;

@@ -736,6 +736,33 @@ export default function AdminGrowth() {
                   </table>
                 </div>
               )}
+              {(r.team_revenue?.length ?? 0) > 0 && (
+                <div className="border-t border-white/[0.06] px-4 py-3">
+                  <p className="text-xs font-semibold text-muted-foreground">Team and test payments · left out above</p>
+                  <ul className="mt-1.5 space-y-1 text-sm">
+                    {r.team_revenue!.map((v) => (
+                      <li key={`${v.product}-${v.currency}`} className="flex items-baseline gap-3 text-muted-foreground">
+                        <span className="text-cream/80">{PRODUCT_LABELS[v.product] ?? v.product}</span>
+                        <span className="text-xs">
+                          {v.sales} sale{v.sales === 1 ? "" : "s"} · {v.buyers} account{v.buyers === 1 ? "" : "s"}
+                        </span>
+                        <span className="ml-auto tabular-nums">{formatMoney(v.amount, v.currency)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {(r.received_total?.length ?? 0) > 0 && (
+                <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-white/[0.06] px-4 py-3 text-sm">
+                  <span className="font-semibold text-cream">Total received</span>
+                  <span className="text-xs text-muted-foreground">everyone, matches your statements</span>
+                  <span className="ml-auto flex flex-wrap gap-x-4 tabular-nums text-emerald-300">
+                    {r.received_total!.map((t) => (
+                      <span key={t.currency ?? "none"}>{formatMoney(t.amount, t.currency)}</span>
+                    ))}
+                  </span>
+                </div>
+              )}
               <p className="border-t border-white/[0.06] px-4 py-2 text-[11px] text-muted-foreground/70">
                 Amounts are per currency and never converted. Google Play doesn't report prices, so Play sales show "—".
               </p>
