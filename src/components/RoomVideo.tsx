@@ -36,6 +36,8 @@ import {
 import { loadDevicePreference } from "@/lib/devices";
 import { getInvitedGuestName } from "@/lib/invitedGuest";
 import { livekitToken, mutedNotice } from "@/lib/rooms";
+import { mobilePlatform } from "@/lib/appStores";
+import { groupRoomOptions } from "@/lib/videoProfiles";
 import { nightFullFrom, type NightFull } from "@/lib/squad";
 import { SquadSeatFull } from "@/components/squad/SquadSeatFull";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
@@ -55,15 +57,8 @@ import type { PresenceState } from "@/lib/realtime/roomChannel";
 // source; warnings and errors still surface.
 setLogLevel("warn");
 
-// Squad nights: up to five people each receiving everyone, so capture at
-// 360p with a single 180p layer. With adaptive stream this keeps a 5-seat
-// night near the modelled ~$0.85 and cool on phones.
-const GROUP_ROOM_OPTIONS: RoomOptions = {
-  adaptiveStream: true,
-  dynacast: true,
-  videoCaptureDefaults: { resolution: VideoPresets.h360.resolution },
-  publishDefaults: { simulcast: true, videoSimulcastLayers: [VideoPresets.h180] },
-};
+// Squad nights: see groupRoomOptions.
+const GROUP_ROOM_OPTIONS: RoomOptions = groupRoomOptions(mobilePlatform() !== null);
 
 const LIVEKIT_ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
