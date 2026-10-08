@@ -38,6 +38,7 @@ import { getInvitedGuestName } from "@/lib/invitedGuest";
 import { livekitToken, mutedNotice } from "@/lib/rooms";
 import { mobilePlatform } from "@/lib/appStores";
 import { groupRoomOptions } from "@/lib/videoProfiles";
+import { TAB_DEVICE_ID, otherDeviceOnCall } from "@/lib/deviceId";
 import { nightFullFrom, type NightFull } from "@/lib/squad";
 import { SquadSeatFull } from "@/components/squad/SquadSeatFull";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
@@ -1174,8 +1175,16 @@ export function RoomVideo({
   // Squad night with every seat taken: offer to add one instead of an error.
   const [nightFull, setNightFull] = useState<NightFull | null>(null);
   const [attempt, setAttempt] = useState(0);
+  // Already on this call from another device (same account)? Ask before
+  // connecting: joining here takes the call over from the other device,
+  // which used to happen silently and looked like someone got kicked.
+  // Decided once, when the call opens here.
+  const [askMove, setAskMove] = useState(() =>
+    otherDeviceOnCall(room.presence, room.senderId, TAB_DEVICE_ID),
+  );
 
   useEffect(() => {
+    if (askMove) return;
     let cancelled = false;
     setConn(null);
     setError(null);
@@ -1198,7 +1207,7 @@ export function RoomVideo({
     return () => {
       cancelled = true;
     };
-  }, [room.roomId, room.participantId, attempt]);
+  }, [room.roomId, room.participantId, attempt, askMove]);
 
   // Apply saved device preferences at join. Computed once per mount (not per
   // render) so the Room isn't reconfigured mid-call; deviceId is an *ideal*
@@ -1254,7 +1263,7 @@ export function RoomVideo({
   const onLkDisconnected = useCallback(
     (reason?: DisconnectReason) => {
       if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
-        toast.message("Call moved to your other device.");
+        toast.message("The call moved to your other device. Join here again to bring it back.");
         onLeave?.();
       }
     },
@@ -1262,6 +1271,30 @@ export function RoomVideo({
     [onLeave],
   );
 
+  if (askMove) {
+    return (
+      <div className="flex h-full items-center justify-center p-6">
+        <div className="w-full max-w-sm space-y-4 rounded-2xl border border-white/[0.1] bg-card/60 p-5 text-center">
+          <div className="space-y-1">
+            <p className="text-[17px] font-semibold text-cream">You're on this call on another device</p>
+            <p className="text-sm text-muted-foreground">
+              Move it here and the other device leaves the call. Nobody else is affected.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAskMove(false)}
+            className="btn-primary focus-ring w-full rounded-full py-3 font-semibold"
+          >
+            Move the call here
+          </button>
+          <button type="button" onClick={() => onLeave?.()} className="text-xs text-primary hover:underline">
+            Stay on the other device
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (nightFull) {
     return <SquadSeatFull roomId={room.roomId} full={nightFull} onSeated={() => setAttempt((n) => n + 1)} />;
   }
