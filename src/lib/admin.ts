@@ -718,6 +718,12 @@ export type AnalyticsReport = {
     median_call_seconds: number | null;
   }[];
   revenue?: { product: string; currency: string | null; sales: number; buyers: number; amount: number | null }[];
+  /** Real money from team and test accounts, left out of `revenue` (empty
+   *  with include_team on). Missing on servers older than backend#112. */
+  team_revenue?: { product: string; currency: string | null; sales: number; buyers: number; amount: number | null }[];
+  /** Every real-money payment in the window, whoever paid and whatever the
+   *  filters: the number that matches the statements. */
+  received_total?: { currency: string | null; sales: number; amount: number | null }[];
   tracking_since: string | null;
   funnel: AnalyticsFunnelStep[];
   usage?: AnalyticsUsage;

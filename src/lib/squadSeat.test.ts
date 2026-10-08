@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@/lib/api";
-import { nightFullFrom, seatChoice } from "@/lib/squad";
+import { nightFullFrom, seatChoice, seatsTakenLabel } from "@/lib/squad";
 
 const full = (detail: unknown, status = 409) => new ApiError(status, "conflict", { detail });
 
@@ -29,5 +29,20 @@ describe("seatChoice", () => {
   });
   it("says so when the night is already at five", () => {
     expect(seatChoice({ ...open, seats: 5, can_add_seat: false }, 10)).toBe("maxed");
+  });
+});
+
+describe("seatsTakenLabel", () => {
+  const night = { id: "n", number: 2, started_at: "", ends_at: "", seats: 3, rate: "pack" as const, refunded: false };
+  const base = { seats: 3, seat_nights: 9, nights_left: 3, free_night_expires_at: null, nights: [] };
+  it("says how full tonight is before anyone taps Join", () => {
+    expect(seatsTakenLabel({ ...base, active_night: night, on_call: 2 })).toEqual({ text: "2 of 3 seats taken", full: false });
+    expect(seatsTakenLabel({ ...base, active_night: night, on_call: 3 })).toEqual({ text: "3 of 3 seats taken", full: true });
+    expect(seatsTakenLabel({ ...base, active_night: night, on_call: 4 })?.text).toBe("3 of 3 seats taken");
+  });
+  it("stays quiet between nights, with nobody on, or on older servers", () => {
+    expect(seatsTakenLabel({ ...base, active_night: null, on_call: 0 })).toBeNull();
+    expect(seatsTakenLabel({ ...base, active_night: night, on_call: 0 })).toBeNull();
+    expect(seatsTakenLabel({ ...base, active_night: night })).toBeNull();
   });
 });

@@ -43,6 +43,7 @@ import {
   getSquadPlan,
   lastTopUpLabel,
   nightsLeftLabel,
+  seatsTakenLabel,
   startSquadNight,
   type SquadNights,
 } from "@/lib/squad";
@@ -250,6 +251,8 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
   }, [n, nextAt, enough, now, here, live.senderId, start]);
 
   const name = room?.greeting_headline?.trim() || "Our squad";
+  // "3 of 3 seats taken" before anyone taps Join.
+  const taken = n ? seatsTakenLabel(n) : null;
 
   return (
     <PageShell className="px-5 pb-16 pt-8 sm:px-6">
@@ -284,6 +287,14 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
             <p className="text-sm text-muted-foreground">
               Ends at {clockTime(n.active_night.ends_at)} your time · {n.active_night.seats} seats tonight
             </p>
+            {taken && (
+              <p className={cn("text-sm font-medium", taken.full ? "text-primary" : "text-cream/90")}>
+                {taken.text}
+                {taken.full && (
+                  <span className="font-normal text-muted-foreground"> · you can add a seat when you join</span>
+                )}
+              </p>
+            )}
             <button
               type="button"
               onClick={() => navigate(`/room/${roomId}`)}

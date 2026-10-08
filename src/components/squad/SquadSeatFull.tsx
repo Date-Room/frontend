@@ -121,7 +121,7 @@ export function SquadSeatFull({
             <p className="text-sm text-muted-foreground">The seat price didn't load. Try again in a moment.</p>
           ) : prices.data.provider === "store" && !prices.data.dev_checkout ? (
             <p className="text-sm text-muted-foreground">
-              Paying on the web isn't open in your country yet. Anyone already in the squad can add a seat for you.
+              Ask someone already in the squad to add a seat for you.
             </p>
           ) : (
             <div className="space-y-3 text-left">

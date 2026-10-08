@@ -92,8 +92,7 @@ export function SquadBuy({ roomId, onPaid }: { roomId: string; onPaid: () => voi
   if (p.provider === "store" && !p.dev_checkout) {
     return (
       <p className="rounded-xl border border-white/[0.08] bg-black/20 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
-        Paying on the web isn't open in your country yet. Anyone else in your squad can top up the
-        room, and the nights are shared.
+        Nights belong to the whole squad, so anyone in it can top up the room.
       </p>
     );
   }
