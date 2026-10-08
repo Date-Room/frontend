@@ -42,6 +42,9 @@ import {
   getSquadNights,
   getSquadPlan,
   lastTopUpLabel,
+  canRunSquad,
+  nightSizes,
+  nightsAndSpare,
   nightsLeftLabel,
   seatsTakenLabel,
   startSquadNight,
@@ -57,6 +60,7 @@ import {
 } from "@/lib/squadRoom";
 import { SQUAD_GAMES } from "@/lib/squadGames";
 import { cn } from "@/lib/utils";
+import { SquadNightSize } from "@/components/squad/SquadNightSize";
 
 /** Broadcast when someone starts a night, so everyone here sees it at once. */
 const NIGHT_STARTED = "squad.night_started";
@@ -151,6 +155,9 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
   const chat = useChatRoom();
   const [params, setParams] = useSearchParams();
   const [confirmStart, setConfirmStart] = useState(false);
+  // Seats for the night about to start: the room's size unless not
+  // everyone can make it.
+  const [startSeats, setStartSeats] = useState<number | null>(null);
   const [tab, setTab] = useState<Tab>("chat");
   const [now, setNow] = useState(() => Date.now());
 
@@ -214,16 +221,26 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
   }, []);
 
   const start = useMutation({
-    mutationFn: () => startSquadNight(roomId),
+    mutationFn: (seats?: number) => startSquadNight(roomId, seats),
     onSuccess: () => {
       void live.channel.broadcast(NIGHT_STARTED, { by: live.displayName });
       navigate(`/room/${roomId}`);
     },
     onError: (e) => {
-      const code = e instanceof ApiError ? (e.body as { detail?: { error?: string } })?.detail?.error : null;
+      const detail = e instanceof ApiError ? (e.body as { detail?: { error?: string; can_start_for?: number | null } })?.detail : null;
+      const code = detail?.error ?? null;
       if (code === "night_in_progress") {
         // Someone beat us to it: it's on, so go in.
         navigate(`/room/${roomId}`);
+        return;
+      }
+      // Not enough for everyone, but enough for a smaller night.
+      const smaller = code === "no_nights_left" ? detail?.can_start_for : null;
+      if (smaller) {
+        toast.message(`Enough seats for ${smaller} tonight.`, {
+          action: { label: `Start for ${smaller}`, onClick: () => start.mutate(smaller) },
+        });
+        refresh();
         return;
       }
       toast.error(
@@ -247,7 +264,8 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
     if (triedFor.current === nextAt || start.isPending) return;
     triedFor.current = nextAt;
     toast.message("It's time. Starting the night…");
-    start.mutate();
+    start.mutate(undefined); // the room's usual size; the server says if it can't
+
   }, [n, nextAt, enough, now, here, live.senderId, start]);
 
   const name = room?.greeting_headline?.trim() || "Our squad";
@@ -270,6 +288,12 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
           {n && (
             <p className="text-sm text-muted-foreground">
               {nightsLeftLabel(n)} · {n.seats} seats
+              {canRunSquad(members.data) && (
+                <>
+                  {" "}
+                  <SquadNightSize roomId={roomId} nights={n} />
+                </>
+              )}
               {lastTopUpLabel(n) && <span className="text-muted-foreground/70"> · Last top-up: {lastTopUpLabel(n)}</span>}
             </p>
           )}
@@ -333,14 +357,17 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
             )}
             <button
               type="button"
-              disabled={n.nights_left === 0 || !enough || start.isPending}
-              onClick={() => setConfirmStart(true)}
+              disabled={n.seat_nights < 2 || !enough || start.isPending}
+              onClick={() => {
+                setStartSeats(Math.min(n.seats, Math.max(2, n.seat_nights)));
+                setConfirmStart(true);
+              }}
               className="btn-primary focus-ring flex w-full items-center justify-center gap-2 rounded-full py-3.5 font-semibold disabled:opacity-40"
             >
               {start.isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
               Start a night
             </button>
-            {!enough && n.nights_left > 0 && (
+            {!enough && n.seat_nights >= 2 && (
               <p className="text-center text-xs text-muted-foreground">
                 Waiting for one more. Send the link or say hi in the chat.
               </p>
@@ -401,14 +428,23 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
           <AlertDialogHeader>
             <AlertDialogTitle>Start a night?</AlertDialogTitle>
             <AlertDialogDescription>
-              {n
-                ? `Uses 1 of your ${n.nights_left} night${n.nights_left === 1 ? "" : "s"}. Two hours, one clock for everyone. If everyone leaves in the first 10 minutes, it doesn't count.`
-                : ""}
+              Two hours, one clock for everyone. If everyone leaves in the first 10 minutes, it doesn't count.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {n && startSeats != null && (
+            <StartSeats
+              nights={n}
+              seats={startSeats}
+              onChange={setStartSeats}
+            />
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>Not now</AlertDialogCancel>
-            <AlertDialogAction onClick={() => start.mutate()}>Start the night</AlertDialogAction>
+            <AlertDialogAction
+              onClick={() => start.mutate(startSeats != null && n && startSeats !== n.seats ? startSeats : undefined)}
+            >
+              {startSeats != null && n && startSeats !== n.seats ? `Start for ${startSeats}` : "Start the night"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -481,5 +517,52 @@ function NightsLog({ nights }: { nights: SquadNights | undefined }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+
+/** In the start dialog: how many tonight. Defaults to the room's size;
+ *  fewer when not everyone's free (more, up to the limit, when more are). */
+function StartSeats({
+  nights,
+  seats,
+  onChange,
+}: {
+  nights: SquadNights;
+  seats: number;
+  onChange: (n: number) => void;
+}) {
+  const sizes = nightSizes(nights).filter((s) => s <= nights.seat_nights);
+  const lo = Math.min(...sizes, seats);
+  const hi = Math.max(...sizes, seats);
+  const left = nights.seat_nights - seats;
+  return (
+    <div className="space-y-2 rounded-xl border border-white/[0.08] px-4 py-3">
+      <div className="flex items-center gap-3">
+        <span className="flex-1 text-sm text-cream">Seats tonight</span>
+        <button
+          type="button"
+          aria-label="Fewer seats"
+          disabled={seats <= lo}
+          onClick={() => onChange(seats - 1)}
+          className="focus-ring flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.14] text-cream disabled:opacity-30"
+        >
+          −
+        </button>
+        <span className="w-6 text-center text-base font-semibold tabular-nums text-cream">{seats}</span>
+        <button
+          type="button"
+          aria-label="More seats"
+          disabled={seats >= hi}
+          onClick={() => onChange(seats + 1)}
+          className="focus-ring flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.14] text-cream disabled:opacity-30"
+        >
+          +
+        </button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Uses {seats} seats. Left after tonight: {nightsAndSpare(left, nights.seats)}.
+      </p>
+    </div>
   );
 }
