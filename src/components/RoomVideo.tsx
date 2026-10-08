@@ -36,6 +36,8 @@ import {
 import { loadDevicePreference } from "@/lib/devices";
 import { getInvitedGuestName } from "@/lib/invitedGuest";
 import { livekitToken } from "@/lib/rooms";
+import { nightFullFrom, type NightFull } from "@/lib/squad";
+import { SquadSeatFull } from "@/components/squad/SquadSeatFull";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
 import { partnerFromPresence } from "@/lib/stagecraft/usePartnerName";
 import { useRoomSession } from "@/context/RoomSessionContext";
@@ -1152,11 +1154,15 @@ export function RoomVideo({
   const wideScreen = useWideViewport();
   const [conn, setConn] = useState<{ token: string; url: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Squad night with every seat taken: offer to add one instead of an error.
+  const [nightFull, setNightFull] = useState<NightFull | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setConn(null);
     setError(null);
+    setNightFull(null);
     void livekitToken(room.roomId, room.participantId)
       .then((t) => {
         if (cancelled) return;
@@ -1167,12 +1173,15 @@ export function RoomVideo({
         setConn({ token: t.token, url: t.url });
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Could not start video.");
+        if (cancelled) return;
+        const full = nightFullFrom(e);
+        if (full) setNightFull(full);
+        else setError(e instanceof Error ? e.message : "Could not start video.");
       });
     return () => {
       cancelled = true;
     };
-  }, [room.roomId, room.participantId]);
+  }, [room.roomId, room.participantId, attempt]);
 
   // Apply saved device preferences at join. Computed once per mount (not per
   // render) so the Room isn't reconfigured mid-call; deviceId is an *ideal*
@@ -1236,6 +1245,9 @@ export function RoomVideo({
     [onLeave],
   );
 
+  if (nightFull) {
+    return <SquadSeatFull roomId={room.roomId} full={nightFull} onSeated={() => setAttempt((n) => n + 1)} />;
+  }
   if (error) {
     return <div className="flex h-full items-center justify-center p-6 text-center text-body text-muted-foreground">{error}</div>;
   }
