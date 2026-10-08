@@ -45,7 +45,8 @@ import { partnerFromPresence } from "@/lib/stagecraft/usePartnerName";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { authClient } from "@/lib/authClient";
 import { useVideoOrientation } from "@/lib/videoOrientation";
-import { useWideViewport } from "@/lib/viewport";
+import { useMediaQuery, useWideViewport } from "@/lib/viewport";
+import { AUTO_GRID_MIN_WIDTH, resolveSquadLayout, useSquadLayout } from "@/lib/squadLayout";
 import type { PresenceState } from "@/lib/realtime/roomChannel";
 
 // Adaptive stream + dynacast let LiveKit stop sending layers nobody is
@@ -1165,7 +1166,9 @@ export function RoomVideo({
   groupLayout,
 }: { onLeave?: () => void } & CallControls = {}) {
   const room = useRoomSession();
-  const wideScreen = useWideViewport();
+  // Squad calls: the viewer's own grid / speaker / auto choice.
+  const [squadLayout] = useSquadLayout();
+  const roomForGrid = useMediaQuery(`(min-width: ${AUTO_GRID_MIN_WIDTH}px)`);
   const [conn, setConn] = useState<{ token: string; url: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Squad night with every seat taken: offer to add one instead of an error.
@@ -1298,7 +1301,10 @@ export function RoomVideo({
           roomId={room.roomId}
           layout={
             groupLayout ??
-            (collapsed || variant === "pip" || compact || !wideScreen ? "focus" : "grid")
+            resolveSquadLayout(squadLayout, {
+              tucked: Boolean(collapsed || variant === "pip" || compact),
+              width: roomForGrid ? AUTO_GRID_MIN_WIDTH : 0,
+            })
           }
           bare={collapsed}
           onLeave={onLeave ?? (() => {})}

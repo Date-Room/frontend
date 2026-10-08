@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { RoomContext } from "@livekit/components-react";
-import { CameraDropup, MicDropup } from "@/components/DeviceMenu";
+import { CameraDropup, MicDropup, SquadLayoutMenu } from "@/components/DeviceMenu";
 import { SeatRequestsBanner } from "@/components/squad/SeatRequestsBanner";
 import { JoinRequestsAlert } from "@/components/squad/JoinRequests";
 import { createPortal } from "react-dom";
@@ -1636,6 +1636,13 @@ export function RoomStage({
                     </button>
                   </div>
                 </RoomContext.Provider>
+                {/* My own grid / speaker / auto choice for the faces. Not on
+                    phones: the bar is full there, and auto gives a phone the
+                    speaker view. */}
+                <SquadLayoutMenu
+                  triggerClassName="focus-ring pointer-events-auto hidden h-11 w-11 shrink-0 sm:flex items-center justify-center rounded-full border border-white/10 bg-card/85 text-cream shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition hover:bg-card"
+                  iconClassName="h-5 w-5"
+                />
                 {pill}
                 <button
                   type="button"
