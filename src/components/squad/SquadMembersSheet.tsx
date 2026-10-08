@@ -35,6 +35,7 @@ import {
   removeSquadMember,
   setSquadCohost,
   setSquadNightEmails,
+  canRunSquad,
   setSquadSettings,
   setSquadWhere,
   squadErrorText,
@@ -43,6 +44,7 @@ import {
   type SquadMembers,
 } from "@/lib/squad";
 import { cn } from "@/lib/utils";
+import { InviteGuest } from "@/components/squad/InviteGuest";
 
 /** Pure: what the viewer may do to someone else in the list. */
 export function memberActions(
@@ -315,6 +317,7 @@ export function SquadMembersSheet({
                 </span>
               </button>
             )}
+            <InviteGuest roomId={roomId} canRun={canRunSquad(members)} />
             <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/[0.1] px-3 py-3 text-sm text-cream">
               <Lock className="h-4 w-4 text-primary" aria-hidden />
               <span className="flex-1">
