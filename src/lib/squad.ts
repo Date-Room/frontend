@@ -147,6 +147,33 @@ export function startSquadNight(roomId: string) {
   return api.post<SquadNights>(`/v1/rooms/${roomId}/nights`, {});
 }
 
+/** One more seat for tonight from the room's nights (any member can). 402 when the room has none left. */
+export function addSquadSeat(roomId: string) {
+  return api.post<{ seats: number; ends_at: string }>(`/v1/rooms/${roomId}/nights/current/seats`, {});
+}
+
+/** What the server says when tonight's seats are all taken (409 on the video token). */
+export type NightFull = { seats: number; can_add_seat: boolean; product: string | null };
+
+/** Pure: the night_full refusal from a video-token error, or null for anything else. */
+export function nightFullFrom(e: unknown): NightFull | null {
+  if (!(e instanceof ApiError) || e.status !== 409) return null;
+  const detail = (e.body as { detail?: unknown } | undefined)?.detail as Record<string, unknown> | undefined;
+  if (!detail || typeof detail !== "object" || detail.error !== "night_full") return null;
+  return {
+    seats: Number(detail.seats) || 0,
+    can_add_seat: detail.can_add_seat !== false,
+    product: typeof detail.product === "string" ? detail.product : null,
+  };
+}
+
+/** Pure: what the person left off the call can do. */
+export function seatChoice(full: NightFull, seatNights: number | null): "maxed" | "use_balance" | "pay" | "loading" {
+  if (!full.can_add_seat) return "maxed";
+  if (seatNights == null) return "loading";
+  return seatNights > 0 ? "use_balance" : "pay";
+}
+
 export function getSquadPrices(roomId: string) {
   return api.get<SquadPrices>(`/v1/rooms/${roomId}/squad/prices`);
 }
