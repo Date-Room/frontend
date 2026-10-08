@@ -26,12 +26,15 @@ import {
   VideoTrack,
   isTrackReference,
   useLocalParticipant,
+  useRoomContext,
   useSpeakingParticipants,
   useTracks,
   type TrackReferenceOrPlaceholder,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
-import { Armchair, Clock, Mic, MicOff, Video, VideoOff } from "lucide-react";
+import { Armchair, Clock, Mic, MicOff, MoreHorizontal, Video, VideoOff } from "lucide-react";
+import { toast } from "sonner";
+import { muteParticipant, type MuteWhat } from "@/lib/rooms";
 import { useSquadStage, type FaceCue } from "@/context/SquadStageContext";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
 import { useMediaQuery, useWideViewport } from "@/lib/viewport";
@@ -112,6 +115,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
   const tracks = useTracks([{ source: Track.Source.Camera, withPlaceholder: true }], { onlySubscribed: false });
   const speaking = useSpeakingParticipants();
   const { localParticipant, isMicrophoneEnabled, isCameraEnabled } = useLocalParticipant();
+  const lkRoom = useRoomContext();
 
   // First squad call on this device: tell the squad my zone, so my face
   // shows my local time. City is set on the room page.
@@ -137,8 +141,9 @@ export function GroupStage({ roomId, layout, bare }: Props) {
       cam: isCameraEnabled,
       toggleMic: () => void lp.current.setMicrophoneEnabled(!lp.current.isMicrophoneEnabled),
       toggleCam: () => void lp.current.setCameraEnabled(!lp.current.isCameraEnabled),
+      room: lkRoom,
     });
-  }, [setControls, isMicrophoneEnabled, isCameraEnabled]);
+  }, [setControls, isMicrophoneEnabled, isCameraEnabled, lkRoom]);
   useEffect(() => () => setControls?.(null), [setControls]);
 
   const byIdentity = useMemo(() => {
@@ -181,6 +186,23 @@ export function GroupStage({ roomId, layout, bare }: Props) {
     if (!ref) return null;
     const m = byIdentity.get(id);
     const name = id === self ? "You" : m?.display_name || ref.participant.name || "Friend";
+    // Anyone on the call can mute someone else (they stepped away and
+    // their laptop is noisy); they can turn it back on. Not while picking
+    // faces in a game, where a tap on a face is the answer.
+    const target = id !== self && !onTap ? m?.participant_id : undefined;
+    const onMute = target
+      ? (what: MuteWhat) => {
+          void muteParticipant(roomId, target, what)
+            .then((r) =>
+              toast.message(
+                r.muted.length
+                  ? `${what.camera ? "Turned off" : "Muted"} ${name.split(" ")[0]}'s ${what.camera ? "camera" : "microphone"}`
+                  : `${name.split(" ")[0]}'s ${what.camera ? "camera" : "microphone"} is already off`,
+              ),
+            )
+            .catch(() => toast.error("Couldn't reach the call. Try again."));
+        }
+      : undefined;
     return (
       <Face
         key={id}
@@ -193,6 +215,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
         size={size}
         cue={cue}
         onTap={onTap}
+        onMute={onMute}
       />
     );
   };
@@ -496,6 +519,7 @@ function Face({
   size,
   cue,
   onTap,
+  onMute,
 }: {
   trackRef: TrackReferenceOrPlaceholder;
   name: string;
@@ -506,6 +530,8 @@ function Face({
   size: FaceSize;
   cue?: FaceCue;
   onTap?: () => void;
+  /** Someone else's face: mute their mic or turn off their camera. */
+  onMute?: (what: MuteWhat) => void;
 }) {
   // A phone held upright sends a tall picture. In a wide seat, cropping it
   // leaves a band across the face, so show it whole on a dark ground.
@@ -603,6 +629,7 @@ function Face({
         <div className="absolute inset-x-1.5 bottom-1.5 flex items-center gap-1 rounded-md bg-black/65 px-1.5 py-0.5 text-[11px]">
           <span className="truncate font-semibold text-cream">{name}</span>
           {place && <span className="ml-auto shrink-0 truncate text-cream/70">{place}</span>}
+          {onMute && <FaceMenu name={name} hasVideo={hasVideo} onMute={onMute} className={place ? "" : "ml-auto"} small />}
         </div>
       </div>
     );
@@ -670,6 +697,7 @@ function Face({
         {/* The name always shows in full; the city and clock give way first. */}
         <span className="max-w-[70%] shrink-0 truncate text-sm font-semibold text-cream">{name}</span>
         {place && <span className="ml-auto min-w-0 truncate text-xs text-cream/75">{place}</span>}
+        {onMute && <FaceMenu name={name} hasVideo={hasVideo} onMute={onMute} className={place ? "" : "ml-auto"} />}
       </div>
     </div>,
     // Always fill the space given: a seat, a grid cell. Left to its content,
@@ -696,6 +724,59 @@ function ScoresSeat({ roomId, self, style }: { roomId: string; self: string; sty
             <span className="font-semibold tabular-nums text-cream">{r.points}</span>
           </div>
         ))
+      )}
+    </div>
+  );
+}
+
+
+/** The "…" on someone else's face: mute their microphone, or turn off their
+ *  camera, for everyone. A small menu that opens upward from the name bar. */
+function FaceMenu({
+  name,
+  hasVideo,
+  onMute,
+  className,
+  small,
+}: {
+  name: string;
+  hasVideo: boolean;
+  onMute: (what: MuteWhat) => void;
+  className?: string;
+  small?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const first = name.split(" ")[0];
+  const item = "block w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm text-cream hover:bg-white/[0.08]";
+  return (
+    <div className={cn("relative shrink-0", className)} onPointerDown={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        aria-label={`Options for ${first}`}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          "focus-ring flex items-center justify-center rounded-full text-cream/85 hover:bg-white/15 hover:text-cream",
+          small ? "h-5 w-5" : "h-6 w-6",
+        )}
+      >
+        <MoreHorizontal className={small ? "h-3.5 w-3.5" : "h-4 w-4"} aria-hidden />
+      </button>
+      {open && (
+        <>
+          <button type="button" aria-label="Close" className="fixed inset-0 z-30 cursor-default" onClick={() => setOpen(false)} />
+          <div className="absolute bottom-full right-0 z-40 mb-2 min-w-[11rem] rounded-xl border border-white/10 bg-card/95 p-1 shadow-[0_16px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+            <button type="button" className={item} onClick={() => { setOpen(false); onMute({ microphone: true }); }}>
+              Mute {first}
+            </button>
+            {hasVideo && (
+              <button type="button" className={item} onClick={() => { setOpen(false); onMute({ camera: true }); }}>
+                Turn off {first}'s camera
+              </button>
+            )}
+            <p className="px-3 pb-1.5 pt-1 text-[11px] text-muted-foreground">They can turn it back on.</p>
+          </div>
+        </>
       )}
     </div>
   );
