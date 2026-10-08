@@ -19,6 +19,10 @@ export type AdminUserRow = {
   email: string;
   display_name: string;
   country: string | null;
+  /** Where Growth places them (signup region, else last visit, else profile). Null = unknown. */
+  location?: string | null;
+  /** Team / test account: left out of Growth. */
+  is_team?: boolean;
   provider: string | null;
   is_admin: boolean;
   account_tier: string;
@@ -118,6 +122,11 @@ export function revokeUserSubscription(id: string) {
 
 export function setUserAdmin(id: string, is_admin: boolean) {
   return api.patch<void>(`/v1/admin/users/${id}/admin`, { is_admin });
+}
+
+/** Team / test accounts are left out of Growth. Friends we invite are not team. */
+export function setUserTeam(id: string, is_team: boolean) {
+  return api.patch<{ ok: boolean; is_team: boolean }>(`/v1/admin/users/${id}/team`, { is_team });
 }
 
 export function listPromoCodes() {
@@ -631,8 +640,18 @@ export function listAdminPromoCodes(params: { label?: string; cursor?: string; l
 /* ── Growth analytics (/v1/admin/analytics) ─────────────────────────────── */
 
 export type AnalyticsFunnelStep = {
-  step: "signed_up" | "opened_or_joined_room" | "had_a_date" | "came_back_later" | "paid";
+  /** came_back_later and paid come only from servers older than the funnel rework. */
+  step: "signed_up" | "opened_or_joined_room" | "had_a_date" | "used_again" | "came_back_later" | "paid";
   users: number;
+};
+
+/** Counts beside the funnel: where people drop off, and who paid. */
+export type AnalyticsUsage = {
+  never_opened_a_room: number;
+  opened_but_no_date: number;
+  used_again_any: number;
+  used_again_without_a_date: number;
+  paid: number;
 };
 
 export type AnalyticsDay = {
@@ -653,7 +672,12 @@ export type AnalyticsCountryRow = {
   country: string;
   signed_up: number;
   new_in_period: number;
+  /** Missing on servers older than the funnel rework. */
+  opened_a_room?: number;
   had_a_date: number;
+  /** Opened or joined a room a day or more after signing up. */
+  used_again?: number;
+  /** Older servers: any visit on a later day. Mirrors used_again on newer ones. */
   came_back_later: number;
   paid: number;
 };
@@ -696,6 +720,7 @@ export type AnalyticsReport = {
   revenue?: { product: string; currency: string | null; sales: number; buyers: number; amount: number | null }[];
   tracking_since: string | null;
   funnel: AnalyticsFunnelStep[];
+  usage?: AnalyticsUsage;
   cohorts: { week_of: string; signed_up: number; active_pct: (number | null)[] }[];
   daily: AnalyticsDay[];
   rooms_by_package: { package: string; paid_via: string; rooms: number }[];
@@ -747,6 +772,33 @@ export async function getAdminAnalytics(days: number, includeTeam = false, filte
   const q = new URLSearchParams({ days: String(days), include_team: String(includeTeam) });
   for (const [k, v] of Object.entries(filters)) if (v) q.set(k, v);
   return api.get<AnalyticsReport>(`/v1/admin/analytics?${q.toString()}`);
+}
+
+export type ActivityGroup = "calls" | "rooms" | "signups";
+
+export type ActivityItem = {
+  kind: string;
+  at: string;
+  user_email: string | null;
+  room_id: string | null;
+  props: Record<string, unknown>;
+  backfilled: boolean;
+};
+
+export type ActivityPage = { items: ActivityItem[]; next_before: string | null; total: number };
+
+export async function getAdminActivity(opts: {
+  includeTeam?: boolean;
+  group?: ActivityGroup | null;
+  search?: string;
+  before?: string | null;
+  limit?: number;
+}) {
+  const q = new URLSearchParams({ include_team: String(Boolean(opts.includeTeam)), limit: String(opts.limit ?? 50) });
+  if (opts.group) q.set("group", opts.group);
+  if (opts.search?.trim()) q.set("search", opts.search.trim());
+  if (opts.before) q.set("before", opts.before);
+  return api.get<ActivityPage>(`/v1/admin/analytics/activity?${q.toString()}`);
 }
 
 export async function postAdminAnalyticsBackfill(apply: boolean) {

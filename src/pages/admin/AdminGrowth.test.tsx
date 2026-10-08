@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { channelLabel, eventLine, filterSummary, formatDuration, formatMoney, funnelRows, isRealMoney, loadProblem, paidViaLabel, share } from "./AdminGrowth";
+import { channelLabel, eventLine, filterSummary, formatDuration, formatMoney, funnelRows, isRealMoney, loadProblem, paidViaLabel, share, usageLines } from "./AdminGrowth";
 
 describe("funnelRows", () => {
   it("gives each step its share of sign-ups and of the step before", () => {
@@ -76,5 +76,18 @@ describe("layer 1 helpers", () => {
   it("shows shares safely", () => {
     expect(share(1, 4)).toBe("25%");
     expect(share(0, 0)).toBe("—");
+  });
+});
+
+describe("funnel rework", () => {
+  it("labels the used-again step and lists drop-offs beside the funnel", () => {
+    expect(funnelRows([{ step: "used_again", users: 1 }])[0].label).toMatch(/again/);
+    expect(usageLines(undefined)).toEqual([]);
+    const lines = usageLines({ never_opened_a_room: 60, opened_but_no_date: 8, used_again_any: 3, used_again_without_a_date: 1, paid: 2 });
+    expect(lines.map((l) => l.value)).toEqual([60, 8, 1, 2]);
+    expect(lines[0].label).toMatch(/never opened/);
+  });
+  it("names sign-ups in the activity list", () => {
+    expect(eventLine("signed_up", {})).toBe("Signed up");
   });
 });
