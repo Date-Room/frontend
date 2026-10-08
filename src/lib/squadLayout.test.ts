@@ -29,3 +29,13 @@ describe("the saved choice", () => {
     expect(localStorage.getItem("dr:squad-layout")).toBeNull();
   });
 });
+
+describe("callVariant", () => {
+  it("doesn't let a date-call preference squash a squad call into the speaker view", async () => {
+    const { callVariant } = await import("@/lib/callLayout");
+    expect(callVariant({ floating: false, squad: true, layout: "side-pip" })).toBe("full");
+    expect(callVariant({ floating: false, squad: false, layout: "side-pip" })).toBe("pip");
+    expect(callVariant({ floating: true, squad: true, layout: "side" })).toBe("pip");
+    expect(callVariant({ floating: false, squad: false, layout: "side" })).toBe("full");
+  });
+});

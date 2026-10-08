@@ -67,6 +67,7 @@ import {
 import { SQUAD_GAMES, SQUAD_GAME_IDS, isSquadGame } from "@/lib/squadGames";
 import { useSquadStage } from "@/context/SquadStageContext";
 import {
+  callVariant,
   isSidePane,
   useCallLayout,
 } from "@/lib/callLayout";
@@ -1778,7 +1779,7 @@ export function RoomStage({
               // In the pane, `side-pip` gives the phone-call shape — one feed
               // full-bleed with the other floating over it — while `side`
               // shows both tiles.
-              variant={floatingCall || callLayout === "side-pip" ? "pip" : "full"}
+              variant={callVariant({ floating: floatingCall, squad, layout: callLayout })}
               framed={!floatingCall}
               collapsed={bubble}
               pair={pairBubble}

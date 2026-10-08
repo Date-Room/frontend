@@ -46,6 +46,16 @@ export function writeCallLayout(next: CallLayout): void {
 }
 
 /** The current layout, kept in step across every component that asks. */
+/** Pure: the call's shape. "Pane + inset" (side-pip) is a 1-on-1 date
+ *  choice; a squad call in the room ignores it (it has its own grid /
+ *  speaker / auto choice), so only a floating squad call is picture-in-
+ *  picture. Without this, a date-call preference forced every squad call
+ *  into the speaker view. */
+export function callVariant(opts: { floating: boolean; squad: boolean; layout: CallLayout }): "pip" | "full" {
+  if (opts.floating) return "pip";
+  return !opts.squad && opts.layout === "side-pip" ? "pip" : "full";
+}
+
 export function useCallLayout(): [CallLayout, (next: CallLayout) => void] {
   const [layout, setLayout] = useState<CallLayout>(readCallLayout);
 
