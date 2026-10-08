@@ -53,7 +53,7 @@ import {
   TABLE_GAP,
   TABLE_QUERY,
   friendGridClass,
-  gridColumns,
+  gridColumnsFor,
   readSeats,
   saveSeats,
   swapSeats,
@@ -477,11 +477,14 @@ export function GroupStage({ roomId, layout, bare }: Props) {
     );
   }
 
-  const cols = gridColumns(order.length + freeSeats);
+  // Columns that keep tiles closest to a camera's shape for this stage
+  // (the same measurement the game table uses; only one layout shows).
+  const cols = gridColumnsFor(order.length + freeSeats, box.w, box.h);
   return (
     <div className="relative flex h-full w-full flex-col bg-black/40">
       {clockChip}
       <div
+        ref={setTableEl}
         className="grid min-h-0 flex-1 gap-2 p-2 sm:gap-3 sm:p-3"
         style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: "minmax(0, 1fr)" }}
       >
@@ -689,7 +692,8 @@ function Face({
         </span>
       )}
       {talking && (
-        <span className="absolute left-3 top-3 rounded-full bg-fill px-2 py-0.5 text-[11px] font-bold text-fill-foreground">
+        // Top right: the clock sits top left on the first tile.
+        <span className="absolute right-3 top-3 rounded-full bg-fill px-2 py-0.5 text-[11px] font-bold text-fill-foreground">
           Talking
         </span>
       )}
