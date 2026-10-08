@@ -62,6 +62,7 @@ import { SQUAD_GAMES } from "@/lib/squadGames";
 import { cn } from "@/lib/utils";
 import { SquadNightSize } from "@/components/squad/SquadNightSize";
 import { SeatRequestsBanner } from "@/components/squad/SeatRequestsBanner";
+import { JoinRequestsCard } from "@/components/squad/JoinRequests";
 
 /** Broadcast when someone starts a night, so everyone here sees it at once. */
 const NIGHT_STARTED = "squad.night_started";
@@ -299,6 +300,8 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
             </p>
           )}
         </header>
+
+        <JoinRequestsCard roomId={roomId} />
 
         {!n ? (
           <div className="editorial-card flex justify-center p-8">

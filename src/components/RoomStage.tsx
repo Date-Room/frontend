@@ -11,6 +11,7 @@ import {
 import { RoomContext } from "@livekit/components-react";
 import { CameraDropup, MicDropup } from "@/components/DeviceMenu";
 import { SeatRequestsBanner } from "@/components/squad/SeatRequestsBanner";
+import { JoinRequestsAlert } from "@/components/squad/JoinRequests";
 import { createPortal } from "react-dom";
 import {
   RotateCw,
@@ -1889,6 +1890,7 @@ export function RoomStage({
 
       {/* Squads: someone left off a full call asking to borrow a seat. */}
       {squad && callActive && <SeatRequestsBanner roomId={roomId} />}
+      {squad && callActive && <JoinRequestsAlert roomId={roomId} />}
 
       <RoomAmbianceSheet
         open={themeOpen}
