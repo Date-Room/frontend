@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from "react";
+import { TAB_DEVICE_ID } from "@/lib/deviceId";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -342,6 +343,7 @@ function RoomShell({
         is_ready: true,
         is_typing: false,
         is_in_call: true,
+        device_id: TAB_DEVICE_ID,
         last_seen: new Date().toISOString(),
         participant_id: session.participantId ?? null,
       });
@@ -372,6 +374,7 @@ function RoomShell({
       is_ready: true,
       is_typing: false,
       is_in_call: false,
+      device_id: TAB_DEVICE_ID,
       last_seen: new Date().toISOString(),
       participant_id: session.participantId ?? null,
     });

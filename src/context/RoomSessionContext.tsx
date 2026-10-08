@@ -7,6 +7,7 @@
  * caller's identity: signed-in member vs. anonymous guest, slot from the join
  * response, and whether they may persist durable state.
  */
+import { TAB_DEVICE_ID } from "@/lib/deviceId";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { RoomChannel, type PresenceState } from "@/lib/realtime/roomChannel";
 import type { RoomPackage } from "@/lib/rooms";
@@ -110,6 +111,7 @@ export function RoomSessionProvider({
           is_ready: true,
           is_typing: false,
           is_in_call: false,
+          device_id: TAB_DEVICE_ID,
           last_seen: new Date().toISOString(),
           // Surfaces a stable handle to kick by; only guests have one
           // (signed-in partners don't need it for DELETE /participants).
