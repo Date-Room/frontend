@@ -1,5 +1,5 @@
 /**
- * Squad beta, the requester's side. Squad (friend nights for 2 to 5 people)
+ * Squad beta, the requester's side. Squad (friend nights for 2 to 6 people)
  * opens to a few groups first: the public slot says "Request access", a
  * signed-in person answers a few short questions, and the team lets groups
  * in from the admin queue. Mirrors backend `api/v1/squad.py`.
@@ -33,7 +33,7 @@ export const SQUAD_PLAN_OPTIONS: { id: SquadPlan; label: string }[] = [
   { id: "other", label: "Something else" },
 ];
 
-export const SQUAD_GROUP_SIZES = [2, 3, 4, 5] as const;
+export const SQUAD_GROUP_SIZES = [2, 3, 4, 5, 6] as const;
 
 export function getSquadBeta() {
   return api.get<SquadBetaState>("/v1/squad/beta");
@@ -59,7 +59,9 @@ export function toggleSquadPlan(plans: SquadPlan[], id: SquadPlan): SquadPlan[] 
 // api/v1/squad_billing. Nights belong to the room: anyone in the squad
 // can start one or top the room up.
 
-export const SQUAD_SEATS = [2, 3, 4, 5] as const;
+// Up to 6 on a call (three either side of the game card), once the server
+// allows it (SQUAD_MAX_PER_CALL); until then 6 gets a clear "up to 5" answer.
+export const SQUAD_SEATS = [2, 3, 4, 5, 6] as const;
 
 export type SquadNight = {
   id: string;

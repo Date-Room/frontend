@@ -45,7 +45,7 @@ describe("squad call helpers", () => {
   });
 
   it("picks grid columns", () => {
-    expect([1, 2, 4, 5, 6].map(gridColumns)).toEqual([1, 2, 2, 3, 3]);
+    expect([1, 2, 3, 4, 5, 6].map(gridColumns)).toEqual([1, 2, 3, 2, 3, 3]);
   });
 });
 
@@ -60,11 +60,13 @@ describe("friendGridClass", () => {
 
 describe("the table", () => {
   const ids = ["me", "a", "k", "s", "t"];
-  it("seats friends left then right, you under them, and leaves the sixth space", () => {
+  it("seats friends left then right, you under them, and keeps both sides even", () => {
+    expect(tableSeats(ids.slice(0, 1), "me", null)).toEqual({ left: [], right: ["me"] });
     expect(tableSeats(ids.slice(0, 2), "me", null)).toEqual({ left: ["a"], right: ["me"] });
-    expect(tableSeats(ids.slice(0, 3), "me", null)).toEqual({ left: ["a"], right: ["k", "me"] });
+    expect(tableSeats(ids.slice(0, 3), "me", null)).toEqual({ left: ["a", "k"], right: ["me", null] });
     expect(tableSeats(ids.slice(0, 4), "me", null)).toEqual({ left: ["a", "k"], right: ["s", "me"] });
     expect(tableSeats(ids, "me", null)).toEqual({ left: ["a", "k", "s"], right: ["t", "me", null] });
+    expect(tableSeats([...ids, "z"], "me", null)).toEqual({ left: ["a", "k", "s"], right: ["t", "z", "me"] });
   });
 
   it("keeps a saved arrangement, drops who left and adds who arrived", () => {
