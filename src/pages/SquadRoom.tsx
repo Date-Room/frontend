@@ -61,6 +61,7 @@ import {
 import { SQUAD_GAMES } from "@/lib/squadGames";
 import { cn } from "@/lib/utils";
 import { SquadNightSize } from "@/components/squad/SquadNightSize";
+import { SeatRequestsBanner } from "@/components/squad/SeatRequestsBanner";
 
 /** Broadcast when someone starts a night, so everyone here sees it at once. */
 const NIGHT_STARTED = "squad.night_started";
@@ -422,6 +423,9 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
           <SquadBuy roomId={roomId} onPaid={refresh} />
         </section>
       </div>
+
+      {/* Someone left off tonight's full call asking to borrow a seat. */}
+      {n?.active_night && <SeatRequestsBanner roomId={roomId} />}
 
       <AlertDialog open={confirmStart} onOpenChange={setConfirmStart}>
         <AlertDialogContent>

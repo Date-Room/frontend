@@ -50,6 +50,12 @@ export function useRoomSession(): RoomSession {
   return s;
 }
 
+/** The room session, or null outside one (tests, previews). */
+// eslint-disable-next-line react-refresh/only-export-components -- hook co-located with its provider
+export function useMaybeRoomSession(): RoomSession | null {
+  return useContext(Ctx);
+}
+
 export function RoomSessionProvider({
   roomId,
   identity,
