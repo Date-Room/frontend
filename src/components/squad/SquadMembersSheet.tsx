@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Copy, Link2, Lock, Mail, MapPin, MoreHorizontal, Users } from "lucide-react";
+import { Copy, DoorOpen, Link2, Lock, Mail, MapPin, MoreHorizontal, Users, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -35,6 +35,7 @@ import {
   removeSquadMember,
   setSquadCohost,
   setSquadNightEmails,
+  setSquadSettings,
   setSquadWhere,
   squadErrorText,
   squadInviteUrl,
@@ -115,6 +116,26 @@ export function SquadMembersSheet({
     },
     onError: fail("That didn't work."),
   });
+  // The owner's choices about the squad itself.
+  const settings = useMutation({
+    mutationFn: (body: { members_manage?: boolean; open_join?: boolean }) => setSquadSettings(roomId, body),
+    onSuccess: (m, body) => {
+      setMembers(m);
+      toast.success(
+        body.members_manage !== undefined
+          ? body.members_manage
+            ? "Everyone in the squad can run it now."
+            : "Only you and co-hosts run the squad now."
+          : body.open_join
+            ? "Anyone with the link can join."
+            : "New people need your OK to join.",
+      );
+    },
+    onError: fail("That didn't save."),
+  });
+  // Approval is only worth a switch when the server asks for it (it can be
+  // switched off server-side while the screens are new).
+  const approvalOn = Boolean(members?.approval_needed || members?.open_join);
   const nightEmails = members?.my_night_emails ?? true;
   const emails = useMutation({
     mutationFn: (on: boolean) => setSquadNightEmails(roomId, on),
@@ -306,6 +327,42 @@ export function SquadMembersSheet({
               </span>
               <Switch checked={locked} disabled={lock.isPending} onCheckedChange={(on) => lock.mutate(on)} />
             </label>
+            {myRole === "owner" && (
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/[0.1] px-3 py-3 text-sm text-cream">
+                <UsersRound className="h-4 w-4 text-primary" aria-hidden />
+                <span className="flex-1">
+                  Everyone can run the squad
+                  <span className="block text-xs text-muted-foreground">
+                    {members?.members_manage
+                      ? "Anyone in it can lend seats, change the night size and let people in."
+                      : "Only you and co-hosts lend seats, change the night size and let people in."}
+                  </span>
+                </span>
+                <Switch
+                  checked={Boolean(members?.members_manage)}
+                  disabled={settings.isPending}
+                  onCheckedChange={(on) => settings.mutate({ members_manage: on })}
+                />
+              </label>
+            )}
+            {myRole === "owner" && approvalOn && (
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/[0.1] px-3 py-3 text-sm text-cream">
+                <DoorOpen className="h-4 w-4 text-primary" aria-hidden />
+                <span className="flex-1">
+                  New people need an OK
+                  <span className="block text-xs text-muted-foreground">
+                    {members?.open_join
+                      ? "Off: anyone with the link joins straight away."
+                      : "Someone new waits until you or a co-host lets them in."}
+                  </span>
+                </span>
+                <Switch
+                  checked={!members?.open_join}
+                  disabled={settings.isPending}
+                  onCheckedChange={(on) => settings.mutate({ open_join: !on })}
+                />
+              </label>
+            )}
           </section>
 
           <button

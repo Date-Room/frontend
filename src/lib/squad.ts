@@ -124,7 +124,30 @@ export type SquadMembers = {
   my_role: "owner" | "cohost" | "member";
   /** My "email me about nights" switch (missing on older servers: on). */
   my_night_emails?: boolean;
+  /** "Everyone in the squad can manage it" (owner's choice). */
+  members_manage?: boolean;
+  /** "Anyone with the link joins" instead of new people needing approval. */
+  open_join?: boolean;
+  /** New people need approval right now (approval is on and the room isn't open). */
+  approval_needed?: boolean;
 };
+
+/** Pure: may I run the squad (lend seats, change the night size, let
+ *  people in)? The owner and co-hosts, or everyone when the room says so. */
+export function canRunSquad(m: SquadMembers | undefined): boolean {
+  if (!m) return false;
+  return m.my_role === "owner" || m.my_role === "cohost" || Boolean(m.members_manage);
+}
+
+/** The owner's choices: who manages the squad, and whether new people need approval. */
+export function setSquadSettings(roomId: string, body: { members_manage?: boolean; open_join?: boolean }) {
+  return api.patch<SquadMembers>(`/v1/rooms/${roomId}/squad/settings`, body);
+}
+
+/** How many seats a night books from now on (tonight keeps its seats). */
+export function setSquadNightSize(roomId: string, seats: number) {
+  return api.patch<SquadNights>(`/v1/rooms/${roomId}/squad/night-size`, { seats });
+}
 
 export type CreateSquadRoom = { seats: number; name: string };
 
@@ -150,8 +173,24 @@ export function getSquadNights(roomId: string) {
   return api.get<SquadNights>(`/v1/rooms/${roomId}/nights`);
 }
 
-export function startSquadNight(roomId: string) {
-  return api.post<SquadNights>(`/v1/rooms/${roomId}/nights`, {});
+/** Start a night; `seats` for fewer (or more) than the room's night size. */
+export function startSquadNight(roomId: string, seats?: number) {
+  return api.post<SquadNights>(`/v1/rooms/${roomId}/nights`, seats ? { seats } : {});
+}
+
+/** Pure: the night sizes a night can start at (2 up to the squad limit),
+ *  from the server's by_size; falls back to the room's size alone. */
+export function nightSizes(n: SquadNights): number[] {
+  const sizes = (n.by_size ?? []).map((b) => b.seats);
+  return sizes.length ? sizes : [n.seats];
+}
+
+/** Pure: "3 nights + 1 spare seat" for a balance at a night size. */
+export function nightsAndSpare(seatNights: number, size: number): string {
+  const nights = size > 0 ? Math.floor(seatNights / size) : 0;
+  const spare = size > 0 ? seatNights % size : 0;
+  const n = nights === 1 ? "1 night" : `${nights} nights`;
+  return spare ? `${n} + ${spare} spare seat${spare === 1 ? "" : "s"}` : n;
 }
 
 /** One more seat for tonight from the room's nights (any member can). 402 when the room has none left. */
@@ -235,8 +274,10 @@ export function seatsTakenLabel(n: SquadNights): { text: string; full: boolean }
 }
 
 export function nightsLeftLabel(n: SquadNights): string {
-  if (n.nights_left === 0) return "No nights left";
-  return n.nights_left === 1 ? "1 night left" : `${n.nights_left} nights left`;
+  const spare = n.spare_seats ?? 0;
+  const spareText = spare ? ` + ${spare} spare seat${spare === 1 ? "" : "s"}` : "";
+  if (n.nights_left === 0) return spare ? `No full nights · ${spare} spare seat${spare === 1 ? "" : "s"}` : "No nights left";
+  return (n.nights_left === 1 ? "1 night left" : `${n.nights_left} nights left`) + spareText;
 }
 
 /** "Joshua added 1 night · 3 Oct" / "DateRoom gifted 3 nights · 3 Oct", or null. */
