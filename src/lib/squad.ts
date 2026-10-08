@@ -457,3 +457,62 @@ export function squadErrorCode(e: unknown): string | null {
   const detail = (e.body as { detail?: unknown } | undefined)?.detail;
   return detail && typeof detail === "object" && "error" in detail ? String((detail as { error: unknown }).error) : null;
 }
+
+// ── Letting new people in (backend#116) ──────────────────────────────────
+
+export type JoinRequest = {
+  id: string;
+  user_id: string;
+  display_name: string;
+  photo_url: string | null;
+  /** pending | approved | declined */
+  status: string;
+  created_at: string;
+};
+
+export type MyJoinRequest = {
+  /** none | pending | approved | declined | member */
+  status: string;
+  approval_needed: boolean;
+  request: JoinRequest | null;
+};
+
+export const JOIN_REQUESTED = "join_requested";
+
+export function getMyJoinRequest(roomId: string) {
+  return api.get<MyJoinRequest>(`/v1/rooms/${roomId}/join-request`);
+}
+
+export function getJoinRequests(roomId: string) {
+  return api.get<{ requests: JoinRequest[] }>(`/v1/rooms/${roomId}/join-requests`);
+}
+
+export function approveJoin(roomId: string, requestId: string) {
+  return api.post<{ requests: JoinRequest[] }>(`/v1/rooms/${roomId}/join-requests/${requestId}/approve`, {});
+}
+
+export function declineJoin(roomId: string, requestId: string) {
+  return api.post<{ requests: JoinRequest[] }>(`/v1/rooms/${roomId}/join-requests/${requestId}/decline`, {});
+}
+
+export function approveAllJoins(roomId: string) {
+  return api.post<{ requests: JoinRequest[] }>(`/v1/rooms/${roomId}/join-requests/approve-all`, {});
+}
+
+/** Pure: a squad join refusal that needs its own screen rather than an
+ *  error toast, or null. */
+export function joinGate(e: unknown): "awaiting_approval" | "declined" | "room_locked" | "removed" | null {
+  const code = squadErrorCode(e);
+  return code === "awaiting_approval" || code === "declined" || code === "room_locked" || code === "removed"
+    ? code
+    : null;
+}
+
+/** Pure: "Amina and Kev want to join" / "Amina, Kev and 2 others want to join". */
+export function joinAskLine(reqs: { display_name: string }[]): string {
+  const names = reqs.map((r) => (r.display_name || "Someone").split(" ")[0]);
+  if (names.length === 0) return "";
+  if (names.length === 1) return `${names[0]} wants to join the squad`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} want to join the squad`;
+  return `${names[0]}, ${names[1]} and ${names.length - 2} other${names.length === 3 ? "" : "s"} want to join the squad`;
+}

@@ -11,6 +11,8 @@ import { PageShell } from "@/components/PageShell";
 import { AmbientSceneStack } from "@/components/AmbientSceneStack";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
 import { toast } from "sonner";
+import { SquadJoinWaiting, type JoinGateState } from "@/components/squad/SquadJoinWaiting";
+import { joinGate } from "@/lib/squad";
 
 const OPEN_BUFFER_MS = 5 * 60 * 1000;
 // A resting (sub_lapsed) Together room still shows its card: members
@@ -39,6 +41,9 @@ export default function Lobby() {
   const [now, setNow] = useState(Date.now());
   const [name, setName] = useState("");
   const [joining, setJoining] = useState(false);
+  // A squad that lets people in by approval (or locked, or removed me):
+  // its own screen instead of an error toast.
+  const [gate, setGate] = useState<JoinGateState | null>(null);
   // PIN now travels in the deep-link path (`/i/<code>/<pin>`) — share UIs
   // always include it, so the lobby no longer asks for it.
   const pin = (pinParam ?? "").trim();
@@ -186,6 +191,11 @@ export default function Lobby() {
       });
       navigate(`/room/${res.room_id}?${params.toString()}`, { replace: true });
     } catch (err) {
+      const squadGate = joinGate(err);
+      if (squadGate) {
+        setGate(squadGate);
+        return;
+      }
       // Backend 403 "Persistent rooms require an account" → divert
       // anonymous guests to the auth flow with the deep link in tow.
       const msg = err instanceof Error ? err.message : "Could not join.";
@@ -217,6 +227,22 @@ export default function Lobby() {
     // We only ever want to fire once per (invite, identity) pair.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [invite, signedIn, profileName, pin, open]);
+
+  // ── Squad: waiting to be let in (or locked / removed) ──
+  if (gate && invite) {
+    return (
+      <PageShell className="flex flex-col items-center justify-center px-6 py-16">
+        <SquadJoinWaiting
+          invite={invite}
+          state={gate}
+          onApproved={() => {
+            setGate(null);
+            void attemptJoin(effectiveName);
+          }}
+        />
+      </PageShell>
+    );
+  }
 
   // ── Date finished — recap only ──
   if (ended && invite) {
