@@ -20,6 +20,7 @@ import {
   type ChaperonConfig,
   type ChaperonProviderInfo,
   type ChaperonTestResult,
+  type ChaperonThinking,
   type CoachBetaApplication,
   type SttTestResult,
 } from "@/lib/admin";
@@ -53,6 +54,7 @@ export default function AdminChaperon() {
   // blank until the admin types one, and a blank model alone reads as "not
   // custom", which hid the text box.
   const [customPicked, setCustomPicked] = useState(false);
+  const [thinking, setThinking] = useState<ChaperonThinking>("low");
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<ChaperonTestResult | null>(null);
@@ -63,13 +65,20 @@ export default function AdminChaperon() {
       setProvider(data.provider);
       setModel(data.model);
       setCustomPicked(false);
+      setThinking(data.thinking ?? "low");
     }
   }, [data]);
 
   const providers = data?.providers ?? [];
   const selected = providers.find((p) => p.id === provider);
   const selectedConfigured = selected?.configured ?? false;
-  const dirty = data ? provider !== data.provider || model !== data.model : false;
+  const dirty = data
+    ? provider !== data.provider ||
+      model !== data.model ||
+      thinking !== (data.thinking ?? "low")
+    : false;
+  // Only Claude 5.x models take a thinking level; others ignore it.
+  const thinkingApplies = provider === "anthropic" && /^claude-(haiku|sonnet|opus)-5/.test(model);
 
   function pickProvider(p: ChaperonProviderInfo) {
     if (!p.configured) return;
@@ -88,7 +97,7 @@ export default function AdminChaperon() {
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await testChaperonProvider({ provider, model: model.trim() });
+      const res = await testChaperonProvider({ provider, model: model.trim(), thinking });
       setTestResult(res);
     } catch (e) {
       setTestResult({
@@ -107,7 +116,7 @@ export default function AdminChaperon() {
     if (!selectedConfigured) return;
     setSaving(true);
     try {
-      await setChaperonConfig({ provider, model: model.trim() });
+      await setChaperonConfig({ provider, model: model.trim(), thinking });
       toast.success("Chaperon provider updated.");
       await refetch();
     } catch (e) {
@@ -236,6 +245,48 @@ export default function AdminChaperon() {
               server env.
             </p>
           )}
+        </section>
+      )}
+
+      {thinkingApplies && (
+        <section className="space-y-2">
+          <h2
+            id="chaperon-thinking-label"
+            className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            Thinking
+          </h2>
+          <div
+            role="radiogroup"
+            aria-labelledby="chaperon-thinking-label"
+            className="inline-flex rounded-lg border border-white/[0.08] bg-card/40 p-1"
+          >
+            {(data.thinking_levels ?? ["off", "low", "medium"]).map((level) => (
+              <button
+                key={level}
+                type="button"
+                role="radio"
+                aria-checked={thinking === level}
+                onClick={() => {
+                  setThinking(level);
+                  setTestResult(null);
+                }}
+                className={cn(
+                  "rounded-md px-4 py-1.5 text-sm capitalize transition",
+                  thinking === level
+                    ? "bg-emerald-500/15 text-emerald-300"
+                    : "text-cream/70 hover:bg-white/[0.06]",
+                )}
+              >
+                {level}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground/70">
+            How much the AI may think before each check. Off is fastest; low thinks only
+            when a moment is tricky (recommended); medium is more careful and a little
+            slower. Adds about 2–6 cents per monitored hour.
+          </p>
         </section>
       )}
 
