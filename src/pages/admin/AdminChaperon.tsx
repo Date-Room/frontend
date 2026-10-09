@@ -49,6 +49,10 @@ export default function AdminChaperon() {
 
   const [provider, setProvider] = useState<string>("");
   const [model, setModel] = useState<string>("");
+  // "Custom…" picked from the dropdown. Kept separately because the model is
+  // blank until the admin types one, and a blank model alone reads as "not
+  // custom", which hid the text box.
+  const [customPicked, setCustomPicked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<ChaperonTestResult | null>(null);
@@ -58,6 +62,7 @@ export default function AdminChaperon() {
     if (data) {
       setProvider(data.provider);
       setModel(data.model);
+      setCustomPicked(false);
     }
   }, [data]);
 
@@ -71,11 +76,12 @@ export default function AdminChaperon() {
     setProvider(p.id);
     // Prefill the provider's suggested model when switching.
     setModel(p.default_model);
+    setCustomPicked(false);
     setTestResult(null);
   }
 
   const knownModels = selected?.models ?? [];
-  const isCustomModel = model !== "" && !knownModels.includes(model);
+  const isCustomModel = customPicked || (model !== "" && !knownModels.includes(model));
 
   async function test() {
     if (!selectedConfigured) return;
@@ -199,6 +205,7 @@ export default function AdminChaperon() {
               value={isCustomModel ? CUSTOM_MODEL : model}
               onChange={(e) => {
                 const v = e.target.value;
+                setCustomPicked(v === CUSTOM_MODEL);
                 setModel(v === CUSTOM_MODEL ? "" : v);
                 setTestResult(null);
               }}
