@@ -163,7 +163,13 @@ export type ChaperonTestResult = {
   sample_whisper: string | null;
 };
 
-export function testChaperonProvider(body: { provider: string; model: string }) {
+export type ChaperonThinking = "off" | "low" | "medium";
+
+export function testChaperonProvider(body: {
+  provider: string;
+  model: string;
+  thinking?: ChaperonThinking;
+}) {
   return api.post<ChaperonTestResult>("/v1/admin/chaperon/test", body);
 }
 
@@ -176,6 +182,9 @@ export type ChaperonStats = {
 export type ChaperonConfig = {
   provider: string;
   model: string;
+  // How much a Claude 5.x judge may think before answering.
+  thinking?: ChaperonThinking;
+  thinking_levels?: ChaperonThinking[];
   providers: ChaperonProviderInfo[];
   stats: ChaperonStats;
 };
@@ -184,7 +193,11 @@ export function getChaperonConfig() {
   return api.get<ChaperonConfig>("/v1/admin/chaperon/config");
 }
 
-export function setChaperonConfig(body: { provider: string; model: string }) {
+export function setChaperonConfig(body: {
+  provider: string;
+  model: string;
+  thinking?: ChaperonThinking;
+}) {
   return api.patch<ChaperonConfig>("/v1/admin/chaperon/config", body);
 }
 
