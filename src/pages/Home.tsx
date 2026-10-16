@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import {
   Plus,
@@ -15,6 +15,7 @@ import {
   Moon,
   Play,
   X,
+  ArrowRight,
 } from "lucide-react";
 import { BRAND_NAME } from "@/lib/constants";
 import { authClient } from "@/lib/authClient";
@@ -56,6 +57,13 @@ const ENDED_STATES = new Set<RoomStateName>(["ended", "grace"]);
 const RESTING_STATES = new Set<RoomStateName>(["sub_lapsed", "closing"]);
 
 type Tab = "history" | "rooms" | "profile";
+
+/** Each tab's address. `?tab=` links from before still resolve, above. */
+const TAB_PATH: Record<Tab, string> = {
+  rooms: "/home",
+  history: "/recap",
+  profile: "/profile",
+};
 
 function useHomeTabs() {
   const { t } = useTranslation();
@@ -142,13 +150,25 @@ export default function Home() {
   const { t } = useTranslation();
   const tabs = useHomeTabs();
   const [searchParams] = useSearchParams();
-  const initialTab: Tab =
-    searchParams.get("tab") === "profile"
+  const location = useLocation();
+  // Which tab is open is a property of the URL, not of component state. That
+  // gives each tab its own address to share or reload, and makes the browser
+  // back button move between them instead of leaving the app.
+  const legacyTab = searchParams.get("tab");
+  const tab: Tab =
+    legacyTab === "profile"
       ? "profile"
-      : searchParams.get("tab") === "history"
+      : legacyTab === "history"
         ? "history"
-        : "rooms";
-  const [tab, setTab] = useState<Tab>(initialTab);
+        : location.pathname.startsWith("/recap")
+          ? "history"
+          : location.pathname.startsWith("/profile")
+            ? "profile"
+            : "rooms";
+  const setTab = useCallback(
+    (next: Tab) => navigate(TAB_PATH[next]),
+    [navigate],
+  );
 
   const { data: me } = useQuery({
     queryKey: ["me"],
@@ -265,6 +285,10 @@ export default function Home() {
   const hasSquad = aliveRooms.some((r) => r.room_kind === "squad");
   const hasDate = aliveRooms.some((r) => r.room_kind !== "squad");
   const showKinds = hasSquad && hasDate;
+  // Searching or filtering turns the page into a pure list: a "continue"
+  // hero that survived a search would be hiding the very thing you searched
+  // for, which is worse than losing the shortcut for a moment.
+  const isFiltering = q.length > 0 || (showKinds && kind !== "all");
   const visibleAliveRooms = aliveRooms
     .filter((r) => matchesKind(r, showKinds ? kind : "all"))
     .filter((r) => {
@@ -277,6 +301,10 @@ export default function Home() {
     // which says nothing about where you actually were last.
     .slice()
     .sort(byLastVisited);
+  // The sort already puts the room you were in most recently first, so the
+  // thing you most likely came back for is simply the head of the list.
+  const continueRoom = isFiltering ? undefined : visibleAliveRooms[0];
+  const listRooms = continueRoom ? visibleAliveRooms.slice(1) : visibleAliveRooms;
 
   // WhatsApp-style header — fade in the compact pinned title once the
   // big inline title has scrolled past.
@@ -365,7 +393,9 @@ export default function Home() {
 
           {/* Desktop tab nav */}
           <nav className="ml-8 hidden items-center gap-1 lg:flex">
-            {tabs.map((item) => (
+            {tabs
+              .filter((item) => item.id !== "profile")
+              .map((item) => (
               <button
                 key={item.id}
                 type="button"
@@ -392,7 +422,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setTab("profile")}
-              className="flex items-center gap-2.5 rounded-full border border-hairline bg-secondary/60 py-1 pl-1 pr-3.5 transition-colors hover:border-primary/25"
+              className="flex items-center gap-2.5 rounded-full border border-hairline bg-card py-1 pl-1 pr-3.5 transition-colors hover:border-primary/25"
             >
               <UserAvatarImg
                 src={me?.photo_url}
@@ -421,59 +451,69 @@ export default function Home() {
       <main ref={mainRef} className="relative z-10 mx-auto min-h-screen max-w-6xl px-4 pt-20 pb-28 lg:px-6 lg:pb-16">
         {tab === "rooms" && (
           <div className="animate-fade-in space-y-4">
-            {/* Big inline title — scrolls with content, WhatsApp-style.
-                Compact pinned mirror lives in the header. */}
-            <div className="flex items-end justify-between px-2 pt-3">
+            {/* Title, and the two ways to start something. "New room" is a
+                normal button beside the title rather than a full-width slab:
+                you come to this page to go back into a room far more often
+                than to make a new one, and the slab was shouting the wrong
+                one of those. */}
+            <div className="flex items-center justify-between gap-3 px-2 pt-3">
               <h1 className="font-serif text-4xl font-semibold leading-tight text-cream">Rooms</h1>
-              <button
-                type="button"
-                onClick={() => navigate("/join")}
-                aria-label="Join with code"
-                className="focus-ring flex h-10 w-10 items-center justify-center rounded-full text-amber transition-colors hover:bg-amber/10"
-              >
-                <KeyRound className="h-5 w-5" />
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/join")}
+                  aria-label="Join with code"
+                  className="focus-ring flex h-10 w-10 items-center justify-center rounded-full text-amber transition-colors hover:bg-amber/10"
+                >
+                  <KeyRound className="h-5 w-5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/create")}
+                  className="btn-primary focus-ring elev-cta inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold sm:px-5"
+                >
+                  <Plus className="h-4 w-4" strokeWidth={2.5} />
+                  <span className="hidden sm:inline">New room</span>
+                  <span className="sm:hidden">New</span>
+                </button>
+              </div>
             </div>
 
-            {/* Search field — chat-app style under the title. */}
-            <div className="px-2">
-              <div className="relative">
+            {!roomsLoading && continueRoom ? (
+              <ContinueCard
+                room={continueRoom}
+                card={cardByRoomId[continueRoom.id]}
+                me={me}
+                visits={visits}
+                now={now}
+                onTap={() => onTileTap(continueRoom)}
+              />
+            ) : null}
+
+            {/* Search and the kind filter share one row — they are the same
+                job (narrow the list) and were taking two full bands. */}
+            <div className="flex flex-col gap-2.5 px-2 sm:flex-row sm:items-center">
+              <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search"
-                  className="focus-ring w-full rounded-xl border border-transparent bg-secondary/60 py-2.5 pl-10 pr-9 text-sm text-cream placeholder:text-muted-foreground/70 focus:border-primary/30"
+                  className="focus-ring w-full rounded-xl border border-hairline bg-secondary/60 py-2.5 pl-10 pr-9 text-sm text-cream placeholder:text-muted-foreground/70 focus:border-primary/30"
                 />
                 {query && (
                   <button
                     type="button"
                     aria-label="Clear search"
                     onClick={() => setQuery("")}
-                    className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-white/10"
+                    className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary"
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
-            </div>
-
-            {/* Action bar — Create + Join. */}
-            <div className="flex flex-col gap-3 px-2 pt-2 sm:flex-row sm:items-stretch">
-              <button
-                type="button"
-                onClick={() => navigate("/create")}
-                className="btn-primary focus-ring flex items-center justify-center gap-3 rounded-[1.35rem] py-4 shadow-[0_12px_48px_rgba(232,166,83,0.28)] sm:flex-1"
-              >
-                <Plus className="h-5 w-5" strokeWidth={2.25} />
-                <span className="font-medium tracking-wide">Create a new room</span>
-              </button>
-            </div>
-
-            {/* Unified rooms list (no separate Our Rooms section). */}
-            <section className="pt-2">
               {showKinds && (
-                <div className="flex gap-2 px-2 pb-3 pt-1">
+                <div className="flex shrink-0 gap-2">
                   {ROOM_KINDS.map((k) => (
                     <button
                       key={k}
@@ -484,7 +524,7 @@ export default function Home() {
                         "focus-ring rounded-full px-3.5 py-1.5 text-[13px] transition-colors",
                         kind === k
                           ? "border border-primary/55 bg-primary/[0.18] font-semibold text-cream"
-                          : "border border-transparent bg-card/40 text-muted-foreground hover:text-cream",
+                          : "border border-hairline bg-secondary/60 text-muted-foreground hover:text-cream",
                       )}
                     >
                       {ROOM_KIND_CHIPS[k]}
@@ -492,28 +532,39 @@ export default function Home() {
                   ))}
                 </div>
               )}
-              <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                {showKinds ? ROOM_KIND_HEADINGS[kind] : "Rooms"}
-              </p>
+            </div>
+
+            {/* One card, divided rows. Eight separate floating tiles in two
+                ragged columns read as eight objects; a single list reads as
+                one thing you scan. */}
+            <section className="px-2">
               {roomsLoading ? (
                 <RoomsSkeletonList />
-              ) : visibleAliveRooms.length === 0 ? (
-                <RoomsEmptyState query={q} />
+              ) : listRooms.length === 0 ? (
+                continueRoom ? null : (
+                  <RoomsEmptyState query={q} />
+                )
               ) : (
-                <ul className="grid gap-2.5 lg:grid-cols-2">
-                  {visibleAliveRooms.map((r) => (
-                    <li key={r.id}>
-                      <RoomTileRow
-                        room={r}
-                        card={cardByRoomId[r.id]}
-                        me={me}
-                        onTap={() => onTileTap(r)}
-                        visits={visits}
-                        now={now}
-                      />
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <p className="pb-2 pl-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {continueRoom ? "Your other rooms" : showKinds ? ROOM_KIND_HEADINGS[kind] : "Rooms"}
+                  </p>
+                  <ul className="surface-tile elev-tile overflow-hidden rounded-2xl border border-hairline">
+                    {listRooms.map((r, idx) => (
+                      <li key={r.id}>
+                        <RoomTileRow
+                          room={r}
+                          card={cardByRoomId[r.id]}
+                          me={me}
+                          onTap={() => onTileTap(r)}
+                          visits={visits}
+                          now={now}
+                          isLast={idx === listRooms.length - 1}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </section>
           </div>
@@ -535,7 +586,7 @@ export default function Home() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search"
-                  className="focus-ring w-full rounded-xl border border-transparent bg-secondary/60 py-2.5 pl-10 pr-9 text-sm text-cream placeholder:text-muted-foreground/70 focus:border-primary/30"
+                  className="focus-ring w-full rounded-xl border border-hairline bg-secondary/60 py-2.5 pl-10 pr-9 text-sm text-cream placeholder:text-muted-foreground/70 focus:border-primary/30"
                 />
                 {query && (
                   <button
@@ -551,12 +602,12 @@ export default function Home() {
             </div>
 
             {visibleEndedRooms.length === 0 ? (
-              <div className="space-y-2 rounded-[2rem] border border-dashed border-hairline px-8 py-20 text-center">
+              <div className="space-y-2 rounded-[2rem] border border-dashed border-border px-8 py-20 text-center">
                 <p className="font-serif text-lg italic text-cream">No past sessions yet.</p>
                 <p className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground">Rooms move here once their session ends</p>
               </div>
             ) : (
-              <ul className="overflow-hidden rounded-2xl border border-hairline bg-card/30">
+              <ul className="surface-tile elev-tile overflow-hidden rounded-2xl border border-hairline">
                 {visibleEndedRooms
                   .filter((r) => {
                     if (!q) return true;
@@ -639,22 +690,24 @@ export default function Home() {
  * Session rooms get the small timer-outline icon next to the
  * expiry label.
  */
-function RoomTileRow({
+/**
+ * Everything the page knows about one room, derived once.
+ *
+ * Both the "continue" hero and the compact list row render the same room, so
+ * the derivation lives here rather than inside either of them — the two
+ * drifting apart (a different title, a different "with" line) is the obvious
+ * way this page would rot.
+ */
+function roomView({
   room,
   card,
   me,
-  onTap,
   visits,
-  now,
 }: {
   room: Room;
   card: InviteCard | undefined;
   me: UserMe | undefined;
-  onTap: () => void;
-  /** roomId → ISO last-visited, read once by the page. */
   visits: Record<string, string>;
-  /** Ticked once a minute by the page, so "14m ago" stays current. */
-  now: number;
 }) {
   const isHost = me?.id ? room.host_id === me.id : false;
   const isPersistent = room.persistence === "persistent";
@@ -665,6 +718,10 @@ function RoomTileRow({
     ? { name: card.host_display_name, photo: card.host_photo_url }
     : null);
 
+  // The code, until someone names the room. Tried "Our squad" as a friendlier
+  // fallback for squads and it was worse: a list of unnamed squads became
+  // three rows all called the same thing, with nothing to tell them apart.
+  // In a list, unique beats friendly.
   const title = room.greeting_headline?.trim() || room.code;
   // A squad room matched none of the package branches below and came out
   // labelled "Try".
@@ -699,19 +756,158 @@ function RoomTileRow({
           ? "Long Pack"
           : "Try";
 
+  return {
+    isHost,
+    isPersistent,
+    lifecycle,
+    effectivePartner,
+    title,
+    isSquad,
+    withLine,
+    endsLine,
+    lastVisit,
+    roleWord,
+    typeLabel,
+    faces: (card?.participants ?? []).map((p) => ({
+      name: p.display_name ?? "",
+      photo: p.photo_url ?? null,
+    })),
+  };
+}
+
+/**
+ * "Continue" — the room you were in most recently, given its own card.
+ *
+ * The list below answers "which rooms do I have"; this answers "take me back
+ * to the one I was just in", which is the far more common reason to be on
+ * this page. It reads the same `roomView` the rows do, so the title and the
+ * "with" line can never say something different here.
+ */
+function ContinueCard({
+  room,
+  card,
+  me,
+  visits,
+  now,
+  onTap,
+}: {
+  room: Room;
+  card: InviteCard | undefined;
+  me: UserMe | undefined;
+  visits: Record<string, string>;
+  now: number;
+  onTap: () => void;
+}) {
+  const { title, isSquad, typeLabel, withLine, lastVisit, roleWord, faces, effectivePartner } =
+    roomView({ room, card, me, visits });
+  // A room you have never opened gets different words: "back into" would be
+  // a lie, and it is the one case where the hero is an invitation rather
+  // than a return.
+  const returning = lastVisit != null;
+  const when = returning ? `You were here ${lastVisitedLabel(lastVisit, now)}` : "Not opened yet";
+  // "Rejoin" for the common case. A room you have never opened still says
+  // "Open", because rejoining something you never joined is a lie.
+  const action = returning ? "Rejoin" : isSquad ? "Open the squad" : "Open the room";
+
+  return (
+    <div className="px-2">
+      <div className="editorial-card relative overflow-hidden rounded-[1.6rem] px-5 py-5 sm:px-6 sm:py-6">
+        <div className="flex items-center gap-4">
+          {isSquad ? (
+            <SquadAvatar faces={faces} />
+          ) : (
+            <DuoAvatar
+              meName={me?.display_name ?? ""}
+              mePhoto={me?.photo_url ?? null}
+              partnerName={effectivePartner?.name ?? ""}
+              partnerPhoto={effectivePartner?.photo ?? null}
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-serif text-2xl leading-tight text-cream sm:text-[1.75rem]">
+              {title}
+            </p>
+            <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+              <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-primary/75">
+                {typeLabel}
+              </span>
+              {withLine ? (
+                <>
+                  <span className="text-muted-foreground/35">·</span>
+                  <span className="truncate">{withLine}</span>
+                </>
+              ) : null}
+            </p>
+          </div>
+          <span className="hidden shrink-0 text-[11px] uppercase tracking-[0.15em] text-muted-foreground sm:block">
+            {roleWord}
+          </span>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+          <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
+            <History className="h-3.5 w-3.5" strokeWidth={1.5} />
+            {when}
+          </span>
+          <button
+            type="button"
+            onClick={onTap}
+            className="btn-primary focus-ring elev-cta inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold"
+          >
+            {action}
+            <ArrowRight className="h-4 w-4" strokeWidth={2.25} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RoomTileRow({
+  room,
+  card,
+  me,
+  onTap,
+  visits,
+  now,
+  isLast,
+}: {
+  room: Room;
+  card: InviteCard | undefined;
+  me: UserMe | undefined;
+  onTap: () => void;
+  /** roomId → ISO last-visited, read once by the page. */
+  visits: Record<string, string>;
+  /** Ticked once a minute by the page, so "14m ago" stays current. */
+  now: number;
+  /** Rows sit inside one card, so the last one drops its divider. */
+  isLast: boolean;
+}) {
+  const {
+    isPersistent,
+    lifecycle,
+    effectivePartner,
+    title,
+    isSquad,
+    withLine,
+    endsLine,
+    lastVisit,
+    roleWord,
+    typeLabel,
+    faces,
+  } = roomView({ room, card, me, visits });
+
   return (
     <button
       type="button"
       onClick={onTap}
-      className="focus-ring group flex h-full w-full items-center gap-3 rounded-2xl border border-hairline bg-card/30 px-3.5 py-3.5 text-left transition-colors hover:border-white/[0.1] hover:bg-white/[0.04]"
+      className={cn(
+        "focus-ring group flex w-full items-center gap-3 px-3.5 py-3.5 text-left transition-colors hover:bg-secondary/50",
+        !isLast && "border-b border-hairline",
+      )}
     >
       {isSquad ? (
-        <SquadAvatar
-          faces={(card?.participants ?? []).map((p) => ({
-            name: p.display_name ?? "",
-            photo: p.photo_url ?? null,
-          }))}
-        />
+        <SquadAvatar faces={faces} />
       ) : (
         <DuoAvatar
           meName={me?.display_name ?? ""}
@@ -968,7 +1164,7 @@ function RoomsSkeletonList() {
       {[0, 1, 2, 3].map((i) => (
         <li
           key={i}
-          className="flex items-center gap-3 rounded-2xl border border-hairline bg-card/30 px-3.5 py-3.5"
+          className="surface-tile elev-tile flex items-center gap-3 rounded-2xl border border-hairline px-3.5 py-3.5"
         >
           <div className="relative h-12 w-[60px] shrink-0">
             <ShimmerSkeleton circle={36} className="absolute left-0 top-1 ring-2 ring-background" />
@@ -993,13 +1189,13 @@ function RoomsSkeletonList() {
 function RoomsEmptyState({ query }: { query: string }) {
   if (query) {
     return (
-      <div className="rounded-2xl border border-dashed border-hairline px-6 py-12 text-center">
+      <div className="rounded-2xl border border-dashed border-border px-6 py-12 text-center">
         <p className="text-sm text-muted-foreground">No matches.</p>
       </div>
     );
   }
   return (
-    <div className="flex flex-col items-center justify-center space-y-5 rounded-[2rem] border border-dashed border-hairline px-8 py-16 text-center">
+    <div className="flex flex-col items-center justify-center space-y-5 rounded-[2rem] border border-dashed border-border px-8 py-16 text-center">
       <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/25 via-primary/10 to-transparent ring-1 ring-primary/25">
         <Heart className="h-9 w-9 text-primary/75" strokeWidth={1.25} />
       </div>

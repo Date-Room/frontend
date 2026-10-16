@@ -17,7 +17,7 @@ import { AppleIcon, GoogleIcon } from "@/components/icons/AuthProviderIcons";
 import { cn } from "@/lib/utils";
 
 const oauthBtnClass =
-  "focus-ring relative flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.10] bg-white/[0.04] py-3.5 text-sm font-medium text-cream transition-all duration-200 hover:bg-white/[0.08] hover:border-white/[0.18] hover:-translate-y-px sm:rounded-[1.15rem]";
+  "focus-ring relative flex w-full items-center justify-center gap-3 rounded-xl border border-white/[0.16] bg-white/[0.10] py-3.5 text-sm font-medium text-ondark backdrop-blur-sm transition-all duration-200 hover:border-white/[0.28] hover:bg-white/[0.16] hover:-translate-y-px sm:rounded-[1.15rem]";
 
 const REDIRECT_KEY = "post_auth_redirect";
 
@@ -137,19 +137,19 @@ export default function Auth() {
   }
 
   return (
-    <PageShell className="flex items-center justify-center px-6 overflow-hidden">
+    <PageShell tone="dark" className="flex items-center justify-center px-6 overflow-hidden">
       <div className="absolute inset-0 z-0">
-        <img
-          src="/lobby-hero.png"
-          alt=""
-          className="w-full h-full object-cover opacity-30 scale-110 blur-sm"
-        />
-        <div className="absolute inset-0 bg-gradient-to-tr from-background via-background/80 to-transparent" />
+        {/* No page-coloured wash over the photo — the cards are glass and sit
+            on it directly. What is here instead is a plain dark vignette: it
+            keeps the candlelit middle vivid while pulling the bright edges
+            down far enough for the fine print to survive on bare image. */}
+        <img src="/lobby-hero.png" alt="" className="h-full w-full scale-105 object-cover" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_25%,rgba(0,0,0,0.45)_100%)]" />
       </div>
 
       <Link
         to="/"
-        className="fixed z-30 top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] sm:top-8 sm:left-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-background/70 px-4 py-2.5 text-sm font-medium text-cream shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition-colors hover:border-white/35 hover:bg-background/85 hover:text-cream focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rosegold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background group"
+        className="fixed z-30 top-[max(1rem,env(safe-area-inset-top))] left-[max(1rem,env(safe-area-inset-left))] sm:top-8 sm:left-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/45 px-4 py-2.5 text-sm font-medium text-ondark shadow-[0_8px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition-colors hover:border-white/35 hover:bg-black/60 hover:text-ondark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rosegold/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background group"
       >
         <ChevronLeft
           className="h-4 w-4 shrink-0 text-rosegold group-hover:-translate-x-0.5 transition-transform"
@@ -159,7 +159,7 @@ export default function Auth() {
       </Link>
 
       <div className="relative z-10 w-full max-w-md animate-scale-in sm:max-w-lg lg:max-w-xl">
-        <div className="editorial-card rounded-[1.75rem] px-6 py-7 sm:rounded-[2.25rem] sm:px-10 sm:py-9 lg:px-12 lg:py-10">
+        <div className="auth-card rounded-[1.75rem] px-6 py-7 sm:rounded-[2.25rem] sm:px-10 sm:py-9 lg:px-12 lg:py-10">
           <div className="mb-4 flex justify-center sm:mb-5">
             <div className="h-2 w-2 animate-pulse-glow rounded-full bg-rosegold" />
           </div>
@@ -249,7 +249,7 @@ export default function Auth() {
                   onClick={handleApple}
                   className={oauthBtnClass}
                 >
-                  <AppleIcon className="h-5 w-5 shrink-0 text-cream" />
+                  <AppleIcon className="h-5 w-5 shrink-0 text-ondark" />
                   {t("auth.continueWithApple")}
                 </button>
               </div>
@@ -302,13 +302,13 @@ export default function Auth() {
           )}
         </div>
 
-        <p className="mt-5 text-center text-[10px] font-light leading-relaxed tracking-[0.25em] text-muted-foreground/30">
+        <p className="mt-5 text-center text-[10px] font-light leading-relaxed tracking-[0.25em] text-ondark/75 [text-shadow:0_1px_4px_rgba(0,0,0,0.85)]">
           By continuing you confirm you are 18 or older.
         </p>
-        <p className="mt-2 text-center text-[10px] tracking-[0.25em] uppercase text-muted-foreground/40">
-          <Link to="/privacy" className="hover:text-cream transition-colors">{t("nav.privacy")}</Link>
+        <p className="mt-2 text-center text-[10px] tracking-[0.25em] uppercase text-ondark/80 [text-shadow:0_1px_4px_rgba(0,0,0,0.85)]">
+          <Link to="/privacy" className="transition-colors hover:text-ondark">{t("nav.privacy")}</Link>
           <span className="mx-2 opacity-60" aria-hidden>·</span>
-          <Link to="/terms" className="hover:text-cream transition-colors">{t("nav.terms")}</Link>
+          <Link to="/terms" className="transition-colors hover:text-ondark">{t("nav.terms")}</Link>
         </p>
         <div className="mt-6 flex justify-center">
           <LanguageSwitcher variant="row" />

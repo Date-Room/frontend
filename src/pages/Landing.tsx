@@ -96,9 +96,9 @@ export default function Landing() {
 
       {/* Section 1 — Hero */}
       <section className="lp-vignette relative overflow-hidden">
-        <img src="/lov/hero-candlelit.jpg" alt="Candlelit dinner table with a tablet showing a video date" width={1920} height={1280} className="absolute inset-0 h-full w-full object-cover" />
+        <img src="/lov/hero-candlelit.jpg" alt="Candlelit dinner table with a tablet showing a video date" width={1920} height={1280} className="animate-ken-burns motion-reduce:animate-none absolute inset-0 h-full w-full object-cover" />
         <div className="relative z-10 mx-auto max-w-7xl px-6 pb-32 pt-28 md:pb-38 md:pt-30">
-          <div className="max-w-2xl text-left">
+          <div className="lp-hero-copy max-w-2xl text-left">
             <Eyebrow>{t("landing.hero.eyebrow")}</Eyebrow>
             <h1 className="lp-display mt-6 whitespace-pre-line text-5xl text-lpcream md:text-7xl lg:text-8xl">
               {t("landing.hero.title")}
@@ -140,7 +140,7 @@ export default function Landing() {
             width={800}
             height={800}
             loading="lazy"
-            className="lp-glow aspect-square w-half rounded-2xl object-cover"
+            className="lp-photo lp-glow aspect-square w-half rounded-2xl object-cover"
           />
         </div>
       </section>
@@ -255,7 +255,7 @@ export default function Landing() {
 
       {/* Section 5 — One room. Every app. */}
       <section className="lp-vignette relative overflow-hidden border-y border-lpborder/40">
-        <img src="/lov/phone-code.jpg" alt="A phone showing a 6-digit code by candlelight" width={1280} height={1280} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <img src="/lov/phone-code.jpg" alt="A phone showing a 6-digit code by candlelight" width={1280} height={1280} loading="lazy" className="lp-photo absolute inset-0 h-full w-full object-cover" />
         <div className="relative z-10 mx-auto max-w-7xl px-6 py-28 md:py-40">
           <div className="max-w-2xl">
             <Eyebrow>{t("landing.oneRoom.eyebrow")}</Eyebrow>
@@ -277,7 +277,7 @@ export default function Landing() {
 
       {/* Section 6 — For couples */}
       <section id="couples" className="relative overflow-hidden">
-        <img src="/premium-bg.png" alt="Warm morning light through curtains onto a rumpled bed" width={1920} height={1080} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <img src="/premium-bg.png" alt="Warm morning light through curtains onto a rumpled bed" width={1920} height={1080} loading="lazy" className="lp-photo absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, oklch(0.18 0.02 50 / 0.92) 0%, oklch(0.18 0.02 50 / 0.55) 60%, transparent 100%)" }} />
         <div className="relative z-10 mx-auto max-w-7xl px-6 py-28 md:py-40">
           <div className="max-w-xl">
@@ -293,7 +293,7 @@ export default function Landing() {
 
       {/* Section 7 — For friends */}
       <section id="friends" className="relative overflow-hidden">
-        <img src="/lov/friends-evening.jpg" alt="Cozy living room with a laptop showing a group video call" width={1920} height={1080} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <img src="/lov/friends-evening.jpg" alt="Cozy living room with a laptop showing a group video call" width={1920} height={1080} loading="lazy" className="lp-photo absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0" style={{ background: "linear-gradient(270deg, oklch(0.18 0.02 50 / 0.92) 0%, oklch(0.18 0.02 50 / 0.55) 60%, transparent 100%)" }} />
         <div className="relative z-10 mx-auto flex max-w-7xl justify-end px-6 py-28 md:py-40">
           <div className="max-w-xl">
@@ -378,7 +378,7 @@ export default function Landing() {
 
       {/* Section 11 — Final CTA */}
       <section id="cta" className="lp-vignette relative overflow-hidden">
-        <img src="/lov/final-door.jpg" alt="An open door with warm light spilling into a dark room" width={1920} height={1080} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <img src="/lov/final-door.jpg" alt="An open door with warm light spilling into a dark room" width={1920} height={1080} loading="lazy" className="lp-photo absolute inset-0 h-full w-full object-cover" />
         <div className="relative z-10 mx-auto max-w-3xl px-6 py-36 text-center md:py-48">
           <h2 className="lp-display text-5xl text-lpcream md:text-7xl">{t("landing.finalCta.title")}</h2>
           <p className="mt-8 text-lg text-lpcream/85">{t("landing.finalCta.subtitle")}</p>

@@ -301,7 +301,7 @@ export default function Lobby() {
     : null;
 
   return (
-    <PageShell orbs={false} vignette={false} className="overflow-hidden">
+    <PageShell tone="dark" orbs={false} vignette={false} className="overflow-hidden">
       <AmbientSceneStack
         ambiance={ambientPreset}
         positionClassName="fixed inset-0 z-[1]"

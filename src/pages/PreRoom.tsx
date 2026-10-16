@@ -1115,7 +1115,7 @@ function PreRoomShell({
   const shellStyle = mood ? ambianceAccentStyle(mood) : undefined;
   const lowPower = useLowPowerMode();
   return (
-    <PageShell className="overflow-hidden" style={shellStyle}>
+    <PageShell tone="dark" className="overflow-hidden" style={shellStyle}>
       {mood ? (
         <>
           <AmbientSceneStack
