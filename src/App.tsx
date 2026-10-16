@@ -132,7 +132,12 @@ const App = () => {
             <Route path="/r/:code" element={<AuthGuard requireAuth={false}><ReferralLanding /></AuthGuard>} />
 
             {/* Authenticated Dashboard */}
+            {/* The three Home tabs are real routes, so each has its own URL and
+                back/forward moves between them. They render the same page;
+                which tab is open is read from the path. */}
             <Route path="/home" element={<AuthGuard><Home /></AuthGuard>} />
+            <Route path="/recap" element={<AuthGuard><Home /></AuthGuard>} />
+            <Route path="/profile" element={<AuthGuard><Home /></AuthGuard>} />
             <Route path="/create" element={<AuthGuard><CreateRoom /></AuthGuard>} />
             <Route path="/rooms/:id/pre" element={<AuthGuard><PreRoom /></AuthGuard>} />
             <Route path="/room/:id" element={<AuthGuard guestParam="participant_id"><RoomErrorBoundary><LiveRoom /></RoomErrorBoundary></AuthGuard>} />

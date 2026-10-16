@@ -215,7 +215,7 @@ export default function Settings() {
           <p className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             {t("settings.account")}
           </p>
-          <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-card/40 p-5">
+          <div className="flex flex-col items-center gap-2 rounded-2xl surface-panel elev-tile border border-border p-5">
             <div className="relative self-center">
               <div className="h-20 w-20 overflow-hidden rounded-full border border-border bg-secondary/60 lg:h-24 lg:w-24">
                 <UserAvatarImg
@@ -258,7 +258,7 @@ export default function Settings() {
           <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             {t("settings.details")}
           </p>
-          <div className="overflow-hidden rounded-2xl border border-border bg-card/40">
+          <div className="overflow-hidden rounded-2xl surface-panel elev-tile border border-border">
             <div className="flex items-center px-4 py-3">
               <span className="w-20 shrink-0 text-sm text-muted-foreground">{t("settings.name")}</span>
               <input
@@ -491,7 +491,7 @@ function InviteSection({
       <p className="px-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
         Invite
       </p>
-      <div className="overflow-hidden rounded-2xl border border-border bg-card/40 p-4">
+      <div className="overflow-hidden rounded-2xl surface-panel elev-tile border border-border p-4">
         {!shareUrl ? (
           <p className="text-sm text-muted-foreground">
             Your invite link is loading. Pull to refresh or try again in a moment.
