@@ -13,6 +13,20 @@ export type ThemeMode = "dark" | "light" | "system";
 
 const KEY = "dr_theme_mode";
 
+/**
+ * Whether the appearance picker is offered at all.
+ *
+ * Parked until after the mobile store release so the two clients look the
+ * same while that ships. Nothing is deleted: the `[data-theme="light"]`
+ * palette, the fill/ink token split, the hairline and elevation tokens and
+ * every light-mode override stay in index.css. Turning it back on is
+ * flipping this to `true`.
+ *
+ * While it is `false` a stored preference is IGNORED rather than cleared, so
+ * anyone who had chosen light gets it back unchanged when it returns.
+ */
+export const LIGHT_MODE_ENABLED = false;
+
 export const THEME_MODES: ThemeMode[] = ["dark", "light", "system"];
 
 export const THEME_MODE_LABELS: Record<ThemeMode, string> = {
@@ -23,6 +37,7 @@ export const THEME_MODE_LABELS: Record<ThemeMode, string> = {
 
 /** Dark is the default: DateRoom is a candle-lit product by design. */
 export function loadThemeMode(): ThemeMode {
+  if (!LIGHT_MODE_ENABLED) return "dark";
   try {
     const raw = localStorage.getItem(KEY);
     return raw === "light" || raw === "system" ? raw : "dark";
@@ -42,6 +57,9 @@ export function saveThemeMode(mode: ThemeMode): void {
 
 /** What the setting resolves to right now. */
 export function resolveTheme(mode: ThemeMode): "dark" | "light" {
+  // Belt and braces: `system` on a light-set OS would otherwise still
+  // resolve light for anyone whose stored mode never goes through load.
+  if (!LIGHT_MODE_ENABLED) return "dark";
   if (mode !== "system") return mode;
   try {
     return window.matchMedia("(prefers-color-scheme: light)").matches
