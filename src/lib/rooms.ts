@@ -312,6 +312,44 @@ export function updateRoom(
   return api.patch<Room>(`/v1/rooms/${roomId}`, patch);
 }
 
+export type MuteWhat = { microphone?: boolean; camera?: boolean };
+
+/** Mute someone else's microphone and/or camera for the whole call (say
+ *  they stepped away). They can turn it back on themselves. Anonymous
+ *  callers pass their own participant_id. Resolves to what was muted. */
+export function muteParticipant(
+  roomId: string,
+  targetParticipantId: string,
+  what: MuteWhat,
+  myParticipantId?: string,
+): Promise<{ muted: string[] }> {
+  return api.post<{ muted: string[] }>(
+    `/v1/rooms/${roomId}/participants/${targetParticipantId}/mute`,
+    {
+      microphone: what.microphone ?? false,
+      camera: what.camera ?? false,
+      participant_id: myParticipantId ?? null,
+    },
+  );
+}
+
+/** Pure: the notice for the person who was muted, or null when the event
+ *  isn't about them. "Joshua muted your microphone. Tap the mic to talk again." */
+export function mutedNotice(
+  payload: Record<string, unknown>,
+  myIdentity: string,
+): string | null {
+  if (!myIdentity || payload.identity !== myIdentity) return null;
+  const muted = Array.isArray(payload.muted) ? (payload.muted as string[]) : [];
+  const by = typeof payload.by === "string" && payload.by ? payload.by : "Someone";
+  const mic = muted.includes("microphone");
+  const cam = muted.includes("camera");
+  if (mic && cam) return `${by} muted your microphone and turned off your camera. Tap them to turn them back on.`;
+  if (mic) return `${by} muted your microphone. Tap the mic to talk again.`;
+  if (cam) return `${by} turned off your camera. Tap the camera to turn it back on.`;
+  return null;
+}
+
 /** Guests pass the participant_id they got from join; signed-in users omit it. */
 export function livekitToken(roomId: string, participantId?: string): Promise<LiveKitToken> {
   return api.post<LiveKitToken>(`/v1/rooms/${roomId}/livekit-token`, {

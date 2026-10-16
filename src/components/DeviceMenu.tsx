@@ -9,7 +9,10 @@ import {
   LayoutTemplate,
   Mic,
   PictureInPicture2,
+  LayoutGrid,
   LayoutPanelLeft,
+  Sparkles,
+  UserRound,
   Video,
   Volume2,
   type LucideIcon,
@@ -23,6 +26,7 @@ import {
   type DeviceKind,
 } from "@/lib/devices";
 import { useCallLayout, type CallLayout } from "@/lib/callLayout";
+import { useSquadLayout, type SquadLayoutPref } from "@/lib/squadLayout";
 import { cn } from "@/lib/utils";
 
 /** One kind's device list inside the menu. Uses LiveKit's hook (enumeration
@@ -353,4 +357,70 @@ export function DeviceChangeToaster() {
   }, [room]);
 
   return null;
+}
+
+/**
+ * Squad calls: how I see the faces, my own choice (like Zoom's gallery and
+ * speaker views). Doesn't need the call, so it can sit in the room bar.
+ */
+export function SquadLayoutMenu({ triggerClassName, iconClassName }: { triggerClassName: string; iconClassName: string }) {
+  const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const ref = useRef<HTMLButtonElement>(null);
+  const [pref, choose] = useSquadLayout();
+  const options: { id: SquadLayoutPref; label: string; hint: string; Icon: LucideIcon }[] = [
+    { id: "grid", label: "Grid", hint: "Everyone the same size", Icon: LayoutGrid },
+    { id: "speaker", label: "Speaker", hint: "Whoever's talking big, the rest small", Icon: UserRound },
+    { id: "auto", label: "Auto", hint: "Grid when there's room, speaker when there isn't", Icon: Sparkles },
+  ];
+  return (
+    <>
+      <button
+        ref={ref}
+        type="button"
+        aria-label="Call layout"
+        aria-expanded={anchor !== null}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => setAnchor(anchor ? null : (ref.current?.getBoundingClientRect() ?? null))}
+        className={triggerClassName}
+      >
+        <LayoutGrid className={iconClassName} />
+      </button>
+      {anchor && (
+        <Dropup anchor={anchor} onClose={() => setAnchor(null)}>
+          <div className="space-y-2">
+            <p className="px-1 text-label font-semibold uppercase tracking-[0.18em] text-muted-foreground">Layout</p>
+            {options.map((o) => {
+              const active = pref === o.id;
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={active}
+                  onClick={() => {
+                    choose(o.id);
+                    setAnchor(null);
+                  }}
+                  className={cn(
+                    "flex w-full items-center gap-3.5 rounded-xl border p-3 text-left transition",
+                    active ? "border-primary/40 bg-primary/[0.08]" : "border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05]",
+                  )}
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15">
+                    <o.Icon className="h-4 w-4 text-primary" aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-body text-cream">{o.label}</span>
+                    <span className="block text-label text-muted-foreground">{o.hint}</span>
+                  </span>
+                  {active && <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden />}
+                </button>
+              );
+            })}
+            <p className="px-1 text-label text-muted-foreground">Only changes your screen. Games and films use their own layouts.</p>
+          </div>
+        </Dropup>
+      )}
+    </>
+  );
 }

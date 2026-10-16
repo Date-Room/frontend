@@ -1,5 +1,5 @@
 /**
- * Squad beta, the requester's side. Squad (friend nights for 2 to 5 people)
+ * Squad beta, the requester's side. Squad (friend nights for 2 to 6 people)
  * opens to a few groups first: the public slot says "Request access", a
  * signed-in person answers a few short questions, and the team lets groups
  * in from the admin queue. Mirrors backend `api/v1/squad.py`.
@@ -33,7 +33,7 @@ export const SQUAD_PLAN_OPTIONS: { id: SquadPlan; label: string }[] = [
   { id: "other", label: "Something else" },
 ];
 
-export const SQUAD_GROUP_SIZES = [2, 3, 4, 5] as const;
+export const SQUAD_GROUP_SIZES = [2, 3, 4, 5, 6] as const;
 
 export function getSquadBeta() {
   return api.get<SquadBetaState>("/v1/squad/beta");
@@ -59,7 +59,9 @@ export function toggleSquadPlan(plans: SquadPlan[], id: SquadPlan): SquadPlan[] 
 // api/v1/squad_billing. Nights belong to the room: anyone in the squad
 // can start one or top the room up.
 
-export const SQUAD_SEATS = [2, 3, 4, 5] as const;
+// Up to 6 on a call (three either side of the game card), once the server
+// allows it (SQUAD_MAX_PER_CALL); until then 6 gets a clear "up to 5" answer.
+export const SQUAD_SEATS = [2, 3, 4, 5, 6] as const;
 
 export type SquadNight = {
   id: string;
@@ -73,9 +75,16 @@ export type SquadNight = {
 };
 
 export type SquadNights = {
+  /** The room's night size. */
   seats: number;
   seat_nights: number;
   nights_left: number;
+  /** Seats left after the whole nights (missing on older servers). */
+  spare_seats?: number;
+  /** The balance as nights + spare at each night size the host could pick. */
+  by_size?: { seats: number; nights: number; spare: number }[];
+  /** People on the call right now; 0 between nights. */
+  on_call?: number;
   /** The latest nights bought or gifted into the room. */
   last_top_up?: { by: string; nights: number; source: "purchase" | "admin"; at: string } | null;
   free_night_expires_at: string | null;
@@ -117,7 +126,30 @@ export type SquadMembers = {
   my_role: "owner" | "cohost" | "member";
   /** My "email me about nights" switch (missing on older servers: on). */
   my_night_emails?: boolean;
+  /** "Everyone in the squad can manage it" (owner's choice). */
+  members_manage?: boolean;
+  /** "Anyone with the link joins" instead of new people needing approval. */
+  open_join?: boolean;
+  /** New people need approval right now (approval is on and the room isn't open). */
+  approval_needed?: boolean;
 };
+
+/** Pure: may I run the squad (lend seats, change the night size, let
+ *  people in)? The owner and co-hosts, or everyone when the room says so. */
+export function canRunSquad(m: SquadMembers | undefined): boolean {
+  if (!m) return false;
+  return m.my_role === "owner" || m.my_role === "cohost" || Boolean(m.members_manage);
+}
+
+/** The owner's choices: who manages the squad, and whether new people need approval. */
+export function setSquadSettings(roomId: string, body: { members_manage?: boolean; open_join?: boolean }) {
+  return api.patch<SquadMembers>(`/v1/rooms/${roomId}/squad/settings`, body);
+}
+
+/** How many seats a night books from now on (tonight keeps its seats). */
+export function setSquadNightSize(roomId: string, seats: number) {
+  return api.patch<SquadNights>(`/v1/rooms/${roomId}/squad/night-size`, { seats });
+}
 
 export type CreateSquadRoom = { seats: number; name: string };
 
@@ -143,8 +175,51 @@ export function getSquadNights(roomId: string) {
   return api.get<SquadNights>(`/v1/rooms/${roomId}/nights`);
 }
 
-export function startSquadNight(roomId: string) {
-  return api.post<SquadNights>(`/v1/rooms/${roomId}/nights`, {});
+/** Start a night; `seats` for fewer (or more) than the room's night size. */
+export function startSquadNight(roomId: string, seats?: number) {
+  return api.post<SquadNights>(`/v1/rooms/${roomId}/nights`, seats ? { seats } : {});
+}
+
+/** Pure: the night sizes a night can start at (2 up to the squad limit),
+ *  from the server's by_size; falls back to the room's size alone. */
+export function nightSizes(n: SquadNights): number[] {
+  const sizes = (n.by_size ?? []).map((b) => b.seats);
+  return sizes.length ? sizes : [n.seats];
+}
+
+/** Pure: "3 nights + 1 spare seat" for a balance at a night size. */
+export function nightsAndSpare(seatNights: number, size: number): string {
+  const nights = size > 0 ? Math.floor(seatNights / size) : 0;
+  const spare = size > 0 ? seatNights % size : 0;
+  const n = nights === 1 ? "1 night" : `${nights} nights`;
+  return spare ? `${n} + ${spare} spare seat${spare === 1 ? "" : "s"}` : n;
+}
+
+/** One more seat for tonight from the room's nights (any member can). 402 when the room has none left. */
+export function addSquadSeat(roomId: string) {
+  return api.post<{ seats: number; ends_at: string }>(`/v1/rooms/${roomId}/nights/current/seats`, {});
+}
+
+/** What the server says when tonight's seats are all taken (409 on the video token). */
+export type NightFull = { seats: number; can_add_seat: boolean; product: string | null };
+
+/** Pure: the night_full refusal from a video-token error, or null for anything else. */
+export function nightFullFrom(e: unknown): NightFull | null {
+  if (!(e instanceof ApiError) || e.status !== 409) return null;
+  const detail = (e.body as { detail?: unknown } | undefined)?.detail as Record<string, unknown> | undefined;
+  if (!detail || typeof detail !== "object" || detail.error !== "night_full") return null;
+  return {
+    seats: Number(detail.seats) || 0,
+    can_add_seat: detail.can_add_seat !== false,
+    product: typeof detail.product === "string" ? detail.product : null,
+  };
+}
+
+/** Pure: what the person left off the call can do. */
+export function seatChoice(full: NightFull, seatNights: number | null): "maxed" | "use_balance" | "pay" | "loading" {
+  if (!full.can_add_seat) return "maxed";
+  if (seatNights == null) return "loading";
+  return seatNights > 0 ? "use_balance" : "pay";
 }
 
 export function getSquadPrices(roomId: string) {
@@ -190,9 +265,21 @@ export function formatSquadMoney(amount: number, currency: string): string {
 }
 
 /** Nights left in words, for the room header. */
+/** Pure: "3 of 3 seats taken" for a night that's on, or null when the
+ *  server doesn't say (older servers) or nobody's on yet. */
+export function seatsTakenLabel(n: SquadNights): { text: string; full: boolean } | null {
+  const night = n.active_night;
+  if (!night || n.on_call == null || n.on_call <= 0) return null;
+  const taken = Math.min(n.on_call, night.seats);
+  const full = n.on_call >= night.seats;
+  return { text: `${taken} of ${night.seats} seat${night.seats === 1 ? "" : "s"} taken`, full };
+}
+
 export function nightsLeftLabel(n: SquadNights): string {
-  if (n.nights_left === 0) return "No nights left";
-  return n.nights_left === 1 ? "1 night left" : `${n.nights_left} nights left`;
+  const spare = n.spare_seats ?? 0;
+  const spareText = spare ? ` + ${spare} spare seat${spare === 1 ? "" : "s"}` : "";
+  if (n.nights_left === 0) return spare ? `No full nights · ${spare} spare seat${spare === 1 ? "" : "s"}` : "No nights left";
+  return (n.nights_left === 1 ? "1 night left" : `${n.nights_left} nights left`) + spareText;
 }
 
 /** "Joshua added 1 night · 3 Oct" / "DateRoom gifted 3 nights · 3 Oct", or null. */
@@ -297,4 +384,137 @@ export function squadErrorText(e: unknown, fallback: string): string {
     }
   }
   return fallback;
+}
+
+// ── Lending a seat (backend#114) ─────────────────────────────────────────
+
+export type SeatRequest = {
+  id: string;
+  user_id: string;
+  name: string;
+  /** pending | lent | declined | cancelled | expired */
+  status: string;
+  created_at: string;
+  expires_at: string;
+};
+
+/** What lending one seat leaves the squad with. */
+export type SeatEffect = {
+  night_size: number;
+  seats_before: number;
+  seats_after: number;
+  nights_before: number;
+  spare_before: number;
+  nights_after: number;
+  spare_after: number;
+  can_lend: boolean;
+};
+
+export type SeatRequests = { requests: SeatRequest[]; effect: SeatEffect | null; can_lend: boolean };
+
+/** Live events: someone asked; a manager answered. `seat_request_paid` is
+ *  sent by a manager's app after paying for the seat themselves. */
+export const SEAT_REQUESTED = "seat_requested";
+export const SEAT_DECIDED = "seat_request_decided";
+export const SEAT_PAID = "seat_request_paid";
+
+export function askForSeat(roomId: string) {
+  return api.post<SeatRequest>(`/v1/rooms/${roomId}/nights/current/seat-requests`, {});
+}
+
+export function getSeatRequests(roomId: string) {
+  return api.get<SeatRequests>(`/v1/rooms/${roomId}/nights/current/seat-requests`);
+}
+
+export function lendSeat(roomId: string, requestId: string) {
+  return api.post<SeatRequest>(`/v1/rooms/${roomId}/nights/current/seat-requests/${requestId}/lend`, {});
+}
+
+export function declineSeat(roomId: string, requestId: string) {
+  return api.post<SeatRequest>(`/v1/rooms/${roomId}/nights/current/seat-requests/${requestId}/decline`, {});
+}
+
+export function cancelSeatRequest(roomId: string, requestId: string) {
+  return api.delete<void>(`/v1/rooms/${roomId}/nights/current/seat-requests/${requestId}`);
+}
+
+/** Pure: the cost of saying yes, in the squad's own terms.
+ *  "Lending a seat leaves 3 nights + 1 spare seat (was 4 nights)." */
+export function seatEffectLine(e: SeatEffect): string {
+  if (!e.can_lend) return "The squad has no seats left to lend.";
+  const after = nightsAndSpare(e.seats_after, e.night_size);
+  const before = nightsAndSpare(e.seats_before, e.night_size);
+  return `Lending a seat leaves ${after} (was ${before}).`;
+}
+
+/** Pure: the squad owner's first name, for "Ask Joshua". */
+export function ownerFirstName(m: SquadMembers | undefined): string {
+  const owner = m?.members.find((x) => x.role === "owner");
+  return (owner?.display_name || "the host").split(" ")[0];
+}
+
+/** Pure: the error code on a squad API refusal, if any. */
+export function squadErrorCode(e: unknown): string | null {
+  if (!(e instanceof ApiError)) return null;
+  const detail = (e.body as { detail?: unknown } | undefined)?.detail;
+  return detail && typeof detail === "object" && "error" in detail ? String((detail as { error: unknown }).error) : null;
+}
+
+// ── Letting new people in (backend#116) ──────────────────────────────────
+
+export type JoinRequest = {
+  id: string;
+  user_id: string;
+  display_name: string;
+  photo_url: string | null;
+  /** pending | approved | declined */
+  status: string;
+  created_at: string;
+};
+
+export type MyJoinRequest = {
+  /** none | pending | approved | declined | member */
+  status: string;
+  approval_needed: boolean;
+  request: JoinRequest | null;
+};
+
+export const JOIN_REQUESTED = "join_requested";
+
+export function getMyJoinRequest(roomId: string) {
+  return api.get<MyJoinRequest>(`/v1/rooms/${roomId}/join-request`);
+}
+
+export function getJoinRequests(roomId: string) {
+  return api.get<{ requests: JoinRequest[] }>(`/v1/rooms/${roomId}/join-requests`);
+}
+
+export function approveJoin(roomId: string, requestId: string) {
+  return api.post<{ requests: JoinRequest[] }>(`/v1/rooms/${roomId}/join-requests/${requestId}/approve`, {});
+}
+
+export function declineJoin(roomId: string, requestId: string) {
+  return api.post<{ requests: JoinRequest[] }>(`/v1/rooms/${roomId}/join-requests/${requestId}/decline`, {});
+}
+
+export function approveAllJoins(roomId: string) {
+  return api.post<{ requests: JoinRequest[] }>(`/v1/rooms/${roomId}/join-requests/approve-all`, {});
+}
+
+/** Pure: a squad join refusal that needs its own screen rather than an
+ *  error toast, or null. */
+export function joinGate(e: unknown): "awaiting_approval" | "declined" | "room_locked" | "removed" | null {
+  const code = squadErrorCode(e);
+  return code === "awaiting_approval" || code === "declined" || code === "room_locked" || code === "removed"
+    ? code
+    : null;
+}
+
+/** Pure: "Amina and Kev want to join" / "Amina, Kev and 2 others want to join". */
+export function joinAskLine(reqs: { display_name: string }[]): string {
+  const names = reqs.map((r) => (r.display_name || "Someone").split(" ")[0]);
+  if (names.length === 0) return "";
+  if (names.length === 1) return `${names[0]} wants to join the squad`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} want to join the squad`;
+  return `${names[0]}, ${names[1]} and ${names.length - 2} other${names.length === 3 ? "" : "s"} want to join the squad`;
 }

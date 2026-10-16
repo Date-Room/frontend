@@ -49,6 +49,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useTranslation } from "react-i18next";
 import { AppearanceSwitcher } from "@/components/AppearanceSwitcher";
+import { LIGHT_MODE_ENABLED } from "@/lib/themeMode";
 import AvatarCropDialog from "@/components/AvatarCropDialog";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { COUNTRIES, countryByCode, flagFor, type Country } from "@/lib/countries";
@@ -246,7 +247,7 @@ export default function Settings() {
             </p>
             <p className="truncate text-center text-xs text-muted-foreground">{me?.email}</p>
             <div className="mt-3 w-full space-y-3">
-              <AppearanceSwitcher />
+              {LIGHT_MODE_ENABLED && <AppearanceSwitcher />}
               <LanguageSwitcher />
             </div>
           </div>

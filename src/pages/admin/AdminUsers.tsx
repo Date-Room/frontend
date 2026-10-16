@@ -19,8 +19,10 @@ import {
   PROTECT_MAX_GRANT,
   revokeUserSubscription,
   setUserAdmin,
+  setUserTeam,
   type AdminUserRow,
 } from "@/lib/admin";
+import { countryName, flag } from "@/components/admin/CountryBars";
 import { cn } from "@/lib/utils";
 
 const GRANTS = [
@@ -105,6 +107,21 @@ export default function AdminUsers() {
     }
   }
 
+  async function toggleTeam() {
+    if (!selected) return;
+    const next = !selected.is_team;
+    try {
+      await setUserTeam(selected.id, next);
+      toast.success(next ? "Marked as team / test: left out of Growth" : "Counted as a real user again");
+      void qc.invalidateQueries({ queryKey: ["admin-users"] });
+      void qc.invalidateQueries({ queryKey: ["admin-analytics"] });
+      void qc.invalidateQueries({ queryKey: ["admin-activity"] });
+      setSelected({ ...selected, is_team: next });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Update failed");
+    }
+  }
+
   async function toggleAdmin() {
     if (!selected) return;
     try {
@@ -138,13 +155,14 @@ export default function AdminUsers() {
               <tr>
                 <th className="px-4 py-3 font-medium">User</th>
                 <th className="px-4 py-3 font-medium">Tier</th>
+                <th className="px-4 py-3 font-medium" title="Where Growth places them: signup region, else last visit, else profile">Location</th>
                 <th className="px-4 py-3 font-medium">Joined</th>
               </tr>
             </thead>
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground/70">
+                  <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground/70">
                     Loading…
                   </td>
                 </tr>
@@ -169,6 +187,12 @@ export default function AdminUsers() {
                     {u.is_admin && (
                       <span className="ml-1 text-fuchsia-400 text-xs">admin</span>
                     )}
+                    {u.is_team && (
+                      <span className="ml-1 text-amber-300/80 text-xs">team</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">
+                    {u.location === undefined ? "—" : u.location ? `${flag(u.location)} ${countryName(u.location)}` : "Unknown"}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground/70 text-xs">
                     {new Date(u.created_at).toLocaleDateString()}
@@ -177,7 +201,7 @@ export default function AdminUsers() {
               ))}
               {!isLoading && users.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground/70">
+                  <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground/70">
                     No users found.
                   </td>
                 </tr>
@@ -339,6 +363,19 @@ export default function AdminUsers() {
               >
                 Revoke subscription
               </Button>
+              <div className="space-y-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full border-white/[0.14]"
+                  onClick={() => void toggleTeam()}
+                >
+                  {selected.is_team ? "Count as a real user" : "Mark as team / test account"}
+                </Button>
+                <p className="text-[11px] text-muted-foreground/70">
+                  Team and test accounts are left out of Growth. Friends we invite to try it are real users: leave them unmarked.
+                </p>
+              </div>
               <Button
                 size="sm"
                 variant="outline"
