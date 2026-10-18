@@ -8,7 +8,9 @@
           "/auth/callback",
           "/auth/callback/*",
           "/i/*",
-          "/r/*"
+          "/r/*",
+          "/squad/room/*",
+          "/rooms/*"
         ]
       }
     ]
