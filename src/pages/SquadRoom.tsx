@@ -66,7 +66,18 @@ import { JoinRequestsCard } from "@/components/squad/JoinRequests";
 import { GuestsAfterTheNight } from "@/components/squad/GuestsAfterTheNight";
 
 /** Broadcast when someone starts a night, so everyone here sees it at once. */
+/** What this client shouts when it starts a night, for other web tabs. */
 const NIGHT_STARTED = "squad.night_started";
+/**
+ * What the SERVER broadcasts when any client starts one.
+ *
+ * The client-side shout above only reaches people whose client did the
+ * starting — a night begun on mobile never reached web, and the squad page
+ * sat unchanged until a reload. Both are handled: the server event is the
+ * one that works across clients, the client one still arrives first for
+ * whoever is already on this page.
+ */
+const SERVER_NIGHT_STARTED = "night_started";
 
 /** Pure: a time as "8:30 PM" in the viewer's own clock. */
 export function clockTime(iso: string): string {
@@ -207,9 +218,11 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
   useEffect(
     () =>
       live.channel.onBroadcast((e) => {
-        if (e.kind !== NIGHT_STARTED) return;
+        if (e.kind !== NIGHT_STARTED && e.kind !== SERVER_NIGHT_STARTED) return;
         refresh();
         const by = typeof e.payload.by === "string" ? e.payload.by : "Someone";
+        // The server event carries number/seats/ends_at, not a name — so
+        // "Someone" is the honest fallback rather than a guess.
         toast.success(`${by} started the night`, {
           action: { label: "Join", onClick: () => navigate(`/room/${roomId}`) },
         });
