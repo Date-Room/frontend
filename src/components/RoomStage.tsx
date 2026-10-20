@@ -386,6 +386,12 @@ export function RoomStage({
   // so this is how you learn your partner did something.)
   const room = useRoomSession();
   const chaperon = useChaperonController();
+  // Tell the chaperon what is on stage, so each whisper is stored with the
+  // activity it landed in.
+  const noteChaperonActivity = chaperon?.noteActivity;
+  useEffect(() => {
+    noteChaperonActivity?.(staged || null);
+  }, [noteChaperonActivity, staged]);
 
   // Game-channel connection state — NOT the video call, which is a separate
   // LiveKit connection that survives networks this WebSocket doesn't. Shown

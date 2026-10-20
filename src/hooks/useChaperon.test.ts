@@ -193,6 +193,62 @@ describe("outcomes, reactions, probe (PR 8)", () => {
     expect(sendChaperonOutcomes).toHaveBeenCalledWith("sess-1", { shown: ["e9"], suppressed: [] });
   });
 
+  it("reports a hand dismissal with how long the whisper was up", async () => {
+    const { result } = await startedHook();
+    act(() => result.current.ingestAgentMessage(whisper({ event_id: "e1" })));
+    act(() => {
+      vi.advanceTimersByTime(2_400);
+      result.current.dismiss();
+    });
+    expect(result.current.currentWhisper).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(OUTCOME_FLUSH_MS + 1);
+    });
+    const bodies = vi.mocked(sendChaperonOutcomes).mock.calls.map(([, b]) => b);
+    expect(bodies.flatMap((b) => b.shown ?? [])).toEqual(["e1"]);
+    expect(bodies.flatMap((b) => b.dismissed ?? [])).toEqual([{ event_id: "e1", after_ms: 2_400 }]);
+  });
+
+  it("does not count a coaching whisper that timed out as dismissed", async () => {
+    const { result } = await startedHook();
+    act(() => result.current.ingestAgentMessage(whisper({ event_id: "c1", severity: "note", check_id: "stall" })));
+    act(() => {
+      vi.advanceTimersByTime(15_000);
+    });
+    expect(result.current.currentWhisper).toBeNull();
+    const bodies = vi.mocked(sendChaperonOutcomes).mock.calls.map(([, b]) => b);
+    expect(bodies.flatMap((b) => b.dismissed ?? [])).toEqual([]);
+  });
+
+  it("stamps each batch with the activity on screen, splitting on a switch", async () => {
+    const { result } = await startedHook();
+    act(() => {
+      result.current.noteActivity("watch");
+      result.current.ingestAgentMessage(whisper({ event_id: "e1" }));
+      result.current.noteActivity("thisorthat");
+      result.current.ingestAgentMessage(whisper({ event_id: "e2", check_id: "pressure" }));
+    });
+    act(() => {
+      vi.advanceTimersByTime(OUTCOME_FLUSH_MS + 1);
+    });
+    const bodies = vi.mocked(sendChaperonOutcomes).mock.calls.map(([, b]) => b);
+    expect(bodies).toEqual([
+      { shown: ["e1"], suppressed: [], activity: "watch" },
+      { shown: ["e2"], suppressed: [], activity: "thisorthat" },
+    ]);
+  });
+
+  it("keeps an activity id the server would not accept to itself", async () => {
+    const { result } = await startedHook();
+    act(() => {
+      result.current.noteActivity("Not An Id!");
+      result.current.ingestAgentMessage(whisper({ event_id: "e1" }));
+      vi.advanceTimersByTime(OUTCOME_FLUSH_MS + 1);
+    });
+    const [, body] = vi.mocked(sendChaperonOutcomes).mock.calls[0];
+    expect(body).toEqual({ shown: ["e1"], suppressed: [] });
+  });
+
   it("sends a reason and the share tick with an unhelpful reaction", async () => {
     const { result } = await startedHook();
     act(() => result.current.ingestAgentMessage(whisper({ event_id: "e1" })));
