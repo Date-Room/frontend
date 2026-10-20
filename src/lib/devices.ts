@@ -95,3 +95,25 @@ export function speakerSelectionSupported(): boolean {
     "setSinkId" in HTMLMediaElement.prototype
   );
 }
+
+/** Stop every track of the preview being replaced. Switching cameras used
+ *  to leave the old one running (its light stayed on, and phones that can
+ *  only open one camera at a time then refused the new one). */
+export function stopReplacedStream(prev: MediaStream | null, next: MediaStream | null): void {
+  if (prev && prev !== next) prev.getTracks().forEach((t) => t.stop());
+}
+
+/** A line for a camera the browser refused, or null to stay quiet. */
+export function cameraErrorMessage(err: unknown): string | null {
+  const name = err && typeof err === "object" && "name" in err ? String((err as { name: unknown }).name) : "";
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    return "Camera is blocked. Allow it in your browser's site settings to be seen.";
+  }
+  if (name === "NotReadableError" || name === "AbortError") {
+    return "Your camera is busy in another app. Close it there and turn the camera back on.";
+  }
+  if (name === "NotFoundError" || name === "OverconstrainedError") {
+    return "No camera found on this device.";
+  }
+  return null;
+}

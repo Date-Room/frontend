@@ -20,13 +20,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # `npm run typecheck` is `tsc -b`: the root tsconfig is a solution
+      # file, so a bare `tsc --noEmit` checks nothing (see CLAUDE.md).
       - name: Type check
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       # Advisory for now: the repo predates this workflow and currently has
-      # 9 lint errors (7 stale eslint-disable comments naming the uninstalled
-      # jsx-a11y plugin, 2 empty catch blocks in PreRoom.tsx) plus 18
-      # warnings. Clearing that backlog touches component files that open
+      # 7 lint errors (stale eslint-disable comments naming the uninstalled
+      # jsx-a11y plugin) plus warnings. Clearing that backlog touches component files that open
       # feature branches are working in, so it wants its own PR. Flip this
       # step to blocking (drop continue-on-error) once that lands.
       - name: ESLint (advisory)

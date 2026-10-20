@@ -64,10 +64,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
+  cameraErrorMessage,
   deviceLabel,
   groupDevices,
   loadDevicePreference,
   saveDevicePreference,
+  stopReplacedStream,
 } from "@/lib/devices";
 import { getInvitedGuestName, saveInvitedGuestName } from "@/lib/invitedGuest";
 import { saveRoomPlanFromServer, defaultCuratedForPackage } from "@/lib/roomExperience";
@@ -226,13 +228,17 @@ export default function PreRoom() {
   useEffect(() => {
     try {
       localStorage.setItem("dr_pre_camera_enabled", String(cameraEnabled));
-    } catch {}
+    } catch {
+      /* storage can be unavailable in private modes */
+    }
   }, [cameraEnabled]);
 
   useEffect(() => {
     try {
       localStorage.setItem("dr_pre_mic_enabled", String(micEnabled));
-    } catch {}
+    } catch {
+      /* storage can be unavailable in private modes */
+    }
   }, [micEnabled]);
 
   // Keep streamRef in sync so the cleanup branch always sees the live track.
@@ -260,6 +266,7 @@ export default function PreRoom() {
             s.getTracks().forEach((t) => t.stop());
             return;
           }
+          stopReplacedStream(streamRef.current, s);
           streamRef.current = s;
           setStream(s);
           if (videoRef.current) {
@@ -269,6 +276,8 @@ export default function PreRoom() {
         .catch((err) => {
           if (!cancelled) {
             console.warn("Camera access denied or unavailable", err);
+            const msg = cameraErrorMessage(err);
+            if (msg) toast.error(msg);
             setCameraEnabled(false);
           }
         });

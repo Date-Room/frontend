@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { authClient } from "@/lib/authClient";
 import { RoomChannel } from "./roomChannel";
 
 /**
@@ -184,6 +185,88 @@ describe("RoomChannel zombie watchdog", () => {
     }
     expect(ch.status).toBe("subscribed");
     expect(FakeSocket.instances).toHaveLength(1);
+    ch.dispose();
+  });
+});
+
+describe("RoomChannel token expiry and bad frames", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("refreshes an expired sign-in once and reconnects instead of going dead", async () => {
+    let token = "old";
+    vi.spyOn(authClient, "getAccessToken").mockImplementation(() => token);
+    const refresh = vi.spyOn(authClient, "refresh").mockImplementation(async () => {
+      token = "new";
+      return {} as Awaited<ReturnType<typeof authClient.refresh>>;
+    });
+    const ch = new RoomChannel("room-1");
+    const open = ch.open();
+    FakeSocket.instances[0].serverDrop(4401);
+    await vi.waitFor(() => expect(FakeSocket.instances).toHaveLength(2));
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(FakeSocket.instances[1].url).toContain("token=new");
+    FakeSocket.instances[1].serverOpen();
+    FakeSocket.instances[1].serverReady();
+    await expect(open).resolves.toBeUndefined();
+    ch.dispose();
+  });
+
+  it("gives up when the refreshed token is refused too", async () => {
+    vi.spyOn(authClient, "getAccessToken").mockReturnValue("tok");
+    const refresh = vi
+      .spyOn(authClient, "refresh")
+      .mockResolvedValue({} as Awaited<ReturnType<typeof authClient.refresh>>);
+    const ch = new RoomChannel("room-1");
+    const open = ch.open();
+    FakeSocket.instances[0].serverDrop(4401);
+    await vi.waitFor(() => expect(FakeSocket.instances).toHaveLength(2));
+    FakeSocket.instances[1].serverDrop(4401);
+    await expect(open).rejects.toThrow("4401");
+    vi.advanceTimersByTime(60_000);
+    expect(FakeSocket.instances).toHaveLength(2);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    ch.dispose();
+  });
+
+  it("does not queue keepalive pings while the socket is down", () => {
+    const ch = new RoomChannel("room-1");
+    void ch.open();
+    const s1 = FakeSocket.instances[0];
+    s1.serverOpen();
+    s1.serverReady();
+    s1.serverDrop(1006);
+    void ch.broadcast("activity", { type: "cut" });
+    // Long enough for many ping ticks, short of the first reconnect landing.
+    vi.advanceTimersByTime(400);
+    vi.advanceTimersByTime(200);
+    const s2 = FakeSocket.instances[1];
+    vi.advanceTimersByTime(60_000);
+    s2.serverOpen();
+    s2.serverReady();
+    expect(s2.sentTypes().filter((t) => t === "ping").length).toBe(0);
+    expect(s2.sentTypes()).toContain("broadcast:activity");
+    ch.dispose();
+  });
+
+  it("survives a malformed frame and a listener that throws", () => {
+    const ch = new RoomChannel("room-1");
+    void ch.open();
+    const s1 = FakeSocket.instances[0];
+    s1.serverOpen();
+    s1.serverReady();
+    const seen: string[] = [];
+    ch.onBroadcast(() => {
+      throw new Error("game bug");
+    });
+    ch.onBroadcast((e) => seen.push(String(e.payload.type)));
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(() => s1.onmessage?.({ data: "not json" })).not.toThrow();
+    s1.onmessage?.({
+      data: JSON.stringify({ type: "broadcast", event: "activity", payload: { type: "cut" }, from: "x" }),
+    });
+    expect(seen).toEqual(["cut"]);
     ch.dispose();
   });
 });

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useReducedActivity } from "@/lib/activities/useReducedActivity";
 import {
   DOOR_ROUNDS,
+  type DoorRound,
   initialPickADoorState,
   pickADoorFromJson,
   pickADoorIsFinished,
@@ -114,6 +115,23 @@ export function PickADoor() {
     return () => window.clearTimeout(t);
   }, [state.stage, secondOpened]);
 
+  // Everything the typewriter needs is worked out before the finished
+  // early-return: a hook skipped on the last round crashed the game.
+  // `round` is undefined once finished; `revealing` is false then too.
+  const round: DoorRound | undefined = DOOR_ROUNDS[state.round];
+  const myPick = state.picks[senderId];
+  const sameDoor = revealing && pickADoorSameDoor(state);
+  const stageOwner = revealing ? pickADoorStageOwner(state) : null;
+  const stageDoorIdx = sameDoor
+    ? myPick
+    : stageOwner != null
+      ? state.picks[stageOwner]
+      : undefined;
+  const stageDoor = stageDoorIdx != null ? round?.doors[stageDoorIdx] ?? null : null;
+  const onPlaque = revealing && (witnessed ? cin === "question" : true);
+  const secondIntro = onPlaque && state.stage >= 2 && !secondOpened;
+  const typed = useTypewriter(stageDoor?.question ?? "", onPlaque && !secondIntro);
+
   if (pickADoorIsFinished(state)) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center animate-fade-in">
@@ -128,26 +146,14 @@ export function PickADoor() {
     );
   }
 
-  const round = DOOR_ROUNDS[state.round];
-  const myPick = state.picks[senderId];
+  if (!round) return null;
   const otherEntry = Object.entries(state.picks).find(([uid]) => uid !== senderId);
   const theirPick = otherEntry?.[1];
   const iPicked = myPick != null;
-  const sameDoor = revealing && pickADoorSameDoor(state);
-  const stageOwner = revealing ? pickADoorStageOwner(state) : null;
   const iOwnStage = stageOwner === senderId;
-  const stageDoorIdx = sameDoor
-    ? myPick
-    : stageOwner != null
-      ? state.picks[stageOwner]
-      : undefined;
-  const stageDoor = stageDoorIdx != null ? round.doors[stageDoorIdx] : null;
 
   const dimmed = revealing && witnessed && cin != null;
-  const onPlaque = revealing && (witnessed ? cin === "question" : true);
   const showDoors = !revealing || (witnessed && (cin === "dimming" || cin === "opening"));
-  const secondIntro = onPlaque && state.stage >= 2 && !secondOpened;
-  const typed = useTypewriter(stageDoor?.question ?? "", onPlaque && !secondIntro);
 
   const lastStage = sameDoor ? 1 : 3;
   const finishLabel = state.round + 1 >= DOOR_ROUNDS.length ? "Finish" : "Next round";

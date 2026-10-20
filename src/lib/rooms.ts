@@ -3,7 +3,7 @@
  * `invites` / `room_state` tables. Shapes mirror the FastAPI Pydantic models
  * in `backend/app/schemas/room.py`.
  */
-import { api, apiFetch } from "@/lib/api";
+import { ApiError, api, apiFetch } from "@/lib/api";
 
 export type RoomPersistence = "session" | "persistent";
 export type RoomPackage =
@@ -214,6 +214,28 @@ export function getRoomByCode(code: string): Promise<InviteCard> {
 
 export function joinRoom(roomId: string, body: JoinRoomRequest): Promise<JoinRoomResponse> {
   return api.post<JoinRoomResponse>(`/v1/rooms/${roomId}/join`, body);
+}
+
+/** What to tell someone whose join was refused. Only a wrong PIN asks
+ *  them to check the PIN: a full, ended or resting room used to say
+ *  "Check the PIN and try again" too, which sent guests retyping a PIN
+ *  that was right all along. */
+export function joinErrorMessage(err: unknown): string {
+  if (!(err instanceof ApiError)) {
+    return "Couldn't reach DateRoom. Check your connection and try again.";
+  }
+  const detail = (err.body as { detail?: unknown } | null)?.detail;
+  const code =
+    detail && typeof detail === "object" && "error" in detail
+      ? String((detail as { error: unknown }).error)
+      : null;
+  if (err.status === 403 && /pin/i.test(err.message)) {
+    return "That PIN doesn't match this room. Check it with your host and try again.";
+  }
+  if (code === "room_resting") return "This room is resting right now, so it can't take new guests.";
+  if (err.status === 410) return "This room has ended.";
+  if (err.status === 409) return `${err.message} Ask your host to free a seat.`;
+  return err.message || "Could not join.";
 }
 
 export function getRoomExperienceApi(

@@ -96,6 +96,10 @@ export class RoomChannel {
   private disposed = false;
   private openResolver: (() => void) | null = null;
   private openRejecter: ((err: Error) => void) | null = null;
+  /** Whether the socket being opened carried a sign-in token. */
+  private sentToken = false;
+  /** One token refresh per bad-token close; reset once `ready` lands. */
+  private refreshedForToken = false;
 
   constructor(roomId: string, options?: { participantId?: string }) {
     this.roomId = roomId;
@@ -211,6 +215,7 @@ export class RoomChannel {
     const params = new URLSearchParams();
     const token = authClient.getAccessToken();
     if (token) params.set("token", token);
+    this.sentToken = token != null;
     if (this.participantId) params.set("participant_id", this.participantId);
     return `${WS_BASE}/v1/rooms/${encodeURIComponent(this.roomId)}/ws?${params}`;
   }
@@ -230,7 +235,16 @@ export class RoomChannel {
       // before resolving open() and flushing the outbox.
     };
 
-    sock.onmessage = (ev) => this.handle(JSON.parse(ev.data as string) as Inbound);
+    sock.onmessage = (ev) => {
+      let message: Inbound;
+      try {
+        message = JSON.parse(ev.data as string) as Inbound;
+      } catch {
+        console.warn("[realtime] dropped a malformed frame");
+        return;
+      }
+      this.handle(message);
+    };
 
     sock.onerror = () => {
       this.setStatus("error");
@@ -241,13 +255,27 @@ export class RoomChannel {
       this.setStatus(`closed:${ev.code}`);
       this.socket = null;
       this.presence = {};
-      // 4401 = bad token (server-side close), don't retry on it.
+      // 4401 = bad token (server-side close). Access tokens last an hour
+      // and a date can run two, so a drop late in the night reconnects
+      // with an expired token: refresh it once and try again. Only a
+      // second 4401, or a refresh that fails, ends the channel.
+      if (!this.disposed && ev.code === 4401 && this.sentToken && !this.refreshedForToken) {
+        this.refreshedForToken = true;
+        void authClient
+          .refresh()
+          .catch(() => null)
+          .then((session) => {
+            if (this.disposed) return;
+            if (session) {
+              this.connect();
+            } else {
+              this.rejectOpen(ev.code);
+            }
+          });
+        return;
+      }
       if (this.disposed || ev.code === 4401) {
-        if (this.openRejecter) {
-          this.openRejecter(new Error(`WS closed ${ev.code}`));
-          this.openRejecter = null;
-          this.openResolver = null;
-        }
+        this.rejectOpen(ev.code);
         return;
       }
       this.scheduleReconnect();
@@ -261,8 +289,18 @@ export class RoomChannel {
         }
         // Cheap keepalive so intermediaries don't reap the socket on idle —
         // and the pong it earns is what the watchdog above listens for.
-        this.send({ type: "ping" });
+        // Only while joined: queued while down, pings would fill the
+        // outbox and push out the real moves waiting to be sent.
+        if (this.subscribed) this.send({ type: "ping" });
       }, PING_INTERVAL_MS);
+    }
+  }
+
+  private rejectOpen(code: number) {
+    if (this.openRejecter) {
+      this.openRejecter(new Error(`WS closed ${code}`));
+      this.openRejecter = null;
+      this.openResolver = null;
     }
   }
 
@@ -323,6 +361,7 @@ export class RoomChannel {
         this.subscribed = true;
         this.setStatus("subscribed");
         this.backoff = 500;
+        this.refreshedForToken = false;
         this.presence = { ...message.presence };
         this.emitPresence();
         // Re-track presence on reconnect so peers see us again.
@@ -347,7 +386,15 @@ export class RoomChannel {
           payload: message.payload ?? {},
           receivedAt: Date.now(),
         };
-        for (const fn of this.broadcastListeners) fn(event);
+        // One activity's listener throwing must not starve the others
+        // (or the frame's later listeners) of the same event.
+        for (const fn of this.broadcastListeners) {
+          try {
+            fn(event);
+          } catch (err) {
+            console.warn("[realtime] broadcast listener failed", err);
+          }
+        }
         return;
       }
       case "presence.sync": {

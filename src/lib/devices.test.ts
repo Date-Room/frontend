@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
+  cameraErrorMessage,
+  stopReplacedStream,
   deviceLabel,
   groupDevices,
   loadDevicePreference,
@@ -87,5 +89,25 @@ describe("speakerSelectionSupported", () => {
       expect(speakerSelectionSupported()).toBe(false);
     }
     vi.restoreAllMocks();
+  });
+});
+
+describe("camera preview", () => {
+  it("stops the old camera when a new one replaces it", () => {
+    const stop = vi.fn();
+    const prev = { getTracks: () => [{ stop }, { stop }] } as unknown as MediaStream;
+    const next = { getTracks: () => [] } as unknown as MediaStream;
+    stopReplacedStream(prev, next);
+    expect(stop).toHaveBeenCalledTimes(2);
+    stop.mockClear();
+    stopReplacedStream(next, next);
+    stopReplacedStream(null, next);
+    expect(stop).not.toHaveBeenCalled();
+  });
+
+  it("says why the camera didn't open, and stays quiet on unknown errors", () => {
+    expect(cameraErrorMessage({ name: "NotAllowedError" })).toMatch(/blocked/);
+    expect(cameraErrorMessage({ name: "NotReadableError" })).toMatch(/busy/);
+    expect(cameraErrorMessage(new Error("x"))).toBeNull();
   });
 });
