@@ -8,6 +8,7 @@ import {
   sendChaperonFeedback,
   sendChaperonOutcomes,
   setChaperonProbe,
+  type ChaperonDismissal,
   type ReactionReason,
   type ChaperonMode,
   type ChaperonDataTier,
@@ -70,8 +71,24 @@ export type ChaperonStartConfig = {
   dataTier: ChaperonDataTier;
 };
 
-// Outcome reports (shown / suppressed) are coalesced into one request per window.
+// Outcome reports (shown / suppressed / dismissed) are coalesced into one
+// request per window.
 export const OUTCOME_FLUSH_MS = 1_500;
+
+// Same shape the server accepts for an activity id; anything else stays local.
+const ACTIVITY_ID = /^[a-z0-9_-]{1,64}$/;
+
+type OutcomeQueue = {
+  shown: string[];
+  suppressed: string[];
+  dismissed: ChaperonDismissal[];
+  /** The activity on screen when this batch's whispers landed. */
+  activity: string | null;
+};
+
+function emptyQueue(activity: string | null): OutcomeQueue {
+  return { shown: [], suppressed: [], dismissed: [], activity };
+}
 
 // The server agent heartbeats every ~8s. If none arrives for this long, treat
 // the agent as not responding and say so (status -> "connecting"), rather than
@@ -125,10 +142,12 @@ export function useChaperon(opts: {
   // Outcomes are batched (one POST per ~1.5 s) so a burst of signals never
   // turns into a burst of requests. Best-effort telemetry: failures are
   // dropped, never retried, never surfaced.
-  const outcomeQueueRef = useRef<{ shown: string[]; suppressed: string[] }>({
-    shown: [],
-    suppressed: [],
-  });
+  const outcomeQueueRef = useRef<OutcomeQueue>(emptyQueue(null));
+  // What the person has open right now (set by the stage), so each whisper is
+  // stored with the context it landed in.
+  const activityRef = useRef<string | null>(null);
+  // When the visible whisper went up, so a hand dismissal carries its dwell.
+  const shownAtRef = useRef(0);
   const outcomeTimerRef = useRef<number | undefined>(undefined);
   const startedAtRef = useRef(0);
   const dismissTimerRef = useRef<number | undefined>(undefined);
@@ -139,36 +158,74 @@ export function useChaperon(opts: {
     dismissTimerRef.current = undefined;
   };
 
-  const dismiss = useCallback(() => {
+  // Take the visible whisper down (timeout, or replaced by stop).
+  const hide = useCallback(() => {
     clearDismissTimer();
     gateRef.current = dismissCurrent(gateRef.current);
     setCurrentWhisper(null);
   }, []);
 
   const flushOutcomes = useCallback(() => {
+    if (outcomeTimerRef.current !== undefined) window.clearTimeout(outcomeTimerRef.current);
     outcomeTimerRef.current = undefined;
     const sess = sessionRef.current;
     const q = outcomeQueueRef.current;
-    if (!sess || (q.shown.length === 0 && q.suppressed.length === 0)) return;
-    outcomeQueueRef.current = { shown: [], suppressed: [] };
-    void sendChaperonOutcomes(sess.id, q).catch(() => {});
+    outcomeQueueRef.current = emptyQueue(activityRef.current);
+    if (!sess || (q.shown.length === 0 && q.suppressed.length === 0 && q.dismissed.length === 0)) {
+      return;
+    }
+    void sendChaperonOutcomes(sess.id, {
+      shown: q.shown,
+      suppressed: q.suppressed,
+      ...(q.dismissed.length ? { dismissed: q.dismissed } : {}),
+      ...(q.activity ? { activity: q.activity } : {}),
+    }).catch(() => {});
   }, []);
+
+  const scheduleFlush = useCallback(() => {
+    if (outcomeTimerRef.current === undefined) {
+      outcomeTimerRef.current = window.setTimeout(flushOutcomes, OUTCOME_FLUSH_MS);
+    }
+  }, [flushOutcomes]);
 
   const queueOutcome = useCallback(
     (eventId: string | null, outcome: "shown" | "suppressed") => {
       if (!eventId) return;
-      outcomeQueueRef.current[outcome].push(eventId);
-      if (outcomeTimerRef.current === undefined) {
-        outcomeTimerRef.current = window.setTimeout(flushOutcomes, OUTCOME_FLUSH_MS);
+      // A batch carries one activity: if the person switched since it began,
+      // send what landed before the switch under the old one first.
+      const q = outcomeQueueRef.current;
+      if (q.activity !== activityRef.current) {
+        if (q.shown.length || q.suppressed.length || q.dismissed.length) flushOutcomes();
+        outcomeQueueRef.current.activity = activityRef.current;
       }
+      outcomeQueueRef.current[outcome].push(eventId);
+      scheduleFlush();
     },
-    [flushOutcomes],
+    [flushOutcomes, scheduleFlush],
   );
+
+  /** The person closed the visible whisper by hand. Recorded with how long it
+   *  was up: the reaction most people give instead of a thumb. */
+  const dismiss = useCallback(() => {
+    const id = gateRef.current.current?.event_id;
+    if (id) {
+      const afterMs = Math.max(0, Date.now() - shownAtRef.current);
+      outcomeQueueRef.current.dismissed.push({ event_id: id, after_ms: afterMs });
+      scheduleFlush();
+    }
+    hide();
+  }, [hide, scheduleFlush]);
+
+  /** The stage tells us what is open; odd ids are kept local. */
+  const noteActivity = useCallback((activity: string | null) => {
+    activityRef.current = activity && ACTIVITY_ID.test(activity) ? activity : null;
+  }, []);
 
   const showWhisper = useCallback(
     (signal: ChaperonSignal) => {
       clearDismissTimer();
       setCurrentWhisper(signal);
+      shownAtRef.current = Date.now();
       const elapsedSec = Math.max(0, Math.round((Date.now() - startedAtRef.current) / 1000));
       const entry: WhisperLogEntry = {
         id: signal.event_id ?? `${signal.check_id}-${Date.now()}`,
@@ -181,10 +238,10 @@ export function useChaperon(opts: {
       setUnread((u) => ({ ...u, [fam]: u[fam] + 1 }));
       // Alerts persist until dismissed; coaching auto-hides at a readable pace.
       if (!isPersistentSeverity(signal.severity)) {
-        dismissTimerRef.current = window.setTimeout(dismiss, COACH_DISPLAY_MS);
+        dismissTimerRef.current = window.setTimeout(hide, COACH_DISPLAY_MS);
       }
     },
-    [dismiss],
+    [hide],
   );
 
   /** The rail is being looked at — clear the unread badge. */
@@ -285,7 +342,6 @@ export function useChaperon(opts: {
     runningRef.current = false;
     if (agentWatchdogRef.current) window.clearTimeout(agentWatchdogRef.current);
     clearDismissTimer();
-    if (outcomeTimerRef.current !== undefined) window.clearTimeout(outcomeTimerRef.current);
     flushOutcomes();
     setProbe("idle");
     const sess = sessionRef.current;
@@ -357,6 +413,7 @@ export function useChaperon(opts: {
     start,
     stop,
     dismiss,
+    noteActivity,
     sendFeedback,
     ingestAgentMessage,
     probe,
