@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { CardPage } from "@/components/CardPage";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +15,10 @@ import { cn } from "@/lib/utils";
  */
 export default function JoinByCode() {
   const navigate = useNavigate();
-  const [code, setCode] = useState("");
+  const [params] = useSearchParams();
+  // An invite link missing its PIN lands here as /join?code=XXXXXX; keep
+  // the code so the guest only has to type the PIN.
+  const [code, setCode] = useState(() => cleanCode(params.get("code") ?? ""));
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -71,7 +74,7 @@ export default function JoinByCode() {
           label="ROOM ID"
           length={6}
           value={code}
-          onChange={(v) => setCode(v.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 6))}
+          onChange={(v) => setCode(cleanCode(v))}
           inputRef={codeRef}
           inputMode="text"
           autoComplete="off"
@@ -80,7 +83,7 @@ export default function JoinByCode() {
           label="PIN"
           length={4}
           value={pin}
-          onChange={(v) => setPin(v.replace(/[^\d]/g, "").slice(0, 4))}
+          onChange={(v) => setPin(cleanPin(v))}
           inputRef={pinRef}
           inputMode="numeric"
           obscure
@@ -97,6 +100,15 @@ export default function JoinByCode() {
       </form>
     </CardPage>
   );
+}
+
+/** Room IDs are six letters/digits; pasted text may carry spaces or dashes. */
+export function cleanCode(v: string): string {
+  return v.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 6);
+}
+
+export function cleanPin(v: string): string {
+  return v.replace(/[^\d]/g, "").slice(0, 4);
 }
 
 /**
@@ -171,7 +183,6 @@ export function SlotInput({
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          maxLength={length}
           inputMode={inputMode}
           autoCapitalize="characters"
           autoCorrect="off"

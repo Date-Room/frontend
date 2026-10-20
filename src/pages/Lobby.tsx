@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { getRoomByCode, joinRoom, type InviteCard } from "@/lib/rooms";
+import { getRoomByCode, joinErrorMessage, joinRoom, type InviteCard } from "@/lib/rooms";
 import { setSmartAppBanner, clearSmartAppBanner } from "@/lib/appBanner";
 import { saveRoomPlanFromServer } from "@/lib/roomExperience";
 import { getMe, updateMe } from "@/lib/users";
@@ -203,7 +203,7 @@ export default function Lobby() {
         bounceToAuthForPersistent();
         return;
       }
-      toast.error(msg + " Check the PIN and try again.");
+      toast.error(joinErrorMessage(err));
     } finally {
       setJoining(false);
     }

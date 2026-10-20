@@ -65,7 +65,8 @@ export function OneHasToGo() {
   const accentBtn = "rounded-full text-primary-foreground transition hover:opacity-90 disabled:opacity-50";
   const accentStyle = { backgroundColor: "var(--room-accent)" } as const;
 
-  const revealing = !ohtgIsFinished(state) && state.phase === "revealing";
+  const finished = ohtgIsFinished(state);
+  const revealing = !finished && state.phase === "revealing";
   const { stage, witnessed } = useCinematic(
     revealing,
     ohtgRevealSteps(Math.min(state.round, OHTG_ROUNDS.length - 1)),
@@ -73,7 +74,28 @@ export function OneHasToGo() {
   // -1 before the reveal; hydrating mid-reveal jumps straight to the verdict.
   const rank = revealing ? (witnessed ? STAGE_RANK[stage ?? "dim"] ?? 0 : 3) : -1;
 
-  if (ohtgIsFinished(state)) {
+  const iCut = state.cuts[senderId] != null;
+  const iGuessed = state.guesses[senderId] != null;
+  const guessing = state.phase === "guessing";
+
+  // "Right now" help snapshot (see lib/activityHelpNow). Runs before the
+  // finished early-return: a hook skipped on the last round crashed the game.
+  useEffect(() => {
+    const snap = finished
+      ? { now: "That's all the rounds. Tap Play again for another run.", step: 3 }
+      : revealing
+        ? { now: "The cuts fall. Say why yours had to go, then tap Next round.", step: 2 }
+        : guessing
+          ? iGuessed
+            ? { now: `Locked. Waiting for ${partnerName}…`, step: 1 }
+            : { now: `Now tap the one you think ${partnerName} cut.`, step: 1 }
+          : iCut
+            ? { now: `Sealed. Waiting for ${partnerName} to cut.`, step: 0 }
+            : { now: "Tap the one you'd get rid of forever.", step: 0 };
+    setHelpNow("one_has_to_go", snap);
+  }, [finished, revealing, guessing, iGuessed, iCut, partnerName]);
+
+  if (finished) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-5 p-6 text-center animate-fade-in">
         <p className="font-serif text-display italic text-cream">That&apos;s all {OHTG_ROUNDS.length} rounds</p>
@@ -97,9 +119,6 @@ export function OneHasToGo() {
   const otherCutEntry = Object.entries(state.cuts).find(([uid]) => uid !== senderId);
   const theirCut = otherCutEntry?.[1];
   const myGuess = state.guesses[senderId];
-  const iCut = myCut != null;
-  const iGuessed = myGuess != null;
-  const guessing = state.phase === "guessing";
   const sameCut = revealing && myCut === theirCut;
   const iReadThem = revealing && myGuess === theirCut;
   const theyReadMe = revealing && otherCutEntry != null && state.guesses[otherCutEntry[0]] === myCut;
@@ -111,20 +130,6 @@ export function OneHasToGo() {
   const survivorNames = onVerdict
     ? round.options.filter((_, i) => i !== myCut && i !== theirCut).map((o) => o.label)
     : [];
-
-  // "Right now" help snapshot (see lib/activityHelpNow).
-  useEffect(() => {
-    const snap = revealing
-      ? { now: "The cuts fall. Say why yours had to go, then tap Next round.", step: 2 }
-      : guessing
-        ? iGuessed
-          ? { now: `Locked. Waiting for ${partnerName}…`, step: 1 }
-          : { now: `Now tap the one you think ${partnerName} cut.`, step: 1 }
-        : iCut
-          ? { now: `Sealed. Waiting for ${partnerName} to cut.`, step: 0 }
-          : { now: "Tap the one you'd get rid of forever.", step: 0 };
-    setHelpNow("one_has_to_go", snap);
-  }, [revealing, guessing, iGuessed, iCut, partnerName]);
 
   const title = !revealing
     ? guessing
