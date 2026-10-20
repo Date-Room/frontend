@@ -80,6 +80,28 @@ export function gridColumns(n: number): number {
   return 3;
 }
 
+/** Pure: grid columns for n tiles in a w x h stage, the count whose tiles
+ *  come closest to a camera's shape (16:9). The stage is filled top to
+ *  bottom, so a single row of three on a laptop made tall, narrow tiles;
+ *  this keeps 3 as 2 x 2 there and allows a row of three only on a very
+ *  wide stage. Falls back to gridColumns before the stage is measured. */
+export function gridColumnsFor(n: number, w: number, h: number): number {
+  if (n <= 1) return 1;
+  if (w <= 0 || h <= 0) return gridColumns(n);
+  const target = Math.log(16 / 9);
+  let best = gridColumns(n);
+  let bestScore = Infinity;
+  for (let cols = 1; cols <= Math.min(n, 4); cols++) {
+    const rows = Math.ceil(n / cols);
+    const score = Math.abs(Math.log(w / cols / (h / rows)) - target);
+    if (score < bestScore - 1e-9) {
+      best = cols;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
 /** "Amaka", "Amaka and Salma", "Amaka, Salma and Nia". */
 export function joinNames(names: string[]): string {
   const n = names.filter(Boolean);
@@ -124,9 +146,11 @@ export type Seat = string | null;
 
 /**
  * Pure: who sits where. Friends fill the left from the top, then the right;
- * you sit under them on the right. Five on the call is three a side with
- * the sixth space free. A saved arrangement (this device's own) wins for
- * everyone still on the call; newcomers join at the end.
+ * you sit under them on the right. Both sides always match (decided
+ * 2026-10-08, a lopsided 2/1 or 3/2 looked wrong): three on the call is
+ * two a side, five is three a side, with the spare space showing the
+ * squad's scores; six is three a side. A saved arrangement (this device's
+ * own) wins for everyone still on the call; newcomers join at the end.
  */
 export function tableSeats(
   present: string[],
@@ -139,10 +163,12 @@ export function tableSeats(
     ? [...saved.filter((id) => base.includes(id)), ...base.filter((id) => !saved.includes(id))]
     : base;
   const n = order.length;
-  const leftCount = n >= 5 ? 3 : Math.floor(n / 2);
+  // Odd counts above one take the bigger half on the left; the scores
+  // fill the right's spare space so the sides match.
+  const leftCount = n > 1 ? Math.ceil(n / 2) : 0;
   const left: Seat[] = order.slice(0, leftCount);
   const right: Seat[] = order.slice(leftCount);
-  if (n === 5) right.push(null);
+  if (n > 1 && n % 2 === 1) right.push(null);
   return { left, right };
 }
 

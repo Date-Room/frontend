@@ -121,12 +121,21 @@ export function sendChaperonFeedback(
   return api.post<void>(`/v1/chaperon/sessions/${sessionId}/feedback`, body);
 }
 
-/** What the client did with the whispers it received: rendered, or held
- *  back by the on-screen gate. Without this the corpus cannot tell a signal
- *  the judge wrote from one the person actually saw. */
+/** A shown whisper the person closed by hand, and how long it was up. */
+export type ChaperonDismissal = { event_id: string; after_ms: number };
+
+/** What the client did with the whispers it received: rendered, held back by
+ *  the on-screen gate, or closed by hand, plus the activity on screen when
+ *  they landed. Without this the corpus cannot tell a signal the judge wrote
+ *  from one the person actually saw, or in what context they saw it. */
 export function sendChaperonOutcomes(
   sessionId: string,
-  body: { shown?: string[]; suppressed?: string[] },
+  body: {
+    shown?: string[];
+    suppressed?: string[];
+    dismissed?: ChaperonDismissal[];
+    activity?: string;
+  },
 ): Promise<void> {
   return api.post<void>(`/v1/chaperon/sessions/${sessionId}/outcomes`, body);
 }

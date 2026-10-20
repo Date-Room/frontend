@@ -3,7 +3,7 @@
  * `invites` / `room_state` tables. Shapes mirror the FastAPI Pydantic models
  * in `backend/app/schemas/room.py`.
  */
-import { api, apiFetch } from "@/lib/api";
+import { ApiError, api, apiFetch } from "@/lib/api";
 
 export type RoomPersistence = "session" | "persistent";
 export type RoomPackage =
@@ -216,6 +216,28 @@ export function joinRoom(roomId: string, body: JoinRoomRequest): Promise<JoinRoo
   return api.post<JoinRoomResponse>(`/v1/rooms/${roomId}/join`, body);
 }
 
+/** What to tell someone whose join was refused. Only a wrong PIN asks
+ *  them to check the PIN: a full, ended or resting room used to say
+ *  "Check the PIN and try again" too, which sent guests retyping a PIN
+ *  that was right all along. */
+export function joinErrorMessage(err: unknown): string {
+  if (!(err instanceof ApiError)) {
+    return "Couldn't reach DateRoom. Check your connection and try again.";
+  }
+  const detail = (err.body as { detail?: unknown } | null)?.detail;
+  const code =
+    detail && typeof detail === "object" && "error" in detail
+      ? String((detail as { error: unknown }).error)
+      : null;
+  if (err.status === 403 && /pin/i.test(err.message)) {
+    return "That PIN doesn't match this room. Check it with your host and try again.";
+  }
+  if (code === "room_resting") return "This room is resting right now, so it can't take new guests.";
+  if (err.status === 410) return "This room has ended.";
+  if (err.status === 409) return `${err.message} Ask your host to free a seat.`;
+  return err.message || "Could not join.";
+}
+
 export function getRoomExperienceApi(
   roomId: string,
   participantId?: string,
@@ -310,6 +332,44 @@ export function updateRoom(
   patch: { theme_color?: string | null; background_id?: string | null },
 ): Promise<Room> {
   return api.patch<Room>(`/v1/rooms/${roomId}`, patch);
+}
+
+export type MuteWhat = { microphone?: boolean; camera?: boolean };
+
+/** Mute someone else's microphone and/or camera for the whole call (say
+ *  they stepped away). They can turn it back on themselves. Anonymous
+ *  callers pass their own participant_id. Resolves to what was muted. */
+export function muteParticipant(
+  roomId: string,
+  targetParticipantId: string,
+  what: MuteWhat,
+  myParticipantId?: string,
+): Promise<{ muted: string[] }> {
+  return api.post<{ muted: string[] }>(
+    `/v1/rooms/${roomId}/participants/${targetParticipantId}/mute`,
+    {
+      microphone: what.microphone ?? false,
+      camera: what.camera ?? false,
+      participant_id: myParticipantId ?? null,
+    },
+  );
+}
+
+/** Pure: the notice for the person who was muted, or null when the event
+ *  isn't about them. "Joshua muted your microphone. Tap the mic to talk again." */
+export function mutedNotice(
+  payload: Record<string, unknown>,
+  myIdentity: string,
+): string | null {
+  if (!myIdentity || payload.identity !== myIdentity) return null;
+  const muted = Array.isArray(payload.muted) ? (payload.muted as string[]) : [];
+  const by = typeof payload.by === "string" && payload.by ? payload.by : "Someone";
+  const mic = muted.includes("microphone");
+  const cam = muted.includes("camera");
+  if (mic && cam) return `${by} muted your microphone and turned off your camera. Tap them to turn them back on.`;
+  if (mic) return `${by} muted your microphone. Tap the mic to talk again.`;
+  if (cam) return `${by} turned off your camera. Tap the camera to turn it back on.`;
+  return null;
 }
 
 /** Guests pass the participant_id they got from join; signed-in users omit it. */

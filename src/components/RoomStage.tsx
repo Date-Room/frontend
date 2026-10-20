@@ -8,6 +8,11 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { RoomContext } from "@livekit/components-react";
+import { CameraDropup, MicDropup, SquadLayoutMenu } from "@/components/DeviceMenu";
+import { SeatRequestsBanner } from "@/components/squad/SeatRequestsBanner";
+import { JoinRequestsAlert } from "@/components/squad/JoinRequests";
+import { GUEST_HIDDEN_ACTIVITIES, isSquadGuest } from "@/lib/squadGuests";
 import { createPortal } from "react-dom";
 import {
   RotateCw,
@@ -63,6 +68,7 @@ import {
 import { SQUAD_GAMES, SQUAD_GAME_IDS, isSquadGame } from "@/lib/squadGames";
 import { useSquadStage } from "@/context/SquadStageContext";
 import {
+  callVariant,
   isSidePane,
   useCallLayout,
 } from "@/lib/callLayout";
@@ -380,6 +386,12 @@ export function RoomStage({
   // so this is how you learn your partner did something.)
   const room = useRoomSession();
   const chaperon = useChaperonController();
+  // Tell the chaperon what is on stage, so each whisper is stored with the
+  // activity it landed in.
+  const noteChaperonActivity = chaperon?.noteActivity;
+  useEffect(() => {
+    noteChaperonActivity?.(staged || null);
+  }, [noteChaperonActivity, staged]);
 
   // Game-channel connection state — NOT the video call, which is a separate
   // LiveKit connection that survives networks this WebSocket doesn't. Shown
@@ -602,6 +614,8 @@ export function RoomStage({
   const tableShare = tableFaceShare(cueMode, Boolean(squadStage?.cue?.focus));
   /** The squad's bar: mute and camera from the call beside Activities and chat. */
   const squadBar = squad && callActive && !watchFullscreen ? (squadStage?.controls ?? null) : null;
+  const squadCaret =
+    "focus-ring flex h-9 w-7 items-center justify-center rounded-full text-cream/70 hover:bg-white/10 hover:text-cream";
   /** The right-hand call pane is rendered — `side` and `side-pip` both use it. */
   const splitCallLayout =
     callActive && wide && isSidePane(callLayout) && !squadHangout && !squadCouch;
@@ -612,6 +626,9 @@ export function RoomStage({
   /** Phone, squad night, watching: chat lines run under the film. */
   const squadTicker = squadCouch && WATCHING_IDS.has(staged) && !wide;
   chatTickerRef.current = squadTicker;
+  /** Tonight's guest in a squad: the call and games, not the squad's chat
+   *  history, fridge or vision board (the server refuses those anyway). */
+  const squadGuest = squad && isSquadGuest(roomId);
   const squadGroupLayout: GroupLayout | undefined = squadStrip
     ? "strip"
     : squadGameStaged
@@ -691,10 +708,11 @@ export function RoomStage({
         ...c,
         items: c.itemIds
           .filter((id) => !(squad && DATE_GAME_IDS.has(id)))
+          .filter((id) => !(squadGuest && GUEST_HIDDEN_ACTIVITIES.has(id)))
           .map((id) => items.find((i) => i.id === id))
           .filter((i): i is StageItem => Boolean(i)),
       })).filter((c) => c.items.length > 0),
-    [items, squad],
+    [items, squad, squadGuest],
   );
   const activeCat = catId ? availCats.find((c) => c.id === catId) ?? null : null;
   /** The launcher is a floating dropup again, not a resident dock: the stage
@@ -1422,7 +1440,7 @@ export function RoomStage({
               </ActivityBoundary>
             ) : null}
           </div>
-          {squadTicker && (
+          {squadTicker && !squadGuest && (
             <ChatTicker
               lines={tickerLines(chat?.messages ?? [], room.senderId, presenceName)}
               onOpen={() => setChatOpen(true)}
@@ -1603,28 +1621,46 @@ export function RoomStage({
             // bar, in the same place on every screen. Games never cover it.
             return (
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={squadBar.toggleMic}
-                  aria-label={squadBar.mic ? "Mute" : "Unmute"}
-                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", squadBar.mic ? "border-white/10 bg-card/85 text-cream" : "border-rose-400/50 bg-rose-500/20 text-rose-200")}
-                >
-                  {squadBar.mic ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={squadBar.toggleCam}
-                  aria-label={squadBar.cam ? "Turn camera off" : "Turn camera on"}
-                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", squadBar.cam ? "border-white/10 bg-card/85 text-cream" : "border-rose-400/50 bg-rose-500/20 text-rose-200")}
-                >
-                  {squadBar.cam ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
-                </button>
+                {/* Mic and camera each carry their device list (microphone +
+                    speaker, camera), like a date call. The bar sits outside
+                    the call, so the call is handed in for the pickers. */}
+                <RoomContext.Provider value={squadBar.room}>
+                  <div className={cn("pointer-events-auto flex h-11 shrink-0 items-center rounded-full border pl-1 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", squadBar.mic ? "border-white/10 bg-card/85 text-cream" : "border-rose-400/50 bg-rose-500/20 text-rose-200")}>
+                    <MicDropup triggerClassName={squadCaret} iconClassName="h-4 w-4" />
+                    <button
+                      type="button"
+                      onClick={squadBar.toggleMic}
+                      aria-label={squadBar.mic ? "Mute" : "Unmute"}
+                      className="focus-ring flex h-11 w-10 items-center justify-center rounded-full"
+                    >
+                      {squadBar.mic ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
+                    </button>
+                  </div>
+                  <div className={cn("pointer-events-auto flex h-11 shrink-0 items-center rounded-full border pl-1 shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", squadBar.cam ? "border-white/10 bg-card/85 text-cream" : "border-rose-400/50 bg-rose-500/20 text-rose-200")}>
+                    <CameraDropup triggerClassName={squadCaret} iconClassName="h-4 w-4" />
+                    <button
+                      type="button"
+                      onClick={squadBar.toggleCam}
+                      aria-label={squadBar.cam ? "Turn camera off" : "Turn camera on"}
+                      className="focus-ring flex h-11 w-10 items-center justify-center rounded-full"
+                    >
+                      {squadBar.cam ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+                    </button>
+                  </div>
+                </RoomContext.Provider>
+                {/* My own grid / speaker / auto choice for the faces. Not on
+                    phones: the bar is full there, and auto gives a phone the
+                    speaker view. */}
+                <SquadLayoutMenu
+                  triggerClassName="focus-ring pointer-events-auto hidden h-11 w-11 shrink-0 sm:flex items-center justify-center rounded-full border border-white/10 bg-card/85 text-cream shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition hover:bg-card"
+                  iconClassName="h-5 w-5"
+                />
                 {pill}
                 <button
                   type="button"
                   onClick={() => setChatOpen(true)}
                   aria-label={chatUnread ? `Chat, ${chatUnread} unread` : "Chat"}
-                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", "relative border-white/10 bg-card/85 text-primary")}
+                  className={cn("focus-ring pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border shadow-[0_12px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition", "relative border-white/10 bg-card/85 text-primary", squadGuest && "!hidden")}
                 >
                   <MessageCircle className="h-5 w-5" />
                   {chatUnread > 0 && (
@@ -1754,7 +1790,7 @@ export function RoomStage({
               // In the pane, `side-pip` gives the phone-call shape — one feed
               // full-bleed with the other floating over it — while `side`
               // shows both tiles.
-              variant={floatingCall || callLayout === "side-pip" ? "pip" : "full"}
+              variant={callVariant({ floating: floatingCall, squad, layout: callLayout })}
               framed={!floatingCall}
               collapsed={bubble}
               pair={pairBubble}
@@ -1870,6 +1906,10 @@ export function RoomStage({
           </div>,
           document.body,
         )}
+
+      {/* Squads: someone left off a full call asking to borrow a seat. */}
+      {squad && callActive && <SeatRequestsBanner roomId={roomId} />}
+      {squad && callActive && <JoinRequestsAlert roomId={roomId} />}
 
       <RoomAmbianceSheet
         open={themeOpen}

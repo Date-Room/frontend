@@ -1,6 +1,6 @@
 /**
  * /squad/new: open a Squad room. Beta members only (the server checks).
- * Pick seats (2 to 5, you included) and a name; the room opens between
+ * Pick seats (2 to 6, you included) and a name; the room opens between
  * nights with the free first night in it.
  */
 import { useState } from "react";
@@ -18,6 +18,10 @@ export function createErrorMessage(e: unknown): { text: string; requestAccess?: 
     const code = (e.body as { detail?: { error?: string } } | undefined)?.detail?.error;
     if (code === "squad_access_required") {
       return { text: "Squad is invite-only for now.", requestAccess: true };
+    }
+    if (code === "squad_seats_invalid") {
+      const said = (e.body as { detail?: { message?: string } } | undefined)?.detail?.message;
+      return { text: said ?? "That's more seats than a squad room takes right now. Pick fewer." };
     }
     if (code === "squad_unavailable" || e.status === 404) {
       return { text: "Squad rooms aren't open yet. We'll email you the moment they are." };

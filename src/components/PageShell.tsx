@@ -8,6 +8,8 @@ type PageShellProps = {
   orbs?: boolean;
   /** Edge darkening */
   vignette?: boolean;
+  /** "dark" keeps the surface dark in both themes (rooms, photo pages). */
+  tone?: "page" | "dark";
   /** Inline style — used by LiveRoom to paint the customized
    *  background gradient + drop the --room-accent CSS variable. */
   style?: CSSProperties;
@@ -30,13 +32,20 @@ export function PageShell({
   className,
   orbs = false,
   vignette = true,
+  /** "dark" for surfaces that stay dark in both themes — rooms, and any page
+   *  whose background is a photograph. See `.surface-dark` in index.css. */
+  tone = "page",
   style,
   ...rest
 }: PageShellProps) {
   return (
     <div
       {...rest}
-      className={cn("min-h-screen relative bg-background text-foreground overflow-x-hidden", className)}
+      className={cn(
+        "min-h-screen relative bg-background text-foreground overflow-x-hidden",
+        tone === "dark" && "surface-dark",
+        className,
+      )}
       style={style}
     >
       {vignette ? <div className="vignette" aria-hidden /> : null}

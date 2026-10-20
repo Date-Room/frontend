@@ -155,6 +155,43 @@
     --radius: 0.75rem;
     font-family: 'DM Sans', sans-serif;
   }
+  /* A surface that stays dark in BOTH themes: a page whose background is a
+     photograph, and every live/pre room — DateRoom is candlelit by design,
+     so a room does not become paper just because the viewer picked light
+     mode. Everything on such a surface is ink-on-dark no matter what the
+     theme says.
+
+     Re-pointing the tokens inside the scope beats rewriting every utility on
+     the page, and it carries whole components (the language switcher, muted
+     copy, inputs, borders) along for free. Without it, `text-cream` resolves
+     to dark INK on paper and vanishes against the dark room — which is
+     exactly what the pre-room's panel heading was doing. */
+  .surface-dark {
+    color-scheme: dark;
+    --foreground: 40 14% 96%;
+    --card: 22 18% 16%;
+    --card-foreground: 40 14% 96%;
+    --popover: 22 20% 14%;
+    --popover-foreground: 40 14% 96%;
+    --secondary: 22 16% 19%;
+    --secondary-foreground: 40 14% 96%;
+    --muted: 22 14% 23%;
+    --muted-foreground: 30 12% 72%;
+    --border: 30 10% 28%;
+    --input: 30 10% 26%;
+    --hairline: rgb(255 255 255 / 0.1);
+    --primary: 33 76% 62%;
+    --primary-foreground: 22 22% 9%;
+    --primary-fill: 33 76% 62%;
+    --primary-fill-alt: 0 56% 62%;
+    --on-fill: 22 22% 9%;
+    --amber: 37 91% 55%;
+    --champagne: 38 72% 72%;
+    --elev-card: 0 28px 80px -20px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.05);
+    --elev-tile: 0 10px 30px -18px rgb(0 0 0 / 0.5);
+    --elev-cta: 0 12px 48px rgb(232 166 83 / 0.28);
+  }
+
   .theme-admin {
     background-image:
       radial-gradient(900px 520px at -10% -10%, hsl(var(--neon) / 0.14), transparent 60%),
@@ -332,7 +369,7 @@
   }
 
   .card-shadow {
-    @apply shadow-[0_20px_50px_rgba(0,0,0,0.5)];
+    box-shadow: var(--elev-card);
   }
 
   .ember-glow {
@@ -350,10 +387,18 @@
 
   /** Cozy auth fields: low-contrast inputs that still meet focus affordance */
   .auth-input {
-    @apply w-full rounded-2xl px-5 py-3.5 text-sm font-light text-cream placeholder:text-muted-foreground/35
-           bg-secondary/35 border border-white/[0.09] shadow-inner shadow-black/20
-           focus:outline-none focus:border-primary/35 focus:ring-2 focus:ring-primary/20 focus:bg-secondary/45
+    @apply w-full rounded-2xl px-5 py-3.5 text-sm font-light text-ondark placeholder:text-ondark/40
+           bg-black/35 border border-white/[0.14] shadow-inner shadow-black/25
+           focus:outline-none focus:border-primary/45 focus:ring-2 focus:ring-primary/25 focus:bg-black/45
            transition-colors duration-200;
+  }
+
+  /* The auth card sits directly on the photo, so it is glass over an image
+     rather than a panel on a page — darker and blurrier than `editorial-card`,
+     which has a page behind it. */
+  .auth-card {
+    @apply rounded-[1.75rem] border border-white/[0.18] bg-black/60
+           shadow-[0_30px_90px_-25px_rgba(0,0,0,0.8)] backdrop-blur-2xl;
   }
 
   /* Keep autofill from flashing light backgrounds in dark auth cards (Chrome/Safari) */
@@ -583,6 +628,11 @@
 :root[data-theme="light"] .text-rose { color: hsl(var(--destructive)); }
 :root[data-theme="light"] .text-amber { color: hsl(var(--amber)); }
 
+/* …and back again on a photo surface, which stays dark in light mode. */
+:root[data-theme="light"] .surface-dark .text-cream { color: #F8F7F3; }
+:root[data-theme="light"] .surface-dark .text-rose { color: #D4826A; }
+:root[data-theme="light"] .surface-dark .text-amber { color: #F5A623; }
+
 /* Light mode runs one weight notch heavier, the same step the mobile text
    theme makes. Light text on a dark ground blooms and reads heavier than it
    is; the same weight on paper looks thin and spindly, so matching the
@@ -622,6 +672,96 @@
   border-color: var(--hairline);
 }
 
+/* The full-viewport vignette is atmosphere on a dark page. On paper it is a
+   40%-black wash over everything: the corners go grey, every card edge goes
+   mushy, and the app reads as a dirty lens rather than as paper. PageShell
+   renders it on EVERY page, so this one rule is most of what made light mode
+   look unfinished. */
+:root[data-theme="light"] .vignette { display: none; }
+
+/* Elevation.
+   A dark page builds depth with a large, soft, far-thrown shadow plus a lit
+   top edge — there is no ambient light, so the shadow IS the depth. Paper
+   works the opposite way: light comes from above, so a crisp object casts a
+   SHORT shadow close to itself, and a long soft one just looks like dirt.
+   Hence two different recipes behind one name, and why "shadows are too
+   much" in light mode was a correct read of a dark-mode recipe. */
+:root {
+  --elev-card: 0 28px 80px -20px rgb(0 0 0 / 0.55), inset 0 1px 0 rgb(255 255 255 / 0.05);
+  --elev-tile: 0 10px 30px -18px rgb(0 0 0 / 0.5);
+  --elev-cta: 0 12px 48px rgb(232 166 83 / 0.28);
+}
+:root[data-theme="light"] {
+  --elev-card: 0 1px 2px rgb(30 24 19 / 0.05), 0 10px 26px -18px rgb(30 24 19 / 0.22);
+  --elev-tile: 0 1px 1px rgb(30 24 19 / 0.04);
+  /* The CTA keeps a hint of its own colour so it still reads as the warm
+     thing on the page, but close in — a wide amber halo on paper is a
+     smudge, not a glow. */
+  --elev-cta: 0 1px 2px rgb(30 24 19 / 0.08), 0 8px 20px -12px rgb(191 74 42 / 0.45);
+}
+.elev-card { box-shadow: var(--elev-card); }
+/* CardPage is a full-bleed column on phones and only becomes a card at sm+,
+   so its elevation is gated the same way. A plain class cannot take
+   Tailwind's `sm:` prefix, hence the explicit query. */
+@media (min-width: 640px) {
+  .elev-card-sm { box-shadow: var(--elev-card); }
+}
+.elev-tile { box-shadow: var(--elev-tile); }
+.elev-cta { box-shadow: var(--elev-cta); }
+
+/* Surfaces that are translucent on a dark page and solid on paper.
+   `bg-card/30` over near-black still reads as a tile; over 96% paper it
+   lands at ~98%, i.e. the page. A light list separates with a solid card,
+   a hairline and that short shadow — which is what "crisp" actually means
+   here. Kept as classes rather than opaquing `bg-card/NN` globally, because
+   in-room panels use the same utility over a dark room and must stay
+   translucent. */
+.surface-tile { background-color: hsl(var(--card) / 0.3); }
+.surface-panel { background-color: hsl(var(--card) / 0.4); }
+:root[data-theme="light"] .surface-tile,
+:root[data-theme="light"] .surface-panel { background-color: hsl(var(--card)); }
+
+/* `.editorial-card` is the app's card — 15 files use it — and it was written
+   purely for a dark page: a white 10% border, a 65%-opacity fill and a soft
+   shadow thrown 60px. On paper the border is invisible, the fill lands at
+   ~97% (the page), and the shadow is the grey smudge under everything. So a
+   card had no edge, no fill and no shelf: that is what "not crisp" was.
+   Paper wants the opposite — a real border, a solid fill, a short shadow.
+   The tokens resolve per surface, so a card inside a dark room keeps the
+   dark values. */
+:root[data-theme="light"] .editorial-card {
+  background-color: hsl(var(--card));
+  border-color: hsl(var(--border));
+  box-shadow: var(--elev-card);
+}
+
+/* A disabled primary control.
+   Dropping a saturated fill to 40% opacity works on a dark page — the colour
+   sinks toward the background and reads as "off". Over near-white paper the
+   same 40% turns clay into PASTEL PINK, so the button reads as a decorative
+   choice rather than an unavailable one ("Start a night" was the giveaway).
+   Paper signals unavailable with a flat muted fill at full opacity instead.
+   Carried on tokens so `.surface-dark` — rooms, photo pages — keeps the
+   dark behaviour automatically. */
+:root {
+  --btn-off-bg: hsl(var(--primary-fill) / 0.4);
+  --btn-off-fg: hsl(var(--on-fill) / 0.65);
+}
+:root[data-theme="light"] {
+  --btn-off-bg: hsl(var(--muted));
+  --btn-off-fg: hsl(var(--muted-foreground));
+}
+.surface-dark {
+  --btn-off-bg: hsl(var(--primary-fill) / 0.4);
+  --btn-off-fg: hsl(var(--on-fill) / 0.65);
+}
+:root .btn-primary:disabled {
+  opacity: 1;
+  background-color: var(--btn-off-bg);
+  color: var(--btn-off-fg);
+  box-shadow: none;
+}
+
 /* Recessed fills go solid on paper. An alpha tuned against a near-black page
    blends a surface darker; the same alpha over 96% paper blends it into the
    page — which is how the search inputs ended up indistinguishable from the
@@ -653,18 +793,28 @@
   font-family: "Playfair Display", Georgia, serif;
 }
 .lp-eyebrow {
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #f0ad7f;
-  font-weight: 500;
+  font-weight: 600;
+}
+.lp-eyebrow::before {
+  content: "";
+  width: 1.6rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #f0ad7f);
 }
 .lp-display {
   font-family: "Playfair Display", Georgia, serif;
   font-style: italic;
   font-weight: 500;
-  letter-spacing: -0.01em;
-  line-height: 1.02;
+  letter-spacing: -0.035em;
+  line-height: 0.92;
+  text-wrap: balance;
 }
 .lp-btn {
   display: inline-flex;
@@ -680,9 +830,25 @@
   transition: all 0.25s ease;
   box-shadow: 0 10px 40px -10px oklch(0.8 0.1 55 / 0.45);
 }
+.lp-btn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.lp-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, transparent 35%, rgb(255 255 255 / 0.55) 50%, transparent 65%);
+  transform: translateX(-120%);
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.lp-btn:hover::after { transform: translateX(120%); }
 .lp-btn:hover {
   background-color: #efc8aa;
   transform: translateY(-1px);
+  box-shadow: 0 14px 44px -12px oklch(0.8 0.1 55 / 0.55);
 }
 .lp-link {
   color: #f0ad7f;
@@ -696,11 +862,16 @@
 }
 .lp-glow {
   box-shadow:
-    0 0 0 1px oklch(0.8 0.1 55 / 0.15),
-    0 30px 80px -20px oklch(0.62 0.14 50 / 0.35);
+    0 0 0 1px rgb(255 255 255 / 0.08),
+    0 36px 90px -28px rgb(0 0 0 / 0.85);
 }
 .lp-vignette {
   position: relative;
+}
+.lp-vignette > img {
+  filter: saturate(0.4) contrast(1.2) brightness(0.6);
+  transform: scale(1.12);
+  transform-origin: 62% 45%;
 }
 .lp-vignette::after {
   content: "";
@@ -708,8 +879,56 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse at center, transparent 30%, oklch(0.1 0.01 40 / 0.55) 90%),
-    linear-gradient(180deg, oklch(0.16 0.012 40 / 0.55) 0%, oklch(0.16 0.012 40 / 0.25) 35%, oklch(0.16 0.012 40 / 0.85) 100%);
+    /* The warm pool carries the candles. Without it the cool wash below
+       reads as cold rather than cinematic — the point is the SPLIT, not the
+       blue. */
+    radial-gradient(46% 50% at 66% 46%, oklch(0.66 0.11 58 / 0.3) 0%, transparent 72%),
+    /* cool wash — this is what lifts the frame off its sepia */
+    radial-gradient(66% 58% at 12% 18%, oklch(0.42 0.07 278 / 0.34) 0%, transparent 72%),
+    radial-gradient(58% 52% at 90% 84%, oklch(0.38 0.055 228 / 0.3) 0%, transparent 74%),
+    radial-gradient(ellipse 88% 76% at 50% 46%, transparent 32%, oklch(0.07 0.01 40 / 0.78) 100%),
+    linear-gradient(180deg, oklch(0.1 0.012 40 / 0.5) 0%, oklch(0.1 0.012 40 / 0.2) 38%, #120c09 100%);
+}
+/* Film grain. Low enough to be felt rather than seen — it keeps the big
+   gradient fields above from banding on a wide display. */
+.lp-vignette::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Every other landing photograph gets the same grade, a touch lighter —
+   they sit behind copy rather than under a headline. Applied by class so a
+   photo that is the PRODUCT (the room screenshots) keeps its real colour. */
+.lp-photo {
+  filter: saturate(0.46) contrast(1.16) brightness(0.66);
+}
+
+/* Hero copy arrives as a sentence rather than all at once. */
+.lp-hero-copy > * {
+  animation: lp-rise 0.85s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.lp-hero-copy > *:nth-child(1) { animation-delay: 0.05s; }
+.lp-hero-copy > *:nth-child(2) { animation-delay: 0.14s; }
+.lp-hero-copy > *:nth-child(3) { animation-delay: 0.24s; }
+.lp-hero-copy > *:nth-child(4) { animation-delay: 0.34s; }
+.lp-hero-copy > *:nth-child(5) { animation-delay: 0.44s; }
+.lp-hero-copy > *:nth-child(6) { animation-delay: 0.54s; }
+@keyframes lp-rise {
+  from { opacity: 0; transform: translate3d(0, 20px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The glow was a warm halo on every framed image — the single most dated
+   touch after the photos themselves. A crisp edge and a neutral drop
+   shadow instead. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-hero-copy > * { animation: none; }
+  .lp-btn:hover { transform: none; }
 }
 
 @keyframes ken-burns {

@@ -35,13 +35,19 @@ import {
 } from "@/components/DeviceMenu";
 import { loadDevicePreference } from "@/lib/devices";
 import { getInvitedGuestName } from "@/lib/invitedGuest";
-import { livekitToken } from "@/lib/rooms";
+import { livekitToken, mutedNotice } from "@/lib/rooms";
+import { mobilePlatform } from "@/lib/appStores";
+import { groupRoomOptions } from "@/lib/videoProfiles";
+import { TAB_DEVICE_ID, otherDeviceOnCall } from "@/lib/deviceId";
+import { nightFullFrom, type NightFull } from "@/lib/squad";
+import { SquadSeatFull } from "@/components/squad/SquadSeatFull";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
 import { partnerFromPresence } from "@/lib/stagecraft/usePartnerName";
 import { useRoomSession } from "@/context/RoomSessionContext";
 import { authClient } from "@/lib/authClient";
 import { useVideoOrientation } from "@/lib/videoOrientation";
-import { useWideViewport } from "@/lib/viewport";
+import { useMediaQuery, useWideViewport } from "@/lib/viewport";
+import { AUTO_GRID_MIN_WIDTH, resolveSquadLayout, useSquadLayout } from "@/lib/squadLayout";
 import type { PresenceState } from "@/lib/realtime/roomChannel";
 
 // Adaptive stream + dynacast let LiveKit stop sending layers nobody is
@@ -53,15 +59,8 @@ import type { PresenceState } from "@/lib/realtime/roomChannel";
 // source; warnings and errors still surface.
 setLogLevel("warn");
 
-// Squad nights: up to five people each receiving everyone, so capture at
-// 360p with a single 180p layer. With adaptive stream this keeps a 5-seat
-// night near the modelled ~$0.85 and cool on phones.
-const GROUP_ROOM_OPTIONS: RoomOptions = {
-  adaptiveStream: true,
-  dynacast: true,
-  videoCaptureDefaults: { resolution: VideoPresets.h360.resolution },
-  publishDefaults: { simulcast: true, videoSimulcastLayers: [VideoPresets.h180] },
-};
+// Squad nights: see groupRoomOptions.
+const GROUP_ROOM_OPTIONS: RoomOptions = groupRoomOptions(mobilePlatform() !== null);
 
 const LIVEKIT_ROOM_OPTIONS: RoomOptions = {
   adaptiveStream: true,
@@ -1135,6 +1134,25 @@ function Stage({
   );
 }
 
+/** When someone else mutes my mic or turns off my camera (I stepped away),
+ *  say who and how to undo it. The server tells the room; LiveKit has
+ *  already switched the track off. Must be inside <LiveKitRoom>. */
+function MutedNotice() {
+  const { channel } = useRoomSession();
+  const { localParticipant } = useLocalParticipant();
+  const identity = localParticipant.identity;
+  useEffect(
+    () =>
+      channel.onBroadcast((e) => {
+        if (e.kind !== "participant_muted") return;
+        const text = mutedNotice(e.payload, identity);
+        if (text) toast.message(text, { duration: 8000 });
+      }),
+    [channel, identity],
+  );
+  return null;
+}
+
 export function RoomVideo({
   onLeave,
   variant,
@@ -1149,14 +1167,28 @@ export function RoomVideo({
   groupLayout,
 }: { onLeave?: () => void } & CallControls = {}) {
   const room = useRoomSession();
-  const wideScreen = useWideViewport();
+  // Squad calls: the viewer's own grid / speaker / auto choice.
+  const [squadLayout] = useSquadLayout();
+  const roomForGrid = useMediaQuery(`(min-width: ${AUTO_GRID_MIN_WIDTH}px)`);
   const [conn, setConn] = useState<{ token: string; url: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Squad night with every seat taken: offer to add one instead of an error.
+  const [nightFull, setNightFull] = useState<NightFull | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  // Already on this call from another device (same account)? Ask before
+  // connecting: joining here takes the call over from the other device,
+  // which used to happen silently and looked like someone got kicked.
+  // Decided once, when the call opens here.
+  const [askMove, setAskMove] = useState(() =>
+    otherDeviceOnCall(room.presence, room.senderId, TAB_DEVICE_ID),
+  );
 
   useEffect(() => {
+    if (askMove) return;
     let cancelled = false;
     setConn(null);
     setError(null);
+    setNightFull(null);
     void livekitToken(room.roomId, room.participantId)
       .then((t) => {
         if (cancelled) return;
@@ -1167,12 +1199,15 @@ export function RoomVideo({
         setConn({ token: t.token, url: t.url });
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Could not start video.");
+        if (cancelled) return;
+        const full = nightFullFrom(e);
+        if (full) setNightFull(full);
+        else setError(e instanceof Error ? e.message : "Could not start video.");
       });
     return () => {
       cancelled = true;
     };
-  }, [room.roomId, room.participantId]);
+  }, [room.roomId, room.participantId, attempt, askMove]);
 
   // Apply saved device preferences at join. Computed once per mount (not per
   // render) so the Room isn't reconfigured mid-call; deviceId is an *ideal*
@@ -1228,7 +1263,7 @@ export function RoomVideo({
   const onLkDisconnected = useCallback(
     (reason?: DisconnectReason) => {
       if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
-        toast.message("Call moved to your other device.");
+        toast.message("The call moved to your other device. Join here again to bring it back.");
         onLeave?.();
       }
     },
@@ -1236,6 +1271,33 @@ export function RoomVideo({
     [onLeave],
   );
 
+  if (askMove) {
+    return (
+      <div className="flex h-full items-center justify-center p-6">
+        <div className="w-full max-w-sm space-y-4 rounded-2xl border border-white/[0.1] bg-card/60 p-5 text-center">
+          <div className="space-y-1">
+            <p className="text-[17px] font-semibold text-cream">You're on this call on another device</p>
+            <p className="text-sm text-muted-foreground">
+              Move it here and the other device leaves the call. Nobody else is affected.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAskMove(false)}
+            className="btn-primary focus-ring w-full rounded-full py-3 font-semibold"
+          >
+            Move the call here
+          </button>
+          <button type="button" onClick={() => onLeave?.()} className="text-xs text-primary hover:underline">
+            Stay on the other device
+          </button>
+        </div>
+      </div>
+    );
+  }
+  if (nightFull) {
+    return <SquadSeatFull roomId={room.roomId} full={nightFull} onSeated={() => setAttempt((n) => n + 1)} />;
+  }
   if (error) {
     return <div className="flex h-full items-center justify-center p-6 text-center text-body text-muted-foreground">{error}</div>;
   }
@@ -1266,12 +1328,16 @@ export function RoomVideo({
       <ChaperonAgentBridge />
       <CallPeersBridge />
       <DeviceChangeToaster />
+      <MutedNotice />
       {group ? (
         <GroupStage
           roomId={room.roomId}
           layout={
             groupLayout ??
-            (collapsed || variant === "pip" || compact || !wideScreen ? "focus" : "grid")
+            resolveSquadLayout(squadLayout, {
+              tucked: Boolean(collapsed || variant === "pip" || compact),
+              width: roomForGrid ? AUTO_GRID_MIN_WIDTH : 0,
+            })
           }
           bare={collapsed}
           onLeave={onLeave ?? (() => {})}

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from "react";
+import { TAB_DEVICE_ID } from "@/lib/deviceId";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { markRoomVisited } from "@/lib/roomList";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AddMoreTimeCheckout } from "@/components/AddMoreTimeCheckout";
 import { ROOM_PLAN_CHANGED, announceRoomPlanChanged, type TimeSheetMode } from "@/lib/timeExtensions";
@@ -76,7 +78,7 @@ import { isResting, restingReason, roomCapabilities } from "@/lib/roomLifecycle"
 
 function Loading({ label }: { label: string }) {
   return (
-    <PageShell className="flex items-center justify-center">
+    <PageShell tone="dark" className="flex items-center justify-center">
       <div className="text-center relative z-10 animate-fade-in">
         <div className="w-2 h-2 rounded-full bg-rosegold mx-auto mb-4 animate-pulse-glow" />
         <p className="font-serif italic text-cream text-xl">{label}</p>
@@ -342,6 +344,7 @@ function RoomShell({
         is_ready: true,
         is_typing: false,
         is_in_call: true,
+        device_id: TAB_DEVICE_ID,
         last_seen: new Date().toISOString(),
         participant_id: session.participantId ?? null,
       });
@@ -372,6 +375,7 @@ function RoomShell({
       is_ready: true,
       is_typing: false,
       is_in_call: false,
+      device_id: TAB_DEVICE_ID,
       last_seen: new Date().toISOString(),
       participant_id: session.participantId ?? null,
     });
@@ -649,6 +653,7 @@ function RoomShell({
   // the call auto-starts (above) and they keep their countdown + expiry (below).
   return (
       <PageShell
+        tone="dark"
         orbs={false}
         vignette={false}
         data-room-scope
@@ -853,6 +858,15 @@ export default function LiveRoom() {
   const { id: roomId } = useParams<{ id: string }>();
   const [params] = useSearchParams();
   const navigate = useNavigate();
+
+  // Stamp "you were here" on ENTERING the room, not on tapping a tile.
+  // The stamp used to be written by the rooms list, so it only recorded the
+  // one way in: arrive by invite link, by the pre-room's Rejoin, or by the
+  // continue card, and the room you just spent an hour in left no trace and
+  // did not come back to the top of your list.
+  useEffect(() => {
+    if (roomId) markRoomVisited(roomId);
+  }, [roomId]);
   const [identity, setIdentity] = useState<RoomIdentity | null>(null);
   const [resolving, setResolving] = useState(true);
   const [roomPackage, setRoomPackage] = useState<RoomPackage | null>(null);
