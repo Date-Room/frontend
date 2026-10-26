@@ -75,6 +75,19 @@ function ensureObserver() {
   }
 }
 
+/**
+ * A device too weak to decode everyone's video at once: very low memory
+ * (2 GB or less, as the browser reports it). Deliberately NOT the low-power
+ * signal above: that one counts every phone and flips with live thermal
+ * pressure, which made squad faces flick between video and initials. It
+ * stays for effects (blur, blends, backdrops); video uses this.
+ */
+export function isWeakVideoDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const mem = (navigator as { deviceMemory?: number }).deviceMemory;
+  return typeof mem === "number" && mem <= 2;
+}
+
 export function useLowPowerMode(): boolean {
   const [live, setLive] = useState(pressured);
 

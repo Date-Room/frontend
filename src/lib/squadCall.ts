@@ -36,17 +36,45 @@ export function nearTheEnd(endsAt: string | null | undefined, now: Date = new Da
   return ms > 0 && ms <= 10 * 60000;
 }
 
+/** How many friends a weak device plays live at once (you are always live). */
+export const WEAK_DEVICE_LIVE_FRIENDS = 4;
+
 /**
- * Who gets live video. Laptops: everyone. Weak phones: only the person
- * talking and yourself; everyone else shows as a photo bubble that lights
- * up when they speak. Keeps a 5-person night about as light as a date.
+ * Whose video plays live. Everyone, on every device that can manage it:
+ * each face is pulled at the size it is drawn, so a small face is a small,
+ * cheap stream. Only a genuinely weak device (see useWeakVideoDevice) caps
+ * it, at four friends: the ones who spoke most recently, then join order.
+ * "Spoke" means talked for a couple of seconds, not a cough, and a silence
+ * changes nothing, so faces don't flick between video and initials.
  */
 export function liveVideoFor(
   identities: string[],
-  opts: { speaker: string | null; self: string | null; lowPower: boolean },
+  opts: { self: string | null; weak: boolean; lastSpoke: Record<string, number>; max?: number },
 ): Set<string> {
-  if (!opts.lowPower) return new Set(identities);
-  return new Set(identities.filter((id) => id === opts.speaker || id === opts.self));
+  if (!opts.weak) return new Set(identities);
+  const max = opts.max ?? WEAK_DEVICE_LIVE_FRIENDS;
+  const friends = identities
+    .map((id, i) => ({ id, i, at: opts.lastSpoke[id] ?? -Infinity }))
+    .filter((f) => f.id !== opts.self)
+    .sort((x, y) => y.at - x.at || x.i - y.i)
+    .slice(0, max)
+    .map((f) => f.id);
+  return new Set(opts.self && identities.includes(opts.self) ? [...friends, opts.self] : friends);
+}
+
+/** Pure: the friend who spoke last (for the big face), from sustained talk only. */
+export function steadySpeaker(identities: string[], self: string | null, lastSpoke: Record<string, number>): string | null {
+  let best: string | null = null;
+  let at = -Infinity;
+  for (const id of identities) {
+    if (id === self) continue;
+    const t = lastSpoke[id];
+    if (t !== undefined && t > at) {
+      best = id;
+      at = t;
+    }
+  }
+  return best;
 }
 
 /**
