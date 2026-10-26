@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { friendGridClass, gridColumns, gridColumnsFor, joinNames, liveVideoFor, squadHereLine, localClock, nearTheEnd, placeLine, speakerFirst, timeLeft , readSeats, saveSeats, swapSeats, tableFaceShare, tableSeats, tableTile } from "./squadCall";
+import { friendGridClass, gridColumns, gridColumnsFor, joinNames, liveVideoFor, steadySpeaker, squadHereLine, localClock, nearTheEnd, placeLine, speakerFirst, timeLeft , readSeats, saveSeats, swapSeats, tableFaceShare, tableSeats, tableTile } from "./squadCall";
 
 const at = new Date("2026-09-29T17:30:00Z");
 
@@ -24,8 +24,9 @@ describe("squad call helpers", () => {
 
   it("keeps weak phones to the speaker and yourself", () => {
     const all = ["a", "b", "c", "d"];
-    expect(liveVideoFor(all, { speaker: "c", self: "a", lowPower: false }).size).toBe(4);
-    expect([...liveVideoFor(all, { speaker: "c", self: "a", lowPower: true })].sort()).toEqual(["a", "c"]);
+    expect(liveVideoFor(all, { self: "a", weak: false, lastSpoke: {} }).size).toBe(4);
+    // A weak device with room for everyone: nobody drops to an icon.
+    expect(liveVideoFor(all, { self: "a", weak: true, lastSpoke: {} }).size).toBe(4);
   });
 
   it("orders faces: grid starts with you, focus with the speaker and ends with you", () => {
@@ -115,5 +116,19 @@ describe("gridColumnsFor", () => {
     expect(gridColumnsFor(2, 390, 700)).toBe(1);
     // Not measured yet: the simple rule.
     expect(gridColumnsFor(5, 0, 0)).toBe(3);
+  });
+});
+
+
+describe("steady video", () => {
+  const six = ["me", "a", "b", "c", "d", "e"];
+  it("caps a weak device at four friends, most recent speakers first, never by silence", () => {
+    const live = liveVideoFor(six, { self: "me", weak: true, lastSpoke: { e: 200, c: 100 } });
+    // e and c spoke; a and b fill by join order; d (quiet, joined later) waits.
+    expect(new Set(live)).toEqual(new Set(["me", "e", "c", "a", "b"]));
+  });
+  it("picks the big face from sustained talk, not the last noise", () => {
+    expect(steadySpeaker(six, "me", {})).toBeNull();
+    expect(steadySpeaker(six, "me", { a: 5, c: 9, me: 20 })).toBe("c");
   });
 });

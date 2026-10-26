@@ -36,7 +36,7 @@ import { Armchair, Clock, Mic, MicOff, MoreHorizontal, Video, VideoOff } from "l
 import { toast } from "sonner";
 import { muteParticipant, type MuteWhat } from "@/lib/rooms";
 import { useSquadStage, type FaceCue } from "@/context/SquadStageContext";
-import { useLowPowerMode } from "@/hooks/useLowPowerMode";
+import { isWeakVideoDevice } from "@/hooks/useLowPowerMode";
 import { useMediaQuery, useWideViewport } from "@/lib/viewport";
 import {
   browserTimeZone,
@@ -61,6 +61,7 @@ import {
   tableSeats,
   tableTile,
   liveVideoFor,
+  steadySpeaker,
   nearTheEnd,
   placeLine,
   speakerFirst,
@@ -104,7 +105,6 @@ export function GroupStage({ roomId, layout, bare }: Props) {
   const tableWide = useMediaQuery(TABLE_QUERY);
   const bigCentre = useMediaQuery(TABLE_BIG_QUERY);
   const qc = useQueryClient();
-  const lowPower = useLowPowerMode();
   const now = useMinute();
   const members = useQuery({ queryKey: ["squad-members", roomId], queryFn: () => getSquadMembers(roomId) });
   const nights = useQuery({
@@ -152,8 +152,36 @@ export function GroupStage({ roomId, layout, bare }: Props) {
     return map;
   }, [members.data]);
 
-  const speaker = speaking.find((p) => !p.isLocal)?.identity ?? speaking[0]?.identity ?? null;
   const self = localParticipant.identity;
+  // Who has talked lately: someone counts once they've talked for a moment,
+  // so a laugh or a cough moves nothing, and a silence changes nothing.
+  const [lastSpoke, setLastSpoke] = useState<Record<string, number>>({});
+  const talkers = speaking
+    .filter((p) => !p.isLocal)
+    .map((p) => p.identity)
+    .sort()
+    .join(",");
+  useEffect(() => {
+    if (!talkers) return;
+    const t = window.setTimeout(() => {
+      const now = Date.now();
+      setLastSpoke((prev) => {
+        const next = { ...prev };
+        for (const id of talkers.split(",")) next[id] = now;
+        return next;
+      });
+    }, 1500);
+    return () => window.clearTimeout(t);
+  }, [talkers]);
+  const callIds = tracks.map((t) => t.participant.identity);
+  const speaker = steadySpeaker(callIds, self, lastSpoke);
+  // The game counts everyone on the video, even if their room link blinks.
+  const setInCall = stage?.setInCall;
+  const callKey = [...callIds].sort().join(",");
+  useEffect(() => {
+    setInCall?.(callKey ? callKey.split(",") : []);
+  }, [setInCall, callKey]);
+  useEffect(() => () => setInCall?.([]), [setInCall]);
   const byId = new Map(tracks.map((t) => [t.participant.identity, t]));
   const order = speakerFirst(
     tracks.map((t) => t.participant.identity),
@@ -161,7 +189,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
     self,
     focus,
   );
-  const live = liveVideoFor(order, { speaker, self, lowPower });
+  const live = liveVideoFor(order, { self, weak: isWeakVideoDevice(), lastSpoke });
   const night = nights.data?.active_night ?? null;
   const freeSeats = night ? Math.max(0, night.seats - order.length) : 0;
   const clock = timeLeft(night?.ends_at, now);

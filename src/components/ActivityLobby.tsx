@@ -33,7 +33,13 @@ type GamePick = { id: string; line: string; minutes?: string };
  *  least of two people who have only just sat down. */
 const GAMES: GamePick[] = [
   // Squad games (only squad rooms carry these tabs, and none of the ones below).
-  ...SQUAD_GAME_IDS.map((id) => ({ id, line: SQUAD_GAMES[id].line, minutes: SQUAD_GAMES[id].minutes })),
+  // The smallest group that can play goes up front, so nobody opens a game
+  // only to hear it needs more people.
+  ...SQUAD_GAME_IDS.map((id) => ({
+    id,
+    line: SQUAD_GAMES[id].line,
+    minutes: `${SQUAD_GAMES[id].min}+ players · ${SQUAD_GAMES[id].minutes}`,
+  })),
   { id: "this_or_that", line: "Five snap choices, seven seconds each.", minutes: "5–10 min" },
   { id: "2_truths", line: "Three stories. One never happened.", minutes: "10–15 min" },
   { id: "guacamole", line: "Fast fingers, hidden bowls, loud sabotage.", minutes: "2 min a batch" },

@@ -88,11 +88,16 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   const byPid = new Map(list.map((m) => [m.participant_id, m]));
   const nameOf: Names = (pid) => byPid.get(pid)?.display_name || "Someone";
   const me = list.find((m) => m.user_id === room.senderId)?.participant_id ?? null;
-  // Everyone on the call right now, as squad participant ids.
+  // Everyone here right now, as squad participant ids: in the room, or on
+  // the video. The room link can blink on a phone or a long call while the
+  // video carries on; counting only the room made three people look like
+  // two, and every game but Clue Me In said it needed more players.
+  const inCall = useSquadStage()?.inCall;
   const onCall = useMemo(() => {
     const users = new Set(room.presence.map((p) => String(p.user_id ?? p.sender_id ?? "")));
+    for (const id of inCall ?? []) users.add(id);
     return list.filter((m) => m.user_id && users.has(m.user_id)).map((m) => m.participant_id);
-  }, [room.presence, list]);
+  }, [room.presence, list, inCall]);
 
   const put = (s: RoundState) => qc.setQueryData(key, s);
   const fail = (fallback: string) => (e: unknown) => {

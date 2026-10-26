@@ -63,6 +63,10 @@ type SquadStage = {
   setCue: (cue: StageCue | null) => void;
   controls: CallControls | null;
   setControls: (controls: CallControls | null) => void;
+  /** Everyone on the video call right now (call identities = user ids). The
+   *  game counts them as here even if their room connection blinks. */
+  inCall: string[];
+  setInCall: (ids: string[]) => void;
 };
 
 const Ctx = createContext<SquadStage | null>(null);
@@ -70,7 +74,11 @@ const Ctx = createContext<SquadStage | null>(null);
 export function SquadStageProvider({ children }: { children: ReactNode }) {
   const [cue, setCue] = useState<StageCue | null>(null);
   const [controls, setControls] = useState<CallControls | null>(null);
-  const value = useMemo(() => ({ cue, setCue, controls, setControls }), [cue, controls]);
+  const [inCall, setInCall] = useState<string[]>([]);
+  const value = useMemo(
+    () => ({ cue, setCue, controls, setControls, inCall, setInCall }),
+    [cue, controls, inCall],
+  );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
