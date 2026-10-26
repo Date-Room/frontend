@@ -48,7 +48,8 @@ export const SQUAD_GAMES: Record<SquadGameId, SquadGameInfo> = {
     label: "Imposter",
     line: "Everyone knows the word but one.",
     how: "Take turns saying one word about the secret word. The imposter doesn't know it and has to blend in. Then vote them out.",
-    min: 4,
+    // Three play two clues each (the server repeats the order).
+    min: 3,
     minutes: "5 min a round",
   },
   spill_tea: {
