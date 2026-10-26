@@ -91,8 +91,12 @@ describe("helpers", () => {
   });
 
   it("knows each game's minimum", () => {
-    expect(startBlocker("imposter", 3)).toMatch(/at least 4/);
-    expect(startBlocker("imposter", 4)).toBeNull();
+    expect(startBlocker("imposter", 2)).toMatch(/at least 3/);
+    expect(startBlocker("imposter", 3)).toBeNull();
+    // Every squad game plays with three.
+    for (const g of ["most_likely", "who_said_it", "imposter", "spill_tea", "heads_up"] as const) {
+      expect(startBlocker(g, 3)).toBeNull();
+    }
     expect(startBlocker("heads_up", 2)).toBeNull();
   });
 

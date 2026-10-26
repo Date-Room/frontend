@@ -233,7 +233,7 @@ const ACTIVITY_HELP: Record<string, HelpContent> = {
       { glyph: "🕵️", name: "Vote", text: "Tap the face you think is faking." },
       { glyph: "🏆", name: "Scoring", text: "Catch the imposter and everyone else gets a point. If the imposter survives, they get 2." },
     ],
-    note: "Needs 4 players or more.",
+    note: "Needs 3 players or more. With three, everyone gives two clues.",
   },
   spill_tea: {
     title: "Spill the Tea",

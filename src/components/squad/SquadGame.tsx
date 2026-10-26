@@ -817,7 +817,11 @@ function Play({
         )}
         {order.length > 0 && !voting && (
           <p className="text-center text-sm text-muted-foreground">
-            One word each: <span className="text-cream">{order.map((p) => (p === me ? "You" : nameOf(p))).join(" → ")}</span>
+            {/* With three the server sends the order twice: two clues each. */}
+            {order.length > round.players.length ? "Two clues each, round twice: " : "One word each: "}
+            <span className="text-cream">
+              {order.slice(0, round.players.length).map((p) => (p === me ? "You" : nameOf(p))).join(" → ")}
+            </span>
           </p>
         )}
         {turn && !voting && (
