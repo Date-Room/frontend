@@ -20,6 +20,7 @@ import {
   type RoomOptions,
 } from "livekit-client";
 import { toast } from "sonner";
+import { videoFitFor, type VideoFit } from "@/lib/videoFit";
 import "@livekit/components-styles";
 import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Minus, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -511,8 +512,37 @@ function Tile({
       ? participant
       : undefined;
   const lowPower = useLowPowerMode();
+  // Measured, not assumed: a phone publishes portrait and a laptop tile
+  // is landscape, so a fixed `cover` threw away 68% of the frame — the
+  // top and bottom of the person — and read as the camera being zoomed
+  // into their face. `contain` everywhere would letterbox feeds that fit
+  // fine, so the fit follows the two shapes actually involved.
+  const tileRef = useRef<HTMLDivElement | null>(null);
+  const [autoFit, setAutoFit] = useState<VideoFit>("cover");
+  const measureFit = useCallback(() => {
+    const video = tileRef.current?.querySelector("video");
+    setAutoFit(videoFitFor(video, tileRef.current));
+  }, []);
+  useEffect(() => {
+    if (!videoTrackRef) return;
+    measureFit();
+    const tile = tileRef.current;
+    const video = tile?.querySelector("video");
+    // Three things change the answer: the feed arriving, the feed
+    // changing shape (a phone rotating), and the tile being resized.
+    video?.addEventListener("loadedmetadata", measureFit);
+    video?.addEventListener("resize", measureFit);
+    const ro = tile ? new ResizeObserver(measureFit) : null;
+    if (tile) ro?.observe(tile);
+    return () => {
+      video?.removeEventListener("loadedmetadata", measureFit);
+      video?.removeEventListener("resize", measureFit);
+      ro?.disconnect();
+    };
+  }, [videoTrackRef, measureFit]);
   return (
     <div
+      ref={tileRef}
       className={cn(
         "relative h-full w-full overflow-hidden bg-black",
         // `bare` drops the chrome entirely (round bubbles bring their own
@@ -542,7 +572,10 @@ function Tile({
             // imported after it, so `object-contain` lost every time and the
             // `contain` prop silently did nothing — every feed was cropped.
             style={{
-              objectFit: contain ? "contain" : "cover",
+              // `contain` from a caller still forces the whole frame
+              // (both sides seeing the same thing matters more there);
+              // otherwise the measurement decides.
+              objectFit: contain ? "contain" : autoFit,
               filter: lowPower ? LITE_CSS : BEAUTY_CSS,
             }}
           />
