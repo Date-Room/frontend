@@ -20,7 +20,8 @@ import {
   type RoomOptions,
 } from "livekit-client";
 import { toast } from "sonner";
-import { videoFitFor, type VideoFit } from "@/lib/videoFit";
+import { type VideoFit } from "@/lib/videoFit";
+import { observeVideoFit } from "@/lib/observeVideoFit";
 import "@livekit/components-styles";
 import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Minus, RotateCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -519,27 +520,17 @@ function Tile({
   // fine, so the fit follows the two shapes actually involved.
   const tileRef = useRef<HTMLDivElement | null>(null);
   const [autoFit, setAutoFit] = useState<VideoFit>("cover");
-  const measureFit = useCallback(() => {
-    const video = tileRef.current?.querySelector("video");
-    setAutoFit(videoFitFor(video, tileRef.current));
-  }, []);
   useEffect(() => {
-    if (!videoTrackRef) return;
-    measureFit();
     const tile = tileRef.current;
-    const video = tile?.querySelector("video");
-    // Three things change the answer: the feed arriving, the feed
-    // changing shape (a phone rotating), and the tile being resized.
-    video?.addEventListener("loadedmetadata", measureFit);
-    video?.addEventListener("resize", measureFit);
-    const ro = tile ? new ResizeObserver(measureFit) : null;
-    if (tile) ro?.observe(tile);
-    return () => {
-      video?.removeEventListener("loadedmetadata", measureFit);
-      video?.removeEventListener("resize", measureFit);
-      ro?.disconnect();
-    };
-  }, [videoTrackRef, measureFit]);
+    if (!tile) return;
+    // The <video> is mounted by LiveKit a beat after this runs, so it is
+    // never looked up once — `observeVideoFit` waits for it to appear.
+    const obs = observeVideoFit(tile, setAutoFit, {
+      MutationObserver: window.MutationObserver,
+      ResizeObserver: window.ResizeObserver,
+    });
+    return () => obs.stop();
+  }, [videoTrackRef]);
   return (
     <div
       ref={tileRef}
