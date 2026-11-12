@@ -21,6 +21,7 @@
  *   Only the full-screen film strip keeps its own.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useVideoFit } from "@/hooks/useVideoFit";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   VideoTrack,
@@ -564,14 +565,16 @@ function Face({
   /** Someone else's face: mute their mic or turn off their camera. */
   onMute?: (what: MuteWhat) => void;
 }) {
-  // A phone held upright sends a tall picture. In a wide seat, cropping it
-  // leaves a band across the face, so show it whole on a dark ground.
-  const [upright, setUpright] = useState(false);
-  const readShape = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-    const v = e.currentTarget;
-    if (v.videoWidth && v.videoHeight) setUpright(v.videoHeight > v.videoWidth);
-  };
-  const fit = (big: boolean) => cn("h-full w-full", big && upright ? "bg-black object-contain" : "object-cover");
+  // What a seat does with a feed that is not its shape.
+  //
+  // This used to ask only whether the phone was held upright, and only
+  // let the BIG seat letterbox — so every small seat cropped a portrait
+  // feed to a band across somebody's face. The question is not which way
+  // up the camera is, it is how much of it this seat would throw away:
+  // see `videoFit`, which web's 1:1 tiles and mobile both use too.
+  const fitBox = useVideoFit();
+  const fit = () =>
+    cn("h-full w-full", fitBox.fit === "contain" ? "bg-black object-contain" : "object-cover");
   const hasVideo =
     showVideo && isTrackReference(trackRef) && !trackRef.publication.isMuted && Boolean(trackRef.publication.track);
   const initial = (name || "?").charAt(0).toUpperCase();
@@ -612,6 +615,7 @@ function Face({
     const spot = size === "spot";
     return wrap(
       <div
+        ref={fitBox.ref}
         className={cn(
           "relative flex h-full w-full items-center justify-center overflow-hidden bg-white/[0.06]",
           spot ? "rounded-2xl ring-[3px] ring-primary shadow-[0_0_60px_hsl(var(--primary)/0.45)]" : "rounded-xl ring-2 ring-cream/60",
@@ -620,7 +624,7 @@ function Face({
       >
         {badge}
         {hasVideo ? (
-          <VideoTrack trackRef={trackRef} className={fit(spot)} onLoadedMetadata={readShape} onResize={readShape} />
+          <VideoTrack trackRef={trackRef} className={fit()} />
         ) : photo ? (
           <img src={photo} alt="" className={cn("rounded-full object-cover", spot ? "h-28 w-28" : "h-9 w-9")} />
         ) : (
@@ -643,13 +647,14 @@ function Face({
     // The couch: a small face under the film, lit when talking.
     return (
       <div
+        ref={fitBox.ref}
         className={cn(
           "relative flex h-full max-h-[120px] w-40 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.06]",
           talking && "ring-[3px] ring-inset ring-primary",
         )}
       >
         {hasVideo ? (
-          <VideoTrack trackRef={trackRef} className="h-full w-full object-cover" />
+          <VideoTrack trackRef={trackRef} className={fit()} />
         ) : photo ? (
           <img src={photo} alt="" className="h-11 w-11 rounded-full object-cover" />
         ) : (
@@ -670,6 +675,7 @@ function Face({
     return wrap(
       <>
         <div
+          ref={fitBox.ref}
           className={cn(
             "relative h-14 w-14 overflow-hidden rounded-full bg-white/[0.08]",
             talking && "ring-[3px] ring-primary",
@@ -677,7 +683,7 @@ function Face({
           )}
         >
           {hasVideo ? (
-            <VideoTrack trackRef={trackRef} className="h-full w-full object-cover" />
+            <VideoTrack trackRef={trackRef} className={fit()} />
           ) : photo ? (
             <img src={photo} alt="" className="h-full w-full object-cover" />
           ) : (
@@ -697,6 +703,7 @@ function Face({
 
   return wrap(
     <div
+      ref={fitBox.ref}
       className={cn(
         "relative flex h-full min-h-0 w-full items-center justify-center overflow-hidden bg-white/[0.05]",
         size === "tile" ? "rounded-2xl" : "",
@@ -706,12 +713,7 @@ function Face({
     >
       {badge}
       {hasVideo ? (
-        <VideoTrack
-          trackRef={trackRef}
-          className={fit(size === "tile" || size === "big")}
-          onLoadedMetadata={readShape}
-          onResize={readShape}
-        />
+        <VideoTrack trackRef={trackRef} className={fit()} />
       ) : photo ? (
         <img src={photo} alt="" className="aspect-square h-[62%] max-h-28 w-auto rounded-full object-cover" />
       ) : (
