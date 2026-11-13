@@ -22,6 +22,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVideoFit } from "@/hooks/useVideoFit";
+import { useGridColumns } from "@/hooks/useGridColumns";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   VideoTrack,
@@ -53,7 +54,6 @@ import {
   TABLE_CENTRE_BIG,
   TABLE_GAP,
   TABLE_QUERY,
-  friendGridClass,
   gridColumnsFor,
   readSeats,
   saveSeats,
@@ -184,6 +184,14 @@ export function GroupStage({ roomId, layout, bare }: Props) {
   }, [setInCall, callKey]);
   useEffect(() => () => setInCall?.([]), [setInCall]);
   const byId = new Map(tracks.map((t) => [t.participant.identity, t]));
+  // The friend grid sizes itself from the feeds it holds; see
+  // useGridColumns. Derived here rather than from `friends` below,
+  // which is computed inside a render branch — a hook cannot wait for
+  // that. Only the shapes matter, so order is irrelevant.
+  const friendFeeds = tracks
+    .filter((t) => t.participant.identity !== self)
+    .map((t) => ({ dimensions: t.publication?.dimensions }));
+  const friendGrid = useGridColumns(friendFeeds.length, friendFeeds);
   const order = speakerFirst(
     tracks.map((t) => t.participant.identity),
     speaker,
@@ -463,7 +471,17 @@ export function GroupStage({ roomId, layout, bare }: Props) {
           <p className="min-w-0 flex-1 text-sm leading-snug text-cream/85">{cue?.hint}</p>
           {byId.has(self) && <div className="h-[76px] w-[58px] shrink-0">{gface(self, "self")}</div>}
         </div>
-        <div className={cn("grid min-h-0 flex-1 gap-2", friendGridClass(friends.length))}>
+        <div
+          ref={friendGrid.ref}
+          className="grid min-h-0 flex-1 gap-2"
+          style={{
+            // Measured, not looked up: the arrangement follows the shape
+            // of the feeds, so four phones go in a row rather than into
+            // a 2x2 of wide cells with bars down every face.
+            gridTemplateColumns: `repeat(${friendGrid.columns}, minmax(0, 1fr))`,
+            gridAutoRows: "minmax(0, 1fr)",
+          }}
+        >
           {friends.map((id) => gface(id, "tile"))}
         </div>
       </div>
