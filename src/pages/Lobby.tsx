@@ -189,7 +189,21 @@ export default function Lobby() {
         package: res.package,
         curated_activity_ids: res.curated_activity_ids,
       });
-      navigate(`/room/${res.room_id}?${params.toString()}`, { replace: true });
+      // A squad invite lands you in the squad room, not the date room.
+      // Mobile has routed on this since the invite dropped members into
+      // a one-to-one call; web still sent everybody to /room, where a
+      // new member arrived at a call page for a night that may not even
+      // be running.
+      // `package` rather than room_kind: it is on the invite card, and
+      // the server refuses to create a squad room with any other
+      // package (squad_package_invalid), so the two cannot disagree.
+      const isSquad = invite.package === "squad";
+      navigate(
+        isSquad
+          ? `/squad/room/${res.room_id}`
+          : `/room/${res.room_id}?${params.toString()}`,
+        { replace: true },
+      );
     } catch (err) {
       const squadGate = joinGate(err);
       if (squadGate) {
