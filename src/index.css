@@ -2740,3 +2740,14 @@
     opacity: 0.6;
   }
 }
+
+/* The names under an activity scroll like a track title on a music
+   player: a rest at each end, then a steady travel, so the fourth
+   person in a game is not lost to an ellipsis. Distance comes from the
+   element (--dr-marquee-to), because only it knows how far it
+   overflows. */
+@keyframes dr-marquee {
+  0%, 18% { transform: translateX(0); }
+  50%, 68% { transform: translateX(var(--dr-marquee-to, 0)); }
+  100% { transform: translateX(0); }
+}

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, X, LogOut, Gamepad2, Play, Headphones, MessageCircle, DoorOpen, Copy, Check, HelpCircle, KeyRound, UserMinus, Loader2, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, LogOut, Gamepad2, Play, Headphones, MessageCircle, DoorOpen, Copy, Check, HelpCircle, KeyRound, UserMinus, Loader2, Sparkles, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { PartyRow } from "@/components/ActivityParties";
+import { amIn, partiesFrom } from "@/lib/activityParties";
 import { ChatWithBoundary } from "@/components/Chat";
 import { WatchTogether } from "@/components/WatchTogether";
 import { ThisOrThat } from "@/components/ThisOrThat";
@@ -446,6 +448,17 @@ export function ActivityTray({
     [curated, roomPackage],
   );
 
+  // What is already happening, and who is in it. This comes before the
+  // list of things you could start: the tray used to say nothing about
+  // what was going on, so the only way to learn whether anyone was in
+  // a game was to open the game.
+  const { presence, senderId } = useRoomSession();
+  const parties = useMemo(() => partiesFrom(presence, senderId), [presence, senderId]);
+
+  /** The category an activity belongs to, for its icon and its word. */
+  const homeOf = (activityId: string) =>
+    CATEGORIES.find((c) => c.activities.some((a) => a.id === activityId)) ?? null;
+
   // Surface activity changes to the parent (mini-player visibility).
   useEffect(() => {
     onActiveActivityChange?.(actId);
@@ -550,6 +563,25 @@ export function ActivityTray({
         <div className="flex-1 min-h-0 overflow-auto">
           {isMenu ? (
             <div className="flex flex-col gap-2 p-4">
+              {parties.length > 0 && (
+                <div className="mb-2 flex flex-col gap-2">
+                  {parties.map((party) => {
+                    const home = homeOf(party.activityId);
+                    const activity = home?.activities.find((a) => a.id === party.activityId);
+                    return (
+                      <PartyRow
+                        key={party.activityId}
+                        party={party}
+                        Icon={home?.Icon ?? Sparkles}
+                        label={activity?.label ?? home?.label ?? party.activityId}
+                        amIn={amIn(presence, party.activityId, senderId)}
+                        onJoin={() => setActId(party.activityId)}
+                      />
+                    );
+                  })}
+                  <div className="my-1 h-px bg-white/[0.08]" />
+                </div>
+              )}
               {visibleCategories.map((c) => (
                 <button
                   key={c.id}

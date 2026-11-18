@@ -91,6 +91,7 @@ import { useBottomBarHeight } from "@/lib/bottomBar";
 import { useVideoOrientation } from "@/lib/videoOrientation";
 import { useMediaQuery, useWideViewport } from "@/lib/viewport";
 import { SquadClock } from "@/components/squad/SquadClock";
+import { amIn, partiesFrom } from "@/lib/activityParties";
 import { useChaperonController } from "@/context/ChaperonContext";
 import { ChaperonSeam } from "@/components/ChaperonSeam";
 import { CHAT_OPEN_EVENT, ChatDrawer } from "@/components/ChatDrawer";
@@ -402,6 +403,47 @@ export function RoomStage({
     // The lobby is "in the room itself", which is not an activity.
     setPresence({ activity_id: staged && staged !== "lobby" ? staged : null });
   }, [staged, setPresence]);
+  // Somebody opened something: a notice, then a mark that stays.
+  //
+  // A toast you miss is the same as no toast at all, and a room where
+  // people take sides needs the opposite of that — the invitation is
+  // worth ten seconds, and after it goes the fact that something is
+  // still going on has to remain visible, or the only way to find out
+  // is to go looking.
+  const parties = useMemo(
+    () => partiesFrom(room.presence, room.senderId),
+    [room.presence, room.senderId],
+  );
+  const joinable = useMemo(
+    () => parties.filter((party) => !amIn(room.presence, party.activityId, room.senderId)),
+    [parties, room.presence, room.senderId],
+  );
+  /** Something is going on that I am not in: the mark that lingers. */
+  const somethingOn = joinable.length > 0;
+
+  const announced = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    // Only the arrival is news. A party that has been running since
+    // before I looked is on the tray, not in my face.
+    const fresh = joinable.find((party) => !announced.current.has(party.activityId));
+    const live = new Set(joinable.map((party) => party.activityId));
+    for (const id of [...announced.current]) if (!live.has(id)) announced.current.delete(id);
+    if (!fresh) return;
+    announced.current.add(fresh.activityId);
+    const who = fresh.people[0]?.displayName?.split(" ")[0] ?? "Someone";
+    const what =
+      items.find((i) => i.id === fresh.activityId)?.title ?? fresh.activityId;
+    setNotif({
+      id: Date.now(),
+      text: `${who} is in ${what} — join in`,
+      target: fresh.activityId,
+    });
+    window.clearTimeout(notifTimer.current);
+    // Ten seconds: long enough to notice and act on, short enough that
+    // it is not sitting over the room.
+    notifTimer.current = window.setTimeout(() => setNotif(null), 10_000);
+  }, [joinable, items]);
+
   const chaperon = useChaperonController();
   // Tell the chaperon what is on stage, so each whisper is stored with the
   // activity it landed in.
@@ -1623,7 +1665,19 @@ export function RoomStage({
                 ) : menuOpen ? (
                   <X className="h-4 w-4" />
                 ) : (
-                  <LayoutGrid className="h-4 w-4 text-primary" />
+                  <span className="relative inline-flex">
+                    <LayoutGrid className="h-4 w-4 text-primary" />
+                    {/* The notice is gone in ten seconds; what is going
+                        on is not. This is what the notice settles into,
+                        so "somebody is in something" survives you
+                        looking away. */}
+                    {somethingOn && (
+                      <span
+                        aria-label="Something is going on"
+                        className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-primary motion-safe:animate-pulse"
+                      />
+                    )}
+                  </span>
                 )}
                 <span
                   key={showNotif ? notif.id : menuOpen ? "close" : "activities"}
