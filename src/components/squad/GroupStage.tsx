@@ -34,7 +34,7 @@ import {
   type TrackReferenceOrPlaceholder,
 } from "@livekit/components-react";
 import { Track } from "livekit-client";
-import { Armchair, Clock, Mic, MicOff, MoreHorizontal, Video, VideoOff } from "lucide-react";
+import { Clock, Mic, MicOff, MoreHorizontal, Video, VideoOff } from "lucide-react";
 import { toast } from "sonner";
 import { muteParticipant, type MuteWhat } from "@/lib/rooms";
 import { useSquadStage, type FaceCue } from "@/context/SquadStageContext";
@@ -54,7 +54,6 @@ import {
   TABLE_CENTRE_BIG,
   TABLE_GAP,
   TABLE_QUERY,
-  gridColumnsFor,
   readSeats,
   saveSeats,
   swapSeats,
@@ -199,8 +198,16 @@ export function GroupStage({ roomId, layout, bare }: Props) {
     focus,
   );
   const live = liveVideoFor(order, { self, weak: isWeakVideoDevice(), lastSpoke });
+  // The call grid follows the feeds, the same way the game grid does.
+  // It used to be measured against a fixed 16:9 ideal and sized for the
+  // night's seats rather than the people on it, so three phones in a
+  // five-seat night were laid out as five wide cells: two of them
+  // empty, and the three real ones the wrong shape for the video.
+  const callGrid = useGridColumns(
+    order.length,
+    order.map((id) => ({ dimensions: byId.get(id)?.publication?.dimensions })),
+  );
   const night = nights.data?.active_night ?? null;
-  const freeSeats = night ? Math.max(0, night.seats - order.length) : 0;
   const clock = timeLeft(night?.ends_at, now);
   const ending = nearTheEnd(night?.ends_at, now);
 
@@ -524,28 +531,22 @@ export function GroupStage({ roomId, layout, bare }: Props) {
     );
   }
 
-  // Columns that keep tiles closest to a camera's shape for this stage
-  // (the same measurement the game table uses; only one layout shows).
-  const cols = gridColumnsFor(order.length + freeSeats, box.w, box.h);
+  // People, arranged around the shape of their feeds. A seat nobody is
+  // sitting in is not a picture and does not take a cell: an empty chair
+  // held a fifth of the table hostage and squeezed every real face to
+  // fit beside it.
   return (
     <div className="relative flex h-full w-full flex-col bg-black/40">
       {clockChip}
       <div
-        ref={setTableEl}
+        ref={callGrid.ref}
         className="grid min-h-0 flex-1 gap-2 p-2 sm:gap-3 sm:p-3"
-        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: "minmax(0, 1fr)" }}
+        style={{
+          gridTemplateColumns: `repeat(${callGrid.columns}, minmax(0, 1fr))`,
+          gridAutoRows: "minmax(0, 1fr)",
+        }}
       >
         {order.map((id) => face(id, "tile"))}
-        {Array.from({ length: freeSeats }, (_, i) => (
-          <div
-            key={`free-${i}`}
-            className="flex min-h-0 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/[0.12] p-3 text-center"
-          >
-            <Armchair className="h-9 w-9 text-muted-foreground" aria-hidden />
-            <p className="text-sm font-semibold text-cream">A free seat</p>
-            <p className="hidden text-xs text-muted-foreground sm:block">Anyone with the link can sit here.</p>
-          </div>
-        ))}
       </div>
     </div>
   );
