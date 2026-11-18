@@ -8,7 +8,7 @@
  * response, and whether they may persist durable state.
  */
 import { TAB_DEVICE_ID } from "@/lib/deviceId";
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { RoomChannel, type PresenceState } from "@/lib/realtime/roomChannel";
 import type { RoomPackage } from "@/lib/rooms";
 import type { CuratableActivityId } from "@/lib/roomExperience";
@@ -40,6 +40,17 @@ export type RoomSession = RoomIdentity & {
   curatedActivityIds: CuratableActivityId[];
   /** Max people allowed in the room (2 for dates, 12 for watch parties). */
   maxParticipants: number;
+  /**
+   * Change some of what this tab says about itself, keeping the rest.
+   *
+   * Presence goes out as a whole object, so every caller of
+   * `channel.track` has to send every field — and there were three,
+   * each knowing its own flag and spelling out the others from
+   * memory. That is how `is_in_call` and `is_typing` ended up being
+   * asserted by code that had no idea whether either was true. Merge
+   * here instead: a caller changes the one thing it came to change.
+   */
+  setPresence: (patch: Record<string, unknown>) => void;
 };
 
 const Ctx = createContext<RoomSession | null>(null);
@@ -116,6 +127,8 @@ export function RoomSessionProvider({
           // Surfaces a stable handle to kick by; only guests have one
           // (signed-in partners don't need it for DELETE /participants).
           participant_id: identity.participantId ?? null,
+          // Nothing open yet: in the room itself.
+          activity_id: null,
         });
       })
       .catch(() => {
@@ -132,6 +145,17 @@ export function RoomSessionProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
+  // What this tab is currently publishing, so a patch can be merged
+  // onto it rather than every caller restating the whole thing.
+  const published = useRef<Record<string, unknown>>({});
+  const patchPresence = useCallback(
+    (patch: Record<string, unknown>) => {
+      published.current = { ...published.current, ...patch, last_seen: new Date().toISOString() };
+      void channel.track(published.current);
+    },
+    [channel],
+  );
+
   const value = useMemo<RoomSession>(
     () => ({
       roomId,
@@ -141,9 +165,10 @@ export function RoomSessionProvider({
       roomPackage,
       curatedActivityIds,
       maxParticipants,
+      setPresence: patchPresence,
       ...identity,
     }),
-    [roomId, channel, presence, status, roomPackage, curatedActivityIds, maxParticipants, identity],
+    [roomId, channel, presence, status, roomPackage, curatedActivityIds, maxParticipants, patchPresence, identity],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

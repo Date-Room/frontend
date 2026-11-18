@@ -346,6 +346,7 @@ export function RoomStage({
   // the notifier on the Activities button instead.
   const commitStage = useCallback((id: string) => setStaged(id), []);
 
+
   const [helpOpen, setHelpOpen] = useState(false);
   /** Pre-game intro — shown the FIRST time you open an activity. After that
    *  the ? in the stage header is the way back to it. */
@@ -387,6 +388,20 @@ export function RoomStage({
   // a tappable notice for ~3s, then it settles back. (Activities are per-user,
   // so this is how you learn your partner did something.)
   const room = useRoomSession();
+
+  // Tell the room what I have open.
+  //
+  // Browsing is private, but WHERE SOMEONE IS is not: a room is not one
+  // thing everybody does together, and two people in a game while a
+  // third puts a film on could not see any of that. Mobile reads this
+  // off presence to list what is going on; without web publishing it
+  // too, anyone on a laptop shows up as idle in the room while they
+  // are plainly in the middle of something.
+  const setPresence = room.setPresence;
+  useEffect(() => {
+    // The lobby is "in the room itself", which is not an activity.
+    setPresence({ activity_id: staged && staged !== "lobby" ? staged : null });
+  }, [staged, setPresence]);
   const chaperon = useChaperonController();
   // Tell the chaperon what is on stage, so each whisper is stored with the
   // activity it landed in.
