@@ -41,3 +41,28 @@ describe("the join notice", () => {
     expect(src).toContain("motion-safe:animate-pulse");
   });
 });
+
+describe("the launcher lists what is going on", () => {
+  it("lives in the launcher that actually renders", () => {
+    // It was first added to ActivityTray.tsx, which nothing imports —
+    // so it compiled, passed, and was tree-shaken out of the bundle.
+    // The real launcher is the menu inside RoomStage.
+    expect(src).toContain("<PartyRow");
+    expect(src).toContain("partiesFrom(room.presence, room.senderId)");
+  });
+
+  it("sits above the row of things you could start", () => {
+    const list = src.indexOf("<PartyRow");
+    const icons = src.indexOf("availCats.map((c) => (");
+    expect(list).toBeGreaterThan(0);
+    expect(icons).toBeGreaterThan(0);
+    expect(list).toBeLessThan(icons);
+  });
+
+  it("joining one puts it on my stage and closes the menu", () => {
+    const at = src.indexOf("<PartyRow");
+    const row = src.slice(at, at + 700);
+    expect(row).toContain("commitStage(party.activityId)");
+    expect(row).toContain("setMenuOpen(false)");
+  });
+});

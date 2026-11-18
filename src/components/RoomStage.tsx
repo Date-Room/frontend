@@ -91,6 +91,7 @@ import { useBottomBarHeight } from "@/lib/bottomBar";
 import { useVideoOrientation } from "@/lib/videoOrientation";
 import { useMediaQuery, useWideViewport } from "@/lib/viewport";
 import { SquadClock } from "@/components/squad/SquadClock";
+import { PartyRow } from "@/components/ActivityParties";
 import { amIn, partiesFrom } from "@/lib/activityParties";
 import { useChaperonController } from "@/context/ChaperonContext";
 import { ChaperonSeam } from "@/components/ChaperonSeam";
@@ -1610,6 +1611,38 @@ export function RoomStage({
                 /* Level 1 — categories (Room / Games / Watch / DJ / Chat),
                    centered squircle tiles. Chaperon sits alongside them so it
                    stays reachable mid-activity. */
+                <div className="flex flex-col gap-4">
+                  {/* What is already happening comes before what you
+                      could start. Without it the only way to find out
+                      whether anyone was in a game was to open the game,
+                      and two people on different sides of a room were
+                      invisible to each other. */}
+                  {parties.length > 0 && (
+                    <div className="flex w-[min(24rem,88vw)] flex-col gap-2">
+                      {parties.map((party) => {
+                        const home = availCats.find((c) =>
+                          c.items.some((i) => i.id === party.activityId),
+                        );
+                        return (
+                          <PartyRow
+                            key={party.activityId}
+                            party={party}
+                            Icon={ITEM_ICONS[party.activityId] ?? home?.icon ?? LayoutGrid}
+                            label={
+                              items.find((i) => i.id === party.activityId)?.title ??
+                              party.activityId
+                            }
+                            amIn={amIn(room.presence, party.activityId, room.senderId)}
+                            onJoin={() => {
+                              commitStage(party.activityId);
+                              setMenuOpen(false);
+                            }}
+                          />
+                        );
+                      })}
+                      <div className="mt-1 h-px bg-white/[0.08]" />
+                    </div>
+                  )}
                 <div className="flex flex-wrap items-start justify-center gap-4">
                   {availCats.map((c) => (
                     <MenuTile
@@ -1632,6 +1665,7 @@ export function RoomStage({
                       }}
                     />
                   )}
+                </div>
                 </div>
               )}
             </div>
