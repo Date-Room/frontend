@@ -92,7 +92,7 @@ import { useVideoOrientation } from "@/lib/videoOrientation";
 import { useMediaQuery, useWideViewport } from "@/lib/viewport";
 import { SquadClock } from "@/components/squad/SquadClock";
 import { PartyRow } from "@/components/ActivityParties";
-import { amIn, partiesFrom } from "@/lib/activityParties";
+import { activeActivityIds, amIn, partiesFrom } from "@/lib/activityParties";
 import { useChaperonController } from "@/context/ChaperonContext";
 import { ChaperonSeam } from "@/components/ChaperonSeam";
 import { CHAT_OPEN_EVENT, ChatDrawer } from "@/components/ChatDrawer";
@@ -399,11 +399,16 @@ export function RoomStage({
   // off presence to list what is going on; without web publishing it
   // too, anyone on a laptop shows up as idle in the room while they
   // are plainly in the middle of something.
+  /** What this tab has open — the lobby is the room itself, not an
+   *  activity. Published as my presence, and also the local truth that
+   *  stops the room inviting me into something I am already in before
+   *  my own echo has come back. */
+  const openHere = staged && staged !== "lobby" ? staged : null;
   const setPresence = room.setPresence;
   useEffect(() => {
     // The lobby is "in the room itself", which is not an activity.
-    setPresence({ activity_id: staged && staged !== "lobby" ? staged : null });
-  }, [staged, setPresence]);
+    setPresence({ activity_id: openHere });
+  }, [openHere, setPresence]);
   // Somebody opened something: a notice, then a mark that stays.
   //
   // A toast you miss is the same as no toast at all, and a room where
@@ -416,19 +421,35 @@ export function RoomStage({
     [room.presence, room.senderId],
   );
   const joinable = useMemo(
-    () => parties.filter((party) => !amIn(room.presence, party.activityId, room.senderId)),
-    [parties, room.presence, room.senderId],
+    () =>
+      parties.filter(
+        (party) => !amIn(room.presence, party.activityId, room.senderId, openHere),
+      ),
+    [parties, room.presence, room.senderId, openHere],
   );
   /** Something is going on that I am not in: the mark that lingers. */
   const somethingOn = joinable.length > 0;
 
+  /** Activities this tab has already seen begin. Keyed on the activity
+   *  RUNNING, never on it being joinable by me — see below. */
   const announced = useRef<Set<string>>(new Set());
+  const running = useMemo(() => activeActivityIds(room.presence), [room.presence]);
   useEffect(() => {
-    // Only the arrival is news. A party that has been running since
-    // before I looked is on the tray, not in my face.
+    // Only a fresh start is news.
+    //
+    // "Fresh" means nobody had this open and now somebody does — not
+    // "it became joinable for me", which is what this used to track.
+    // Those come apart constantly: somebody steps out of a game for a
+    // second and back; I join and leave; the last other player drops
+    // while the game carries on. Each of those flipped joinability and
+    // re-armed the notice for a game that had been running all along,
+    // so the room kept announcing the same game over and over.
+    //
+    // So the set forgets an activity only when it is genuinely empty,
+    // and a party still gets filtered for whether I am in it before
+    // anything is shown.
+    for (const id of [...announced.current]) if (!running.has(id)) announced.current.delete(id);
     const fresh = joinable.find((party) => !announced.current.has(party.activityId));
-    const live = new Set(joinable.map((party) => party.activityId));
-    for (const id of [...announced.current]) if (!live.has(id)) announced.current.delete(id);
     if (!fresh) return;
     announced.current.add(fresh.activityId);
     const who = fresh.people[0]?.displayName?.split(" ")[0] ?? "Someone";
@@ -443,7 +464,7 @@ export function RoomStage({
     // Ten seconds: long enough to notice and act on, short enough that
     // it is not sitting over the room.
     notifTimer.current = window.setTimeout(() => setNotif(null), 10_000);
-  }, [joinable, items]);
+  }, [joinable, running, items]);
 
   const chaperon = useChaperonController();
   // Tell the chaperon what is on stage, so each whisper is stored with the
@@ -1656,7 +1677,7 @@ export function RoomStage({
                               items.find((i) => i.id === party.activityId)?.title ??
                               party.activityId
                             }
-                            amIn={amIn(room.presence, party.activityId, room.senderId)}
+                            amIn={amIn(room.presence, party.activityId, room.senderId, openHere)}
                             onJoin={() => {
                               commitStage(party.activityId);
                               setMenuOpen(false);

@@ -29,7 +29,10 @@ describe("presence carries what this tab has open", () => {
     const at = stage.indexOf("setPresence({ activity_id:");
     expect(at).toBeGreaterThan(0);
     const deps = stage.slice(at, at + 260);
-    expect(deps).toMatch(/\}, \[staged, setPresence\]\)/);
+    // `openHere` IS the staged id with the lobby mapped to null, so
+    // this still fires on every stage change — and the same value now
+    // also tells the notice what I have open.
+    expect(deps).toMatch(/\}, \[openHere, setPresence\]\)/);
   });
 
   it("merges rather than restating every field", () => {

@@ -24,8 +24,24 @@ describe("the join notice", () => {
     expect(src).toContain("announced.current.add(fresh.activityId)");
   });
 
-  it("forgets a party that ended, so it can announce the next one", () => {
-    expect(src).toMatch(/if \(!live\.has\(id\)\) announced\.current\.delete\(id\)/);
+  it("forgets an activity only once it is genuinely EMPTY", () => {
+    // It used to forget one that stopped being *joinable*, which is a
+    // different thing and comes apart from "is it running" constantly:
+    // the last other player steps out for a second, or I join, or I
+    // leave again. Each of those re-armed the notice for a game that
+    // had been going the whole time, so the room kept announcing it.
+    // The rule is keyed on who has it open, me included.
+    expect(src).toMatch(/if \(!running\.has\(id\)\) announced\.current\.delete\(id\)/);
+    expect(src).toContain("activeActivityIds(room.presence)");
+  });
+
+  it("does not offer me what I just opened, before my own echo lands", () => {
+    // Presence is a round trip. In the window between opening
+    // something and seeing myself in it, somebody else's presence
+    // arrives and the room offered to take me where I already was.
+    expect(src).toContain('const openHere = staged && staged !== "lobby" ? staged : null');
+    const at = src.indexOf("const joinable = useMemo(");
+    expect(src.slice(at, at + 260)).toContain("openHere");
   });
 
   it("never announces something I am already in", () => {
