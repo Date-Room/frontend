@@ -2751,3 +2751,35 @@
   50%, 68% { transform: translateX(var(--dr-marquee-to, 0)); }
   100% { transform: translateX(0); }
 }
+
+/* A point landing (components/ScorePop). A spark lifts away from the
+   number, shrinking as it fades, so the burst reads as a flourish
+   rather than as something breaking apart. The caller supplies the
+   destination (--dr-spark-x / -y) because only it knows the angle.
+
+   No reduced-motion override of this name: index.css is one global
+   sheet, so a second @keyframes block with the same name is the silent
+   hijack indexCss.test.ts guards against (it cost us the Guacamole
+   ingredient cards once). ScorePop handles the setting on the element
+   instead — `motion-reduce:hidden` on the spark layer, and the tick
+   skipped outright — so nothing is animated to nothing. */
+@keyframes dr-spark {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  22% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform:
+      translate(
+        calc(-50% + var(--dr-spark-x, 0px)),
+        calc(-50% + var(--dr-spark-y, 0px))
+      )
+      scale(0.5);
+  }
+}
+

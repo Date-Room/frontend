@@ -69,6 +69,7 @@ import {
 } from "@/lib/squadCall";
 import { cn } from "@/lib/utils";
 import { FaceMark } from "@/components/FaceMark";
+import { ScorePop } from "@/components/ScorePop";
 
 /**
  * grid         the hang-out grid (laptop, nothing on stage)
@@ -774,7 +775,11 @@ function ScoresSeat({ roomId, self, style }: { roomId: string; self: string; sty
           <div key={r.user_id} className="flex items-center gap-2 text-sm">
             <span className="w-4 tabular-nums text-muted-foreground">{i + 1}</span>
             <span className="min-w-0 flex-1 truncate text-cream">{r.user_id === self ? "You" : r.display_name}</span>
-            <span className="font-semibold tabular-nums text-cream">{r.points}</span>
+            <ScorePop
+              value={r.points}
+              mine={r.user_id === self}
+              className="font-semibold text-cream"
+            />
           </div>
         ))
       )}
