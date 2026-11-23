@@ -759,6 +759,30 @@ export function RoomStage({
   const size = base;
   const curW = Math.round(size.w * effScale);
   const curH = Math.round(size.h * effScale);
+  // The squad strip is a column of face bubbles, sized by its contents
+  // rather than by `base` — so there is no w×h to keep it on screen with
+  // until it has been measured. Measure it and the ordinary drag applies:
+  // the strip used to be pinned `right-3 top-3` while still advertising
+  // `cursor-grab` and firing `startDrag`, so a drag moved `pos` and the
+  // style block then threw it away. A corner that holds the call has to be
+  // movable, because the whole reason to put the call in a corner is to see
+  // what is underneath it.
+  const [stripEl, setStripEl] = useState<HTMLDivElement | null>(null);
+  const [stripSize, setStripSize] = useState<{ w: number; h: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!squadStrip || !stripEl) {
+      setStripSize(null);
+      return;
+    }
+    const read = () => setStripSize({ w: stripEl.offsetWidth, h: stripEl.offsetHeight });
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(stripEl);
+    return () => ro.disconnect();
+  }, [squadStrip, stripEl]);
+  /** The dragged box: the window's size, or the strip's measured one. */
+  const boxW = stripSize?.w ?? curW;
+  const boxH = stripSize?.h ?? curH;
 
   // Categories that actually have staged items available, each carrying its
   // resolved StageItem[] — mirrors the mobile activity menu groupings.
@@ -853,8 +877,8 @@ export function RoomStage({
     if (pos !== null || !callActive) return;
     // Top-right on every viewport: the bottom of the stage belongs to the
     // activity's controls, so the call never starts on top of them.
-    setPos(dockTopRight(curW));
-  }, [pos, callActive, curW, curH, dockTopRight]);
+    setPos(dockTopRight(boxW));
+  }, [pos, callActive, boxW, boxH, dockTopRight]);
 
   // Re-dock when the call changes mode (bubble ↔ open), so it can't be left
   // sitting over the controls it just grew past.
@@ -863,7 +887,7 @@ export function RoomStage({
     if (prevBubble.current === bubble) return;
     prevBubble.current = bubble;
     if (!callActive) return;
-    setPos(dockTopRight(curW));
+    setPos(dockTopRight(boxW));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bubble, callActive]);
 
@@ -887,9 +911,9 @@ export function RoomStage({
 
   // Keep the window on-screen when its size changes (expand/collapse/rotate).
   useEffect(() => {
-    setPos((p) => (p ? clamp(p.x, p.y, curW, curH) : p));
+    setPos((p) => (p ? clamp(p.x, p.y, boxW, boxH) : p));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [curW, curH]);
+  }, [boxW, boxH]);
 
   // ── Call PiP ↔ Watch-fullscreen bridge ──
   // When Watch enters native fullscreen, the browser only paints the fullscreen
@@ -959,9 +983,9 @@ export function RoomStage({
     (e: PointerEvent) => {
       if (!drag.current) return;
       draggedRef.current = true;
-      setPos(clamp(e.clientX - drag.current.dx, e.clientY - drag.current.dy, curW, curH));
+      setPos(clamp(e.clientX - drag.current.dx, e.clientY - drag.current.dy, boxW, boxH));
     },
-    [clamp, curW, curH],
+    [clamp, boxW, boxH],
   );
   const onUp = useCallback(() => {
     drag.current = null;
@@ -1849,18 +1873,21 @@ export function RoomStage({
         pipHostRef.current &&
         createPortal(
         <div
+          ref={setStripEl}
           className={cn(
-            squadStrip
-              ? "fixed right-3 top-3 z-40"
-              : floatingCall
-                ? "group fixed z-40 select-none touch-none"
-                : "relative h-full w-full",
+            floatingCall
+              ? "group fixed z-40 select-none touch-none"
+              : "relative h-full w-full",
             // The pair bubble draws its own rings; everything else gets the glass card.
             floatingCall && !pairBubble && "rounded-2xl glass p-1 shadow-[0_20px_56px_rgba(0,0,0,0.55)]",
           )}
           style={
-            floatingCall && pos && !squadStrip
-              ? { left: pos.x, top: pos.y, width: curW, height: curH }
+            floatingCall && pos
+              // The strip keeps its content-driven size; only the window
+              // has a width and height to be told.
+              ? squadStrip
+                ? { left: pos.x, top: pos.y }
+                : { left: pos.x, top: pos.y, width: curW, height: curH }
               : undefined
           }
         >

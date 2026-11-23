@@ -21,6 +21,7 @@ import {
   closeStage,
   getRound,
   hasSeenRole,
+  isRoundConflict,
   listNames,
   markRoleSeen,
   makeMove,
@@ -100,8 +101,19 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   }, [room.presence, list, inCall]);
 
   const put = (s: RoundState) => qc.setQueryData(key, s);
+  // Somebody got there first.
+  //
+  // A squad plays together, so two people reaching for the same thing at
+  // once is ordinary rather than a fault: you tap on a screen that was a
+  // second out of date and the server says the round already moved. The
+  // refetch was always right — the server is ahead and this screen is
+  // behind — but calling it a failure sent people back to look for a
+  // mistake they had not made. Say what happened instead. `start` has read
+  // this as "join theirs" all along (see onBusy below); this is the same
+  // reading for the actions taken once a round is open.
   const fail = (fallback: string) => (e: unknown) => {
-    toast.error(squadErrorText(e, fallback));
+    if (isRoundConflict(e)) toast.message("The round moved on — here it is.");
+    else toast.error(squadErrorText(e, fallback));
     void qc.invalidateQueries({ queryKey: key });
   };
   const move = useMutation({
