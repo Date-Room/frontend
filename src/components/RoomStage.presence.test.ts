@@ -36,11 +36,29 @@ describe("presence carries what this tab has open", () => {
     // Three callers each spelled out the whole object from memory,
     // which is how is_in_call and is_typing came to be asserted by
     // code with no idea whether either was true.
-    expect(ctx).toContain("published.current = { ...published.current, ...patch");
+    expect(ctx).toContain("mergePresence(published.current, patch)");
     expect(ctx).toMatch(/setPresence: patchPresence/);
   });
 
+  it("seeds what it merges onto, and sends exactly that", () => {
+    // The merge is only safe if `published` already holds the whole
+    // object. It did not: the initial track wrote its payload straight
+    // to the channel, so the first patch replaced this tab's entire
+    // presence record with `{ activity_id, last_seen }` — no user_id,
+    // no name, no photo. On a wire that REPLACES rather than merges,
+    // that is a person disappearing at the moment they opened
+    // something. The shape of the payload is covered in
+    // `presencePayload.test.ts`; this is the wiring.
+    expect(ctx).toContain("published.current = basePresence(identity, TAB_DEVICE_ID)");
+    expect(ctx).toContain("channel.track(published.current)");
+    // And nothing else may be tracked, or it is the same bug again
+    // through a different door.
+    const tracks = [...ctx.matchAll(/channel\.track\(/g)];
+    expect(tracks).toHaveLength(2); // the seed, and the patch
+  });
+
   it("starts out in the room, not in something", () => {
-    expect(ctx).toMatch(/activity_id: null/);
+    const payload = readFileSync("src/lib/presencePayload.ts", "utf8");
+    expect(payload).toMatch(/activity_id: null/);
   });
 });

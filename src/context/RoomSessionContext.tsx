@@ -12,6 +12,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { RoomChannel, type PresenceState } from "@/lib/realtime/roomChannel";
 import type { RoomPackage } from "@/lib/rooms";
 import type { CuratableActivityId } from "@/lib/roomExperience";
+import { basePresence, mergePresence } from "@/lib/presencePayload";
 
 export type RoomIdentity = {
   /** Stable id used as the sender on broadcasts: user id, or `guest-<participantId>`. */
@@ -84,6 +85,21 @@ export function RoomSessionProvider({
   children: React.ReactNode;
 }) {
   const channelRef = useRef<RoomChannel | null>(null);
+  // What this tab is currently publishing, so a patch can be merged
+  // onto it rather than every caller restating the whole thing.
+  //
+  // Seeded by the initial track below. It used to stay `{}` while that
+  // track wrote its payload straight to the channel, and because
+  // `presence.update` REPLACES the server's snapshot rather than
+  // merging into it, the first patch published
+  // `{ activity_id, last_seen }` and nothing else — no user_id, no
+  // name, no photo, no is_in_call, no participant_id. The only caller
+  // of the patch is "I opened an activity", so a web user stopped
+  // being identifiable at the exact moment they became interesting to
+  // everyone else: a blank avatar and a nameless face on mobile, and
+  // on web `personOf()` returned null for the empty user_id, so the
+  // activity was dropped from the ongoing list altogether.
+  const published = useRef<Record<string, unknown>>({});
   const [presence, setPresence] = useState<PresenceState[]>([]);
   const [status, setStatus] = useState("connecting");
 
@@ -101,35 +117,10 @@ export function RoomSessionProvider({
       .then(() => {
         if (disposed) return;
         setStatus("connected");
-        void channel.track({
-          // Web-legacy fields — kept for web code that still reads
-          // sender_id / name / is_host.
-          sender_id: identity.senderId,
-          slot: identity.slot,
-          name: identity.displayName,
-          is_host: identity.isHost,
-          // Canonical PresenceState fields — what the mobile client
-          // reads off the wire. Without these, mobile's
-          // PresenceState.fromJson failed on web-sent presence and
-          // mobile saw no partner (capture footer rendered just the
-          // self name). Sending both lets either client find the
-          // other regardless of which schema it knows.
-          user_id: identity.senderId,
-          display_name: identity.displayName,
-          photo_url: identity.photoUrl ?? null,
-          // Mirror the mobile flags so cross-platform code paths
-          // (typing dots, in-call halo) see consistent state.
-          is_ready: true,
-          is_typing: false,
-          is_in_call: false,
-          device_id: TAB_DEVICE_ID,
-          last_seen: new Date().toISOString(),
-          // Surfaces a stable handle to kick by; only guests have one
-          // (signed-in partners don't need it for DELETE /participants).
-          participant_id: identity.participantId ?? null,
-          // Nothing open yet: in the room itself.
-          activity_id: null,
-        });
+        // Recorded as well as sent: a later patch merges onto this, and
+        // the wire replaces rather than merges (see `published`).
+        published.current = basePresence(identity, TAB_DEVICE_ID);
+        void channel.track(published.current);
       })
       .catch(() => {
         if (!disposed) setStatus(channel.status);
@@ -145,12 +136,9 @@ export function RoomSessionProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
-  // What this tab is currently publishing, so a patch can be merged
-  // onto it rather than every caller restating the whole thing.
-  const published = useRef<Record<string, unknown>>({});
   const patchPresence = useCallback(
     (patch: Record<string, unknown>) => {
-      published.current = { ...published.current, ...patch, last_seen: new Date().toISOString() };
+      published.current = mergePresence(published.current, patch);
       void channel.track(published.current);
     },
     [channel],
