@@ -27,6 +27,7 @@ import { Mic, MicOff, Video, VideoOff, Camera, PhoneOff, Minus, RotateCw } from 
 import { cn } from "@/lib/utils";
 import { AmbientController } from "@/components/AmbientController";
 import { GroupStage, type GroupLayout } from "@/components/squad/GroupStage";
+import { FaceMark } from "@/components/FaceMark";
 import { ChaperonAgentBridge } from "@/components/ChaperonAgentBridge";
 import { CallPeersBridge } from "@/context/CallPeersContext";
 import {
@@ -424,7 +425,6 @@ function SpeakingAvatar({
   const ringRef = useRef<HTMLSpanElement>(null);
   const discRef = useRef<HTMLSpanElement>(null);
   useVoiceRipple(trackRef.participant, ringRef, discRef);
-  const initial = (label || "?").trim().charAt(0).toUpperCase() || "?";
   // A photo that fails to load shouldn't leave an empty disc — fall back to
   // the initial, which is what we had before photos.
   const [photoBroken, setPhotoBroken] = useState(false);
@@ -471,7 +471,7 @@ function SpeakingAvatar({
               onError={() => setPhotoBroken(true)}
             />
           ) : (
-            initial
+            <FaceMark name={label} />
           )}
         </span>
       </div>

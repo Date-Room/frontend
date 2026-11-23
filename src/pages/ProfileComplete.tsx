@@ -8,6 +8,7 @@ import { UserAvatarImg } from "@/components/UserAvatarImg";
 import AvatarCropDialog from "@/components/AvatarCropDialog";
 import { authClient } from "@/lib/authClient";
 import { getMe, updateMe, type UserMe } from "@/lib/users";
+import { FaceMark } from "@/components/FaceMark";
 
 /**
  * First-run profile gate.
@@ -60,7 +61,7 @@ export default function ProfileComplete() {
     };
   }, []);
 
-  const initial = (displayName || me?.email || "?")[0]?.toUpperCase();
+  const faceName = displayName || me?.email || null;
 
   function onCroppedPhoto(dataUrl: string) {
     setCropFile(null);
@@ -149,7 +150,7 @@ export default function ProfileComplete() {
             src={photoUrl}
             alt=""
             className="h-full w-full object-cover"
-            fallback={<span>{initial}</span>}
+            fallback={<span><FaceMark name={faceName} /></span>}
           />
           <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-black/55 py-1 text-[10px] uppercase tracking-[0.2em] text-ondark">
             <Camera className="h-3 w-3" /> {photoUrl ? "Change" : "Add"}

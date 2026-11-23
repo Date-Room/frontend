@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { MessageCircle } from "lucide-react";
 import { UserAvatarImg } from "@/components/UserAvatarImg";
+import { FaceMark } from "@/components/FaceMark";
 import { cn } from "@/lib/utils";
 
 /**
@@ -34,7 +35,6 @@ export function ChatToast({
     return () => window.clearTimeout(t);
   }, [onDismiss, ttlMs, text]);
 
-  const initial = partnerName.trim().charAt(0).toUpperCase() || "?";
 
   return createPortal(
     <div
@@ -61,7 +61,7 @@ export function ChatToast({
             className="h-full w-full object-cover"
             fallback={
               <span className="flex h-full w-full items-center justify-center text-body font-bold text-primary">
-                {initial}
+                <FaceMark name={partnerName} />
               </span>
             }
           />

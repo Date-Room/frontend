@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { type ActivityParty, partyLine } from "@/lib/activityParties";
+import { FaceMark } from "@/components/FaceMark";
 
 /** Past this many, the rest become "+n": three faces and a count reads
  *  at a glance where six overlapping circles are a smudge. */
@@ -27,7 +28,7 @@ function Face({ name, photoUrl }: { name: string; photoUrl: string | null }) {
     />
   ) : (
     <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/25 text-xs font-bold text-cream ring-2 ring-card">
-      {(name || "?").charAt(0).toUpperCase()}
+      <FaceMark name={name} />
     </span>
   );
 }

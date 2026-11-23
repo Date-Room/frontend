@@ -14,6 +14,7 @@ import { TABLE_QUERY } from "@/lib/squadCall";
 import { useMediaQuery } from "@/lib/viewport";
 import { ApiError } from "@/lib/api";
 import { getSquadMembers, squadErrorText } from "@/lib/squad";
+import { SOMEONE, YOU } from "@/lib/people";
 import {
   SQUAD_GAMES,
   beatCue,
@@ -87,8 +88,19 @@ export function SquadGame({ game }: { game: SquadGameId }) {
 
   const list = members.data?.members ?? [];
   const byPid = new Map(list.map((m) => [m.participant_id, m]));
-  const nameOf: Names = (pid) => byPid.get(pid)?.display_name || "Someone";
   const me = list.find((m) => m.user_id === room.senderId)?.participant_id ?? null;
+  /** Their real name, whoever they are. For anything that LEAVES this
+   *  screen — a poke carries my name to someone else, and "You" would
+   *  arrive as a riddle. */
+  const trueNameOf: Names = (pid) => byPid.get(pid)?.display_name || SOMEONE;
+  /** What to call them on this screen. I am "You" here: seeing your own
+   *  name in the third person — "Jun's turn", "Jun wins" — reads like
+   *  being talked about rather than played with. `revealBeats` has done
+   *  this for its captions all along (and conjugates for it: "You win"
+   *  against "Jun wins"); doing it in `nameOf` is that same choice
+   *  reaching the seat chips, the ballot and every other name on the
+   *  stage. */
+  const nameOf: Names = (pid) => (pid === me ? YOU : trueNameOf(pid));
   // Everyone here right now, as squad participant ids: in the room, or on
   // the video. The room link can blink on a phone or a long call while the
   // video carries on; counting only the room made three people look like
@@ -315,7 +327,7 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   );
   const poke = (pids: string[]) => {
     const to = pids.map((pid) => byPid.get(pid)?.user_id).filter(Boolean);
-    const name = me ? nameOf(me) : "Someone";
+    const name = me ? trueNameOf(me) : SOMEONE;
     void room.channel.broadcast("squad_poke", { from: room.senderId, to, name, game });
   };
 

@@ -11,6 +11,7 @@
  * "X opened Y" events could ever give them.
  */
 import type { PresenceState } from "@/lib/realtime/roomChannel";
+import { SOMEONE, peopleAre } from "@/lib/people";
 
 export type PartyPerson = {
   userId: string;
@@ -34,7 +35,7 @@ function personOf(p: PresenceState): PartyPerson | null {
   if (!userId) return null;
   return {
     userId,
-    displayName: str(p.display_name) || str(p.name) || "Someone",
+    displayName: str(p.display_name) || str(p.name) || SOMEONE,
     photoUrl: typeof p.photo_url === "string" && p.photo_url ? p.photo_url : null,
   };
 }
@@ -94,10 +95,14 @@ export function amIn(presence: PresenceState[], activityId: string, me: string |
   );
 }
 
-/** "Jun is in here" / "Ama, Jun and Tee are in here". */
+/**
+ * "Jun is in here" / "Ama, Jun and Tee are in here".
+ *
+ * The phrase and its verb agreement come from `peopleAre`, shared with
+ * every other line that names people, so "Jun are in here" cannot come
+ * back by being fixed in only one of them.
+ */
 export function partyLine(party: ActivityParty): string {
-  const names = party.people.map((p) => p.displayName).filter(Boolean);
-  if (names.length === 0) return "Someone is in here";
-  if (names.length === 1) return `${names[0]} is in here`;
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]} are in here`;
+  const { subject, verb } = peopleAre(party.people.map((p) => p.displayName));
+  return `${subject} ${verb} in here`;
 }

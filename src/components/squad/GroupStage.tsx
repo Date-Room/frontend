@@ -68,6 +68,7 @@ import {
   timeLeft,
 } from "@/lib/squadCall";
 import { cn } from "@/lib/utils";
+import { FaceMark } from "@/components/FaceMark";
 
 /**
  * grid         the hang-out grid (laptop, nothing on stage)
@@ -596,7 +597,6 @@ function Face({
     cn("h-full w-full", fitBox.fit === "contain" ? "bg-black object-contain" : "object-cover");
   const hasVideo =
     showVideo && isTrackReference(trackRef) && !trackRef.publication.isMuted && Boolean(trackRef.publication.track);
-  const initial = (name || "?").charAt(0).toUpperCase();
   // What the game says about this face: my pick, dimmed, their turn, in/thinking.
   const cueRing = cue?.picked
     ? "ring-[3px] ring-primary shadow-[0_0_26px_hsl(var(--primary)/0.45)]"
@@ -647,7 +647,7 @@ function Face({
         ) : photo ? (
           <img src={photo} alt="" className={cn("rounded-full object-cover", spot ? "h-28 w-28" : "h-9 w-9")} />
         ) : (
-          <span className={cn("font-serif font-semibold text-cream", spot ? "text-6xl" : "text-lg")}>{initial}</span>
+          <span className={cn("font-serif font-semibold text-cream", spot ? "text-6xl" : "text-lg")}><FaceMark name={name} /></span>
         )}
         <span
           className={cn(
@@ -678,7 +678,7 @@ function Face({
           <img src={photo} alt="" className="h-11 w-11 rounded-full object-cover" />
         ) : (
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/25 text-lg font-bold text-cream">
-            {initial}
+            <FaceMark name={name} />
           </span>
         )}
         <div className="absolute inset-x-1.5 bottom-1.5 flex items-center gap-1 rounded-md bg-black/65 px-1.5 py-0.5 text-[11px]">
@@ -706,7 +706,7 @@ function Face({
           ) : photo ? (
             <img src={photo} alt="" className="h-full w-full object-cover" />
           ) : (
-            <span className="flex h-full w-full items-center justify-center text-lg font-bold text-cream">{initial}</span>
+            <span className="flex h-full w-full items-center justify-center text-lg font-bold text-cream"><FaceMark name={name} /></span>
           )}
         </div>
         <span className="max-w-full truncate text-[11px] text-cream/85">{name}</span>
@@ -737,7 +737,7 @@ function Face({
         <img src={photo} alt="" className="aspect-square h-[62%] max-h-28 w-auto rounded-full object-cover" />
       ) : (
         <span className="flex aspect-square h-[62%] max-h-28 items-center justify-center rounded-full bg-primary/25 font-serif text-3xl font-semibold text-cream sm:text-4xl">
-          {initial}
+          <FaceMark name={name} />
         </span>
       )}
       {talking && (

@@ -64,6 +64,7 @@ import { SquadNightSize } from "@/components/squad/SquadNightSize";
 import { SeatRequestsBanner } from "@/components/squad/SeatRequestsBanner";
 import { JoinRequestsCard } from "@/components/squad/JoinRequests";
 import { GuestsAfterTheNight } from "@/components/squad/GuestsAfterTheNight";
+import { SOMEONE } from "@/lib/people";
 
 /** Broadcast when someone starts a night, so everyone here sees it at once. */
 /** What this client shouts when it starts a night, for other web tabs. */
@@ -118,7 +119,10 @@ export default function SquadRoom() {
       slot: "a", // seats aren't lettered in a squad; nothing between nights reads it
       isHost: room ? room.host_id === u.id : false,
       canPersist: true,
-      displayName: u.display_name || u.email?.split("@")[0] || "You",
+      // Published to the whole room, so never "You": that is a
+      // rendering choice for whoever is reading, and as an identity
+      // it reached everyone else as the label for a real person.
+      displayName: u.display_name || u.email?.split("@")[0] || SOMEONE,
       photoUrl: u.photo_url ?? null,
     };
     // Rebuild only when who I am (or my ownership) changes.
