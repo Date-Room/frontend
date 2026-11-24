@@ -61,6 +61,39 @@ export function personName(
 }
 
 /**
+ * What to call someone where their name is a LABEL: a row, a chip, a
+ * tile, a ballot option, a line of standings.
+ *
+ * "Jun (You)" — the form Slack and Teams settled on. Bare "You" was
+ * right about the person and wrong about the job: in a column of names
+ * it reads as just another name, so the one row that is yours does not
+ * stand out at all, which is the whole reason to mark it.
+ *
+ * The parenthetical is the mark, not the colour. Callers tint it (see
+ * `PersonLabel`), but the text has to carry the meaning on its own —
+ * colour as the only cue fails anyone who cannot see the difference,
+ * and loses it entirely in a screen reader.
+ *
+ * Sentences are the other case and keep `personName`: "You win the
+ * round", not "Jun (You) win the round".
+ */
+export function personLabel(
+  name: string | null | undefined,
+  isMe = false,
+): string {
+  if (!isMe) return personName(name);
+  const trimmed = name?.trim();
+  return trimmed ? `${trimmed} (${YOU})` : YOU;
+}
+
+/** The parenthetical half of a label, for a caller rendering the two
+ *  parts separately. Null when there is nothing to mark. */
+export function youMark(isMe: boolean, name?: string | null): string | null {
+  if (!isMe) return null;
+  return name?.trim() ? `(${YOU})` : null;
+}
+
+/**
  * A list of names, in the order given, as a phrase: "Ama", "Ama and
  * Jun", "Ama, Jun and Tee".
  */

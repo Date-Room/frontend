@@ -66,6 +66,7 @@ import { JoinRequestsCard } from "@/components/squad/JoinRequests";
 import { GuestsAfterTheNight } from "@/components/squad/GuestsAfterTheNight";
 import { SOMEONE, personName } from "@/lib/people";
 import { ScorePop } from "@/components/ScorePop";
+import { PersonLabel } from "@/components/PersonLabel";
 
 /** Broadcast when someone starts a night, so everyone here sees it at once. */
 /** What this client shouts when it starts a night, for other web tabs. */
@@ -515,7 +516,7 @@ function League({ roomId, selfUserId }: { roomId: string; selfUserId: string }) 
             <span className="w-6 text-center font-serif text-lg text-primary">{i + 1}</span>
             <span className="min-w-0 flex-1 text-sm text-cream">
               <span className="block truncate">
-                {personName(r.display_name, r.user_id === selfUserId)}
+                <PersonLabel name={r.display_name} isMe={r.user_id === selfUserId} />
               </span>
               {best && best[1] > 0 && (
                 <span className="block text-xs text-muted-foreground">Best at {GAME_NAMES[best[0]] ?? best[0]}</span>

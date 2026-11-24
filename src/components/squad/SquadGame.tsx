@@ -14,6 +14,7 @@ import { TABLE_QUERY } from "@/lib/squadCall";
 import { useMediaQuery } from "@/lib/viewport";
 import { ApiError } from "@/lib/api";
 import { getSquadMembers, squadErrorText } from "@/lib/squad";
+import { PersonLabel } from "@/components/PersonLabel";
 import { SOMEONE, YOU } from "@/lib/people";
 import {
   SQUAD_GAMES,
@@ -369,6 +370,7 @@ export function SquadGame({ game }: { game: SquadGameId }) {
             game={game}
             onCall={onCall}
             nameOf={nameOf}
+            me={me}
             energy={energy}
             onEnergy={setEnergy}
             sitOut={sitOut}
@@ -522,6 +524,7 @@ function Dealer({
   game,
   onCall,
   nameOf,
+  me,
   energy,
   onEnergy,
   sitOut,
@@ -533,6 +536,7 @@ function Dealer({
   game: SquadGameId;
   onCall: string[];
   nameOf: Names;
+  me: string | null;
   energy: Deck | null;
   onEnergy: (d: Deck) => void;
   sitOut: Set<string>;
@@ -645,7 +649,7 @@ function Dealer({
                 )}
               >
                 {on && <Check className="h-3.5 w-3.5 text-primary" aria-hidden />}
-                {nameOf(pid)}
+                <PersonLabel name={nameOf(pid)} isMe={pid === me} />
               </button>
             );
           })}
@@ -702,12 +706,15 @@ function Prompt({ text }: { text?: string }) {
 function PlayerGrid({
   players,
   nameOf,
+  me,
   picked,
   disabled,
   onPick,
 }: {
   players: string[];
+  /** The plain name; the mark is added here. */
   nameOf: Names;
+  me: string | null;
   picked: unknown;
   disabled?: boolean;
   onPick: (pid: string) => void;
@@ -728,7 +735,7 @@ function PlayerGrid({
               : "border-white/[0.08] bg-card/30 text-cream/90 hover:border-primary/30",
           )}
         >
-          {nameOf(pid)}
+          <PersonLabel name={nameOf(pid)} isMe={pid === me} />
         </button>
       ))}
     </div>
@@ -844,7 +851,12 @@ function Play({
             {/* With three the server sends the order twice: two clues each. */}
             {order.length > round.players.length ? "Two clues each, round twice: " : "One word each: "}
             <span className="text-cream">
-              {order.slice(0, round.players.length).map((p) => (p === me ? "You" : nameOf(p))).join(" → ")}
+              {order.slice(0, round.players.length).map((p, i) => (
+                <span key={`${p}-${i}`}>
+                  {i > 0 && " → "}
+                  <PersonLabel name={nameOf(p)} isMe={p === me} />
+                </span>
+              ))}
             </span>
           </p>
         )}
@@ -857,6 +869,7 @@ function Play({
           <PlayerGrid
             players={round.players.filter((p) => p !== me)}
             nameOf={nameOf}
+            me={me}
             picked={mine?.my_move}
             disabled={busy}
             onPick={onMove}
@@ -871,7 +884,7 @@ function Play({
       <div className="space-y-4">
         <Prompt text={text} />
         {turn && !faceVote && (
-          <PlayerGrid players={round.players} nameOf={nameOf} picked={mine?.my_move} disabled={busy} onPick={onMove} />
+          <PlayerGrid players={round.players} nameOf={nameOf} me={me} picked={mine?.my_move} disabled={busy} onPick={onMove} />
         )}
       </div>
     );

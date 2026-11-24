@@ -5,7 +5,15 @@
 // record"), and nobody is addressed by their own name in the third
 // person.
 import { describe, expect, it } from "vitest";
-import { YOU, initialOf, listPeople, peopleAre, personName } from "@/lib/people";
+import {
+  YOU,
+  initialOf,
+  listPeople,
+  peopleAre,
+  personLabel,
+  personName,
+  youMark,
+} from "@/lib/people";
 
 describe("initialOf", () => {
   it("takes the first letter, uppercased", () => {
@@ -60,6 +68,47 @@ describe("personName", () => {
   it("falls back to a word, not a blank or a mark", () => {
     expect(personName(null)).toBe("Someone");
     expect(personName("   ")).toBe("Someone");
+  });
+});
+
+describe("personLabel", () => {
+  it("marks my row without taking my name off it", () => {
+    // Bare "You" in a column of names reads as just another name, so
+    // the one row that is mine does not stand out — which is the whole
+    // reason to mark it.
+    expect(personLabel("Jun", true)).toBe("Jun (You)");
+  });
+
+  it("is just their name for everyone else", () => {
+    expect(personLabel("Jun")).toBe("Jun");
+    expect(personLabel("  Tee ")).toBe("Tee");
+  });
+
+  it("falls back to the mark alone when my name is unknown", () => {
+    expect(personLabel(null, true)).toBe("You");
+    expect(personLabel("   ", true)).toBe("You");
+  });
+
+  it("still says Someone for a nameless other", () => {
+    expect(personLabel(null)).toBe("Someone");
+  });
+
+  it("carries the meaning in the text, not the colour", () => {
+    // Colour as the only cue fails anyone who cannot see the
+    // difference, and is gone entirely in a screen reader.
+    expect(personLabel("Jun", true)).toContain("(You)");
+  });
+});
+
+describe("youMark", () => {
+  it("is the parenthetical, for a caller rendering the parts apart", () => {
+    expect(youMark(true, "Jun")).toBe("(You)");
+  });
+
+  it("is nothing for someone else, or when there is no name to mark", () => {
+    expect(youMark(false, "Jun")).toBeNull();
+    expect(youMark(true, null)).toBeNull();
+    expect(youMark(true, "  ")).toBeNull();
   });
 });
 
