@@ -878,8 +878,16 @@ export function RoomStage({
   const drag = useRef<{ dx: number; dy: number } | null>(null);
   // In fullscreen there is no app header above and the player's controls
   // sit along the bottom, so the safe band moves.
-  const padTop = fsOverlay ? FS_EDGE : TOP_PAD;
-  const padBottom = fsOverlay ? FS_BOTTOM_PAD : BOTTOM_PAD;
+  //
+  // Keyed on `watchFullscreen`, not `fsOverlay`. `fsOverlay` is
+  // `wide && watchFullscreen` — it answers "is the call a pair bubble",
+  // which is a different question from "is there a header above us".
+  // The squad strip has no `wide` requirement, so on a narrow window it
+  // was held off a header that is not there and docked 76px down
+  // instead of the 12px it used to sit at: it had visibly dropped.
+  const overFullscreenVideo = watchFullscreen;
+  const padTop = overFullscreenVideo ? FS_EDGE : TOP_PAD;
+  const padBottom = overFullscreenVideo ? FS_BOTTOM_PAD : BOTTOM_PAD;
   const clamp = useCallback(
     (x: number, y: number, w: number, h: number) => ({
       x: Math.min(Math.max(x, EDGE), Math.max(EDGE, window.innerWidth - w - EDGE)),
@@ -890,9 +898,11 @@ export function RoomStage({
   const dockTopRight = useCallback(
     (w: number) => ({
       x: Math.max(EDGE, window.innerWidth - w - EDGE),
-      y: padTop + (fsOverlay ? 0 : 8),
+      // The extra 8 clears the app header's shadow; over fullscreen
+      // video there is no header to clear.
+      y: padTop + (overFullscreenVideo ? 0 : 8),
     }),
-    [padTop, fsOverlay],
+    [padTop, overFullscreenVideo],
   );
   useEffect(() => {
     if (pos !== null || !callActive) return;

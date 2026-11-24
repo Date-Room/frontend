@@ -27,5 +27,10 @@ export function FaceMark({
 }) {
   const initial = initialOf(name);
   if (initial) return <>{initial}</>;
-  return <User className={className ?? "h-[55%] w-[55%] opacity-80"} aria-hidden />;
+  // Sized in `em`, not `%`. A percentage resolves against the parent's
+  // height, and several of these sit in a plain text span whose height
+  // is auto — where the percentage is indeterminate and the SVG falls
+  // back to its own intrinsic size, which is bigger than the line it
+  // is in and pushes the layout around it down.
+  return <User className={className ?? "h-[1.1em] w-[1.1em] opacity-80"} aria-hidden />;
 }
