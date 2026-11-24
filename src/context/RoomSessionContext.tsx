@@ -12,7 +12,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { RoomChannel, type PresenceState } from "@/lib/realtime/roomChannel";
 import type { RoomPackage } from "@/lib/rooms";
 import type { CuratableActivityId } from "@/lib/roomExperience";
-import { basePresence, mergePresence } from "@/lib/presencePayload";
+import { basePresence, mergePresence, noteArrivals } from "@/lib/presencePayload";
 
 export type RoomIdentity = {
   /** Stable id used as the sender on broadcasts: user id, or `guest-<participantId>`. */
@@ -109,9 +109,31 @@ export function RoomSessionProvider({
   }
   const channel = channelRef.current;
 
+  // Read inside the long-lived presence callback, which outlives the
+  // render that created it — the effect below is keyed on roomId alone,
+  // so a closure over `identity` there would be the first render's.
+  const identityRef = useRef(identity);
+  identityRef.current = identity;
+
+  // Connections already seen in this room. See `noteArrivals`, which
+  // owns the rule.
+  const seen = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     let disposed = false;
-    const offPresence = channel.onPresence((p) => setPresence(p));
+    const offPresence = channel.onPresence((p) => {
+      setPresence(p);
+      // Somebody new in the room? Say again what this tab has open, so
+      // they see a game that was already running when they arrived.
+      const newcomer = noteArrivals(p, seen.current, {
+        senderId: identityRef.current.senderId,
+        deviceId: TAB_DEVICE_ID,
+      });
+      if (newcomer && Object.keys(published.current).length > 0) {
+        published.current = mergePresence(published.current, {});
+        void channel.track(published.current);
+      }
+    });
     void channel
       .open()
       .then(() => {

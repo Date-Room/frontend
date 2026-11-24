@@ -99,3 +99,55 @@ export const IDENTIFYING_KEYS = [
   "display_name",
   "photo_url",
 ] as const;
+
+/**
+ * Who just walked in, so this tab can say again what it has open.
+ *
+ * George: "the host already had the most likely to game opened.. but it
+ * doesn't show as ongoing activity on the users who also just joined
+ * the night. I guess the event only fires when the host manually joins.
+ * But at the start of the call, we need to check what's opened and
+ * share that.."
+ *
+ * The server does hand a joiner the whole presence snapshot, so what is
+ * open should already be in it. The weakness is that this leaves every
+ * arrival at the mercy of everyone else's LAST publish having been
+ * right — and when one is wrong it stays wrong for the rest of the
+ * night. Which is what happened: a bug republished "not in a game" a
+ * frame after announcing the game, and the snapshot kept the last thing
+ * it was told.
+ *
+ * So each client re-announces when somebody new appears, and the room
+ * repairs itself. `seen` is the caller's memory of this room and is
+ * updated in place; the return value says whether to publish.
+ *
+ * Keyed per CONNECTION, not per account: the same person in two tabs is
+ * two arrivals, and each of them needs telling.
+ *
+ * It cannot storm. Only an id not already in `seen` counts, so the
+ * publish this triggers reaches everyone else as an arrival of nobody
+ * and stops there. Departures are pruned, so somebody who drops and
+ * comes back counts again — which is exactly when they need telling.
+ */
+export function noteArrivals(
+  presence: ReadonlyArray<Record<string, unknown>>,
+  seen: Set<string>,
+  me?: { senderId?: string | null; deviceId?: string | null },
+): boolean {
+  const now = new Set<string>();
+  let arrived = false;
+  for (const p of presence) {
+    const user = typeof p.user_id === "string" && p.user_id ? p.user_id : p.sender_id;
+    const device = typeof p.device_id === "string" ? p.device_id : "";
+    const key = `${typeof user === "string" ? user : ""}|${device}`;
+    now.add(key);
+    // My own entry is not an arrival.
+    if (me?.senderId && user === me.senderId && device === (me.deviceId ?? "")) continue;
+    if (!seen.has(key)) {
+      seen.add(key);
+      arrived = true;
+    }
+  }
+  for (const key of [...seen]) if (!now.has(key)) seen.delete(key);
+  return arrived;
+}

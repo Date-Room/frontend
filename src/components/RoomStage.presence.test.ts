@@ -54,10 +54,29 @@ describe("presence carries what this tab has open", () => {
     // `presencePayload.test.ts`; this is the wiring.
     expect(ctx).toContain("published.current = basePresence(identity, TAB_DEVICE_ID)");
     expect(ctx).toContain("channel.track(published.current)");
-    // And nothing else may be tracked, or it is the same bug again
-    // through a different door.
-    const tracks = [...ctx.matchAll(/channel\.track\(/g)];
-    expect(tracks).toHaveLength(2); // the seed, and the patch
+    // And nothing may be tracked EXCEPT that object, or it is the same
+    // bug again through a different door. Counting the call sites was
+    // the old way of saying this, and it just meant a third publisher
+    // broke the test for being a third rather than for being wrong.
+    const tracks = [...ctx.matchAll(/channel\.track\(([^)]*)\)/g)];
+    expect(tracks.length).toBeGreaterThan(1);
+    for (const [, arg] of tracks) expect(arg).toBe("published.current");
+  });
+
+  it("says again what it has open when somebody new walks in", () => {
+    // The joiner is handed the whole presence snapshot, so in principle
+    // it is already there — but that leaves every arrival at the mercy
+    // of everyone else's last publish having been right, and one that
+    // went wrong stays wrong all night. Re-announcing makes the room
+    // repair itself. The rule is covered in `noteArrivals.test.ts`;
+    // this is the wiring.
+    expect(ctx).toContain("noteArrivals(p, seen.current");
+    const at = ctx.indexOf("noteArrivals(p, seen.current");
+    expect(ctx.slice(at, at + 400)).toContain("channel.track(published.current)");
+    // Read through a ref: the presence callback outlives the render
+    // that made it, and the effect is keyed on roomId alone, so a
+    // closure over `identity` would be the first render's forever.
+    expect(ctx).toContain("identityRef.current.senderId");
   });
 
   it("starts out in the room, not in something", () => {
