@@ -141,7 +141,30 @@ export function RoomSessionProvider({
         setStatus("connected");
         // Recorded as well as sent: a later patch merges onto this, and
         // the wire replaces rather than merges (see `published`).
-        published.current = basePresence(identity, TAB_DEVICE_ID);
+        //
+        // The base goes UNDERNEATH anything already patched, never over
+        // it. `open()` is async, and the stage restores what it had
+        // open from localStorage the moment it mounts — so
+        // "I am in Most Likely To" routinely reaches `published`
+        // BEFORE this line runs. Assigning the base outright threw
+        // that away and published activity_id: null.
+        //
+        // Nothing then put it back: the patch only fires when the
+        // staged activity CHANGES, and it had not changed — it was
+        // restored. So the tab spent the whole night telling the room
+        // it was in nothing, every phone that walked in was handed
+        // that in its presence snapshot, and even re-announcing on
+        // arrival re-sent the same wiped record. The only cure was to
+        // open something else, or rejoin.
+        //
+        // George: "I joined the squad room later than the web on
+        // mobile with my 2 phones.. They aren't even aware of the
+        // ongoing Most likely game... I shouldn't have to always
+        // refresh, rejoin, join at the same time to re-establish sync."
+        published.current = mergePresence(
+          basePresence(identity, TAB_DEVICE_ID),
+          published.current,
+        );
         void channel.track(published.current);
       })
       .catch(() => {
