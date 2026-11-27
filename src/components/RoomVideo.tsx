@@ -42,6 +42,7 @@ import { livekitToken, mutedNotice } from "@/lib/rooms";
 import { mobilePlatform } from "@/lib/appStores";
 import { groupRoomOptions } from "@/lib/videoProfiles";
 import { TAB_DEVICE_ID, otherDeviceOnCall } from "@/lib/deviceId";
+import { joinWithCamera, joinWithMic, rememberCamera, rememberMic } from "@/lib/avPreference";
 import { nightFullFrom, type NightFull } from "@/lib/squad";
 import { SquadSeatFull } from "@/components/squad/SquadSeatFull";
 import { useLowPowerMode } from "@/hooks/useLowPowerMode";
@@ -668,6 +669,8 @@ function Stage({
   const toggleMic = useCallback(async () => {
     const next = !(micWanted ?? micActual);
     setMicWanted(next);
+    // Remembered so a reload comes back the way you left it.
+    rememberMic(next);
     try {
       await localParticipant.setMicrophoneEnabled(next);
     } catch {
@@ -717,6 +720,7 @@ function Stage({
     const next = !(camWanted ?? camActual);
     setCamWanted(next);
     try {
+      rememberCamera(next);
       await localParticipant.setCameraEnabled(next);
     } catch {
       setCamWanted(null);
@@ -1206,6 +1210,10 @@ export function RoomVideo({
   const [askMove, setAskMove] = useState(() =>
     otherDeviceOnCall(room.presence, room.senderId, TAB_DEVICE_ID),
   );
+  // Read once: these are props on LiveKitRoom, and a changing value
+  // there renegotiates the connection mid-call.
+  const [joinMic] = useState(joinWithMic);
+  const [joinCamera] = useState(joinWithCamera);
 
   // Self-healing. The question above is decided ONCE, at mount, from
   // the presence snapshot as it stood at that instant — and the
@@ -1358,8 +1366,15 @@ export function RoomVideo({
       token={conn.token}
       serverUrl={conn.url}
       connect
+      // The mic always PUBLISHES, even when you are joining muted:
+      // MicKeepAlive turns it on whenever no track exists, so
+      // `audio={false}` would simply be undone. A published-but-muted
+      // track is the shape it leaves alone, and <JoinAsYouLeftIt/>
+      // mutes it the moment the room connects.
       audio
-      video
+      // The camera has no keep-alive, so this can just be honoured —
+      // which also means a remembered-off camera never lights up.
+      video={joinCamera}
       options={roomOptions}
       data-lk-theme="default"
       className="relative h-full w-full"
@@ -1368,6 +1383,7 @@ export function RoomVideo({
       onDisconnected={onLkDisconnected}
     >
       <MicKeepAlive />
+      <JoinAsYouLeftIt mic={joinMic} />
       <AmbientController />
       <ChaperonAgentBridge />
       <CallPeersBridge />
@@ -1405,6 +1421,41 @@ export function RoomVideo({
       <StartAudio label="Tap to enable sound" className="lk-start-audio-button" />
     </LiveKitRoom>
   );
+}
+
+/**
+ * Come back the way you left.
+ *
+ * George: "If I'm muted on the web, and I refresh my window, it should
+ * stay muted.. Same with video on/off"
+ *
+ * The camera is handled by the `video` prop — nothing re-enables it,
+ * so a remembered-off camera simply never turns on. The microphone
+ * cannot be done that way: MicKeepAlive publishes it whenever no track
+ * exists, by design, because a swallowed publish failure used to leave
+ * someone inaudible until a full relog. So the mic joins published and
+ * is muted here the moment the room connects — which is precisely the
+ * published-but-muted state MicKeepAlive is written to leave alone.
+ */
+function JoinAsYouLeftIt({ mic }: { mic: boolean }) {
+  const room = useRoomContext();
+  const done = useRef(false);
+  useEffect(() => {
+    if (!room || mic) return;
+    let cancelled = false;
+    const apply = () => {
+      if (cancelled || done.current) return;
+      done.current = true;
+      void room.localParticipant.setMicrophoneEnabled(false).catch(() => {});
+    };
+    if (room.state === "connected") apply();
+    room.on(RoomEvent.Connected, apply);
+    return () => {
+      cancelled = true;
+      room.off(RoomEvent.Connected, apply);
+    };
+  }, [room, mic]);
+  return null;
 }
 
 /**
