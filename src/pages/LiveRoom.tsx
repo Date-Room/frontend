@@ -271,10 +271,24 @@ function RoomShell({
   // the rooms list is there to read this from).
   const isSquad = room?.room_kind === "squad";
   // The menu can't wait on the rooms list: the package comes with the room.
+  //
+  // Nor can the LAYOUT, which is what the rooms list arriving late looked
+  // like. George: "Even how it loads up when I refresh the page, it's
+  // first a split layout, then it becomes a grid layout with the game at
+  // the middle and the people around it... Loading animations should flow
+  // nicely.. instead of glitching and then trying to regularise."
+  //
+  // `room` comes from the my-rooms query, so `isSquad` is false for the
+  // first frames of every reload. The stage read that as "a two-person
+  // room on a call", drew the split pane, and then had to undo the whole
+  // arrangement a moment later when the list landed. The package arrives
+  // with the room session, so this is the same answer a few hundred
+  // milliseconds earlier — which is the difference between a layout and
+  // a correction.
   const squadRoom = isSquad || roomPackage === "squad";
   const squadNames = useMemo(
     () =>
-      isSquad
+      squadRoom
         ? session.presence
             .filter((p) => {
               const sid = presenceSenderId(p);
@@ -283,7 +297,7 @@ function RoomShell({
             .map((p) => partnerDisplayName(p))
             .filter((name, i, all) => all.indexOf(name) === i)
         : [],
-    [isSquad, session.presence, session.senderId],
+    [squadRoom, session.presence, session.senderId],
   );
   // A resting Together room takes things away in stages; the server
   // computes these and refuses anything they forbid, so the UI only
@@ -763,7 +777,7 @@ function RoomShell({
           partnerInCall={partnerInfo.inCall}
           partnerPresent={partnerPresent}
           callActive={liveMode}
-          squad={isSquad}
+          squad={squadRoom}
           squadNames={squadNames}
           onCallIn={() => {
             if (!caps.can_call) {
