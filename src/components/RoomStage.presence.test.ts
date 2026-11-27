@@ -52,7 +52,17 @@ describe("presence carries what this tab has open", () => {
     // that is a person disappearing at the moment they opened
     // something. The shape of the payload is covered in
     // `presencePayload.test.ts`; this is the wiring.
-    expect(ctx).toContain("published.current = basePresence(identity, TAB_DEVICE_ID)");
+    //
+    // The base is now merged UNDER whatever has already been patched,
+    // not assigned over it. `open()` is async and the stage restores
+    // its activity from localStorage on mount, so a patch regularly
+    // arrives first; assigning the base then republished
+    // activity_id: null and the room never learned otherwise. See
+    // presencePayload.test.ts, "seeding presence when the channel
+    // finally opens".
+    expect(ctx).toMatch(
+      /published\.current = mergePresence\(\s*basePresence\(identity, TAB_DEVICE_ID\),\s*published\.current,?\s*\)/,
+    );
     expect(ctx).toContain("channel.track(published.current)");
     // And nothing may be tracked EXCEPT that object, or it is the same
     // bug again through a different door. Counting the call sites was
