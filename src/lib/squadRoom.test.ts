@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SquadMember, SquadNight } from "@/lib/squad";
+import type { SquadMember, SquadNight, SquadNights } from "@/lib/squad";
 import {
   hereLine,
   hereNow,
@@ -7,6 +7,7 @@ import {
   nightLine,
   otherClocks,
   plannedStartDue,
+  startBlockedReason,
   suggestedTime,
   toLocalInput,
 } from "@/lib/squadRoom";
@@ -114,5 +115,53 @@ describe("nightLine", () => {
     expect(nightLine(base)).toMatch(/4 seats · 2h \+ 30 min$/);
     expect(nightLine({ ...base, rate: "free", extended_minutes: 0 })).toMatch(/free night$/);
     expect(nightLine({ ...base, refunded: true })).toMatch(/didn't count/);
+  });
+});
+
+// George, on a room he had just made: "I just created another squad
+// room, and the start the night is refusing to enable." It was out of
+// nights — but the button said so nowhere. The only line under it was
+// gated on HAVING nights, so the one state that needed explaining was
+// the one state that got none.
+describe("why Start a night is dead", () => {
+  const nights = (over: Partial<SquadNights>): SquadNights => ({
+    seats: 3,
+    seat_nights: 0,
+    nights_left: 0,
+    free_night_expires_at: null,
+    active_night: null,
+    nights: [],
+    ...over,
+  });
+
+  it("says the room is empty, and where to fix it", () => {
+    // The exact shape George hit: three people here, nothing to spend.
+    expect(startBlockedReason(nights({ seat_nights: 0 }), 3)).toBe(
+      "This room is out of nights. Add nights below to start one.",
+    );
+  });
+
+  it("counts one spare seat as still not a night", () => {
+    // A night is two seats at the least, so 1 is as dead as 0 — and
+    // "no nights left" would be a lie with a seat sitting there.
+    expect(startBlockedReason(nights({ seat_nights: 1, spare_seats: 1 }), 3)).toBe(
+      "One spare seat in the room — a night needs two. Add nights below.",
+    );
+  });
+
+  it("asks for one more person once the room can afford it", () => {
+    expect(startBlockedReason(nights({ seat_nights: 6, nights_left: 2 }), 1)).toBe(
+      "Waiting for one more. Send the link or say hi in the chat.",
+    );
+  });
+
+  it("reports the balance first, since topping up is the way out of both", () => {
+    // Alone AND broke: being told to wait for someone would send you to
+    // the chat to fetch a person who could not start a night either.
+    expect(startBlockedReason(nights({ seat_nights: 0 }), 1)).toContain("out of nights");
+  });
+
+  it("is null when the night can actually start", () => {
+    expect(startBlockedReason(nights({ seat_nights: 6, nights_left: 2 }), 2)).toBeNull();
   });
 });

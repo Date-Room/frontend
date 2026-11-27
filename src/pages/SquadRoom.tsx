@@ -57,6 +57,7 @@ import {
   isAutoStarter,
   nightLine,
   plannedStartDue,
+  startBlockedReason,
 } from "@/lib/squadRoom";
 import { SQUAD_GAMES } from "@/lib/squadGames";
 import { cn } from "@/lib/utils";
@@ -280,6 +281,8 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
   const nextAt = plan.data?.next_night_at ?? null;
   const triedFor = useRef<string | null>(null);
   const enough = here.length >= START_MIN_PRESENT;
+  // Why the button is dead, in the one place you are looking when it is.
+  const startBlocked = n ? startBlockedReason(n, here.length) : null;
   useEffect(() => {
     if (!n || n.active_night || n.nights_left === 0 || !nextAt || !enough) return;
     if (!plannedStartDue(nextAt, now) || !isAutoStarter(here, live.senderId)) return;
@@ -382,7 +385,7 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
             )}
             <button
               type="button"
-              disabled={n.seat_nights < 2 || !enough || start.isPending}
+              disabled={startBlocked != null || start.isPending}
               onClick={() => {
                 setStartSeats(Math.min(n.seats, Math.max(2, n.seat_nights)));
                 setConfirmStart(true);
@@ -392,10 +395,8 @@ function SquadRoomBody({ roomId, room, nights: n }: { roomId: string; room: Room
               {start.isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
               Start a night
             </button>
-            {!enough && n.seat_nights >= 2 && (
-              <p className="text-center text-xs text-muted-foreground">
-                Waiting for one more. Send the link or say hi in the chat.
-              </p>
+            {startBlocked && (
+              <p className="text-center text-xs text-muted-foreground">{startBlocked}</p>
             )}
           </section>
         )}

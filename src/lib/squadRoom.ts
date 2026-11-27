@@ -4,10 +4,37 @@
  * and the nights log.
  */
 import type { PresenceState } from "@/lib/realtime/roomChannel";
-import type { SquadMember, SquadNight, SquadPlanView } from "@/lib/squad";
+import type { SquadMember, SquadNight, SquadNights, SquadPlanView } from "@/lib/squad";
 
 /** A night starts once this many of the squad are in the room. */
 export const START_MIN_PRESENT = 2;
+
+/**
+ * Pure: why "Start a night" is dead, or null when it is live.
+ *
+ * A disabled button that says nothing is worse than no button at all.
+ * The out-of-nights case had no line under it — the only clue the room
+ * was empty was "No nights left" set in 11px beside the seat count at
+ * the top of the page, and an "Add nights" card three sections down.
+ * Everyone who hit it read the button as broken, which is exactly what
+ * it looks like.
+ *
+ * The order matters: an empty room is still empty when you are alone in
+ * it, and topping up is the thing to do about it either way, so the
+ * balance is reported before the headcount.
+ */
+export function startBlockedReason(nights: SquadNights, presentCount: number): string | null {
+  // A night is at least two seats, so one spare seat still cannot start one.
+  if (nights.seat_nights < 2) {
+    return nights.seat_nights === 1
+      ? "One spare seat in the room — a night needs two. Add nights below."
+      : "This room is out of nights. Add nights below to start one.";
+  }
+  if (presentCount < START_MIN_PRESENT) {
+    return "Waiting for one more. Send the link or say hi in the chat.";
+  }
+  return null;
+}
 
 /** The planned time starts the night for up to this long after it. */
 export const PLANNED_WINDOW_MS = 3 * 60 * 60 * 1000;
