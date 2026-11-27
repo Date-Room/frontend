@@ -390,6 +390,106 @@ export function roomAhead(pin: Pinned | null, current: RoundState | null): boole
   return Boolean(pin && here && here.number > pin.number);
 }
 
+/* ── Question, options, button ───────────────────────────────────────── */
+
+/**
+ * Pure: the card's question, for the top of the stage.
+ *
+ * George: "for the games, try a distribution like Question (top area),
+ * Options or main piece (middle area), Button (bottom area)." Imposter
+ * and Clue Me In have no question to put there — what they hand you is
+ * a secret word, which is the middle — so they say so rather than
+ * leaving an empty band at the top.
+ */
+export function questionFor(round: Round): string | null {
+  if (round.game === "imposter" || round.game === "heads_up") return null;
+  return round.prompt?.text ?? null;
+}
+
+/** The one button at the bottom: what it says, what it sends, and
+ *  whether it can be pressed yet. */
+export type Submission = { label: string; value: unknown; ready: boolean };
+
+/**
+ * Pure: choose, then submit.
+ *
+ * George: "For the Most Likely game for instance, the selection process
+ * should be choose and submit, to avoid accidental selections. Same for
+ * web and mobile. See if this can be applied to other games that match
+ * this."
+ *
+ * A tap used to BE the vote — one stray touch on a phone held sideways
+ * and your answer was in, with the round possibly closing on it before
+ * you knew. So a tap now picks, and the button at the bottom sends. The
+ * server has always allowed a move to be changed until the stage
+ * closes, so "Change my vote" is not a new power, just the honest name
+ * for the one that was already there.
+ *
+ * Applies wherever a stage is "choose one of these": the votes, the
+ * judge's pick, and the answer you type. Clue Me In is the exception
+ * and keeps its instant taps — a 60-second clock is no place to ask for
+ * confirmation, and "Got it" is a word you have already said out loud.
+ */
+export function submitFor(args: {
+  round: Round;
+  mine: MyView | null;
+  me: string | null;
+  /** The ballot pick this device is holding, not yet sent. */
+  pick: string | null;
+  /** Who Said It: the guesses in progress, and whether they're all in. */
+  draft: Record<string, string>;
+  guessable: { key: string }[];
+  reviewing: boolean;
+  /** Who Said It / the answer stage: what's in the box. */
+  text: string;
+  /** Imposter: "Ready to vote" has been tapped. */
+  imposterReady: boolean;
+}): Submission | null {
+  const { round, mine, me, pick, draft, guessable, reviewing, text } = args;
+  if (!myTurn(round, me)) return null;
+  const sent = typeof mine?.my_move === "string" ? mine.my_move : null;
+
+  if (round.stage === "vote") {
+    // Imposter talks first; the ballot isn't up yet, so neither is this.
+    if (round.game === "imposter" && !args.imposterReady && !sent) return null;
+    const chosen = pick ?? sent;
+    if (!chosen) return { label: "Submit", value: null, ready: false };
+    if (!sent) return { label: "Submit my vote", value: chosen, ready: true };
+    return chosen === sent
+      ? { label: "Vote locked in", value: chosen, ready: false }
+      : { label: "Change my vote", value: chosen, ready: true };
+  }
+
+  if (round.stage === "pick") {
+    const chosen = pick ?? sent;
+    if (!chosen) return { label: "Submit", value: null, ready: false };
+    if (!sent) return { label: "Lock in my pick", value: chosen, ready: true };
+    return chosen === sent
+      ? { label: "Pick locked in", value: chosen, ready: false }
+      : { label: "Change my pick", value: chosen, ready: true };
+  }
+
+  if (round.stage === "answer") {
+    const body = text.trim();
+    if (!sent) {
+      return { label: "Send in secret", value: body, ready: body.length > 0 };
+    }
+    return body && body !== sent
+      ? { label: "Change my answer", value: body, ready: true }
+      : { label: "Answer sent", value: body, ready: false };
+  }
+
+  if (round.stage === "guess") {
+    // One answer at a time until they're all attributed; the button is
+    // for the review pass over the lot.
+    if (!reviewing) return null;
+    const all = guessable.every((a) => draft[a.key]);
+    return { label: "Lock in my guesses", value: draft, ready: all };
+  }
+
+  return null;
+}
+
 /** Pure: who to poke (still thinking, not me), and the line for it. */
 export function pokeLine(round: Round, me: string | null, nameOf: (pid: string) => string): { pids: string[]; label: string } | null {
   const pids = waitingOn(round).filter((p) => p !== me);

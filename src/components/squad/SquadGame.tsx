@@ -32,6 +32,7 @@ import {
   myTurn,
   nextPin,
   pokeLine,
+  questionFor,
   readEnergy,
   revealBeats,
   roleCard,
@@ -45,6 +46,7 @@ import {
   startBlocker,
   stageCueFor,
   startRound,
+  submitFor,
   waitingLine,
   waitingOn,
   type Beat,
@@ -55,6 +57,7 @@ import {
   type RoundState,
   type RoleCard,
   type SquadGameId,
+  type Submission,
 } from "@/lib/squadGames";
 import { iAmOnTheCall } from "@/lib/deviceId";
 import { cn } from "@/lib/utils";
@@ -216,6 +219,28 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   const toGuess = (round?.public.answers ?? []).filter((a) => a.key !== mine?.my_answer_key);
   const reviewing = local.at >= toGuess.length;
   const onScreen = reviewing ? null : toGuess[local.at];
+  // The one button at the bottom of the stage (see `submitFor`): a tap
+  // on the ballot picks, this sends.
+  // One value for the box and for the button: without my own typing,
+  // the box shows what I already sent, and "Change my answer" has to be
+  // judged against the same text the box is showing.
+  const sentAnswer =
+    round?.stage === "answer" && typeof mine?.my_move === "string" ? mine.my_move : "";
+  const answerText = local.text || sentAnswer;
+  const submit: Submission | null =
+    round && !setup && round.stage !== "revealed"
+      ? submitFor({
+          round,
+          mine,
+          me,
+          pick: local.pick,
+          draft: local.draft,
+          guessable: toGuess,
+          reviewing,
+          text: answerText,
+          imposterReady: local.ready,
+        })
+      : null;
 
   // Friends with their first-round card open: user id -> when it goes stale.
   const [readers, setReaders] = useState<Record<string, number>>({});
@@ -384,9 +409,14 @@ export function SquadGame({ game }: { game: SquadGameId }) {
 
   return (
     <div className="relative h-full min-h-0">
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto px-4 pb-4 pt-2 sm:px-8 sm:pb-6 sm:pt-6">
-      <div className="mx-auto w-full max-w-xl space-y-3 sm:space-y-5">
-        <header className="space-y-0.5 text-center sm:space-y-1">
+    {/* Three zones, top to bottom — George: "Question (top area), options
+        or main piece (middle area), button (bottom area)." The middle is
+        the only part that scrolls, so the question you are answering and
+        the button you answer it with are both always on screen, which is
+        what a long ballot on a short phone used to cost you. */}
+    <div className="flex h-full min-h-0 flex-col px-4 pb-4 pt-2 sm:px-8 sm:pb-6 sm:pt-6">
+      <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col gap-3 sm:gap-5">
+        <header className="shrink-0 space-y-0.5 text-center sm:space-y-1">
           <p className="dr-eyebrow text-primary/85">
             {round && !setup ? `Round ${round.number} · ${info.mood}` : info.mood}
           </p>
@@ -404,10 +434,11 @@ export function SquadGame({ game }: { game: SquadGameId }) {
           )}
         </header>
         {live && round && plan.mode !== "waiting" && roleLine(round, role, nameOf) && (
-          <p className="text-center text-sm text-cream/80">{roleLine(round, role, nameOf)}</p>
+          <p className="shrink-0 text-center text-sm text-cream/80">{roleLine(round, role, nameOf)}</p>
         )}
 
         {!round || setup ? (
+          <GameLayout>
           <Dealer
             game={game}
             onCall={onCall}
@@ -428,49 +459,86 @@ export function SquadGame({ game }: { game: SquadGameId }) {
               void qc.invalidateQueries({ queryKey: key });
             }}
           />
+          </GameLayout>
         ) : round.stage === "revealed" ? (
-          <>
+          <GameLayout
+            action={
+              revealDone ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Already dealt by somebody who finished reading
+                      // first: step onto it rather than deal a third card.
+                      if (ahead && current) join(current);
+                      else setSetup(true);
+                    }}
+                    className="btn-primary focus-ring w-full rounded-full py-3.5 font-semibold"
+                  >
+                    Next round
+                  </button>
+                  {ahead && (
+                    <p className="mt-2 text-center text-xs text-muted-foreground">
+                      The next card is dealt. Take your time — it waits for you.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={skipReveal}
+                    className="focus-ring rounded-full px-3 py-1 text-sm text-muted-foreground hover:text-cream"
+                  >
+                    {round.game === "who_said_it" ? "Show them all ›" : "Skip ›"}
+                  </button>
+                </div>
+              )
+            }
+          >
             <Reveal round={round} nameOf={nameOf} me={me} beat={beat} done={revealDone} />
-            {revealDone ? (
+          </GameLayout>
+        ) : (
+          /* The card keeps its own question and options all the way
+             through the stage, and waiting goes UNDERNEATH them: the
+             panel used to replace the card the moment you'd moved,
+             which took away the one view of what you had picked and
+             left the stage saying "tap a seat to vote" over a card
+             with nothing to tap. */
+          <GameLayout
+            question={<Prompt text={questionFor(round) ?? undefined} />}
+            action={
               <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Already dealt by somebody who finished reading
-                    // first: step onto it rather than deal a third card.
-                    if (ahead && current) join(current);
-                    else setSetup(true);
-                  }}
-                  className="btn-primary focus-ring w-full rounded-full py-3.5 font-semibold"
-                >
-                  Next round
-                </button>
-                {ahead && (
-                  <p className="text-center text-xs text-muted-foreground">
-                    The next card is dealt. Take your time — it waits for you.
+                {submit && (
+                  <button
+                    type="button"
+                    disabled={!submit.ready || move.isPending}
+                    onClick={() => move.mutate(submit.value)}
+                    className="btn-primary focus-ring w-full rounded-full py-3.5 font-semibold disabled:opacity-40"
+                  >
+                    {submit.label}
+                  </button>
+                )}
+                {table && (plan.vote || plan.guess) && plan.hint && (
+                  <p className="mt-2 text-center text-sm text-muted-foreground">
+                    {plan.hint.replace("Tap a face", "Tap a seat")}
                   </p>
                 )}
+                {canSkip(round, me) && (
+                  <div className="mt-1 text-center">
+                    <button
+                      type="button"
+                      disabled={skipThis.isPending}
+                      onClick={() => skipThis.mutate()}
+                      className="focus-ring rounded-full px-3 py-1 text-sm text-muted-foreground underline-offset-2 hover:text-cream hover:underline disabled:opacity-40"
+                    >
+                      Skip this card
+                    </button>
+                  </div>
+                )}
               </>
-            ) : (
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={skipReveal}
-                  className="focus-ring rounded-full px-3 py-1 text-sm text-muted-foreground hover:text-cream"
-                >
-                  {round.game === "who_said_it" ? "Show them all ›" : "Skip ›"}
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            {/* The card keeps its own question and options all the way
-                through the stage, and waiting goes UNDERNEATH them: the
-                panel used to replace the card the moment you'd moved,
-                which took away the one view of what you had picked and
-                left the stage saying "tap a seat to vote" over a card
-                with nothing to tap. */}
+            }
+          >
             <Play
               round={round}
               mine={mine}
@@ -480,6 +548,10 @@ export function SquadGame({ game }: { game: SquadGameId }) {
               photoOf={photoOf}
               busy={move.isPending}
               onMove={(v) => move.mutate(v)}
+              pick={local.pick}
+              onPickOne={(id) => patch(() => ({ pick: id }))}
+              answerText={answerText}
+              onAnswerText={(t) => patch(() => ({ text: t }))}
               ready={local.ready}
               onReady={() => patch(() => ({ ready: true }))}
               guessing={{
@@ -501,22 +573,7 @@ export function SquadGame({ game }: { game: SquadGameId }) {
                 onPoke={poke}
               />
             )}
-            {table && (plan.vote || plan.guess) && plan.hint && (
-              <p className="text-center text-sm text-muted-foreground">{plan.hint.replace("Tap a face", "Tap a seat")}</p>
-            )}
-            {canSkip(round, me) && (
-              <div className="text-center">
-                <button
-                  type="button"
-                  disabled={skipThis.isPending}
-                  onClick={() => skipThis.mutate()}
-                  className="focus-ring rounded-full px-3 py-1 text-sm text-muted-foreground underline-offset-2 hover:text-cream hover:underline disabled:opacity-40"
-                >
-                  Skip this card
-                </button>
-              </div>
-            )}
-          </>
+          </GameLayout>
         )}
       </div>
     </div>
@@ -533,8 +590,60 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   );
 }
 
-type Local = { key: string; ready: boolean; draft: Record<string, string>; at: number };
-const freshLocal = (key: string): Local => ({ key, ready: false, draft: {}, at: 0 });
+/** What this device holds that the round does not — including a pick
+ *  that has been chosen but not sent (see `submitFor`). Cleared with
+ *  the stage, so a new card never starts with the last one's answer. */
+type Local = {
+  key: string;
+  ready: boolean;
+  draft: Record<string, string>;
+  at: number;
+  pick: string | null;
+  /** The answer being typed, so the Send button can live at the bottom
+   *  of the stage with every other game's. */
+  text: string;
+};
+const freshLocal = (key: string): Local => ({
+  key,
+  ready: false,
+  draft: {},
+  at: 0,
+  pick: null,
+  text: "",
+});
+
+/**
+ * The stage, in three bands: the question at the top, the options or
+ * whatever the round's main piece is in the middle, and the one button
+ * at the bottom.
+ *
+ * George: "for the games, try a distribution like Question (top area),
+ * Options or main piece (middle area), Button (bottom area)."
+ *
+ * Only the middle scrolls. A single scrolling column meant that on a
+ * short phone a five-person ballot pushed its own button off the bottom
+ * of the screen, so answering took a scroll you had no reason to expect
+ * — and the question you were answering had already gone off the top.
+ */
+function GameLayout({
+  question,
+  action,
+  children,
+}: {
+  question?: React.ReactNode;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3 sm:gap-4">
+      {question && <div className="shrink-0">{question}</div>}
+      <div className="flex min-h-0 flex-1 flex-col justify-center gap-3 overflow-y-auto sm:gap-4">
+        {children}
+      </div>
+      {action && <div className="shrink-0">{action}</div>}
+    </div>
+  );
+}
 
 /** Your role, the first time you play it: three lines and the points. Sits
  *  over the game panel only, so the call stays in view. The full rules are
@@ -808,6 +917,7 @@ function Ballot({
   photoOf,
   me,
   picked,
+  sent,
   disabled,
   onPick,
 }: {
@@ -818,7 +928,10 @@ function Ballot({
   trueNameOf: Names;
   photoOf: (pid: string) => string | null;
   me: string | null;
+  /** Chosen — which may be a pick not yet sent. */
   picked: unknown;
+  /** Already with the server, so the row can say so. */
+  sent?: string | null;
   disabled?: boolean;
   onPick: (pid: string) => void;
 }) {
@@ -844,6 +957,11 @@ function Ballot({
             <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-cream">
               <PersonLabel name={nameOf(pid)} isMe={pid === me} />
             </span>
+            {on && sent === pid && (
+              <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-primary/80">
+                In
+              </span>
+            )}
             {on && <Check className="h-5 w-5 shrink-0 text-primary" aria-hidden />}
           </button>
         );
@@ -852,44 +970,36 @@ function Ballot({
   );
 }
 
+/** The answer, as you type it. The Send button lives at the bottom of
+ *  the stage with every other game's (see GameLayout). */
 function AnswerBox({
-  initial,
-  busy,
-  onSend,
+  value,
+  onChange,
+  sent,
   placeholder,
 }: {
-  initial: string;
-  busy: boolean;
-  onSend: (text: string) => void;
+  value: string;
+  onChange: (text: string) => void;
+  sent: string | null;
   placeholder: string;
 }) {
-  const [text, setText] = useState(initial);
   return (
-    <form
-      className="space-y-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (text.trim()) onSend(text.trim());
-      }}
-    >
+    <div className="space-y-2">
       <textarea
-        value={text}
+        value={value}
         maxLength={200}
         rows={3}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         className="auth-input focus-ring w-full resize-none"
         aria-label="Your answer"
       />
-      <button
-        type="submit"
-        disabled={busy || !text.trim()}
-        className="btn-primary focus-ring w-full rounded-full py-3 font-semibold disabled:opacity-40"
-      >
-        {initial ? "Change my answer" : "Send in secret"}
-      </button>
-      {initial && <p className="text-center text-xs text-muted-foreground">Sent. You can change it until everyone's in.</p>}
-    </form>
+      {sent && (
+        <p className="text-center text-xs text-muted-foreground">
+          Sent. You can change it until everyone's in.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -902,6 +1012,10 @@ function Play({
   photoOf,
   busy,
   onMove,
+  pick,
+  onPickOne,
+  answerText,
+  onAnswerText,
   ready,
   onReady,
   guessing,
@@ -914,6 +1028,14 @@ function Play({
   photoOf: (pid: string) => string | null;
   busy: boolean;
   onMove: (value: unknown) => void;
+  /** Chosen on this device, not sent yet. A tap picks; the button at
+   *  the bottom of the stage sends (see `submitFor`). */
+  pick: string | null;
+  onPickOne: (id: string) => void;
+  /** The answer being typed. Held by the stage so its Send button can
+   *  sit in the bottom band with every other game's. */
+  answerText: string;
+  onAnswerText: (text: string) => void;
   /** Imposter: voting shows once you've tapped "Ready to vote". */
   ready: boolean;
   onReady: () => void;
@@ -983,9 +1105,10 @@ function Play({
             trueNameOf={trueNameOf}
             photoOf={photoOf}
             me={me}
-            picked={mine?.my_move}
+            picked={pick ?? mine?.my_move}
+            sent={typeof mine?.my_move === "string" ? mine.my_move : null}
             disabled={busy}
-            onPick={onMove}
+            onPick={onPickOne}
           />
         )}
       </div>
@@ -993,62 +1116,53 @@ function Play({
   }
 
   if (round.game === "most_likely") {
-    return (
-      <div className="space-y-4">
-        <Prompt text={text} />
-        {turn && (
-          <Ballot
-            players={round.players}
-            nameOf={nameOf}
-            trueNameOf={trueNameOf}
-            photoOf={photoOf}
-            me={me}
-            picked={mine?.my_move}
-            disabled={busy}
-            onPick={onMove}
-          />
-        )}
-      </div>
-    );
+    // The question is the stage's top band now, not part of this.
+    return turn ? (
+      <Ballot
+        players={round.players}
+        nameOf={nameOf}
+        trueNameOf={trueNameOf}
+        photoOf={photoOf}
+        me={me}
+        picked={pick ?? mine?.my_move}
+        sent={typeof mine?.my_move === "string" ? mine.my_move : null}
+        disabled={busy}
+        onPick={onPickOne}
+      />
+    ) : null;
   }
 
   const answers = round.public.answers ?? [];
   if (round.stage === "answer") {
-    return (
-      <div className="space-y-4">
-        <Prompt text={text} />
-        {turn && (
-          <AnswerBox
-            key={round.id}
-            initial={typeof mine?.my_move === "string" ? mine.my_move : ""}
-            busy={busy}
-            onSend={onMove}
-            placeholder={round.game === "spill_tea" ? "Fill the blank…" : "Finish the line…"}
-          />
-        )}
-      </div>
-    );
+    return turn ? (
+      <AnswerBox
+        value={answerText}
+        onChange={onAnswerText}
+        sent={typeof mine?.my_move === "string" ? mine.my_move : null}
+        placeholder={round.game === "spill_tea" ? "Fill the blank…" : "Finish the line…"}
+      />
+    ) : null;
   }
 
   if (round.game === "spill_tea") {
     // pick: the judge picks one; everyone reads along.
+    const chosen = pick ?? (typeof mine?.my_move === "string" ? mine.my_move : null);
     return (
       <div className="space-y-4">
-        <Prompt text={text} />
         <p className="text-center text-sm text-muted-foreground">
           {turn ? "Pick your favourite. Nobody knows who wrote what." : `${nameOf(round.lead_id ?? "")} is picking…`}
         </p>
-        <div className="space-y-2">
+        <div className="stagger-children space-y-2">
           {answers.map((a) => (
             <button
               key={a.key}
               type="button"
               disabled={!turn || busy}
-              aria-pressed={mine?.my_move === a.key}
-              onClick={() => onMove(a.key)}
+              aria-pressed={chosen === a.key}
+              onClick={() => onPickOne(a.key)}
               className={cn(
                 "focus-ring w-full rounded-2xl border px-4 py-3.5 text-left text-[15px] text-cream transition-colors disabled:cursor-default",
-                mine?.my_move === a.key ? "border-primary/60 bg-primary/20" : "border-white/[0.08] bg-card/30",
+                chosen === a.key ? "border-primary/60 bg-primary/20" : "border-white/[0.08] bg-card/30",
                 turn && "hover:border-primary/30",
               )}
             >
