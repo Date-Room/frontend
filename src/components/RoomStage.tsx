@@ -693,6 +693,45 @@ export function RoomStage({
   const table = squadGameStaged && tableWide;
   const tableCentre = bigCentre ? TABLE_CENTRE_BIG : TABLE_CENTRE;
   const tableShare = tableFaceShare(cueMode, Boolean(squadStage?.cue?.focus));
+
+  /**
+   * Somebody is on the call and I am not: a notice, once.
+   *
+   * George: "The notice on web that someone has joined the call, it
+   * should be swipe-to-dismiss like any other toast. Instead it stays
+   * there and asks me to join. It doesn't even auto-dismiss."
+   *
+   * The stage's call button is a CONTROL and stays put — that is how
+   * you join whenever you like. What was missing was the notice: the
+   * thing that says somebody just picked up, gets out of the way on
+   * its own, and can be pushed away sooner. Raised once per call: when
+   * the call empties the latch resets, so the next one is announced
+   * again and a dismissed notice does not come straight back.
+   */
+  const [callNotice, setCallNotice] = useState<string | null>(null);
+  const toldOfCall = useRef(false);
+  const callerName = squad
+    ? (squadStage?.inCall ?? []).filter((id) => id !== room.senderId).map(presenceName)[0] ?? null
+    : partnerInCall
+      ? partnerName
+      : null;
+  useEffect(() => {
+    if (!callerName) {
+      toldOfCall.current = false;
+      setCallNotice(null);
+      return;
+    }
+    // I'm in it, so there is nothing to tell me.
+    if (callActive) {
+      toldOfCall.current = true;
+      setCallNotice(null);
+      return;
+    }
+    if (toldOfCall.current) return;
+    toldOfCall.current = true;
+    setCallNotice(callerName);
+    inviteChime(true);
+  }, [callerName, callActive]);
   /** The squad's bar: mute and camera from the call beside Activities and chat. */
   const squadBar = squad && callActive && !watchFullscreen ? (squadStage?.controls ?? null) : null;
   const squadCaret =
@@ -1494,7 +1533,22 @@ export function RoomStage({
                 {/* The live call is re-homed into this slot (see gameFacesSlotRef). */}
                 <div ref={gameFacesSlotRef} className="absolute inset-0" />
                 <div
-                  className="absolute bottom-0 z-10 overflow-y-auto rounded-2xl border border-white/[0.08] bg-card/95 shadow-[0_20px_60px_rgba(0,0,0,0.45)] transition-[top] duration-300"
+                  // A flex column, and it does NOT scroll.
+                  //
+                  // George: "in that grid layout, sometimes the game
+                  // pushes down below the screen, and you can't see it."
+                  // This panel has a definite height (top and bottom are
+                  // both set), but it was a plain block — so the game
+                  // inside it, which pins its question to the top and its
+                  // button to the bottom of whatever it is given, had
+                  // nothing to pin against: `flex-1` in a non-flex parent
+                  // collapses to content height. The bands then stacked to
+                  // their natural size, overflowed the panel, and the
+                  // button went below the fold with `overflow-y-auto`
+                  // quietly making that look intentional. The game owns its
+                  // own scrolling now (GameLayout's middle band), so this
+                  // only has to be a column of the right height.
+                  className="absolute bottom-0 z-10 flex flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-card/95 shadow-[0_20px_60px_rgba(0,0,0,0.45)] transition-[top,width] duration-300 ease-out"
                   style={{
                     width: tableCentre,
                     left: `calc(50% - ${tableCentre / 2}px)`,
@@ -1512,7 +1566,13 @@ export function RoomStage({
               <div className={cn("flex h-full min-h-0 gap-2", wide ? "flex-row" : "flex-col")}>
                 <div
                   className={cn(
-                    "min-h-0 min-w-0 overflow-y-auto transition-[flex-basis,max-height] duration-300",
+                    // A column that does not scroll, for the same reason
+                    // as the table's centre panel above: the game pins its
+                    // question and its button to the ends of what it is
+                    // given, and `flex-1` against a plain block collapses
+                    // to content height — which put the button off the
+                    // bottom and left scrolling to cover for it.
+                    "flex min-h-0 min-w-0 flex-col overflow-hidden transition-[flex-basis,max-height] duration-300 ease-out",
                     wide
                       ? cueMode === "reading"
                         ? "basis-[58%]"
@@ -1859,7 +1919,24 @@ export function RoomStage({
           Rendered into a persistent host (see pipHostRef) so it can be
           re-parented into the Watch fullscreen layer without remounting the
           call. The anchor marks its normal home in the room. */}
-      {inviteId &&
+      {callNotice && (
+        <ActivityInvite
+          kind="call"
+          partnerName={callNotice}
+          partnerPhotoUrl={squad ? null : partnerPhotoUrl}
+          activityId="call"
+          activityTitle="the call"
+          headline={`${callNotice} is in the call`}
+          onJoin={() => {
+            setCallNotice(null);
+            onCallIn();
+          }}
+          onDecline={() => setCallNotice(null)}
+        />
+      )}
+
+      {!callNotice &&
+        inviteId &&
         // A squad round in play keeps its screen: a friend's invite waits
         // until the reveal (a tie has no spotlight, so ask the game).
         !(squadGameStaged && squadStage?.cue?.live) &&
