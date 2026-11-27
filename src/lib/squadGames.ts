@@ -371,20 +371,48 @@ export function waitingLine(round: Round, opts: { judging?: boolean } = {}): str
  * One rule, all five games, because one engine deals all five. The twin
  * of mobile's `features/squad/squad_pacing.dart`.
  */
-export type Pinned = { number: number; state: RoundState };
+export type Pinned = {
+  number: number;
+  state: RoundState;
+  /**
+   * I have pressed Next on this round: take me onward the moment there
+   * IS an onward.
+   *
+   * George: "had to click next twice on mobile. It said the next card is
+   * dealt and waiting for you.. It should just go next.. That extra step
+   * is unnecessary."
+   *
+   * Without this, "Next" had to mean one of two different things —
+   * deal a card, or step onto one somebody else dealt — and the client
+   * had to know which, from state that is a refetch behind. Press it
+   * while the response is in flight and it pinned you back to the round
+   * you had just left, so the second press did what the first appeared
+   * to. One flag instead: a press says "done with this one", and
+   * whatever arrives next is what you get.
+   */
+  done?: boolean;
+};
 
 export function nextPin(pin: Pinned | null, current: RoundState | null): Pinned | null {
   const here = current?.round;
   if (!current || !here) return null;
   const at = (s: RoundState): Pinned => ({ number: here.number, state: s });
   if (!pin) return at(current);
+  // Asked to move on: anything newer will do, and nothing older counts.
+  if (pin.done) return here.number > pin.number ? at(current) : pin;
   if (here.number === pin.number) return at(current);
   if (here.number < pin.number) return pin; // a stale read; the room can't go back
   return pin.state.round?.stage === "revealed" ? pin : at(current);
 }
 
-/** Pure: the room has dealt past the round I'm reading, so "Next" is a
- *  step I take rather than a card to deal. */
+/** Pure: I'm done with this round. The next one the room has — or the
+ *  next one dealt — is where I go. */
+export function leaveRound(pin: Pinned | null): Pinned | null {
+  return pin ? { ...pin, done: true } : pin;
+}
+
+/** Pure: is there already a round past the one I'm on, so pressing Next
+ *  needs no card dealt? */
 export function roomAhead(pin: Pinned | null, current: RoundState | null): boolean {
   const here = current?.round;
   return Boolean(pin && here && here.number > pin.number);

@@ -16,7 +16,15 @@
  * the cases it exists for.
  */
 import { describe, expect, it } from "vitest";
-import { nextPin, roomAhead, waitingLine, type Pinned, type Round, type RoundState } from "@/lib/squadGames";
+import {
+  leaveRound,
+  nextPin,
+  roomAhead,
+  waitingLine,
+  type Pinned,
+  type Round,
+  type RoundState,
+} from "@/lib/squadGames";
 
 const round = (over: Partial<Round> = {}): Round => ({
   id: `r${over.number ?? 1}`,
@@ -81,6 +89,30 @@ describe("the round you are on is yours to leave", () => {
   it("ignores a read that arrives from behind", () => {
     const mine = pinOf(state({ number: 4, id: "r4" }));
     expect(nextPin(mine, state({ number: 3, id: "r3" }))).toBe(mine);
+  });
+
+  it("one press of Next, however the next card arrives", () => {
+    // George: "had to click next twice on mobile. It said the next card
+    // is dealt and waiting for you.. It should just go next.. That extra
+    // step is unnecessary."
+    //
+    // The press says "done with this round" and nothing else. Whether
+    // the card is already dealt or has to be dealt, and whether the
+    // answer arrives before or after a refetch settles, the next thing
+    // the room shows is where I land — so the press can never need
+    // repeating.
+    const mine = leaveRound(pinOf(state({ stage: "revealed" })))!;
+    expect(mine.done).toBe(true);
+    // Already dealt: straight onto it.
+    const theirs = state({ number: 2, id: "r2" });
+    expect(nextPin(mine, theirs)?.state).toBe(theirs);
+    // Not dealt yet, and a stale read lands first: I stay put rather
+    // than being re-pinned to the round I just left — which is what
+    // made the second press look like the one that worked.
+    const stale = state({ stage: "revealed" });
+    expect(nextPin(mine, stale)).toBe(mine);
+    // And then the new one arrives.
+    expect(nextPin(nextPin(mine, stale), theirs)?.state).toBe(theirs);
   });
 
   it("lets go when the game is cleared out", () => {

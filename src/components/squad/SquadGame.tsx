@@ -28,6 +28,7 @@ import {
   isRoundConflict,
   listNames,
   markRoleSeen,
+  leaveRound,
   makeMove,
   myTurn,
   nextPin,
@@ -47,6 +48,7 @@ import {
   stageCueFor,
   startRound,
   submitFor,
+  tallyRows,
   waitingLine,
   waitingOn,
   type Beat,
@@ -468,20 +470,17 @@ export function SquadGame({ game }: { game: SquadGameId }) {
                   <button
                     type="button"
                     onClick={() => {
-                      // Already dealt by somebody who finished reading
-                      // first: step onto it rather than deal a third card.
-                      if (ahead && current) join(current);
-                      else setSetup(true);
+                      // One press, one meaning: done with this round.
+                      // If somebody has already dealt the next card the
+                      // pin lands on it as soon as it is read; if not,
+                      // dealing is what produces it.
+                      setPin(leaveRound);
+                      if (!ahead) setSetup(true);
                     }}
                     className="btn-primary focus-ring w-full rounded-full py-3.5 font-semibold"
                   >
                     Next round
                   </button>
-                  {ahead && (
-                    <p className="mt-2 text-center text-xs text-muted-foreground">
-                      The next card is dealt. Take your time — it waits for you.
-                    </p>
-                  )}
                 </>
               ) : (
                 <div className="text-center">
@@ -496,7 +495,15 @@ export function SquadGame({ game }: { game: SquadGameId }) {
               )
             }
           >
-            <Reveal round={round} nameOf={nameOf} me={me} beat={beat} done={revealDone} />
+            <Reveal
+              round={round}
+              nameOf={nameOf}
+              trueNameOf={trueNameOf}
+              photoOf={photoOf}
+              me={me}
+              beat={beat}
+              done={revealDone}
+            />
           </GameLayout>
         ) : (
           /* The card keeps its own question and options all the way
@@ -1490,15 +1497,38 @@ function WaitPanel({
 
 /** The reveal, beat by beat (see revealBeats). The call carries the face
  *  and the gold caption; this panel carries the words around it. */
+/**
+ * The reveal says the result in words, on the panel.
+ *
+ * George: "After everyone answers on 'Most Likely To' game, it doesn't
+ * show The Reveal on web.. only on mobile. Web needs to show the
+ * reveal."
+ *
+ * It was there — on the CALL. The result rode entirely on the
+ * spotlight: the game told the call which face to put forward with a
+ * gold caption, and the panel deliberately stayed quiet so as not to
+ * say it twice ("in the spotlight the caption rides on the face"). So
+ * the one thing the round exists to announce was drawn by a component
+ * that is not always on screen, and when it wasn't, the reveal was a
+ * prompt and a footnote. Mobile never had the problem because it draws
+ * its own tally.
+ *
+ * The same mistake as the ballot, in the same place: the call is a
+ * flourish on top of the panel, never the only copy of something.
+ */
 function Reveal({
   round,
   nameOf,
+  trueNameOf,
+  photoOf,
   me,
   beat,
   done,
 }: {
   round: Round;
   nameOf: Names;
+  trueNameOf: Names;
+  photoOf: (pid: string) => string | null;
   me: string | null;
   beat: Beat | null;
   done: boolean;
@@ -1516,11 +1546,42 @@ function Reveal({
   ) : null;
 
   if (round.game === "most_likely") {
+    const top = (r.top as string[] | undefined) ?? [];
+    const rows = tallyRows((r.tally ?? {}) as Record<string, number>, nameOf);
     return (
       <div className="space-y-3 sm:space-y-4">
         <Prompt text={round.prompt?.text} />
         {caption}
-        {done && (r.top as string[] | undefined)?.length ? (
+        {done && rows.length > 0 && (
+          <div className="stagger-children space-y-2">
+            {rows.map((row) => {
+              const won = top.includes(row.pid);
+              return (
+                <div
+                  key={row.pid}
+                  className={cn(
+                    "flex items-center gap-3 rounded-2xl border px-3 py-2.5",
+                    won ? "border-primary/60 bg-primary/15" : "border-white/[0.08] bg-card/30",
+                  )}
+                >
+                  <Face photo={photoOf(row.pid)} name={trueNameOf(row.pid)} />
+                  <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-cream">
+                    <PersonLabel name={row.name} isMe={row.pid === me} />
+                  </span>
+                  <span
+                    className={cn(
+                      "shrink-0 text-sm font-semibold tabular-nums",
+                      won ? "text-primary" : "text-muted-foreground",
+                    )}
+                  >
+                    {row.votes} {row.votes === 1 ? "vote" : "votes"}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {done && top.length ? (
           <p className="text-center text-sm text-muted-foreground">Everyone who agreed scores a point.</p>
         ) : null}
       </div>
@@ -1528,9 +1589,20 @@ function Reveal({
   }
 
   if (round.game === "imposter") {
+    const imp = String(r.imposter ?? "");
     return (
       <div className="space-y-3 text-center sm:space-y-4">
         {caption}
+        {/* Who it was, in the panel's own words: the face carrying it is
+            on the call, which is not always on screen. */}
+        {done && imp && (
+          <div className="mx-auto flex max-w-xs items-center gap-3 rounded-2xl border border-primary/50 bg-primary/15 px-3 py-2.5 text-left">
+            <Face photo={photoOf(imp)} name={trueNameOf(imp)} />
+            <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-cream">
+              <PersonLabel name={nameOf(imp)} isMe={imp === me} /> was the imposter
+            </span>
+          </div>
+        )}
         {done && (
           <p className="animate-in text-sm text-muted-foreground fade-in duration-700">
             The word was <span className="font-serif text-lg text-cream">{String(r.word ?? "")}</span>.{" "}

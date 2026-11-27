@@ -27,6 +27,24 @@ import { describe, expect, it } from "vitest";
 
 const src = readFileSync("src/components/squad/SquadGame.tsx", "utf8");
 
+describe("the reveal", () => {
+  it("says the result on the panel, not only on the call", () => {
+    // George: "After everyone answers on 'Most Likely To' game, it
+    // doesn't show The Reveal on web.. only on mobile." The result rode
+    // entirely on the call's spotlight face, so with no call on screen
+    // the reveal was a prompt and a footnote.
+    const at = src.indexOf('if (round.game === "most_likely") {', src.indexOf("function Reveal("));
+    expect(at).toBeGreaterThan(0);
+    const body = src.slice(at, at + 1800);
+    expect(body).toContain("tallyRows(");
+    expect(body).toContain("<Face photo={photoOf(row.pid)}");
+    expect(body).toMatch(/votes.*vote/);
+    // And Imposter names who it was, for the same reason.
+    const imp = src.indexOf('if (round.game === "imposter") {', src.indexOf("function Reveal("));
+    expect(src.slice(imp, imp + 900)).toContain("was the imposter");
+  });
+});
+
 describe("the ballot", () => {
   it("is never hidden because the faces are elsewhere", () => {
     // `faceVote` may still decide where the HINT goes; it may never
@@ -91,10 +109,12 @@ describe("the ballot", () => {
 });
 
 describe("Next round moves one person", () => {
-  it("steps onto a round somebody else dealt rather than dealing again", () => {
-    const at = src.indexOf("if (ahead && current) join(current);");
+  it("needs one press, however the next card arrives", () => {
+    // Not two: the press says "done with this round", and dealing is
+    // only how the next card gets made when nobody has made it.
+    const at = src.indexOf("setPin(leaveRound);");
     expect(at).toBeGreaterThan(0);
-    expect(src.slice(at, at + 120)).toContain("else setSetup(true)");
+    expect(src.slice(at, at + 120)).toContain("if (!ahead) setSetup(true)");
   });
 
   it("renders the round this device is pinned to", () => {
