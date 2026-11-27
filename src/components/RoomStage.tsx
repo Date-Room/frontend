@@ -1872,7 +1872,14 @@ export function RoomStage({
               partnerPhotoUrl={squad ? null : partnerPhotoUrl}
               activityId={inviteId}
               activityTitle={title}
-              headline={inviteHeadline(squad ? (inviterName ?? partnerName) : partnerName, inviteId, title)}
+              headline={inviteHeadline(
+                squad ? (inviterName ?? partnerName) : partnerName,
+                inviteId,
+                title,
+                // More than one person in there means this is a room
+                // that was already going, not one being opened.
+                (parties.find((p) => p.activityId === inviteId)?.people.length ?? 0) > 1,
+              )}
               tileSrc={ACTIVITY_TILES[inviteId]}
               Icon={ITEM_ICONS[inviteId]}
               onJoin={() => commitStage(inviteId)}

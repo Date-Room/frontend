@@ -100,8 +100,24 @@ export function pendingInvite(state: InviteState, myStaged: string | null): stri
 }
 
 /** "JJ fired up Guacamole Panic" */
-export function inviteHeadline(partnerName: string, activityId: string, activityTitle: string): string {
-  const verb = INVITABLE[activityId]?.verb ?? "started";
+export function inviteHeadline(
+  partnerName: string,
+  activityId: string,
+  activityTitle: string,
+  /**
+   * Somebody was already in it when this person arrived.
+   *
+   * George: "say who did what. And if it's started or joined. Those
+   * actions should be distinct."
+   *
+   * The name was always here; the verb was not. Every arrival read as
+   * "started", including walking into a game three people had been
+   * playing for ten minutes — which misdescribes both the event and
+   * what accepting the invitation will get you.
+   */
+  joined = false,
+): string {
+  const verb = joined ? "joined" : (INVITABLE[activityId]?.verb ?? "started");
   return `${partnerName} ${verb} ${activityTitle}`;
 }
 

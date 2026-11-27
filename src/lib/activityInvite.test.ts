@@ -72,6 +72,24 @@ describe("copy", () => {
   it("uses the activity's verb and the partner's real name", () => {
     expect(inviteHeadline("JJ", "guacamole", "Guacamole Panic")).toBe("JJ fired up Guacamole Panic");
     expect(inviteHeadline("JJ", "questions", "Open Book")).toBe("JJ started Open Book");
+  });
+
+  it("says joined when they walked into one already running", () => {
+    // George: "say who did what. And if it's started or joined. Those
+    // actions should be distinct." Every arrival used to read as
+    // "started", including walking into a game three people had been
+    // playing for ten minutes — which misdescribes the event and what
+    // accepting will get you.
+    expect(inviteHeadline("JJ", "questions", "Open Book", true)).toBe("JJ joined Open Book");
+    // "joined" beats the activity's own flavour verb: "JJ fired up
+    // Guacamole Panic" is a lie about a game already in progress.
+    expect(inviteHeadline("JJ", "guacamole", "Guacamole Panic", true)).toBe(
+      "JJ joined Guacamole Panic",
+    );
+  });
+
+  it("and defaults to started, so nothing else had to change", () => {
+    expect(inviteHeadline("JJ", "questions", "Open Book", false)).toBe("JJ started Open Book");
     expect(inviteHeadline("JJ", "watch", "Watch")).toBe("JJ opened Watch");
   });
 });
