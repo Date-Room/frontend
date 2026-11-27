@@ -23,6 +23,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVideoFit } from "@/hooks/useVideoFit";
 import { useGridColumns } from "@/hooks/useGridColumns";
+import { useSquadRowPlan } from "@/hooks/useSquadRowPlan";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   VideoTrack,
@@ -207,8 +208,12 @@ export function GroupStage({ roomId, layout, bare }: Props) {
   // night's seats rather than the people on it, so three phones in a
   // five-seat night were laid out as five wide cells: two of them
   // empty, and the three real ones the wrong shape for the video.
-  const callGrid = useGridColumns(
-    order.length,
+  //
+  // And not one column count for everybody either: that is a single
+  // cell shape, which cannot suit a phone and a laptop at once. The
+  // stage is split into rows whose HEIGHTS follow the feeds in them,
+  // the way mobile does it — see lib/squadRows.ts.
+  const callPlan = useSquadRowPlan(
     order.map((id) => ({ dimensions: byId.get(id)?.publication?.dimensions })),
   );
   const night = nights.data?.active_night ?? null;
@@ -547,14 +552,26 @@ export function GroupStage({ roomId, layout, bare }: Props) {
     <div className="relative flex h-full w-full flex-col bg-black/40">
       {clockChip}
       <div
-        ref={callGrid.ref}
-        className="grid min-h-0 flex-1 gap-2 p-2 sm:gap-3 sm:p-3"
-        style={{
-          gridTemplateColumns: `repeat(${callGrid.columns}, minmax(0, 1fr))`,
-          gridAutoRows: "minmax(0, 1fr)",
-        }}
+        ref={callPlan.ref}
+        className="flex min-h-0 flex-1 flex-col gap-2 p-2 sm:gap-3 sm:p-3"
       >
-        {order.map((id) => face(id, "tile"))}
+        {callPlan.rows.map((cells, r) => {
+          const from = callPlan.rows.slice(0, r).reduce((a, b) => a + b, 0);
+          return (
+            <div
+              key={r}
+              className="flex min-h-0 gap-2 sm:gap-3"
+              // flexBasis 0 so the share alone decides the height.
+              style={{ flexGrow: callPlan.shares[r], flexBasis: 0 }}
+            >
+              {order.slice(from, from + cells).map((id) => (
+                <div key={id} className="min-w-0 flex-1">
+                  {face(id, "tile")}
+                </div>
+              ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
