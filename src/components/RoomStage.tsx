@@ -49,6 +49,7 @@ import {
   Mic,
   MicOff,
   VideoOff,
+  Phone,
   PhoneOff,
   type LucideIcon,
   Loader2,
@@ -1322,8 +1323,17 @@ export function RoomStage({
                 onClick={onCallIn}
                 className="group flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-cream backdrop-blur-md transition hover:border-primary/30 hover:bg-white/[0.07] active:scale-[0.99] lg:hidden"
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                  <Video className="h-[18px] w-[18px]" />
+                {/* A phone, in green, always.
+                    George: "we can use the phone call emoji instead of
+                    video, and make it fixed green. Calls need to be
+                    obvious IMO." A camera icon promised video, which a
+                    call no longer starts with; and the accent is the
+                    room's — it changes with the theme, so the one
+                    control that has to be unmistakable was a different
+                    colour in every room. Green is what answering is
+                    everywhere, and it does not move. */}
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300">
+                  <Phone className="h-[18px] w-[18px]" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-body font-semibold leading-tight">{title}</span>
@@ -1498,11 +1508,10 @@ export function RoomStage({
                         onClick={onCallIn}
                         className="group hidden max-w-md items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] py-1.5 pl-1.5 pr-3 text-left text-cream transition hover:border-primary/30 hover:bg-white/[0.07] lg:flex"
                       >
-                        <span
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-primary-foreground"
-                          style={{ backgroundColor: "var(--room-accent, hsl(var(--primary)))" }}
-                        >
-                          <Video className="h-4 w-4" />
+                        {/* Green, and a phone — see the note on the
+                            narrow-screen CTA above. */}
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[#06100c]">
+                          <Phone className="h-4 w-4" />
                         </span>
                         <span className="min-w-0">
                           <span className="block text-label font-semibold leading-tight">{title}</span>

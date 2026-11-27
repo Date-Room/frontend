@@ -42,9 +42,22 @@ describe("joining with mic and camera", () => {
     s = new MemoryStorage();
   });
 
-  it("both on when nothing has been chosen", () => {
-    // A call you have never configured should just work.
+  it("mic on, camera off when nothing has been chosen", () => {
+    // George: "Can we make dateroom calls by default video off?... Calls
+    // need to be obvious IMO."
+    //
+    // The mic IS the call, so it starts on; joining muted would be
+    // joining to listen. The camera starts off, because a call that
+    // opens with your camera live is a call you have to be ready for,
+    // and the hesitation that buys is what stops people pressing the
+    // button at all. Audio first, video if you want it.
     expect(joinWithMic(s)).toBe(true);
+    expect(joinWithCamera(s)).toBe(false);
+  });
+
+  it("but a camera turned on is remembered on", () => {
+    // The default is only the answer for someone who has never said.
+    rememberCamera(true, s);
     expect(joinWithCamera(s)).toBe(true);
   });
 
@@ -65,11 +78,13 @@ describe("joining with mic and camera", () => {
   });
 
   it("keeps mic and camera independent", () => {
+    rememberCamera(true, s);
     rememberMic(false, s);
     expect(joinWithCamera(s)).toBe(true);
     rememberCamera(false, s);
     rememberMic(true, s);
     expect(joinWithCamera(s)).toBe(false);
+    expect(joinWithMic(s)).toBe(true);
   });
 
   it("shares the pre-room's own keys, so the lobby and the call agree", () => {

@@ -620,8 +620,23 @@ function Face({
   // up the camera is, it is how much of it this seat would throw away:
   // see `videoFit`, which web's 1:1 tiles and mobile both use too.
   const fitBox = useVideoFit();
-  const fit = () =>
-    cn("h-full w-full", fitBox.fit === "contain" ? "bg-black object-contain" : "object-cover");
+  // object-fit INLINE, not as a class.
+  //
+  // George: "You've not figured out a way to write a smart layout for
+  // calls on web, so that portrait videos are portrait. Everything is
+  // still landscape on web. EVERYTHING!!!"
+  //
+  // The measuring was right and the answer never reached the pixels.
+  // LiveKit's stylesheet ships `.lk-participant-media-video { object-fit:
+  // cover }`, which is the same specificity as Tailwind's `object-contain`
+  // and is imported after it — so the class lost every single time and
+  // every feed cropped to its tile, whatever the planner had decided.
+  // RoomVideo found this months ago and sets the property inline for
+  // exactly this reason; the squad call is where that lesson never
+  // arrived. An inline style beats any stylesheet, so the decision now
+  // lands.
+  const fit = () => cn("h-full w-full", fitBox.fit === "contain" && "bg-black");
+  const fitStyle = { objectFit: fitBox.fit } as const;
   const hasVideo =
     showVideo && isTrackReference(trackRef) && !trackRef.publication.isMuted && Boolean(trackRef.publication.track);
   // What the game says about this face: my pick, dimmed, their turn, in/thinking.
@@ -670,7 +685,7 @@ function Face({
       >
         {badge}
         {hasVideo ? (
-          <VideoTrack trackRef={trackRef} className={fit()} />
+          <VideoTrack trackRef={trackRef} className={fit()} style={fitStyle} />
         ) : photo ? (
           <UserAvatarImg
             src={photo}
@@ -704,7 +719,7 @@ function Face({
         )}
       >
         {hasVideo ? (
-          <VideoTrack trackRef={trackRef} className={fit()} />
+          <VideoTrack trackRef={trackRef} className={fit()} style={fitStyle} />
         ) : photo ? (
           <UserAvatarImg
             src={photo}
@@ -739,7 +754,7 @@ function Face({
           )}
         >
           {hasVideo ? (
-            <VideoTrack trackRef={trackRef} className={fit()} />
+            <VideoTrack trackRef={trackRef} className={fit()} style={fitStyle} />
           ) : photo ? (
             <UserAvatarImg
               src={photo}
@@ -773,7 +788,7 @@ function Face({
     >
       {badge}
       {hasVideo ? (
-        <VideoTrack trackRef={trackRef} className={fit()} />
+        <VideoTrack trackRef={trackRef} className={fit()} style={fitStyle} />
       ) : photo ? (
         <UserAvatarImg
           src={photo}
