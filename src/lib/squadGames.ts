@@ -5,7 +5,7 @@
  * only their own card and move; after every change the room channel gets
  * a `durable.update` on activity "game_<game>" and everyone refetches.
  */
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 
 export type SquadGameId = "most_likely" | "who_said_it" | "imposter" | "spill_tea" | "heads_up";
 export type Deck = "mild" | "spicy";
@@ -584,4 +584,22 @@ export function beatCue(beat: Beat, round: Round): CuePlan {
   const faces: CuePlan["faces"] = {};
   for (const p of round.players) faces[p] = beat.ring?.includes(p) ? { ring: true } : {};
   return { mode: beat.mode, focus: beat.focus, faces, hint: beat.mode === "waiting" ? beat.caption : null, vote: false };
+}
+
+/**
+ * Pure: did this failure mean somebody else got there first?
+ *
+ * A squad plays together, so two people reaching for the same thing at once
+ * is ordinary rather than a fault — you tap on a screen that was a second
+ * out of date and the server says the round already moved. The caller
+ * refetches either way; this decides whether to call it a failure or just
+ * say what happened. Dealing has read it as "join theirs" all along, by the
+ * `round_in_progress` code; the actions taken once a round is open only ever
+ * get the bare 409, which is why both shapes count.
+ */
+export function isRoundConflict(e: unknown): boolean {
+  if (!(e instanceof ApiError)) return false;
+  if (e.status === 409) return true;
+  const detail = (e.body as { detail?: { error?: string } } | undefined)?.detail;
+  return detail?.error === "round_in_progress";
 }
