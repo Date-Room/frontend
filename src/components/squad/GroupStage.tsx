@@ -68,6 +68,10 @@ import {
   timeLeft,
 } from "@/lib/squadCall";
 import { cn } from "@/lib/utils";
+import { FaceMark } from "@/components/FaceMark";
+import { ScorePop } from "@/components/ScorePop";
+import { PersonLabel } from "@/components/PersonLabel";
+import { UserAvatarImg } from "@/components/UserAvatarImg";
 
 /**
  * grid         the hang-out grid (laptop, nothing on stage)
@@ -229,7 +233,10 @@ export function GroupStage({ roomId, layout, bare }: Props) {
     const ref = byId.get(id);
     if (!ref) return null;
     const m = byIdentity.get(id);
-    const name = id === self ? "You" : m?.display_name || ref.participant.name || "Friend";
+    // The raw name; `isMe` adds the mark where it is rendered, so a
+    // tile knows whose face it is without the label deciding for it.
+    const name = m?.display_name || ref.participant.name || "Friend";
+    const isMe = id === self;
     // Anyone on the call can mute someone else (they stepped away and
     // their laptop is noisy); they can turn it back on. Not while picking
     // faces in a game, where a tap on a face is the answer.
@@ -252,6 +259,7 @@ export function GroupStage({ roomId, layout, bare }: Props) {
         key={id}
         trackRef={ref}
         name={name}
+        isMe={isMe}
         place={placeLine(m?.city, m?.tz, now)}
         photo={m?.photo_url ?? null}
         talking={speaking.some((p) => p.identity === id)}
@@ -563,6 +571,7 @@ const BADGE_TEXT: Record<NonNullable<FaceCue["badge"]>, string> = {
 function Face({
   trackRef,
   name,
+  isMe = false,
   place,
   photo,
   talking,
@@ -574,6 +583,8 @@ function Face({
 }: {
   trackRef: TrackReferenceOrPlaceholder;
   name: string;
+  /** Marks this tile as mine: the name bar reads "Jun (You)". */
+  isMe?: boolean;
   place: string;
   photo: string | null;
   talking: boolean;
@@ -596,7 +607,6 @@ function Face({
     cn("h-full w-full", fitBox.fit === "contain" ? "bg-black object-contain" : "object-cover");
   const hasVideo =
     showVideo && isTrackReference(trackRef) && !trackRef.publication.isMuted && Boolean(trackRef.publication.track);
-  const initial = (name || "?").charAt(0).toUpperCase();
   // What the game says about this face: my pick, dimmed, their turn, in/thinking.
   const cueRing = cue?.picked
     ? "ring-[3px] ring-primary shadow-[0_0_26px_hsl(var(--primary)/0.45)]"
@@ -645,9 +655,13 @@ function Face({
         {hasVideo ? (
           <VideoTrack trackRef={trackRef} className={fit()} />
         ) : photo ? (
-          <img src={photo} alt="" className={cn("rounded-full object-cover", spot ? "h-28 w-28" : "h-9 w-9")} />
+          <UserAvatarImg
+            src={photo}
+            fallback={<PersonLabel name={name} isMe={isMe} />}
+            className={cn("rounded-full object-cover", spot ? "h-28 w-28" : "h-9 w-9")}
+          />
         ) : (
-          <span className={cn("font-serif font-semibold text-cream", spot ? "text-6xl" : "text-lg")}>{initial}</span>
+          <span className={cn("font-serif font-semibold text-cream", spot ? "text-6xl" : "text-lg")}><FaceMark name={name} /></span>
         )}
         <span
           className={cn(
@@ -655,7 +669,7 @@ function Face({
             spot ? "text-sm" : "text-[10px]",
           )}
         >
-          {name}
+          <PersonLabel name={name} isMe={isMe} />
         </span>
       </div>,
       cn("h-full w-full", cueDim),
@@ -675,14 +689,20 @@ function Face({
         {hasVideo ? (
           <VideoTrack trackRef={trackRef} className={fit()} />
         ) : photo ? (
-          <img src={photo} alt="" className="h-11 w-11 rounded-full object-cover" />
+          <UserAvatarImg
+            src={photo}
+            fallback={<FaceMark name={name} />}
+            className="h-11 w-11 rounded-full object-cover"
+          />
         ) : (
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/25 text-lg font-bold text-cream">
-            {initial}
+            <FaceMark name={name} />
           </span>
         )}
         <div className="absolute inset-x-1.5 bottom-1.5 flex items-center gap-1 rounded-md bg-black/65 px-1.5 py-0.5 text-[11px]">
-          <span className="truncate font-semibold text-cream">{name}</span>
+          <span className="truncate font-semibold text-cream">
+            <PersonLabel name={name} isMe={isMe} />
+          </span>
           {place && <span className="ml-auto shrink-0 truncate text-cream/70">{place}</span>}
           {onMute && <FaceMenu name={name} hasVideo={hasVideo} onMute={onMute} className={place ? "" : "ml-auto"} small />}
         </div>
@@ -704,9 +724,13 @@ function Face({
           {hasVideo ? (
             <VideoTrack trackRef={trackRef} className={fit()} />
           ) : photo ? (
-            <img src={photo} alt="" className="h-full w-full object-cover" />
+            <UserAvatarImg
+              src={photo}
+              fallback={<FaceMark name={name} />}
+              className="h-full w-full object-cover"
+            />
           ) : (
-            <span className="flex h-full w-full items-center justify-center text-lg font-bold text-cream">{initial}</span>
+            <span className="flex h-full w-full items-center justify-center text-lg font-bold text-cream"><FaceMark name={name} /></span>
           )}
         </div>
         <span className="max-w-full truncate text-[11px] text-cream/85">{name}</span>
@@ -734,10 +758,14 @@ function Face({
       {hasVideo ? (
         <VideoTrack trackRef={trackRef} className={fit()} />
       ) : photo ? (
-        <img src={photo} alt="" className="aspect-square h-[62%] max-h-28 w-auto rounded-full object-cover" />
+        <UserAvatarImg
+          src={photo}
+          fallback={<FaceMark name={name} />}
+          className="aspect-square h-[62%] max-h-28 w-auto rounded-full object-cover"
+        />
       ) : (
         <span className="flex aspect-square h-[62%] max-h-28 items-center justify-center rounded-full bg-primary/25 font-serif text-3xl font-semibold text-cream sm:text-4xl">
-          {initial}
+          <FaceMark name={name} />
         </span>
       )}
       {talking && (
@@ -773,8 +801,14 @@ function ScoresSeat({ roomId, self, style }: { roomId: string; self: string; sty
         rows.map((r, i) => (
           <div key={r.user_id} className="flex items-center gap-2 text-sm">
             <span className="w-4 tabular-nums text-muted-foreground">{i + 1}</span>
-            <span className="min-w-0 flex-1 truncate text-cream">{r.user_id === self ? "You" : r.display_name}</span>
-            <span className="font-semibold tabular-nums text-cream">{r.points}</span>
+            <span className="min-w-0 flex-1 truncate text-cream">
+              <PersonLabel name={r.display_name} isMe={r.user_id === self} />
+            </span>
+            <ScorePop
+              value={r.points}
+              mine={r.user_id === self}
+              className="font-semibold text-cream"
+            />
           </div>
         ))
       )}

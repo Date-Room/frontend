@@ -13,22 +13,30 @@
 import { useEffect, useRef, useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { type ActivityParty, partyLine } from "@/lib/activityParties";
+import { FaceMark } from "@/components/FaceMark";
+import { UserAvatarImg } from "@/components/UserAvatarImg";
 
 /** Past this many, the rest become "+n": three faces and a count reads
  *  at a glance where six overlapping circles are a smudge. */
 const MAX_FACES = 3;
 
 function Face({ name, photoUrl }: { name: string; photoUrl: string | null }) {
-  return photoUrl ? (
-    <img
+  const fallback = (
+    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/25 text-xs font-bold text-cream ring-2 ring-card">
+      <FaceMark name={name} />
+    </span>
+  );
+  // UserAvatarImg, not a raw <img>. A Google photo (the `picture` claim
+  // from OAuth, on lh3.googleusercontent.com) is refused outright when
+  // the Referer is not Google, so it 403s and the browser draws its
+  // broken-image glyph. That component sends no referrer and falls back
+  // here if the URL fails anyway.
+  return (
+    <UserAvatarImg
       src={photoUrl}
-      alt=""
+      fallback={fallback}
       className="h-8 w-8 rounded-full object-cover ring-2 ring-card"
     />
-  ) : (
-    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/25 text-xs font-bold text-cream ring-2 ring-card">
-      {(name || "?").charAt(0).toUpperCase()}
-    </span>
   );
 }
 

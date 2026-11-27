@@ -64,6 +64,9 @@ import { SquadNightSize } from "@/components/squad/SquadNightSize";
 import { SeatRequestsBanner } from "@/components/squad/SeatRequestsBanner";
 import { JoinRequestsCard } from "@/components/squad/JoinRequests";
 import { GuestsAfterTheNight } from "@/components/squad/GuestsAfterTheNight";
+import { SOMEONE, personName } from "@/lib/people";
+import { ScorePop } from "@/components/ScorePop";
+import { PersonLabel } from "@/components/PersonLabel";
 
 /** Broadcast when someone starts a night, so everyone here sees it at once. */
 /** What this client shouts when it starts a night, for other web tabs. */
@@ -118,7 +121,10 @@ export default function SquadRoom() {
       slot: "a", // seats aren't lettered in a squad; nothing between nights reads it
       isHost: room ? room.host_id === u.id : false,
       canPersist: true,
-      displayName: u.display_name || u.email?.split("@")[0] || "You",
+      // Published to the whole room, so never "You": that is a
+      // rendering choice for whoever is reading, and as an identity
+      // it reached everyone else as the label for a real person.
+      displayName: u.display_name || u.email?.split("@")[0] || SOMEONE,
       photoUrl: u.photo_url ?? null,
     };
     // Rebuild only when who I am (or my ownership) changes.
@@ -509,12 +515,18 @@ function League({ roomId, selfUserId }: { roomId: string; selfUserId: string }) 
           >
             <span className="w-6 text-center font-serif text-lg text-primary">{i + 1}</span>
             <span className="min-w-0 flex-1 text-sm text-cream">
-              <span className="block truncate">{r.display_name}</span>
+              <span className="block truncate">
+                <PersonLabel name={r.display_name} isMe={r.user_id === selfUserId} />
+              </span>
               {best && best[1] > 0 && (
                 <span className="block text-xs text-muted-foreground">Best at {GAME_NAMES[best[0]] ?? best[0]}</span>
               )}
             </span>
-            <span className="text-[15px] font-bold tabular-nums text-cream">{r.points}</span>
+            <ScorePop
+              value={r.points}
+              mine={r.user_id === selfUserId}
+              className="text-[15px] font-bold text-cream"
+            />
           </li>
         );
       })}

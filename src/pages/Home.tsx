@@ -48,6 +48,8 @@ import { ShimmerSkeleton } from "@/components/ui/skeleton";
 import { UserAvatarImg } from "@/components/UserAvatarImg";
 import { cn } from "@/lib/utils";
 import { lifecycleView } from "@/lib/roomLifecycle";
+import { FaceMark } from "@/components/FaceMark";
+import { initialOf } from "@/lib/people";
 
 const ALIVE_STATES = new Set<RoomStateName>(["created", "waiting", "live", "active"]);
 const ENDED_STATES = new Set<RoomStateName>(["ended", "grace"]);
@@ -362,7 +364,8 @@ export default function Home() {
     navigate("/auth");
   }
 
-  const initial = (me?.display_name || me?.email || "?")[0]?.toUpperCase();
+  const faceName = me?.display_name || me?.email || null;
+  const initial = initialOf(faceName);
 
   return (
     <PageShell>
@@ -430,7 +433,7 @@ export default function Home() {
                 className="h-7 w-7 rounded-full object-cover"
                 fallback={
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-rosegold/40 to-romantic/30 font-serif text-sm text-cream">
-                    {initial}
+                    <FaceMark name={faceName} />
                   </span>
                 }
               />
@@ -1054,7 +1057,7 @@ function SquadAvatar({ faces }: { faces: { name: string; photo: string | null }[
   // Counted from who has actually joined, never from seats — "+3" on an
   // empty room would be claiming people who aren't there.
   const hidden = faces.length - shown.length;
-  const initial = (n: string | undefined) => (n ? n[0]?.toUpperCase() ?? null : null);
+  const initial = (n: string | undefined) => initialOf(n);
   return (
     <div className="relative h-12 w-[60px] shrink-0">
       {[0, 1].map((i) => (
@@ -1097,13 +1100,13 @@ function DuoAvatar({
       {/* Self — behind, left edge. */}
       <DuoCircle
         photo={mePhoto}
-        initial={meName ? meName[0]?.toUpperCase() : null}
+        initial={initialOf(meName)}
         className="absolute left-0 top-1"
       />
       {/* Partner — in front, right edge. */}
       <DuoCircle
         photo={partnerPhoto}
-        initial={partnerName ? partnerName[0]?.toUpperCase() : null}
+        initial={initialOf(partnerName)}
         awaitingJoin={partnerEmpty}
         className="absolute left-[22px] top-1"
       />

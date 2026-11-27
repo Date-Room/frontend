@@ -75,6 +75,7 @@ import { BRAND_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { RoomLifecycleBanner } from "@/components/RoomLifecycleBanner";
 import { isResting, restingReason, roomCapabilities } from "@/lib/roomLifecycle";
+import { SOMEONE } from "@/lib/people";
 
 function Loading({ label }: { label: string }) {
   return (
@@ -899,7 +900,10 @@ export default function LiveRoom() {
 
       if (session) {
         const u = session.user;
-        const name = urlName || u.display_name || u.email?.split("@")[0] || "You";
+        // Published to the whole room, so never "You": that is a
+        // rendering choice for whoever is reading, and as an identity
+        // it reached everyone else as the label for a real person.
+        const name = urlName || u.display_name || u.email?.split("@")[0] || SOMEONE;
         // Signed-in users authorise LiveKit + durable writes via their token,
         // so no participant_id is needed; the host is slot "a".
         setIdentity({

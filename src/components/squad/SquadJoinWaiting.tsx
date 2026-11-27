@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { getMyJoinRequest } from "@/lib/squad";
 import type { InviteCard } from "@/lib/rooms";
+import { FaceMark } from "@/components/FaceMark";
 
 export type JoinGateState = "awaiting_approval" | "declined" | "room_locked" | "removed";
 
@@ -91,7 +92,7 @@ export function SquadJoinWaiting({
                 title={p.display_name}
                 className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-background bg-primary/25 text-sm font-bold text-cream"
               >
-                {(p.display_name || "?").charAt(0).toUpperCase()}
+                <FaceMark name={p.display_name} />
               </span>
             ),
           )}

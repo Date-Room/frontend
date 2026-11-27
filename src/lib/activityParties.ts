@@ -11,6 +11,7 @@
  * "X opened Y" events could ever give them.
  */
 import type { PresenceState } from "@/lib/realtime/roomChannel";
+import { SOMEONE, peopleAre } from "@/lib/people";
 
 export type PartyPerson = {
   userId: string;
@@ -34,7 +35,7 @@ function personOf(p: PresenceState): PartyPerson | null {
   if (!userId) return null;
   return {
     userId,
-    displayName: str(p.display_name) || str(p.name) || "Someone",
+    displayName: str(p.display_name) || str(p.name) || SOMEONE,
     photoUrl: typeof p.photo_url === "string" && p.photo_url ? p.photo_url : null,
   };
 }
@@ -86,18 +87,66 @@ export function partiesFrom(presence: PresenceState[], me: string | null): Activ
   return parties;
 }
 
-/** Am I in this one? Drives "Join in" vs "You're in". */
-export function amIn(presence: PresenceState[], activityId: string, me: string | null): boolean {
+/**
+ * Every activity anybody has open right now, me included.
+ *
+ * Deliberately not `partiesFrom`: that answers "where is everyone
+ * ELSE", drops a party that is only me, and is the right input for a
+ * list of things to join. It is the wrong input for "is this running",
+ * which is what decides whether an activity is NEW.
+ *
+ * Conflating the two is what made the room re-announce a game. The
+ * announced set was keyed on what was joinable *for me*, so it was
+ * cleared the moment an activity stopped being joinable — which
+ * happens when the last other person steps out for a second, and also
+ * when **I** join, and also when I leave again. Each of those re-armed
+ * the notice for a game that had been running the whole time.
+ *
+ * A fresh activity is one that nobody had open and now somebody does.
+ * That is this set going from without to with.
+ */
+export function activeActivityIds(presence: PresenceState[]): Set<string> {
+  const out = new Set<string>();
+  for (const p of presence) {
+    const id = str(p.activity_id);
+    if (id) out.add(id);
+  }
+  return out;
+}
+
+/**
+ * Am I in this one? Drives "Join in" vs "You're in", and suppresses the
+ * notice for something I am already doing.
+ *
+ * `openHere` is what THIS client has open, which it knows before the
+ * room does. Presence is a round trip: publish, server, fan-out, back.
+ * In the window between opening something and seeing my own echo, a
+ * presence update from somebody else in the same activity arrives and
+ * the answer here was "no, you are not in it" — so the room offered to
+ * take me somewhere I was already standing. Local truth about myself
+ * beats a stale echo of myself.
+ */
+export function amIn(
+  presence: PresenceState[],
+  activityId: string,
+  me: string | null,
+  openHere?: string | null,
+): boolean {
+  if (openHere && openHere === activityId) return true;
   if (!me) return false;
   return presence.some(
     (p) => (str(p.user_id) || str(p.sender_id)) === me && str(p.activity_id) === activityId,
   );
 }
 
-/** "Jun is in here" / "Ama, Jun and Tee are in here". */
+/**
+ * "Jun is in here" / "Ama, Jun and Tee are in here".
+ *
+ * The phrase and its verb agreement come from `peopleAre`, shared with
+ * every other line that names people, so "Jun are in here" cannot come
+ * back by being fixed in only one of them.
+ */
 export function partyLine(party: ActivityParty): string {
-  const names = party.people.map((p) => p.displayName).filter(Boolean);
-  if (names.length === 0) return "Someone is in here";
-  if (names.length === 1) return `${names[0]} is in here`;
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]} are in here`;
+  const { subject, verb } = peopleAre(party.people.map((p) => p.displayName));
+  return `${subject} ${verb} in here`;
 }

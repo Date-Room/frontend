@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { LayoutGrid, type LucideIcon } from "lucide-react";
 import { UserAvatarImg } from "@/components/UserAvatarImg";
+import { FaceMark } from "@/components/FaceMark";
 import { cn } from "@/lib/utils";
 
 /**
@@ -42,7 +43,6 @@ export function ActivityInvite({
     return () => window.removeEventListener("keydown", onKey);
   }, [onDecline]);
 
-  const initial = partnerName.trim().charAt(0).toUpperCase() || "?";
 
   return createPortal(
     <div
@@ -80,7 +80,7 @@ export function ActivityInvite({
               className="h-full w-full object-cover"
               fallback={
                 <span className="flex h-full w-full items-center justify-center text-label font-bold text-primary">
-                  {initial}
+                  <FaceMark name={partnerName} />
                 </span>
               }
             />

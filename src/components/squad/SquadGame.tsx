@@ -14,6 +14,8 @@ import { TABLE_QUERY } from "@/lib/squadCall";
 import { useMediaQuery } from "@/lib/viewport";
 import { ApiError } from "@/lib/api";
 import { getSquadMembers, squadErrorText } from "@/lib/squad";
+import { PersonLabel } from "@/components/PersonLabel";
+import { SOMEONE, YOU } from "@/lib/people";
 import {
   SQUAD_GAMES,
   beatCue,
@@ -87,8 +89,19 @@ export function SquadGame({ game }: { game: SquadGameId }) {
 
   const list = members.data?.members ?? [];
   const byPid = new Map(list.map((m) => [m.participant_id, m]));
-  const nameOf: Names = (pid) => byPid.get(pid)?.display_name || "Someone";
   const me = list.find((m) => m.user_id === room.senderId)?.participant_id ?? null;
+  /** Their real name, whoever they are. For anything that LEAVES this
+   *  screen — a poke carries my name to someone else, and "You" would
+   *  arrive as a riddle. */
+  const trueNameOf: Names = (pid) => byPid.get(pid)?.display_name || SOMEONE;
+  /** What to call them on this screen. I am "You" here: seeing your own
+   *  name in the third person — "Jun's turn", "Jun wins" — reads like
+   *  being talked about rather than played with. `revealBeats` has done
+   *  this for its captions all along (and conjugates for it: "You win"
+   *  against "Jun wins"); doing it in `nameOf` is that same choice
+   *  reaching the seat chips, the ballot and every other name on the
+   *  stage. */
+  const nameOf: Names = (pid) => (pid === me ? YOU : trueNameOf(pid));
   // Everyone here right now, as squad participant ids: in the room, or on
   // the video. The room link can blink on a phone or a long call while the
   // video carries on; counting only the room made three people look like
@@ -315,7 +328,7 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   );
   const poke = (pids: string[]) => {
     const to = pids.map((pid) => byPid.get(pid)?.user_id).filter(Boolean);
-    const name = me ? nameOf(me) : "Someone";
+    const name = me ? trueNameOf(me) : SOMEONE;
     void room.channel.broadcast("squad_poke", { from: room.senderId, to, name, game });
   };
 
@@ -357,6 +370,7 @@ export function SquadGame({ game }: { game: SquadGameId }) {
             game={game}
             onCall={onCall}
             nameOf={nameOf}
+            me={me}
             energy={energy}
             onEnergy={setEnergy}
             sitOut={sitOut}
@@ -510,6 +524,7 @@ function Dealer({
   game,
   onCall,
   nameOf,
+  me,
   energy,
   onEnergy,
   sitOut,
@@ -521,6 +536,7 @@ function Dealer({
   game: SquadGameId;
   onCall: string[];
   nameOf: Names;
+  me: string | null;
   energy: Deck | null;
   onEnergy: (d: Deck) => void;
   sitOut: Set<string>;
@@ -633,7 +649,7 @@ function Dealer({
                 )}
               >
                 {on && <Check className="h-3.5 w-3.5 text-primary" aria-hidden />}
-                {nameOf(pid)}
+                <PersonLabel name={nameOf(pid)} isMe={pid === me} />
               </button>
             );
           })}
@@ -690,12 +706,15 @@ function Prompt({ text }: { text?: string }) {
 function PlayerGrid({
   players,
   nameOf,
+  me,
   picked,
   disabled,
   onPick,
 }: {
   players: string[];
+  /** The plain name; the mark is added here. */
   nameOf: Names;
+  me: string | null;
   picked: unknown;
   disabled?: boolean;
   onPick: (pid: string) => void;
@@ -716,7 +735,7 @@ function PlayerGrid({
               : "border-white/[0.08] bg-card/30 text-cream/90 hover:border-primary/30",
           )}
         >
-          {nameOf(pid)}
+          <PersonLabel name={nameOf(pid)} isMe={pid === me} />
         </button>
       ))}
     </div>
@@ -832,7 +851,12 @@ function Play({
             {/* With three the server sends the order twice: two clues each. */}
             {order.length > round.players.length ? "Two clues each, round twice: " : "One word each: "}
             <span className="text-cream">
-              {order.slice(0, round.players.length).map((p) => (p === me ? "You" : nameOf(p))).join(" → ")}
+              {order.slice(0, round.players.length).map((p, i) => (
+                <span key={`${p}-${i}`}>
+                  {i > 0 && " → "}
+                  <PersonLabel name={nameOf(p)} isMe={p === me} />
+                </span>
+              ))}
             </span>
           </p>
         )}
@@ -845,6 +869,7 @@ function Play({
           <PlayerGrid
             players={round.players.filter((p) => p !== me)}
             nameOf={nameOf}
+            me={me}
             picked={mine?.my_move}
             disabled={busy}
             onPick={onMove}
@@ -859,7 +884,7 @@ function Play({
       <div className="space-y-4">
         <Prompt text={text} />
         {turn && !faceVote && (
-          <PlayerGrid players={round.players} nameOf={nameOf} picked={mine?.my_move} disabled={busy} onPick={onMove} />
+          <PlayerGrid players={round.players} nameOf={nameOf} me={me} picked={mine?.my_move} disabled={busy} onPick={onMove} />
         )}
       </div>
     );

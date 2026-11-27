@@ -13,6 +13,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { useRoomSession } from "@/context/RoomSessionContext";
+import { UserAvatarImg } from "@/components/UserAvatarImg";
+import { FaceMark } from "@/components/FaceMark";
 import {
   JOIN_REQUESTED,
   approveAllJoins,
@@ -88,7 +90,11 @@ export function JoinRequestsCard({ roomId }: { roomId: string }) {
           return (
             <li key={r.id} className="flex items-center gap-3 rounded-xl border border-white/[0.08] px-3 py-2.5">
               {r.photo_url ? (
-                <img src={r.photo_url} alt="" className="h-9 w-9 rounded-full object-cover" />
+                <UserAvatarImg
+                  src={r.photo_url}
+                  fallback={<FaceMark name={r.display_name} />}
+                  className="h-9 w-9 rounded-full object-cover"
+                />
               ) : (
                 <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/25 text-sm font-bold text-cream">
                   {first.charAt(0).toUpperCase()}

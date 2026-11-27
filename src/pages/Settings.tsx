@@ -53,6 +53,7 @@ import { LIGHT_MODE_ENABLED } from "@/lib/themeMode";
 import AvatarCropDialog from "@/components/AvatarCropDialog";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { COUNTRIES, countryByCode, flagFor, type Country } from "@/lib/countries";
+import { FaceMark } from "@/components/FaceMark";
 
 /**
  * Profile page — redesigned to match mobile `profile_view.dart`.
@@ -186,7 +187,7 @@ export default function Settings() {
     );
   }
 
-  const initial = displayName?.[0]?.toUpperCase() || me?.email?.[0]?.toUpperCase() || "?";
+  const faceName = displayName || me?.email || null;
   const country = countryByCode(countryCode);
 
   return (
@@ -223,7 +224,7 @@ export default function Settings() {
                   className="h-full w-full object-cover"
                   fallback={
                     <div className="flex h-full w-full items-center justify-center font-serif text-3xl text-primary">
-                      {initial}
+                      <FaceMark name={faceName} />
                     </div>
                   }
                 />

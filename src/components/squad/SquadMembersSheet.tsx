@@ -45,6 +45,7 @@ import {
 } from "@/lib/squad";
 import { cn } from "@/lib/utils";
 import { InviteGuest } from "@/components/squad/InviteGuest";
+import { FaceMark } from "@/components/FaceMark";
 
 /** Pure: what the viewer may do to someone else in the list. */
 export function memberActions(
@@ -192,7 +193,7 @@ export function SquadMembersSheet({
               return (
                 <li key={m.participant_id} className="flex items-center gap-3 rounded-xl bg-white/[0.03] px-3 py-2.5">
                   <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-cream">
-                    {(m.display_name || "?").charAt(0).toUpperCase()}
+                    <FaceMark name={m.display_name} />
                     {here && (
                       <span
                         className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-background bg-emerald-400"
