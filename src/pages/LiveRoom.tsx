@@ -296,7 +296,11 @@ function RoomShell({
   const isPermanentRoom = isPersistent || wallRoom;
 
   // `?live=1` is this tab's own flag; the remembered value is what
-  // survives closing the browser. Either one means "put me back".
+  // survives closing the browser. Either one means "put me back" —
+  // and `wasOnCall` only says `true` while the record is still recent
+  // enough to be about this sitting (see callMemory). A `true` left
+  // behind by a tab closed mid-call used to mean every later visit to
+  // that room opened straight into a call.
   const [liveMode, setLiveMode] = useState(
     () => searchParams.get("live") === "1" || wasOnCall(roomId) === true,
   );
@@ -340,21 +344,18 @@ function RoomShell({
         next.set("live", "1");
         return next;
       }, { replace: true });
-      void session.channel.track({
-        sender_id: session.senderId,
-        user_id: session.senderId,
-        slot: session.slot,
-        name: session.displayName,
-        display_name: session.displayName,
-        photo_url: session.photoUrl ?? null,
-        is_host: session.isHost,
-        is_ready: true,
-        is_typing: false,
-        is_in_call: true,
-        device_id: TAB_DEVICE_ID,
-        last_seen: new Date().toISOString(),
-        participant_id: session.participantId ?? null,
-      });
+      // `setPresence`, not `channel.track`.
+      //
+      // The wire REPLACES a presence record rather than merging into
+      // it, so a hand-written object is a list of everything you are
+      // claiming to be — and everything left out is wiped. This one
+      // left out `activity_id`, so joining or leaving the call
+      // published "I am in no activity" over a tab that had a game
+      // open, and the phones' "who is where" went blank for that
+      // person until they opened something else. Exactly the bug fixed
+      // in RoomSessionContext, through a door outside the file whose
+      // test guards it. Patching leaves the rest of the record alone.
+      session.setPresence({ is_ready: true, is_in_call: true });
       void session.channel.broadcast("call_started", {
         from: session.senderId,
         at: new Date().toISOString(),
@@ -372,21 +373,18 @@ function RoomShell({
       next.delete("live");
       return next;
     }, { replace: true });
-    void session.channel.track({
-      sender_id: session.senderId,
-      user_id: session.senderId,
-      slot: session.slot,
-      name: session.displayName,
-      display_name: session.displayName,
-      photo_url: session.photoUrl ?? null,
-      is_host: session.isHost,
-      is_ready: true,
-      is_typing: false,
-      is_in_call: false,
-      device_id: TAB_DEVICE_ID,
-      last_seen: new Date().toISOString(),
-      participant_id: session.participantId ?? null,
-    });
+    // `setPresence`, not `channel.track`.
+    //
+    // The wire REPLACES a presence record rather than merging into
+    // it, so a hand-written object is a list of everything you are
+    // claiming to be — and everything left out is wiped. This one
+    // left out `activity_id`, so joining or leaving the call
+    // published "I am in no activity" over a tab that had a game
+    // open, and the phones' "who is where" went blank for that
+    // person until they opened something else. Exactly the bug fixed
+    // in RoomSessionContext, through a door outside the file whose
+    // test guards it. Patching leaves the rest of the record alone.
+    session.setPresence({ is_ready: true, is_in_call: false });
   }, [session, setSearchParams, roomId]);
 
   // Note: we intentionally do NOT auto-join the call when the partner starts
@@ -539,6 +537,7 @@ function RoomShell({
     if (autoCallStartedRef.current) return;
     if (!shouldAutoStartCall({
       isPermanentRoom,
+      isGroupRoom: squadRoom,
       expired,
       liveMode,
       remembered: wasOnCall(roomId),
@@ -548,7 +547,7 @@ function RoomShell({
     autoCallStartedRef.current = true;
     enterLiveMode();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPermanentRoom, expired, roomId]);
+  }, [isPermanentRoom, squadRoom, expired, roomId]);
 
   const activeAmbiance = ambianceOverride ?? customization.ambiancePreset;
   const moodLabel = activeAmbiance === PLAIN_MOOD ? "Plain" : ambianceMeta(activeAmbiance).label;

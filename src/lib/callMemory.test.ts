@@ -11,7 +11,12 @@
 // first entry from a refresh — so leaving the call and reloading put
 // you straight back on it, camera and all.
 import { beforeEach, describe, expect, it } from "vitest";
-import { rememberCall, shouldAutoStartCall, wasOnCall } from "@/lib/callMemory";
+import {
+  MEMORY_GOOD_FOR_MS,
+  rememberCall,
+  shouldAutoStartCall,
+  wasOnCall,
+} from "@/lib/callMemory";
 
 class MemoryStorage implements Storage {
   private map = new Map<string, string>();
@@ -74,7 +79,13 @@ describe("what a room remembers about me", () => {
 });
 
 describe("whether the room starts the call by itself", () => {
-  const base = { isPermanentRoom: false, expired: false, liveMode: false, remembered: null };
+  const base = {
+    isPermanentRoom: false,
+    isGroupRoom: false,
+    expired: false,
+    liveMode: false,
+    remembered: null,
+  };
 
   it("yes on a genuine first entry to a session room", () => {
     // The behaviour that must not change: you opened a date room, the
@@ -100,5 +111,58 @@ describe("whether the room starts the call by itself", () => {
 
   it("and never once the room has expired", () => {
     expect(shouldAutoStartCall({ ...base, expired: true })).toBe(false);
+  });
+
+  it("never in a group room, where joining the call is somebody's decision", () => {
+    // George, in a squad room: "when I refresh the page, it joins
+    // call. It wasn't on a call before I refreshed." A squad night is
+    // a place you walk into — five people arriving over ten minutes,
+    // a stage, a lobby, and a call button of its own. Dialling for
+    // them turns a camera on in a room they only just opened.
+    expect(shouldAutoStartCall({ ...base, isGroupRoom: true })).toBe(false);
+    expect(shouldAutoStartCall({ ...base, isGroupRoom: true, remembered: true })).toBe(false);
+  });
+});
+
+describe("a memory stops being worth obeying", () => {
+  // "I was on the call" was written on join and cleared only on Leave,
+  // so a tab closed mid-call left a `true` with no expiry on it. Every
+  // later visit to the room read it as an instruction.
+  const ROOM = "room-1";
+
+  it("obeys a record from this sitting", () => {
+    const s = new MemoryStorage();
+    rememberCall(ROOM, true, s, 1_000_000);
+    expect(wasOnCall(ROOM, s, 1_000_000 + 60_000)).toBe(true);
+  });
+
+  it("forgets one left behind by a closed tab", () => {
+    const s = new MemoryStorage();
+    rememberCall(ROOM, true, s, 1_000_000);
+    expect(wasOnCall(ROOM, s, 1_000_000 + MEMORY_GOOD_FOR_MS + 1)).toBeNull();
+  });
+
+  it("forgets a deliberate 'no' just as readily", () => {
+    // Not asymmetric: a stale record of either kind says nothing about
+    // where this person is now.
+    const s = new MemoryStorage();
+    rememberCall(ROOM, false, s, 1_000_000);
+    expect(wasOnCall(ROOM, s, 1_000_000 + MEMORY_GOOD_FOR_MS + 1)).toBeNull();
+  });
+
+  it("distrusts a record from the future", () => {
+    // A clock that moved backwards (a timezone fix, a laptop waking up)
+    // must not hand out an immortal record.
+    const s = new MemoryStorage();
+    rememberCall(ROOM, true, s, 2_000_000);
+    expect(wasOnCall(ROOM, s, 1_000_000)).toBeNull();
+  });
+
+  it("ignores the old timeless shape already in people's browsers", () => {
+    // v1 stored a bare boolean. It cannot be shown to be recent, and
+    // letting it through is the bug.
+    const s = new MemoryStorage();
+    s.setItem("dr:oncall:v1", JSON.stringify({ [ROOM]: true }));
+    expect(wasOnCall(ROOM, s, 1_000_000)).toBeNull();
   });
 });

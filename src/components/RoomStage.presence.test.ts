@@ -89,6 +89,20 @@ describe("presence carries what this tab has open", () => {
     expect(ctx).toContain("identityRef.current.senderId");
   });
 
+  it("patches presence from the call too, rather than restating it", () => {
+    // The same bug outside the file whose test guards it: joining or
+    // leaving the call wrote a whole hand-made presence object straight
+    // to the channel. On a wire that REPLACES, everything the object
+    // left out is wiped — and it left out `activity_id`, so starting a
+    // call published "I am in no activity" over a tab with a game open,
+    // and the phones' list of who-is-where went blank for that person
+    // until they opened something else.
+    const live = readFileSync("src/pages/LiveRoom.tsx", "utf8");
+    expect(live).toContain("setPresence({ is_ready: true, is_in_call: true })");
+    expect(live).toContain("setPresence({ is_ready: true, is_in_call: false })");
+    expect(live).not.toContain("channel.track(");
+  });
+
   it("starts out in the room, not in something", () => {
     const payload = readFileSync("src/lib/presencePayload.ts", "utf8");
     expect(payload).toMatch(/activity_id: null/);
