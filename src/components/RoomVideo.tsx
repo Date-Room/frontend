@@ -1207,6 +1207,26 @@ export function RoomVideo({
     otherDeviceOnCall(room.presence, room.senderId, TAB_DEVICE_ID),
   );
 
+  // Self-healing. The question above is decided ONCE, at mount, from
+  // the presence snapshot as it stood at that instant — and the
+  // snapshot is at its least trustworthy exactly then, because the
+  // commonest way to arrive here is a reload whose previous socket has
+  // not finished closing. Latched true, `askMove` skips the token
+  // fetch below forever, so the tab waits on a call it never asked to
+  // join. A stable per-tab device id stops that ghost being mistaken
+  // for another device in the first place; this is the second lock on
+  // the same door, for every other way the snapshot can be stale (a
+  // device that dropped off, a socket the server has not reaped yet).
+  //
+  // It only ever CLEARS. Re-raising from live presence would undo the
+  // answer the moment someone said "move the call here", because the
+  // device being moved off is still in the call while it is being
+  // taken over.
+  useEffect(() => {
+    if (!askMove) return;
+    if (!otherDeviceOnCall(room.presence, room.senderId, TAB_DEVICE_ID)) setAskMove(false);
+  }, [askMove, room.presence, room.senderId]);
+
   useEffect(() => {
     if (askMove) return;
     let cancelled = false;
