@@ -273,7 +273,6 @@ export function stageCueFor(
   }
   const turn = myTurn(round, me);
   const moved = me ? round.submitted.includes(me) : false;
-  const count = `${round.submitted.length} of ${expected.size}`;
   // Moved, or nothing for me to do this stage: the room takes over.
   const waiting = (hint: string): CuePlan => ({ mode: "waiting", focus: null, faces, hint, vote: false });
 
@@ -287,7 +286,7 @@ export function stageCueFor(
       faces[p] = { ...faces[p], tappable: turn && !self, picked: mine?.my_move === p, dim: self };
     }
     const hint = moved
-      ? `You're in · ${count}. Tap another face to change.`
+      ? `${waitingLine(round)} Tap another face to change.`
       : round.game === "imposter"
         ? "Tap who you think it is."
         : "Tap a face to vote. Only you see your pick.";
@@ -304,11 +303,91 @@ export function stageCueFor(
   }
 
   if (round.stage === "answer" && round.game === "spill_tea" && me === round.lead_id) {
-    return waiting(`You're judging · ${count} in.`);
+    return waiting(waitingLine(round, { judging: true }));
   }
-  if (moved) return waiting(`You're in · ${count}.`);
+  if (moved) return waiting(waitingLine(round));
   // Writing, reviewing or judging: the card needs the room; faces are a strip.
   return { ...QUIET, faces };
+}
+
+/** The verb each stage is waiting on, for `waitingLine`. */
+const WAIT_VERB: Record<string, string> = {
+  vote: "vote",
+  answer: "answer",
+  guess: "guess",
+  pick: "pick",
+};
+
+/**
+ * Pure: what the room is still waiting for — "Waiting for the others to
+ * vote · 1 of 3."
+ *
+ * A bare count ("You're in · 1 of 3") says how many without ever saying
+ * what for, which matters now that people arrive at a round at different
+ * times: the first one in may be waiting on friends who are still
+ * reading the last reveal. Said in the stage's own verb, because
+ * answering a card and voting on one are different things to be waiting
+ * for.
+ */
+export function waitingLine(round: Round, opts: { judging?: boolean } = {}): string {
+  const still = waitingOn(round);
+  const expected = still.length + round.submitted.length;
+  const count = `${round.submitted.length} of ${expected}`;
+  if (!still.length) return `That's everyone · ${count}.`;
+  const verb = WAIT_VERB[round.stage] ?? "answer";
+  const head = opts.judging ? "\u{1F451} You're judging · waiting" : "Waiting";
+  return `${head} for the others to ${verb} · ${count}.`;
+}
+
+/* ── Everyone moves at their own pace ───────────────────────────────── */
+
+/**
+ * The round you are on is yours to leave.
+ *
+ * George: "the next button should not force others to change... when
+ * someone wants to take their time to click next because they've seen
+ * the selections and are probably still thinking about them, don't sync
+ * that next. They click next at their own pace."
+ *
+ * The server holding one round at a time is right — the card, the
+ * answers and the reveal are shared, and a round cannot close until
+ * everyone expected has answered it. What was wrong was this side
+ * reading "the room's round" as "my screen": the first person to tap
+ * Next dealt a new round, and everyone else's reveal was swept off the
+ * table mid-sentence.
+ *
+ * So a device pins the round it is on, and reads the room's current
+ * round against that pin:
+ *
+ *  - the same round: follow it through every stage, the reveal
+ *    included. Answers stay in sync, which is the point of playing
+ *    together;
+ *  - the room is on a LATER round and I am reading a reveal: stay.
+ *    "Next" lights up and takes me there when I am ready;
+ *  - the room is on a later round and mine was never revealed: follow
+ *    it. My card was skipped, or the stage was settled without me, so
+ *    there is nothing left on this screen to read.
+ *
+ * One rule, all five games, because one engine deals all five. The twin
+ * of mobile's `features/squad/squad_pacing.dart`.
+ */
+export type Pinned = { number: number; state: RoundState };
+
+export function nextPin(pin: Pinned | null, current: RoundState | null): Pinned | null {
+  const here = current?.round;
+  if (!current || !here) return null;
+  const at = (s: RoundState): Pinned => ({ number: here.number, state: s });
+  if (!pin) return at(current);
+  if (here.number === pin.number) return at(current);
+  if (here.number < pin.number) return pin; // a stale read; the room can't go back
+  return pin.state.round?.stage === "revealed" ? pin : at(current);
+}
+
+/** Pure: the room has dealt past the round I'm reading, so "Next" is a
+ *  step I take rather than a card to deal. */
+export function roomAhead(pin: Pinned | null, current: RoundState | null): boolean {
+  const here = current?.round;
+  return Boolean(pin && here && here.number > pin.number);
 }
 
 /** Pure: who to poke (still thinking, not me), and the line for it. */

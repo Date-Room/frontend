@@ -96,7 +96,7 @@ describe("the wiring that makes it stick", () => {
     // `audio={false}` would be undone: MicKeepAlive turns the mic on
     // whenever no track is published, by design. A published-but-muted
     // track is the one shape it leaves alone.
-    expect(src).toMatch(/\n      audio\n/);
+    expect(src).toMatch(/\n {6}audio\n/);
     expect(src).toContain("<JoinAsYouLeftIt mic={joinMic} />");
     expect(src).toContain("setMicrophoneEnabled(false)");
     // The camera has no keep-alive, so it can be honoured outright —

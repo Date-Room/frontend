@@ -159,11 +159,18 @@ describe("stageCueFor", () => {
   });
 
   it("hands the room over once you've written, and to the judge", () => {
+    // The hint names what the room is waiting FOR, not just how many are
+    // in: people reach a round at their own pace now, so the one who got
+    // there first is often waiting on friends still reading the last
+    // reveal. See `waitingLine`.
     const wrote = stageCueFor(round({ game: "who_said_it", stage: "answer", submitted: ["a"] }), { playing: true }, "a", false);
     expect(wrote.mode).toBe("waiting");
-    expect(wrote.hint).toBe("You're in · 1 of 3.");
+    expect(wrote.hint).toBe("Waiting for the others to answer · 1 of 3.");
     const judge = stageCueFor(round({ game: "spill_tea", stage: "answer", lead_id: "a", submitted: ["b"] }), { playing: true }, "a", false);
-    expect(judge).toMatchObject({ mode: "waiting", hint: "You're judging · 1 of 2 in." });
+    expect(judge).toMatchObject({
+      mode: "waiting",
+      hint: "\u{1F451} You're judging · waiting for the others to answer · 1 of 2.",
+    });
   });
 
   it("marks who is reading their first-round card", () => {
