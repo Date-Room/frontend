@@ -999,6 +999,46 @@ export function RoomStage({
     pipHostRef.current = document.createElement("div");
     pipHostRef.current.style.display = "contents";
   }
+  /**
+   * The staged activity lives in a host of its own, for the same reason
+   * the call does.
+   *
+   * George: "When a question is already selected on the web, and a call
+   * is started, it deselects the option selected.. is this because those
+   * components are being rebuilt? If that's the case would it be better
+   * performance to simply move the same activity back and forth between
+   * calls? As opposed to rebuilding... This includes game activities,
+   * music, watch, etc."
+   *
+   * Right on both counts. Starting a call changes which layout branch
+   * the stage takes — split pane, the squad table, the game-and-faces
+   * split — and each branch rendered the activity at a different place
+   * in the React tree. A component that moves position is a component
+   * that unmounts and mounts again, so every activity was rebuilt from
+   * scratch: a half-answered question lost its selection, a film lost
+   * its position and re-buffered, the music stopped and started, a game
+   * threw away the pick you had not sent yet.
+   *
+   * The call has never had this problem because it is portalled into a
+   * hand-managed node that React does not reconcile — moving the NODE
+   * keeps the subtree mounted, which is also how its <video> elements
+   * survive. The activity gets the same treatment: one host, rendered
+   * once, moved between slots. `ActivityBoundary`'s `resetKey` still
+   * rebuilds when you switch to a DIFFERENT activity, which is the one
+   * time a rebuild is the right answer.
+   */
+  const stageHostRef = useRef<HTMLDivElement | null>(null);
+  if (!stageHostRef.current && typeof document !== "undefined") {
+    stageHostRef.current = document.createElement("div");
+    // `contents`: the slot's own flex/height rules reach the activity,
+    // exactly as they did when it was a direct child.
+    stageHostRef.current.style.display = "contents";
+  }
+  /** The activity's homes: the table's centre panel, a squad game's half
+   *  of the stage, and the plain full-stage slot every other room uses. */
+  const tableStageSlotRef = useRef<HTMLDivElement>(null);
+  const gameStageSlotRef = useRef<HTMLDivElement>(null);
+  const plainStageSlotRef = useRef<HTMLDivElement>(null);
   const pipAnchorRef = useRef<HTMLDivElement>(null);
   // The split pane's video slot — the host's third home (desktop side by
   // side). One <RoomVideo> lives in the host for the whole call; switching
@@ -1047,6 +1087,24 @@ export function RoomStage({
   }, [splitCallLayout, squadHangout, squadCouch, squadGameStaged, staged, table]);
   useEffect(() => {
     const host = pipHostRef.current;
+    return () => host?.remove();
+  }, []);
+  // Layout effect for the same reason as the call's: re-home in the same
+  // task that detached the old slot, so nothing in there sees a frame
+  // outside the document.
+  useLayoutEffect(() => {
+    const host = stageHostRef.current;
+    if (!host) return;
+    const target = table
+      ? tableStageSlotRef.current
+      : squadGameStaged
+        ? gameStageSlotRef.current
+        : plainStageSlotRef.current;
+    if (!target || host.parentElement === target) return;
+    target.appendChild(host);
+  }, [table, squadGameStaged, staged, splitCallLayout, squadHangout, squadCouch, cueMode]);
+  useEffect(() => {
+    const host = stageHostRef.current;
     return () => host?.remove();
   }, []);
   const onMove = useCallback(
@@ -1555,9 +1613,9 @@ export function RoomStage({
                     top: tableShare > 0 ? `calc(${tableShare * 100}% + 8px)` : 0,
                   }}
                 >
-                  <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
-                    {renderContent(staged, commitStage)}
-                  </ActivityBoundary>
+                  {/* The activity is re-homed into this slot — see
+                      stageHostRef. */}
+                  <div ref={tableStageSlotRef} className="flex min-h-0 flex-1 flex-col" />
                 </div>
               </div>
             ) : squadGameStaged ? (
@@ -1584,9 +1642,9 @@ export function RoomStage({
                           : "max-h-[52%] shrink-0",
                   )}
                 >
-                  <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
-                    {renderContent(staged, commitStage)}
-                  </ActivityBoundary>
+                  {/* The activity is re-homed into this slot — see
+                      stageHostRef. */}
+                  <div ref={gameStageSlotRef} className="flex min-h-0 flex-1 flex-col" />
                 </div>
                 {/* The live call is re-homed into this slot (see gameFacesSlotRef). */}
                 <div
@@ -1602,17 +1660,17 @@ export function RoomStage({
                 />
               </div>
             ) : staged ? (
-              <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
-                <div
-                  className={[
-                    "h-full min-h-0 transition duration-300",
-                    introOpen ? "pointer-events-none scale-[0.98] opacity-40 blur-[2px]" : "",
-                  ].join(" ")}
-                  aria-hidden={introOpen}
-                >
-                  {renderContent(staged, commitStage)}
-                </div>
-              </ActivityBoundary>
+              /* The activity is re-homed into this slot — see stageHostRef.
+                 The intro's dimming rides on the slot, so it applies
+                 wherever the activity currently lives. */
+              <div
+                ref={plainStageSlotRef}
+                className={[
+                  "flex h-full min-h-0 flex-col transition duration-300",
+                  introOpen ? "pointer-events-none scale-[0.98] opacity-40 blur-[2px]" : "",
+                ].join(" ")}
+                aria-hidden={introOpen}
+              />
             ) : null}
           </div>
           {squadTicker && !squadGuest && (
@@ -1919,6 +1977,20 @@ export function RoomStage({
           Rendered into a persistent host (see pipHostRef) so it can be
           re-parented into the Watch fullscreen layer without remounting the
           call. The anchor marks its normal home in the room. */}
+      {/* The staged activity, rendered ONCE and portalled into whichever
+          slot the current layout provides (see stageHostRef). Starting a
+          call changes the layout, not this element's place in the tree,
+          so the activity is not rebuilt: a part-answered question keeps
+          its selection, a film keeps its position, the music keeps
+          playing. */}
+      {staged && stageHostRef.current &&
+        createPortal(
+          <ActivityBoundary label={stagedItem?.title} resetKey={staged}>
+            {renderContent(staged, commitStage)}
+          </ActivityBoundary>,
+          stageHostRef.current,
+        )}
+
       {callNotice && (
         <ActivityInvite
           kind="call"
