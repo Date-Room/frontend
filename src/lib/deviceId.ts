@@ -67,3 +67,18 @@ export function otherDeviceOnCall(presence: PresenceState[], userId: string, dev
       p.device_id !== deviceId,
   );
 }
+
+/**
+ * Pure: is THIS person on the call right now, from their own presence?
+ *
+ * Distinct from "the call is open in this room". A squad night hands
+ * the vote to the faces on the call — tap the friend who fits — and
+ * that only works for somebody who is on it. A viewer in the room but
+ * not on the call needs the card's own list of names instead.
+ */
+export function iAmOnTheCall(presence: PresenceState[], userId: string): boolean {
+  if (!userId) return false;
+  return presence.some(
+    (p) => (p.user_id === userId || p.sender_id === userId) && p.is_in_call === true,
+  );
+}

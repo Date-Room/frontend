@@ -14,7 +14,7 @@
 // room channel, one token request between them.
 import { beforeEach, describe, expect, it } from "vitest";
 import type { PresenceState } from "@/lib/realtime/roomChannel";
-import { TAB_DEVICE_ID, otherDeviceOnCall, tabDeviceId } from "@/lib/deviceId";
+import { TAB_DEVICE_ID, iAmOnTheCall, otherDeviceOnCall, tabDeviceId } from "@/lib/deviceId";
 
 class MemoryStorage implements Storage {
   private map = new Map<string, string>();
@@ -118,5 +118,50 @@ describe("and what it protects", () => {
 
   it("nor is my other tab that is in the room but not on the call", () => {
     expect(otherDeviceOnCall([entry({ is_in_call: false })], "me", "this-tab")).toBe(false);
+  });
+});
+
+// A vote you cannot reach is not a vote.
+//
+// George: "It says 'Tap a seat to vote. Only you see your pick.' on
+// the web.. but I see no options."
+//
+// On a squad night the card hands voting to the faces on the call —
+// tap the friend who fits. It did that whenever the call was OPEN in
+// the room, which is a different fact from this viewer being ON it. A
+// browser in the room but not on the call got the instruction with an
+// empty stage under it, and picks made on the phones could not move a
+// round the laptop was not in.
+describe("whether I can tap a face", () => {
+  const me = "user-1";
+  const p = (over: Partial<PresenceState>): PresenceState =>
+    ({ user_id: me, is_in_call: true, device_id: "d1", ...over }) as PresenceState;
+
+  it("yes, when my own presence says I am on the call", () => {
+    expect(iAmOnTheCall([p({})], me)).toBe(true);
+  });
+
+  it("no, when I am in the room but have not joined the call", () => {
+    // Exactly George's case: the hint said tap a face, nothing to tap.
+    expect(iAmOnTheCall([p({ is_in_call: false })], me)).toBe(false);
+  });
+
+  it("no, when it is only OTHER people who are on the call", () => {
+    // The call being busy is not the same as me being in it — this is
+    // the distinction the bug collapsed.
+    expect(iAmOnTheCall([p({ user_id: "jun" }), p({ user_id: "ada" })], me)).toBe(false);
+  });
+
+  it("counts my other tab, since the faces are on screen there too", () => {
+    expect(iAmOnTheCall([p({ device_id: "another-tab" })], me)).toBe(true);
+  });
+
+  it("reads the web-legacy sender_id as well as user_id", () => {
+    expect(iAmOnTheCall([{ sender_id: me, is_in_call: true } as PresenceState], me)).toBe(true);
+  });
+
+  it("and says no rather than guessing when there is no me", () => {
+    expect(iAmOnTheCall([p({})], "")).toBe(false);
+    expect(iAmOnTheCall([], me)).toBe(false);
   });
 });

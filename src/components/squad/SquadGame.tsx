@@ -50,6 +50,7 @@ import {
   type RoleCard,
   type SquadGameId,
 } from "@/lib/squadGames";
+import { iAmOnTheCall } from "@/lib/deviceId";
 import { cn } from "@/lib/utils";
 
 type Names = (pid: string) => string;
@@ -156,7 +157,21 @@ export function SquadGame({ game }: { game: SquadGameId }) {
   // tapped, who's in, whose face steps forward. Faces are keyed by call
   // identity (user id); the round speaks in participant ids.
   const setCue = useSquadStage()?.setCue;
-  const faceVote = Boolean(setCue);
+  // Voting by tapping a face only works if you are ON the call, where
+  // the faces are.
+  //
+  // George: "It says 'Tap a seat to vote. Only you see your pick.' on
+  // the web.. but I see no options." He was in the room but his
+  // browser had not joined the call, so the card handed the vote to a
+  // stage with nobody on it and then told him to tap one of them. The
+  // round was running; the laptop simply had no way to answer it, and
+  // picks made on the phones could not move a round it was not in.
+  //
+  // The call being OPEN (setCue) and this viewer being IN it are two
+  // different facts, and only the second one puts a face on screen.
+  // When it is missing the card keeps its own list of names, which is
+  // what every non-squad room uses and has always worked.
+  const faceVote = Boolean(setCue) && iAmOnTheCall(room.presence, room.senderId);
   // On a laptop's table there's no strip over the faces: the hint lives here.
   const table = useMediaQuery(TABLE_QUERY) && faceVote;
 

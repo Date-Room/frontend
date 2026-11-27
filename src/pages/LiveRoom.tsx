@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from "react";
 import { TAB_DEVICE_ID } from "@/lib/deviceId";
+import { rememberCall, shouldAutoStartCall, wasOnCall } from "@/lib/callMemory";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { markRoomVisited } from "@/lib/roomList";
@@ -294,7 +295,11 @@ function RoomShell({
   const wallRoom = isSubscriptionPackage(roomPackage);
   const isPermanentRoom = isPersistent || wallRoom;
 
-  const [liveMode, setLiveMode] = useState(() => searchParams.get("live") === "1");
+  // `?live=1` is this tab's own flag; the remembered value is what
+  // survives closing the browser. Either one means "put me back".
+  const [liveMode, setLiveMode] = useState(
+    () => searchParams.get("live") === "1" || wasOnCall(roomId) === true,
+  );
   const userPrefersAtHomeRef = useRef(false);
 
   const partnerStatus = useMemo(
@@ -329,6 +334,7 @@ function RoomShell({
       userPrefersAtHomeRef.current = false;
       if (nextTab) setTab(nextTab);
       setLiveMode(true);
+      rememberCall(roomId, true);
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set("live", "1");
@@ -354,12 +360,13 @@ function RoomShell({
         at: new Date().toISOString(),
       });
     },
-    [session, setSearchParams],
+    [session, setSearchParams, roomId],
   );
 
   const exitLiveMode = useCallback(() => {
     userPrefersAtHomeRef.current = true;
     setLiveMode(false);
+    rememberCall(roomId, false);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete("live");
@@ -380,7 +387,7 @@ function RoomShell({
       last_seen: new Date().toISOString(),
       participant_id: session.participantId ?? null,
     });
-  }, [session, setSearchParams]);
+  }, [session, setSearchParams, roomId]);
 
   // Note: we intentionally do NOT auto-join the call when the partner starts
   // one — a call is never forced. They see the "Join the call" invite (and the
@@ -518,17 +525,30 @@ function RoomShell({
     return () => window.clearTimeout(t);
   }, [expiryMs]);
 
-  // Session (time-limited) rooms auto-start the call on entry — the date is the
-  // point and the window is short. Permanent rooms never force a call. Runs once
-  // we know the room type and it isn't already expired.
+  // Session (time-limited) rooms auto-start the call on ENTRY — the date is the
+  // point and the window is short. Permanent rooms never force a call.
+  //
+  // "Entry" used to mean every page load, which cannot tell a first
+  // arrival from a refresh: leaving the call and reloading put you
+  // straight back on it, camera and all, having just said you did not
+  // want to be. Now a room that remembers this person obeys the
+  // memory, and only a room with no memory of them at all — a real
+  // first entry — starts the call by itself.
   const autoCallStartedRef = useRef(false);
   useEffect(() => {
     if (autoCallStartedRef.current) return;
-    if (isPermanentRoom || expired || liveMode) return;
+    if (!shouldAutoStartCall({
+      isPermanentRoom,
+      expired,
+      liveMode,
+      remembered: wasOnCall(roomId),
+    })) {
+      return;
+    }
     autoCallStartedRef.current = true;
     enterLiveMode();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPermanentRoom, expired]);
+  }, [isPermanentRoom, expired, roomId]);
 
   const activeAmbiance = ambianceOverride ?? customization.ambiancePreset;
   const moodLabel = activeAmbiance === PLAIN_MOOD ? "Plain" : ambianceMeta(activeAmbiance).label;
