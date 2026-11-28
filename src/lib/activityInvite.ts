@@ -137,3 +137,38 @@ export function starterStatus(
   if (openedAt != null && now - openedAt <= invitingWindowMs) return "inviting";
   return null;
 }
+
+/**
+ * A readable name for an activity id, for when nothing else has one.
+ *
+ * George, of the mobile notices: "Notifications look like they're for
+ * devs. What is 'George started most_likely'.. let's adopt it to real
+ * users." The stage knows the title of everything it lists, but an id
+ * that is not on this room's dock — a squad game, in practice, since
+ * those are named per-game on presence — had nothing to be called, and
+ * the wire format went straight to the screen.
+ *
+ * The squad games get their real names; anything else becomes words, so
+ * an activity nobody has named here reads as slightly generic rather
+ * than as a bug.
+ */
+const NICE_NAMES: Record<string, string> = {
+  most_likely: "Most Likely To",
+  who_said_it: "Who Said It",
+  imposter: "Imposter",
+  spill_tea: "Spill the Tea",
+  heads_up: "Clue Me In",
+  squad_games: "the games",
+  vision_board: "the Vision Board",
+  fridge_notes: "the Fridge",
+  bookshelf: "the Bookshelf",
+  dj: "Music",
+};
+
+export function niceActivityName(id: string): string {
+  const known = NICE_NAMES[id];
+  if (known) return known;
+  const words = id.split(/[_\-\s]+/).filter(Boolean);
+  if (!words.length) return "something";
+  return words.map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
+}

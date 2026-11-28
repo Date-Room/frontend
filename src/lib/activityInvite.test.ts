@@ -3,6 +3,7 @@ import {
   INITIAL_INVITE_STATE,
   inviteHeadline,
   inviteReducer,
+  niceActivityName,
   pendingInvite,
   starterStatus,
   type InviteState,
@@ -107,5 +108,28 @@ describe("starterStatus", () => {
     expect(starterStatus(INITIAL_INVITE_STATE, "lobby", true, 0, 45_000, 0)).toBeNull();
     expect(starterStatus(INITIAL_INVITE_STATE, "vision_board", true, 0, 45_000, 0)).toBeNull();
     expect(starterStatus(INITIAL_INVITE_STATE, "questions", false, 0, 45_000, 0)).toBeNull();
+  });
+});
+
+describe("a notice is for a person, not for a log", () => {
+  // George, of the mobile notices: "Notifications look like they're for
+  // devs. What is 'George started most_likely'.. let's adopt it to real
+  // users." Web had the same fallback in the same shape — an activity
+  // the stage does not list fell through to its wire id.
+  it("gives the squad games their real names", () => {
+    expect(niceActivityName("most_likely")).toBe("Most Likely To");
+    expect(niceActivityName("heads_up")).toBe("Clue Me In");
+    expect(niceActivityName("spill_tea")).toBe("Spill the Tea");
+  });
+
+  it("and turns anything else into words", () => {
+    expect(niceActivityName("some_new_thing")).toBe("Some New Thing");
+    expect(niceActivityName("")).toBe("something");
+  });
+
+  it("never leaves an underscore in a sentence", () => {
+    for (const id of ["most_likely", "who_said_it", "vision_board", "a_b_c"]) {
+      expect(niceActivityName(id)).not.toContain("_");
+    }
   });
 });

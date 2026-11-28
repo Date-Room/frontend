@@ -104,6 +104,7 @@ import { useChatRoom } from "@/context/ChatContext";
 import {
   INITIAL_INVITE_STATE,
   inviteHeadline,
+  niceActivityName,
   inviteReducer,
   isInvitable,
   pendingInvite,
@@ -2023,7 +2024,16 @@ export function RoomStage({
         !(squadGameStaged && squadStage?.cue?.live) &&
         (() => {
           const item = items.find((i) => i.id === inviteId);
-          const title = item?.title ?? inviteId;
+          // Never the raw id.
+          //
+          // George, of the mobile notices: "Notifications look like
+          // they're for devs. What is 'George started most_likely'..
+          // let's adopt it to real users." Web has the same fallback in
+          // the same shape: an activity the stage does not list — a
+          // squad game, in practice, since those are named per-game on
+          // presence — fell through to its wire id, underscores and all.
+          // `niceActivityName` makes it words.
+          const title = item?.title ?? niceActivityName(inviteId);
           return (
             <ActivityInvite
               partnerName={squad ? (inviterName ?? partnerName) : partnerName}
