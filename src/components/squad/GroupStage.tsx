@@ -635,7 +635,31 @@ function Face({
   // exactly this reason; the squad call is where that lesson never
   // arrived. An inline style beats any stylesheet, so the decision now
   // lands.
-  const fit = () => cn("h-full w-full", fitBox.fit === "contain" && "bg-black");
+  const fit = () =>
+    cn(
+      "h-full w-full",
+      fitBox.fit === "contain" && "bg-black",
+      // My own feed is a mirror; everyone else's is a window.
+      //
+      // George: "The web camera is inverting what I see of myself. It
+      // should naturally invert what the receiver sees, since that way,
+      // it creates a true looking at me feel.. But if I raised my right
+      // hand, I want to see my right hand raised in the video feed as
+      // well."
+      //
+      // Both halves of that are one flip, in one place. A camera
+      // captures what it sees, so raising your right hand puts it on
+      // the LEFT of the frame — correct for everyone watching you, and
+      // wrong for you, because every mirror you have ever used does the
+      // opposite. So the local tile is flipped and nothing else is: what
+      // goes out on the wire is untouched, so the people you are talking
+      // to still see you the right way round.
+      //
+      // The 1:1 call has done this since it was built (RoomVideo:
+      // `isLocal ? "scale-x-[-1]"`). The squad call simply never got
+      // it, which is why this only went wrong on a squad night.
+      isMe && "scale-x-[-1]",
+    );
   const fitStyle = { objectFit: fitBox.fit } as const;
   const hasVideo =
     showVideo && isTrackReference(trackRef) && !trackRef.publication.isMuted && Boolean(trackRef.publication.track);

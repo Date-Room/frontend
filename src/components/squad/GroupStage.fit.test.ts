@@ -56,6 +56,28 @@ describe("every call tile sets object-fit where a stylesheet cannot overrule it"
     expect(video).toContain("object-fit is set inline, not as a class");
   });
 
+  it("and my own tile is a mirror, while everyone else's is a window", () => {
+    // George: "The web camera is inverting what I see of myself. It
+    // should naturally invert what the receiver sees, since that way, it
+    // creates a true looking at me feel.. But if I raised my right
+    // hand, I want to see my right hand raised in the video feed as
+    // well."
+    //
+    // A camera captures what it sees, so raising your right hand puts it
+    // on the LEFT of the frame — right for everyone watching you, wrong
+    // for you, because every mirror you have used does the opposite. One
+    // flip, on the local tile only: the wire is untouched, so the people
+    // you are talking to still see you the right way round.
+    const fit = stage.slice(stage.indexOf("const fit = () =>"), stage.indexOf("const fitStyle"));
+    expect(fit).toContain('isMe && "scale-x-[-1]"');
+    // The 1:1 call has always done it; the squad call never got it,
+    // which is why this only went wrong on a squad night.
+    expect(video).toContain('isLocal ? "scale-x-[-1]"');
+    // And it is decided by who the tile belongs to, not by a prop
+    // somebody has to remember to pass.
+    expect(stage).toContain("const isMe = id === self;");
+  });
+
   it("and the row plan still comes from the real feed shapes", () => {
     // The planner was never the broken part, but it is the other half
     // of the answer: rows sized to the feeds in them.
